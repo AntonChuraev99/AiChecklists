@@ -100,6 +100,31 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
+# ── Third-party THROWABLE names in the four -dontwarn-only namespaces above ──
+# Those libraries ship no consumer rule protecting exception names, so R8 renames each
+# throwable freely — and picks a DIFFERENT name every build. One exception therefore lands
+# in Crashlytics as a brand-new issue on every release: LeftCompositionCancellationException
+# arrived unobfuscated up to 1.16.4, as `q13` on 1.18.5 and as `p13` on 1.18.7 — three issues,
+# one bug, and a run-over-run diff that reports a "new crash" each time. Ktor's
+# HttpRequestTimeoutException does the same as `qi3` / `pi3`.
+#
+# Scoped to the namespaces that are the documented root rather than enumerating the classes
+# observed so far: the defect is a CLASS of places (any throwable in these packages), and this
+# project has twice been bitten by patching the instances instead of the invariant. It is also
+# deliberately narrower than the rejected `-keepnames class * extends java.lang.Throwable`,
+# which would publish every Throwable name in the APK to fix these four packages.
+#
+# NAMES only — members stay shrinkable and optimizable, so the cost is a handful of strings.
+# Does not affect app behaviour; it changes what Crashlytics and Amplitude can read.
+# Verify after a release build:
+#   ./gradlew :androidApp:minifyReleaseWithR8
+#   grep -i "LeftCompositionCancellationException ->" androidApp/build/outputs/mapping/release/mapping.txt
+#   # expect the name to map to ITSELF, not to a two-letter token
+-keepnames class androidx.compose.** extends java.lang.Throwable
+-keepnames class io.ktor.** extends java.lang.Throwable
+-keepnames class okhttp3.** extends java.lang.Throwable
+-keepnames class okio.** extends java.lang.Throwable
+
 # General — keep for Crashlytics deobfuscation + generics reflection
 -keepattributes Signature
 -keepattributes SourceFile,LineNumberTable
