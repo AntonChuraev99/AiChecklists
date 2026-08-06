@@ -1,0 +1,141 @@
+{
+  "run_date": "2026-07-23",
+  "prev_run": "2026-07-22",
+  "window": "7d + 30d",
+  "report_url": "https://claude.ai/code/artifact/7d659450-d640-479b-9496-bce69c27dc6b",
+  "bot_filter": "products_load_failed <= 0 (behavioral); gp:userRole NOT existing in 786722 → testers unseparable",
+  "headline": "Дельта 1 день, но структурно fix-heavy: между прошлым снапшотом и сейчас на 07-22 зашиплены vc71/72/73 в Play + chat_agent передеплоен 00020-rat. 🆕 HIGH: новая проверка purchase_failed (добавлена в скилл этот прогон) вскрыла 15% провалов buy-тапов, 56% BILLING_UNAVAILABLE — medium-conf (тестеры/эмуляторы неотделимы). Серверный empty-gemini+double-refund ПОДТВЕРЖДЁН (0 ValueError/500/refund с 00020-rat, но graceful-путь не отработал вживую). routedLayer-фикс приземляется (1.18.x thumb-down 80% атрибутировано vs 86% unknown legacy). rollout vc70→vc73 @100% но review-гейтит serving (trickle 1/5/3) → клиентские фиксы vc71/72 через краши НЕ верифицируемы. Engagement-дивергенция усилилась (сессии 2× hot, действия ниже нормы). 0 новых FATAL. A/B байт-в-байт. МЕТОДОЛОГИЯ: starter-план режет retention >~30-35д → MoM ненадёжен.",
+  "notes": [
+    "Прошлый снапшот 07-22 11:14 ПРЕДШЕСТВОВАЛ вечерней 07-22 работе (vc71/72/73 + 00020-rat) — пометил empty-gemini/language_selected/csat.source/routed_layer как OPEN, их починили ПОСЛЕ снятия.",
+    "purchase_failed: воронка хорошо инструментирована (button_clicked/completed/cancelled/failed/product_not_found + paywall_* + rc_*). Боты почти не касаются (raw16≈clean15). BILLING_UNAVAILABLE 56% = сигнатура окружений без Play-биллинга (эмулятор/dev/регион) — калибровать долю реальных юзеров ПЕРЕД фиксом.",
+    "purchase_completed=0/7д на базе ~1/нед = small-N, не обвал.",
+    "Google review гейтит device-serving новых билдов: 1.18.2(vc71)=1, 1.18.2(vc72)=5, 1.18.3(vc73)=3 события в ингесте = trickle. 'Completed 100%' = track-state, не serving.",
+    "Cloudflare observability MCP не авторизован → worker req/err-счётчики нередактируемы этот прогон (deploy-state читается). Owner может авторизовать OAuth под churaevanton@gmail.com.",
+    "MoM недостоверен: prior-30d (05-24..06-22) вернул 261 сессию (недостоверно) — starter-план truncates >~30-35д. НЕ доверять >30д-lookback запросам."
+  ],
+
+  "rollout": {
+    "production": { "version": "1.18.3", "code": 73, "status": "completed", "user_fraction": 1.0, "changed_since_prev": true, "changed_from": "vc70/1.18.1 completed@100% (07-22) → vc73/1.18.3 completed@100% (07-23)", "serving_note": "review-gated: trickle ингест 1/5/3 на vc71/72/73 → фиксы не верифицируемы через краши" },
+    "collapse": "vc71+vc72 схлопнулись в vc73 (трек хранит только последний completed release). Ожидаемо.",
+    "read_method": "edits.insert → tracks.list → edits.delete, БЕЗ commit; production releases=[{name:1.18.3, versionCodes:[73], status:completed}]",
+    "decision_open": null
+  },
+
+  "events": {
+    "session_start":            { "d30": 6934, "d30_raw": 9361, "d7": 3336, "rate_30d_day": 231, "rate_7d_day": 477, "delta": "cleaned +7.5% (6449→6934); 7d run-rate 2× (477 vs 231) = session surge" },
+    "checklist_created":        { "d30": 49, "d30_raw": 119, "d7": 8, "rate_7d_vs_30d": "70%", "delta": "cleaned +9% (45→49); 7d run-rate ниже нормы" },
+    "ai_analyze_started":       { "d30": 62, "d30_raw": 156, "d7": 8, "rate_7d_vs_30d": "55%", "delta": "cleaned +9%" },
+    "ai_analyze_completed":     { "d30": 42, "d30_raw": 90, "d7": 8, "delta": "cleaned +14%" },
+    "ai_analyze_failed":        { "d30": 19, "d30_raw": 62, "d7": 0, "rate_30d": "31% (19/62 started)", "delta": "7d fail=0 → фейлы старее в окне, недавно очистились; verify-p0 СОЗРЕЛ, улучшается" },
+    "ai_chat_message_sent":     { "d30": 309, "d30_raw": 540, "d7": 17, "rate_30d_day": 10.3, "rate_7d_day": 2.4, "delta": "flat 30d; 7d run-rate ¼ нормы (2.4 vs 10.3)" },
+    "ai_chat_response_received":{ "d30": 358, "d30_raw": 608, "d7": 24 },
+    "ai_chat_thumb_down":       { "d30": 17, "d30_raw": 26, "d7": 3, "rate_d30": "4.75% cleaned / 4.28% raw", "delta": "тик вверх с 3.9% (small-N/1-день); 1.18.x генерит 5/26" },
+    "ai_chat_thumb_up":         { "d30": 25, "d30_raw": 40 },
+    "ai_chat_feedback":         { "d30": 14, "with_text": 6, "bare": 8, "note": "канал есть (feedback/question/answer/routed_layer) но БЕЗ up/down-флага → down чисто не отфильтровать" },
+    "purchase_failed":          { "d30": 15, "d30_raw": 16, "d7": 2, "fail_rate_tap": "15.2% (15/99 button_clicked)", "reasons": { "BILLING_UNAVAILABLE": 9, "NetworkError": 3, "ItemUnavailable": 3, "StoreProblem": 1 }, "root_cause_by_country": { "BILLING_UNAVAILABLE": "9 = 100% Иран (санкции Play, commerce заблокирован, не транзактится — НЕ баг)", "ITEM_UNAVAILABLE": "3 = 100% Филиппины (fixable SKU-distribution)", "NetworkError": "3 GB/US transient", "StoreProblem": "1 AO transient" }, "verdict": "✅ РАЗОБРАНО 07-23: РЕГИОНАЛЬНО, не баг билинга/SKU/эмулятора. billing_client_ready=true 16/16, products_load_success 16/16, Play свежий, offering полный. Owner-гипотеза 'только non-trial' = конфаунд (Иран→no-trial арм; has_free_trial=true 0 кликов/165). Fixable только PH SKU. Побочно: триал никогда не флагается у buy-кнопки (утечка конверсии). GAP: has_free_trial не на purchase_failed/completed" },
+    "purchase_cancelled":       { "d30": 63, "d30_raw": 75, "note": "отдельно от failed — user-cancel, шум" },
+    "purchase_completed":       { "d30": 3, "d30_raw": 4, "d7": 0, "note": "small-N, 0/7д не обвал" },
+    "purchase_button_clicked":  { "d30": 99, "d30_raw": 114 },
+    "mcp_session_started":      { "exists": true, "d30": 5 },
+    "mcp_tool_called":          { "exists": true, "d30": 10 }
+  },
+
+  "event_props": {
+    "checklist_created.source": { "ai": 88, "manual": 26, "template": 3, "chat": 1, "gallery": 1, "weekly": 0, "attachment": 0, "_basis": "30d raw", "delta": "пропорции unchanged; AI ~74%" },
+    "csat_shown.version":       { "pre_1_18": 23, "1.18.x": 6, "_basis": "30d raw=29", "delta": "1.18.x теперь ~21% показов (было ~все pre-1.18)" },
+    "csat_shown.trigger_event": { "ai_analyze_completed": 12, "ai_chat_preview_confirmed": 9, "fill_completed": 4, "(none)": 2, "checklist_milestone": 1, "share_checklist": 1 },
+    "ai_chat_thumb_down.routed_layer_by_version": { "legacy_<=1.17": "18 unknown / 3 FullChat (86% unknown)", "1.18.x": "4 FullChat / 1 unknown (80% attributed)", "verdict": "routedLayer-фикс vc72 ПРИЗЕМЛЯЕТСЯ; все атрибутированные = FullChat/L3" }
+  },
+
+  "dead_instrumentation": {
+    "language_selected": { "exists": false, "zero_kind": "нет данных (code-shipped)", "note": "код зашит vc71/72, клиенты в review → событие не дошло. Было 'не меряется', теперь 'code-shipped, data-absent pending rollout'" },
+    "csat_dismissed.source": { "exists": false, "zero_kind": "нет данных (code-shipped)", "note": "vc71 source-проп не в таксономии (только had_rating) → silent-dismiss заблокирован до раскатки" },
+    "free_trial_start": { "exists": true, "zero_kind": "не меряется", "note": "🆕 0/30д при rc_trial_started_event=6 → client event dead/unwired, сигнал несёт RC-webhook" },
+    "mcp_tool_failed":  { "exists": false, "zero_kind": "не меряется" },
+    "folder_deleted":   { "exists": false, "zero_kind": "не меряется", "note": "created/renamed/toggled есть, delete нет" },
+    "template_used":    { "exists": false, "zero_kind": "не меряется" },
+    "template_previewed": { "exists": false, "zero_kind": "не меряется" },
+    "attachment_added": { "exists": false, "zero_kind": "не меряется", "note": "только attachment_load_failed" }
+  },
+
+  "crashes": {
+    "_ingest_new_versions": "1.18.2(vc71)=1ev, 1.18.2(vc72)=5ev, 1.18.3(vc73)=3ev — trickle (review-gated) = нет данных, не 'чисто'",
+    "fatal_new": 0, "new_any_type_real": 0,
+    "bbfc1375": { "title": "ANR NavDisplay/ConstraintTrackingWorker", "firstSeenVer": "1.18.3", "events": "1/1", "verdict": "cold-start семья, vivo 1906 Android11, blameFrame=SYSTEM — НЕ регрессия 1.18.3; cold-start ANR класс не исчез" },
+    "2018d810": { "title": "SyncRepository Not authenticated", "delta": "19→30ev, 5→7users (РОС)", "verdict": "our-code log-noise benign self-healing; фикс vc71 5ab08133 не верифицируем (билд не крутится)" },
+    "9775ecb7": { "title": "libsqliteJni FATAL", "delta": "29→0ev (aged out)", "verdict": "device-side, spread не рос" },
+    "ddc8be1f": { "title": "registerPushToken NoTransformation", "delta": "6→4ev", "verdict": "our-bug, фикс vc71 не экспонирован, падает естественно" },
+    "8695b359": { "title": "registerUser NoTransformation", "delta": "2→1ev", "verdict": "our-bug, same" },
+    "52217411": { "title": "ZoneOffset desugaring FATAL", "events_30d": 1, "verdict": "our-bug fix vc68 держит, 0 на >=1.18" },
+    "7ddb0bb0": { "absent": true, "verdict": "fix держит, замкнут на 1.17.16" },
+    "f037e7c0": { "title": "IncompatibleClassChange FATAL", "events_30d": 4, "verdict": "device-side SM-G998N unchanged" },
+    "422524_cluster": { "verdict": "network benign (DNS/UnknownHost/Socket ~153+133+48)" },
+    "cold_start_anr_cluster": { "verdict": "our-startup low; RevenueCat/WorkManager/Firebase init main-thread; vc72 ANR-фикс не верифицируем (trickle) + 1.18.3 уже дал 1 cold-start ANR" }
+  },
+  "crashes_summary": { "fatal_new": 0, "play_vitals": "0 строк = не меряется (ниже порога ~470)" },
+
+  "backend": {
+    "_window": "2026-07-16..2026-07-23",
+    "verdict": "Сервер чист. Все 5xx = 503 transient + 1 стареющая pre-fix ValueError. 0 новых our-bugs.",
+    "chat_agent_fixes_00020_rat": { "active_rev": "chat-agent-00020-rat @100% (07-22T06:44)", "empty_gemini": "0 ValueError на 00019/00020; единственное на pre-fix 00015-qox 07-16, выпадет 07-24", "double_refund": "0 refund-строк; interim 00019-yax жил 18мин 0 err → throw-after-refund не сработал", "caveat": "graceful-degrade НЕ отработал вживую (пустого кандидата не было) → подтверждён негативно" },
+    "chat_agent": { "invocations": 120, "err_5xx": 1, "rate": 0.0083, "delta": "dead_model_404 ×4 aged out (предсказано)" },
+    "generate_checklist": { "invocations": 26, "err_5xx": 2, "rate": 0.077, "verdict": "transient 503 noise" },
+    "classify_chat_intent": { "invocations": 49, "err": "3×400 client", "memory_244mib": "@00017-zef 07-18, НЕ повторилась → fading, не bump-memory" },
+    "register_push_token": { "invocations": 962, "errors": 0 },
+    "watch": { "gemini_2_5_EOL": "2026-10-16 (on-rc-event-created 00002-kam печатает google.generativeai FutureWarning, мигрировать на google-genai)", "firestore_positional_filter": "🆕 хронический UserWarning register-user 86× — benign log-noise, .where()→FieldFilter" },
+    "workers": { "gisti_landing": { "deploy": "07-22 ece9efdd, sitemap 124→196 URL (templates-unify live)", "counts": "не читаемы (observability MCP не авторизован)" }, "checklists": { "deploy": "07-22 d7b9e284 (CI master-push)" }, "gisti_mcp": { "state": "401 auth-gate жив, unchanged" } }
+  },
+
+  "ab": {
+    "_delta_vs_prev": "NONE. 3 слоя байт-в-байт (client RC v20 06-18 / server RC / Firestore 07-09). 4 running-эксперимента те же +1д.",
+    "running": { "PaywallsV1_#2": "74д", "CurrentOfferTrial_#6": "38д", "activation_bundle_v1_#7": "35д", "OnboardingABC_#8": "29д", "ai_model_arm": "server 50/50 control gemini-2.5-* EOL 10-16", "push_ab_arm": "33/33/34 доставка сломана" },
+    "forgotten_intentional": "4 revenue-objective — ADR 2026-07-15, НЕ перерешивать",
+    "cleanup": { "templates_json": "🆕 дважды-мёртв: вырезан из кода 07-22 но всё ещё в client RC template (шлёт stale JSON) → удалить ключ из RC", "gemini_2_5_EOL": "ai_model_arm control на gemini-2.5-* EOL 2026-10-16, ручной split без экспы-сторожа", "doc_lag": "ab-tests-overview §7 всё ещё 'код 4 vs live 5' — stale (код 5)", "first_checklist_variant": "поправка: есть в template (100% дефолт), 'code-only' был неточен" }
+  },
+
+  "csat": {
+    "shown_d30": 16, "shown_d30_raw": 29, "rating_selected_d30": 9, "submitted_d30": 2, "review_completed_d30": 4, "chip_toggled": 0,
+    "by_version": "1.18.x ~21% показов (NEW, было ~все pre-1.18)",
+    "verdict": "гипотеза ×4-8 держится (не перерешивать); dismissed считает оба входа → не делить в лоб; csat_dismissed.source ещё не в таксономии (vc71 в review)"
+  },
+
+  "chat_feedback_texts": {
+    "actionable_bugs": [
+      { "fb": "Неправильно взял текст", "q": "добавь в ai чек-лист пункт тест", "layer": "L1 parser", "bug": "выхватил не ту подстроку пункта", "route": "/ai-chat-feedback-fixer red-репро (не лексикон)" },
+      { "fb": "Не добавил в папку", "q": "добавь в апки в папку баги такой пункт", "layer": "L1/L2", "bug": "таргетинг папки: пункт в список, не в папку", "route": "/ai-chat-feedback-fixer" },
+      { "fb": "Баг", "q": "Что мне сделать сегодня?", "layer": "L1", "bug": "intent-мисфайр: вопрос как lookup пункта", "route": "/ai-chat-feedback-fixer guard эскалации (ADR-случай, не лексикон)" }
+    ],
+    "verdict_fixer": "точечный заход /ai-chat-feedback-fixer на 3 парсер/intent-бага оправдан; массовый — нет (86% старого блоба без слоя рассосётся, ждать негатив на 1.18.x)"
+  },
+
+  "verification_records": {
+    "_source": "docs/active/prod-fixes-verification-2026-07-15.md",
+    "_result_this_run": "2 confirmed (thought-signature, allowlist — residual probe aged out сегодня 07-23 → литеральный 0). Остальные too-early (earliest 07-24/27/31 не наступили) или manual→hands. 0 refuted. Доку НЕ правил (нет pending с наступившим earliest).",
+    "thought-signature-fixed": "confirmed (держится)",
+    "allowlist-dead-models": "confirmed (residual 4 probe выпали 07-23 → 0)",
+    "gallery-source-tracking-android": "too-early (пересверка ~07-27)",
+    "csat-contamination-watch": "too-early (earliest 07-24 завтра)",
+    "sync-legacy-cloudid": "too-early (earliest 07-31)",
+    "play-referrer-attribution": "too-early, НЕ hands: GCS-queryable (stats/store_performance/…_traffic_source.csv, gcloud storage под gmail, UTF-16; Reporting API 404=vitals-only). 0 названного utm_source=gallery через 07-16 (GCS лаг ~нед), согласуется с 0 органики. Re-pull ~07-24+ для хвоста",
+    "sync-reminder-fullscreen": "pending/manual → hands (2-девайсная проверка, vc73 несёт a1bb89bd)",
+    "_new_fixes_need_records": "empty-gemini+double-refund (07-22) + routedLayer/csat-source/language_selected — стоит завести verification-блок в release-1.18.2-followups"
+  },
+
+  "owner_hands": [
+    "purchase_failed — РАЗОБРАНО (регион, не hands). Осталось: PH SKU-distribution check в Play Console (fixable, N=3) + опц. region-block UX для commerce-blocked (Иран). НЕ billing-баг",
+    "sync-reminder-fullscreen — 2-девайсная ручная проверка флага на пуле (vc73 несёт a1bb89bd) — единственный настоящий hands",
+    "(опц.) авторизовать Cloudflare observability MCP под churaevanton@gmail.com → разблокирует worker req/err-дельты"
+  ],
+  "_play_referrer_NOT_hands": "traffic-source/UTM queryable через GCS stats/store_performance (агент достаёт сам); 0 gallery через 07-16, re-pull ~07-24+",
+
+  "todos_ripe": ["2026-07-09-verify-p0-fixes-metrics (14д, ai_analyze_failed 31% 30d но 0 7d — улучшается)"],
+  "todos_moot": ["2026-07-14-promote-vc67-rollout (vc67/1.17.17 вытеснен vc73@100% → предложить resolved)"],
+  "todos_not_ripe": ["aichat-l1-thumbsdown (0 негативов на 1.18.x)", "csat-dismiss-tuning (~08-05)", "comeback-phase-b (Phase A копится)"],
+
+  "deltas_this_run": {
+    "fix_confirmed": ["server empty-gemini + double-refund (00020-rat, deploy+log level)", "routedLayer landing (analytics-side, 1.18.x 80% attributed)", "allowlist residual probe aged out → literal 0"],
+    "new": ["🆕 HIGH purchase_failed 15% fail-rate 56% BILLING_UNAVAILABLE (medium-conf, new check)", "methodology: MoM unreliable (starter-plan >30d truncation)", "free_trial_start dead/unwired", "firestore positional-filter chronic log-noise"],
+    "shifted": ["rollout vc70/1.18.1 → vc73/1.18.3 @100% (review-gated trickle)", "engagement divergence sharper (sessions 2× hot, actions below rate)", "2018d810 sync 5→7 users (benign)", "9775ecb7 libsqlite 29→0 aged out", "chat thumb-down 3.9%→4.75% (small-N)", "csat 1.18.x contributes 21% shows"],
+    "unchanged": ["A/B 3 слоя байт-в-байт", "0 новых FATAL", "сервер иначе чист", "CSAT ×4-8 держится"]
+  }
+}

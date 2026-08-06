@@ -86,9 +86,22 @@ composeApp/release/
 hosting/.firebase/
 
 # Docs (local working notes, some contain API keys)
-docs/
+# `docs/*` rather than `docs/` so a subdirectory can be re-included below: git never
+# descends into an excluded DIRECTORY, so a bare `docs/` makes any later `!docs/...`
+# rule unreachable.
+docs/*
 # Business-sensitive pricing/geo-growth strategy — keep out of public repo even if docs/ is ever un-ignored
 docs/pricing-strategy.md
+
+# Exception: /healthcheck snapshots are tracked. They are the baseline the skill diffs each
+# run against — untracked, they live in exactly one working copy and a reinstall loses the
+# history. Scanned before un-ignoring (2026-08-06): no API keys, tokens or private keys;
+# third-party account names, user ids and IP/subnet strings are redacted. The owner's own
+# address stays as-is — it is already the public author email on every commit here.
+# Everything else under docs/healthcheck/ (report.html, seen.json) stays ignored.
+!docs/healthcheck/
+docs/healthcheck/*
+!docs/healthcheck/snapshot-*.json
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 
