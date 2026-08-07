@@ -12,6 +12,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Repea
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.PendingItemAttachment
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 
 /**
@@ -102,13 +104,6 @@ data class MoveTargetUiModel(
     val enabled: Boolean,
     val isCurrentParent: Boolean,
 )
-
-/**
- * Which item-create reminder preset chip is currently active. The four reminder chips are
- * single-select among themselves; [CUSTOM] is set when the user resolves a time via the
- * "Pick time…" date/time picker (the chip then shows the absolute datetime).
- */
-enum class ItemCreateReminderPreset { ONE_HOUR, TOMORROW_MORNING, TONIGHT, CUSTOM }
 
 sealed interface ChecklistDetailState : State {
     data object Loading : ChecklistDetailState
@@ -273,19 +268,6 @@ sealed interface ChecklistDetailState : State {
 data class AttachmentViewerState(
     val itemId: String,
     val initialAttachmentId: String,
-)
-
-/**
- * A file picked in item-create mode BEFORE the item exists. Held in
- * [ChecklistDetailState.Content.itemCreatePendingAttachments] and written to the freshly created
- * item on Send (see [ChecklistDetailIntent.OnAddItemWithParse]); dropped on exit-without-create.
- * [sourcePath] is the raw picker result path (rendered directly by Coil in the preview strip — it is
- * NOT yet a stored/synced attachment path).
- */
-data class PendingItemAttachment(
-    val sourcePath: String,
-    val fileName: String,
-    val mimeType: String?,
 )
 
 sealed interface ChecklistDetailIntent : Intent {

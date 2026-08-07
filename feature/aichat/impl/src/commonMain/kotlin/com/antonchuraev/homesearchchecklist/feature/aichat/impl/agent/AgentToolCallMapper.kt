@@ -36,6 +36,7 @@ internal object AgentToolCallMapper {
      * - `find_items`        → [ToolCall.FindItemsQuery] (null if query blank)
      * - `read_checklist`    → [ToolCall.ReadChecklist]  (null if name blank)
      * - `clear_completed_items` → [ToolCall.ClearCompleted] (checklist_hint optional → null)
+     * - `move_item`         → [ToolCall.MoveItem]     (null if item_text or to_checklist_hint blank)
      * - anything else       → null
      */
     fun map(agentToolCall: AgentToolCall): ToolCall? {
@@ -117,6 +118,18 @@ internal object AgentToolCallMapper {
                 val name = args.stringOrNull("name") ?: return null
                 if (name.isBlank()) return null
                 ToolCall.ReadChecklist(name = name)
+            }
+
+            "move_item" -> {
+                val itemText = args.stringOrNull("item_text") ?: return null
+                val toHint = args.stringOrNull("to_checklist_hint") ?: return null
+                ToolCall.MoveItem(
+                    itemText = itemText,
+                    toChecklistHint = toHint,
+                    // Absent → the client fills the SOURCE from the screen context (the Inbox on
+                    // the v2 Inbox / day tabs); it is never guessed by name.
+                    fromChecklistHint = args.stringOrNull("from_checklist_hint"),
+                )
             }
 
             "clear_completed_items" ->

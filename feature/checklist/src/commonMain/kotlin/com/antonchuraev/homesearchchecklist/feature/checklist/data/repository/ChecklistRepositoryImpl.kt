@@ -31,8 +31,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 class ChecklistRepositoryImpl(
@@ -693,15 +693,31 @@ class ChecklistRepositoryImpl(
     // The one visible artefact is `checklistName` reading "Inbox" on such a row, which is accurate.
 
     override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> {
-        // Combine the checklists flow with all default fills flow to react to any change.
-        // We cannot do a simple SQL query for per-item reminders because items are stored
-        // as JSON (not individual columns), so we scan in-memory.
+        // We cannot express per-item reminders as a SQL predicate — fill items are stored as one JSON
+        // blob per row, not as columns — so both tables are scanned in memory on every tick.
+        //
+        // BOTH sources must be OBSERVABLE queries. This used to read the fills through
+        // `flow { emit(fillDao.getAllDefaultFills()) }`, which looks like "the fills, as a flow" and is
+        // not: that flow completes after one emission, and `combine` then keeps serving that first
+        // snapshot for the whole subscription. Per-item reminders live ONLY inside fill rows, so a task
+        // captured from the Today/Calendar dock could never enter the list — the checklists half kept
+        // ticking (updateFill touches the parent for sync), the transform kept re-running against the
+        // frozen fills, and the screen recomputed the same empty list. It only "fixed itself" after
+        // leaving the tab for >5 s, i.e. once WhileSubscribed(5000) dropped the subscription and the
+        // one-shot ran again. Covered by ChecklistRepositoryImplTest
+        // `observeRemindersInRange_itemReminderCapturedWhileSubscribed_reEmitsWithTheNewTask`.
         return combine(
             checklistDao.observeChecklists(),
-            flow { emit(fillDao.getAllDefaultFills()) }
+            fillDao.observeAllDefaultFills(),
         ) { checklistEntities, fillEntities ->
             buildRemindersInRange(checklistEntities, fillEntities, fromMs, toMs)
         }
+            // Two observable sources mean a single capture ticks this twice (the fill insert, then the
+            // parent touch that updateFill does for sync), and most writes to either table change
+            // nothing inside the window at all. TodayReminderInfo is a data class, so an equal list is
+            // by definition nothing new to draw — dropping it keeps both tabs off the recomposition
+            // treadmill without ever hiding a real change.
+            .distinctUntilChanged()
     }
 
     override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> {

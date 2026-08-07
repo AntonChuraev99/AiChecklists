@@ -116,6 +116,32 @@ class AgentToolResultSerializerTest {
         assertNull(json["details"])
     }
 
+    @Test
+    fun notFound_blockedMove_carriesAMachineReason() {
+        // Without `reason` a refused move is byte-identical to a missing item, so the model tells
+        // the user "I couldn't find that task" about a row they can see, and the translated
+        // explanation (chat_dispatch_move_blocked) reaches no surface at all — MoveItem is
+        // agent-only, so its messageKey dies in this serializer.
+        val outcome = DispatchOutcome.NotFound(
+            messageKey = "chat_dispatch_move_blocked",
+            args = listOf("Call the bank"),
+        )
+        val json = AgentToolResultSerializer.serialize(outcome)
+        assertEquals("not_found", json["status"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("move_blocked", json["reason"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun notFound_ordinaryKey_carriesNoReason() {
+        // The allowlist is the point: adding a field to every result would change what the CONTROL
+        // arm's model receives during a live A/B.
+        val outcome = DispatchOutcome.NotFound(
+            messageKey = "chat_dispatch_item_not_found",
+            args = listOf("milk", "Shopping"),
+        )
+        assertNull(AgentToolResultSerializer.serialize(outcome)["reason"])
+    }
+
     // ─── AmbiguousMatch ───────────────────────────────────────────────────────
 
     @Test

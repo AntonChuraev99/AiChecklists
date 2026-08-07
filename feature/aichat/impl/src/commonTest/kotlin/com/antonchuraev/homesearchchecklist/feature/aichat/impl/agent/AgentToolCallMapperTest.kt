@@ -401,6 +401,56 @@ class AgentToolCallMapperTest {
         assertNull(AgentToolCallMapper.parseIsoToEpochMs("not-a-date"))
     }
 
+    // ─── move_item ────────────────────────────────────────────────────────────
+
+    @Test
+    fun moveItem_withoutFromHint_leavesTheSourceForTheScreenContext() {
+        val result = AgentToolCallMapper.map(
+            agentCall("move_item", buildJsonObject {
+                put("item_text", "Call the bank")
+                put("to_checklist_hint", "Errands")
+            }),
+        )
+
+        val move = assertIs<ToolCall.MoveItem>(result)
+        assertEquals("Call the bank", move.itemText)
+        assertEquals("Errands", move.toChecklistHint)
+        // Absent from_checklist_hint must NOT be invented: the client fills the source from the
+        // screen the dock is open over, which on the Inbox tab is a list no name can reach.
+        assertNull(move.fromChecklistHint)
+        assertNull(move.fromChecklistId)
+    }
+
+    @Test
+    fun moveItem_withFromHint_keepsBothEnds() {
+        val result = AgentToolCallMapper.map(
+            agentCall("move_item", buildJsonObject {
+                put("item_text", "Call the bank")
+                put("to_checklist_hint", "Errands")
+                put("from_checklist_hint", "Work")
+            }),
+        )
+
+        val move = assertIs<ToolCall.MoveItem>(result)
+        assertEquals("Work", move.fromChecklistHint)
+    }
+
+    @Test
+    fun moveItem_missingDestination_mapsToNull() {
+        // A move with no destination is not a move; null makes the agent loop return an error
+        // function_response so the model can self-correct instead of half-executing.
+        assertNull(
+            AgentToolCallMapper.map(
+                agentCall("move_item", buildJsonObject { put("item_text", "Call the bank") }),
+            ),
+        )
+        assertNull(
+            AgentToolCallMapper.map(
+                agentCall("move_item", buildJsonObject { put("to_checklist_hint", "Errands") }),
+            ),
+        )
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private fun agentCall(name: String, args: kotlinx.serialization.json.JsonObject) =

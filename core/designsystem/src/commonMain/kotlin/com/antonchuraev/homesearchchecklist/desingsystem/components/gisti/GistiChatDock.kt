@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -119,6 +120,10 @@ fun GistiChatDock(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
+                // Ellipsis, not the default Clip: this label carries a user-supplied checklist
+                // name ("Ask about …"), so a long one is cut mid-glyph at the weight(1f) boundary
+                // and reads as a rendering bug rather than as truncation.
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
 

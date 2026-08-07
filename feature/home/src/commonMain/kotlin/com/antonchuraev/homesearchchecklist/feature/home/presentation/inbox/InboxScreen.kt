@@ -14,9 +14,11 @@ import aichecklists.core.designsystem.generated.resources.inbox_empty_descriptio
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
 import aichecklists.core.designsystem.generated.resources.inbox_list_actions
 import aichecklists.core.designsystem.generated.resources.inbox_menu_open_checklist
+import aichecklists.core.designsystem.generated.resources.inbox_open_project_action
 import aichecklists.core.designsystem.generated.resources.inbox_project_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
 import aichecklists.core.designsystem.generated.resources.inbox_task_count
+import aichecklists.core.designsystem.generated.resources.inbox_task_sheet_move
 import aichecklists.core.designsystem.generated.resources.inbox_title
 import aichecklists.core.designsystem.generated.resources.save
 import androidx.compose.foundation.background
@@ -46,6 +48,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
@@ -76,6 +79,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,12 +98,27 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxLayout
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerResult
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.AttachmentFullscreenViewer
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ItemDetailsSheet
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ItemDetailsSheetRow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NoteDialog
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionSheet
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.rememberNotificationPermissionRequester
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -155,6 +174,9 @@ fun InboxScreen(
     createDockOpen: Boolean,
     onCreateDockDismiss: () -> Unit,
     homeSignal: Int = 0,
+    /** See [InboxRoute] — hoisted to the shell because this entry does not survive a pushed route. */
+    anchorChecklistId: Long? = null,
+    onAnchorChecklistChanged: (Long?) -> Unit = {},
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.INBOX) }
@@ -226,10 +248,24 @@ fun InboxScreen(
             val pages = content?.pages
             if (createDockOpen && content != null && !pages.isNullOrEmpty()) {
                 QuickCaptureDock(
-                    text = content.quickAddText,
+                    text = content.draft.text,
                     onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
                     onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
                     placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
+                    // The same chip row the checklist detail screen has always had. Until now this
+                    // dock was a bare text field, so a capture made on the home tab could carry no
+                    // reminder and no priority — the surface the user reaches FIRST was the weakest.
+                    //
+                    // Pick-time and Repeat stay off: both open sheets that only the detail screen
+                    // hosts, and a chip that swallows its tap is worse than an absent one.
+                    aboveInput = {
+                        TaskCreateChipsRow(
+                            draft = content.draft,
+                            onAction = { onIntent(InboxIntent.OnCreateChipAction(it)) },
+                            showPickTime = false,
+                            showRepeat = false,
+                        )
+                    },
                 )
             }
         },
@@ -253,6 +289,8 @@ fun InboxScreen(
                     contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
                     onIntent = onIntent,
                     homeSignal = homeSignal,
+                    anchorChecklistId = anchorChecklistId,
+                    onAnchorChecklistChanged = onAnchorChecklistChanged,
                 )
 
                 // Tap-outside-to-dismiss for the capture dock. Deliberately NOT dimmed: the dock is a
@@ -282,17 +320,7 @@ fun InboxScreen(
     // screen's ItemDetailsSheet placement.
     if (content != null) {
         val page = content.pages.getOrNull(content.selectedPage)
-        val sheetTask = page?.tasks?.firstOrNull { it.fillItemId == content.sheetForTaskId }
-        if (page != null && sheetTask != null) {
-            InboxTaskSheet(
-                task = sheetTask,
-                isProjectPage = !page.isInbox,
-                projectId = page.checklistId,
-                moveTargets = content.moveTargets,
-                movePickerOpen = content.movePickerOpen,
-                onIntent = onIntent,
-            )
-        }
+        InboxItemSheetHost(content = content, onIntent = onIntent)
 
         content.renameDraft?.let { draft ->
             RenameChecklistDialog(
@@ -313,6 +341,236 @@ fun InboxScreen(
 
         if (content.displayOptionsOpen) {
             InboxDisplayOptionsSheet(options = content.displayOptions, onIntent = onIntent)
+        }
+    }
+}
+
+/**
+ * Every surface the per-task item sheet raises, in one place.
+ *
+ * The sheet itself is the checklist detail screen's [ItemDetailsSheet] — the SAME composable, not a
+ * copy. That is the whole point of this host: the Inbox used to draw a four-row look-alike (move,
+ * priority, open project, delete), so the screen the v2 user reaches FIRST offered three actions
+ * where the screen one tap deeper offered a dozen. Reusing the real sheet means reminder, note,
+ * open-link, attachments and inline rename arrive here for free — and stay in step forever, because
+ * there is only one of them.
+ *
+ * [ItemDetailsSheet] renders rows only; each row's target surface belongs to its host. All of them
+ * are wired below (reminder sheet, note dialog, date/time picker, notification-permission sheet,
+ * file pickers, fullscreen viewer) — a row whose surface is missing is a tap that does nothing, which
+ * is worse than an absent row.
+ *
+ * ## Why the sub-surfaces REPLACE the sheet instead of stacking on it
+ * Two simultaneous `ModalBottomSheet`s fight over the scrim and Android's predictive-back gesture.
+ * The detail screen sidesteps this by making its item sheet and its reminder sheet mutually
+ * exclusive; here the same is done by [subSurfaceOpen], with one improvement: the task id survives,
+ * so dismissing a sub-surface returns to the item sheet instead of closing everything.
+ */
+@Composable
+private fun InboxItemSheetHost(
+    content: InboxScreenState.Content,
+    onIntent: (InboxIntent) -> Unit,
+) {
+    // Searched across ALL pages, not just the selected one: a sync can shift the pager under an open
+    // sheet, and looking the row up by index would then render a different task's data into it.
+    val task = content.sheetForTaskId?.let { id ->
+        content.pages.firstNotNullOfOrNull { page -> page.tasks.firstOrNull { it.fillItemId == id } }
+    }
+    val page = content.sheetForTaskId?.let { id ->
+        content.pages.firstOrNull { p -> p.tasks.any { it.fillItemId == id } }
+    }
+
+    // ── Attachment pickers ───────────────────────────────────────────────────────────────────
+    // Composed unconditionally (this host is called for every Content state) so the launcher is
+    // still registered when the picker Activity returns. On wasmJs a picker callback captures
+    // Compose state at composition time, so both `onIntent` and the pending id are read through
+    // rememberUpdatedState — the stale-closure trap this project has hit before.
+    val latestOnIntent by rememberUpdatedState(onIntent)
+    val pendingAttachmentTaskId by rememberUpdatedState(content.pendingAttachmentTaskId)
+    val logger: AppLogger = koinInject()
+
+    val onPicked: (String, FilePickerResult?) -> Unit = { launchedIntentTag, result ->
+        val taskId = pendingAttachmentTaskId
+        if (taskId == null) {
+            // Never silent: a dropped result looks exactly like a picker that did nothing.
+            logger.warning("InboxAttachments", "$launchedIntentTag: no pending task — result dropped")
+        } else if (result != null) {
+            latestOnIntent(
+                InboxIntent.OnAttachmentPicked(
+                    taskId = taskId,
+                    sourcePath = result.filePath,
+                    fileName = result.fileName,
+                    mimeType = result.mimeType,
+                )
+            )
+        }
+    }
+
+    val imagePicker = rememberFilePickerLauncher(type = FilePickerType.IMAGE) { result ->
+        latestOnIntent(InboxIntent.OnImagePickerLaunched)
+        onPicked("image picker", result)
+    }
+    val filePicker = rememberFilePickerLauncher(type = FilePickerType.ANY) { result ->
+        latestOnIntent(InboxIntent.OnFilePickerLaunched)
+        onPicked("file picker", result)
+    }
+    LaunchedEffect(content.triggerImagePicker) {
+        if (content.triggerImagePicker) imagePicker.launch()
+    }
+    LaunchedEffect(content.triggerFilePicker) {
+        if (content.triggerFilePicker) filePicker.launch()
+    }
+
+    if (task == null) return
+
+    // ONE surface at a time, arbitrated by a pure function so the "never two modals" rule is pinned
+    // by a test rather than by the order of the `if`s below.
+    val surface = resolveItemSheetSurface(content, taskFound = true)
+
+    if (surface == InboxItemSheetSurface.ITEM_SHEET) {
+        ItemDetailsSheet(
+            item = task.item,
+            isEditingText = content.sheetTextEditing,
+            editingTextDraft = content.sheetTextDraft,
+            onStartTextEdit = { onIntent(InboxIntent.OnTaskTextEditStart) },
+            onTextDraftChange = { onIntent(InboxIntent.OnTaskTextDraftChanged(it)) },
+            onConfirmTextEdit = { onIntent(InboxIntent.OnTaskTextEditConfirm) },
+            onReminderClick = { onIntent(InboxIntent.OnTaskReminderClick) },
+            onNoteClick = { onIntent(InboxIntent.OnTaskNoteClick) },
+            onTogglePriority = { onIntent(InboxIntent.OnToggleImportant) },
+            onDelete = { onIntent(InboxIntent.OnDeleteTask) },
+            onDismiss = { onIntent(InboxIntent.OnTaskSheetDismiss) },
+            onAttachmentClick = { id -> onIntent(InboxIntent.OnAttachmentClick(id)) },
+            onAddImageClick = { onIntent(InboxIntent.OnAddImageAttachment) },
+            onAddFileClick = { onIntent(InboxIntent.OnAddFileAttachment) },
+            canAddAttachment = content.canAddAttachment(task.item.attachments.size),
+            hostActions = {
+                // "Move to project" — the row this round exists to add. Offered on every page: from
+                // the Inbox it is triage, from a project it is a re-file.
+                ItemDetailsSheetRow(
+                    icon = Icons.AutoMirrored.Outlined.DriveFileMove,
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    title = stringResource(Res.string.inbox_task_sheet_move),
+                    subtitle = null,
+                    showChevron = true,
+                    onClick = { onIntent(InboxIntent.OnMovePickerOpen) },
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // "Open project" — carried over from the sheet this replaced. Only on project pages:
+                // the system Inbox page has no detail screen to open.
+                if (page != null && !page.isInbox) {
+                    ItemDetailsSheetRow(
+                        icon = Icons.Outlined.ChecklistRtl,
+                        iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        title = stringResource(Res.string.inbox_open_project_action),
+                        subtitle = null,
+                        showChevron = true,
+                        onClick = { onIntent(InboxIntent.OnOpenProject(page.checklistId)) },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            },
+        )
+    }
+
+    if (surface == InboxItemSheetSurface.MOVE_PICKER) {
+        InboxMoveProjectPicker(moveTargets = content.moveTargets, onIntent = onIntent)
+    }
+
+    content.noteDraft?.takeIf { surface == InboxItemSheetSurface.NOTE_DIALOG }?.let { draft ->
+        NoteDialog(
+            note = draft,
+            onNoteChanged = { onIntent(InboxIntent.OnTaskNoteDraftChanged(it)) },
+            onDismiss = { onIntent(InboxIntent.OnTaskNoteDismiss) },
+            onConfirm = { onIntent(InboxIntent.OnTaskNoteSave) },
+        )
+    }
+
+    // Asked BEFORE the reminder sheet is usable: on Android 13+ an alarm scheduled without the
+    // notification permission is posted and dropped, so the user would be told a reminder is set and
+    // never hear it.
+    if (surface == InboxItemSheetSurface.NOTIFICATION_PERMISSION) {
+        val requestPermission = rememberNotificationPermissionRequester { granted ->
+            onIntent(InboxIntent.OnNotificationPermissionResult(granted))
+        }
+        NotificationPermissionSheet(
+            onEnableClick = requestPermission,
+            onSkip = { onIntent(InboxIntent.OnNotificationPermissionSkip) },
+            onDismiss = { onIntent(InboxIntent.OnNotificationPermissionSkip) },
+        )
+    }
+
+    // The same shared ReminderSheet the detail screen opens for a per-item reminder — once/repeat
+    // tabs, full-screen delivery toggle, calendar export, free-tier locked banner.
+    //
+    // Held back while the permission sheet or the date picker is up: all three are modal, and the
+    // ViewModel keeps `reminderSheet` non-null across both so their state (notably the full-screen
+    // toggle) survives and dismissing them lands back here instead of closing everything.
+    content.reminderSheet?.takeIf { surface == InboxItemSheetSurface.REMINDER_SHEET }?.let { reminder ->
+        ReminderSheet(
+            state = ReminderSheetState(
+                activeTab = reminder.tab,
+                currentReminder = task.item.reminderAt,
+                currentRepeatRule = task.item.repeatRule,
+                repeatRuleSummary = reminder.repeatRuleSummary,
+                pendingRepeatConfig = reminder.pendingRepeatConfig,
+                showEndConditionPicker = reminder.showEndConditionPicker,
+                isLocked = reminder.locked,
+                showFullScreenOption = true,
+                fullScreenEnabled = reminder.fullScreen,
+            ),
+            callbacks = ReminderSheetCallbacks(
+                onTabSelected = { onIntent(InboxIntent.OnReminderTabSelected(it)) },
+                onPresetSelected = { onIntent(InboxIntent.OnReminderPresetSelected(it)) },
+                onCustomDateRequested = { onIntent(InboxIntent.OnCustomDateRequested) },
+                onRemoveReminder = { onIntent(InboxIntent.OnReminderRemove) },
+                onRepeatTypeSelected = { onIntent(InboxIntent.OnRepeatTypeSelected(it)) },
+                onSmartPresetSelected = { onIntent(InboxIntent.OnSmartPresetSelected(it)) },
+                onRepeatIntervalChanged = { onIntent(InboxIntent.OnRepeatIntervalChanged(it)) },
+                onWeekDayToggled = { onIntent(InboxIntent.OnWeekDayToggled(it)) },
+                onResetChecksToggled = { onIntent(InboxIntent.OnResetChecksToggled(it)) },
+                onRepeatTimeChanged = { h, m -> onIntent(InboxIntent.OnRepeatTimeChanged(h, m)) },
+                onEndConditionClick = { onIntent(InboxIntent.OnEndConditionClick) },
+                onEndConditionSelected = { onIntent(InboxIntent.OnEndConditionSelected(it)) },
+                onDismissEndCondition = { onIntent(InboxIntent.OnEndConditionDismiss) },
+                onSaveRepeat = { onIntent(InboxIntent.OnRepeatSave) },
+                onRemoveRepeat = { onIntent(InboxIntent.OnRepeatRemove) },
+                onAddToCalendar = { onIntent(InboxIntent.OnReminderAddToCalendar) },
+                onFullScreenToggled = { onIntent(InboxIntent.OnReminderFullScreenToggled(it)) },
+                onDismiss = { onIntent(InboxIntent.OnReminderSheetDismiss) },
+                onUpgradeClick = { onIntent(InboxIntent.OnReminderUpgradeClick) },
+            ),
+        )
+    }
+
+    content.customPicker?.takeIf { surface == InboxItemSheetSurface.CUSTOM_DATE_PICKER }?.let { picker ->
+        ReminderDateTimePicker(
+            selectedDateMillis = picker.dateMillis,
+            minDateMillis = picker.minDateMillis,
+            initialHour = picker.initialHour,
+            isTimeInPast = picker.timeInPast,
+            onDateSelected = { onIntent(InboxIntent.OnCustomDateSelected(it)) },
+            onTimeChanged = { h, m -> onIntent(InboxIntent.OnCustomTimeChanged(h, m)) },
+            onTimeSelected = { h, m -> onIntent(InboxIntent.OnCustomTimeSelected(h, m)) },
+            onDismiss = { onIntent(InboxIntent.OnCustomPickerDismiss) },
+        )
+    }
+
+    // Drawn ON TOP of the item sheet rather than replacing it (it is a Dialog, not a bottom sheet —
+    // the stacking constraint above does not apply), matching the detail screen.
+    content.attachmentViewerFor?.let { initialAttachmentId ->
+        if (task.item.attachments.isNotEmpty()) {
+            AttachmentFullscreenViewer(
+                attachments = task.item.attachments,
+                initialAttachmentId = initialAttachmentId,
+                onClose = { onIntent(InboxIntent.OnAttachmentViewerClose) },
+                onDelete = { id -> onIntent(InboxIntent.OnAttachmentDelete(id)) },
+                onOpenExternally = { id -> onIntent(InboxIntent.OnAttachmentOpenExternally(id)) },
+            )
+        } else {
+            // Last attachment deleted while the viewer was up — close it instead of showing a blank.
+            LaunchedEffect(Unit) { onIntent(InboxIntent.OnAttachmentViewerClose) }
         }
     }
 }
@@ -459,11 +717,32 @@ private fun InboxContent(
     contentBottomPadding: Dp,
     onIntent: (InboxIntent) -> Unit,
     homeSignal: Int = 0,
+    anchorChecklistId: Long? = null,
+    onAnchorChecklistChanged: (Long?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     // pageCount is a lambda, not a snapshot: rememberPagerState re-reads it every composition, so a
     // project created or deleted while the tab is open resizes the pager without a state reset.
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { pages.size })
+    //
+    // initialPage is resolved from the SHELL-held anchor, not from a literal 0 and not from the
+    // ViewModel.
+    //
+    // Opening a checklist pushes the detail route over this entry, and coming back neither this
+    // composition nor the InboxViewModel survives — measured on an emulator, not reasoned about: an
+    // earlier fix seeded the pager from `content.selectedPage` and the tab still landed on the Inbox,
+    // because the ViewModel holding that page had itself been rebuilt. Worse, the write-back effect
+    // below then reported the fresh 0 outward, so the composition did not merely lose its own state,
+    // it overwrote whatever had survived elsewhere.
+    //
+    // The anchor is therefore owned by the shell, which outlives the entry, and is a checklist ID
+    // rather than an index — a create inserts at position 0 and shifts every index by one.
+    val initialPage = remember(pages) {
+        pages.indexOfFirst { it.checklistId == anchorChecklistId }.coerceAtLeast(0)
+    }
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { pages.size },
+    )
 
     // Pager indices are POSITIONAL, and a new checklist is inserted at position 0
     // (ChecklistRepositoryImpl.addChecklist increments every other position), so it lands at pages[1]
@@ -471,15 +750,18 @@ private fun InboxContent(
     // settled on is what keeps them on THEIR project when a checklist is created elsewhere (AI chat,
     // widget, sync from another device) — without it the pager silently shows a different project and
     // the pinned quick-add row retargets with it.
-    var anchorChecklistId by remember { mutableStateOf<Long?>(null) }
+    //
+    // The anchor itself is the hoisted [anchorChecklistId] param, NOT a local `remember`. A local one
+    // dies with this composition, which is precisely why it could not survive opening a checklist.
 
     // Swipes are the source of truth for the selected page; this mirrors them back into the
-    // ViewModel so quick-add and the move-target list follow the finger. Tab taps go the other way
-    // (animateScrollToPage), and land here on settle — one direction each, so no feedback loop.
+    // ViewModel so quick-add and the move-target list follow the finger, and outward to the shell so
+    // the page survives a pushed route. Tab taps go the other way (animateScrollToPage), and land
+    // here on settle — one direction each, so no feedback loop.
     // Deliberately NOT keyed on `pages`: re-running it on every list edit would re-report an index
     // the user never moved to.
     LaunchedEffect(pagerState.currentPage) {
-        anchorChecklistId = pages.getOrNull(pagerState.currentPage)?.checklistId
+        onAnchorChecklistChanged(pages.getOrNull(pagerState.currentPage)?.checklistId)
         onIntent(InboxIntent.OnPageSelected(pagerState.currentPage))
     }
 
@@ -510,7 +792,7 @@ private fun InboxContent(
         if (index < 0) {
             // Anchored checklist gone (deleted here or on another device): re-anchor on whatever
             // occupies the slot now instead of chasing a dead id on every future change.
-            anchorChecklistId = pages.getOrNull(pagerState.currentPage)?.checklistId
+            onAnchorChecklistChanged(pages.getOrNull(pagerState.currentPage)?.checklistId)
         } else if (index != pagerState.currentPage) {
             pagerState.scrollToPage(index)
         }

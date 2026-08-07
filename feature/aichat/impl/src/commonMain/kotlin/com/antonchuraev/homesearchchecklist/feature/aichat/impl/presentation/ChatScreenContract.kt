@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 
@@ -73,6 +74,14 @@ data class ChatScreenState(
      * Null when the sheet is opened from [MainScreen] with no focus context.
      */
     val contextChecklistId: Long? = null,
+    /**
+     * WHICH SCREEN the dock was opened over. Together with [contextChecklistId] this is the whole
+     * of "where is the user": an open checklist wins, otherwise the v2 shell tab decides.
+     *
+     * [ChatSurface.Unknown] in the control arm and on any non-tab route ⇒ every screen-aware
+     * behaviour degrades to the pre-experiment path, and nothing extra reaches the wire.
+     */
+    val contextSurface: ChatSurface = ChatSurface.Unknown,
     /**
      * Name of the checklist the user chose as their chat default ("Remember my choice"), or null
      * when the chat still asks every time. Resolved from the persisted id against the live
@@ -400,16 +409,38 @@ sealed interface ChatScreenIntent : Intent {
     ) : ChatScreenIntent
 
     /**
-     * Seed the chat session with the checklist context that triggered the sheet.
+     * Seed the chat session with WHERE it was opened — both halves at once.
      *
-     * Called by App.kt when the user opens the sheet from [ChecklistDetailScreen]
-     * with a specific checklist in focus. The ViewModel stores [checklistId] as the
-     * "active context" so Layer-1/Layer-2/Layer-3 requests can default to this
-     * checklist instead of requiring the user to name it explicitly.
+     * Called by App.kt when the dock opens (or when the screen behind it changes). The ViewModel
+     * stores [checklistId] as the "active context" so Layer-1/Layer-2/Layer-3 requests default to
+     * that checklist, and [surface] as the screen the dock is anchored to, which is what makes the
+     * Inbox and the day addressable at all (neither is in `ChecklistRepository.projects`).
      *
-     * Pass `null` to clear the context (sheet opened from [MainScreen] with no focus).
+     * Deliberately ONE intent, not two. Two intents writing overlapping context is how a fresh
+     * checklist id ends up paired with a stale surface; here the pair is always written together
+     * or not at all.
+     *
+     * Pass `checklistId = null` to clear the checklist context (dock opened from a tab screen with
+     * no list in focus); [surface] then decides on its own.
      */
-    data class OnSetContextChecklist(val checklistId: Long?) : ChatScreenIntent
+    /**
+     * The screen that was behind the chat is gone (dock closed, or the full-screen route opened).
+     *
+     * Clears ONLY [ChatScreenState.contextSurface], deliberately leaving `contextChecklistId` alone.
+     * The surface is what makes the Inbox and the day addressable, so a stale one silently retargets
+     * writes into the system Inbox from a screen that shows no inbox — that must be reset. The
+     * checklist id must NOT be: before screen-awareness existed, the id survived a dock close, and
+     * the control arm's dispatch destinations are the frozen baseline of a live A/B. Clearing both
+     * here would move where a hintless write lands in the arm this work is supposed to leave
+     * untouched — which is exactly the regression the surface reset was introduced to prevent, only
+     * pointed at the other arm.
+     */
+    data object OnScreenSurfaceCleared : ChatScreenIntent
+
+    data class OnSetScreenContext(
+        val checklistId: Long?,
+        val surface: ChatSurface = ChatSurface.Unknown,
+    ) : ChatScreenIntent
 
     /**
      * The chat surface became visible — fire once per open (analytics funnel entry).

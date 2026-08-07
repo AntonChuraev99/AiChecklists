@@ -32,8 +32,16 @@ fun AppCard(
     val border = AppCardDefaults.border()
     val elevation = AppCardDefaults.flatElevation()
 
-    // Native Card.onClick is used only for tap-only cards: it carries correct button semantics and
-    // its ripple is already clipped to [shape] by the Card. But Card.onClick can't carry a
+    // Native Card.onClick is used only for tap-only cards: its ripple is already clipped to [shape]
+    // by the Card.
+    //
+    // ⚠ It does NOT carry a button role. Card(onClick=) delegates to Surface(onClick=), whose
+    // clickable is applied without a `role` argument (material3 1.11.0-alpha07, Surface.kt:231-236;
+    // the Surface KDoc says so outright: "No semantic role is set by default"). A caller that needs
+    // TalkBack to announce "Button" must add `Modifier.semantics { role = Role.Button }` itself.
+    // This comment previously claimed the opposite, and that claim is what shipped the v2 Projects
+    // list with its rows announced as plain text — all 12 AppCard(onClick=) call sites inherit the
+    // same gap. But Card.onClick can't carry a
     // long-press — so when [onLongClick] is supplied we drop the native onClick and apply
     // combinedClickable to the INNER content box (above contentPadding). The Card clips its content
     // slot to [shape], so the tap ripple stays inside the rounded form while the whole surface

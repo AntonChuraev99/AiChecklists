@@ -1,6 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.attachment_deleted_snackbar
+import aichecklists.core.designsystem.generated.resources.attachment_load_error
+import aichecklists.core.designsystem.generated.resources.attachment_premium_limit_reached_snackbar
+import aichecklists.core.designsystem.generated.resources.attachment_size_too_large_snackbar
+import aichecklists.core.designsystem.generated.resources.calendar_app_not_found
 import aichecklists.core.designsystem.generated.resources.error_create_checklist_failed
 import aichecklists.core.designsystem.generated.resources.error_save_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_update_failed
@@ -9,6 +14,8 @@ import aichecklists.core.designsystem.generated.resources.fill_error_name_requir
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_delete_failed
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_deleted_message
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_rename_failed
+import aichecklists.core.designsystem.generated.resources.inbox_reminder_permission_denied
+import aichecklists.core.designsystem.generated.resources.inbox_reminder_time_in_past
 import aichecklists.core.designsystem.generated.resources.inbox_task_add_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_delete_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_deleted_message
@@ -21,18 +28,39 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayOptions
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxSort
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.buildCalendarEvent
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.cleared
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveReminderAtNow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailViewModel
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.resolveAttachmentLocalPath
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,13 +75,20 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 private const val TAG = "InboxViewModel"
 
@@ -81,6 +116,12 @@ class InboxViewModel(
     private val displayPrefs: InboxDisplayPrefsRepository,
     private val navigator: AppNavigator,
     private val analytics: AnalyticsTracker,
+    // The item sheet shown here is the detail screen's own `ItemDetailsSheet`, so this screen needs
+    // the same three collaborators that sheet's rows write through: the premium gate behind the
+    // reminder / attachment quotas, the attachment file store, and the calendar export.
+    private val getUserLimitsUseCase: GetUserLimitsUseCase,
+    private val attachmentStorage: AttachmentStoragePort,
+    private val calendarEventLauncher: CalendarEventLauncher,
     private val logger: AppLogger,
 ) : AppViewModel<InboxScreenState, InboxIntent, InboxSideEffect>() {
 
@@ -90,9 +131,41 @@ class InboxViewModel(
      */
     private val _pages = MutableStateFlow<List<InboxPage>?>(null)
     private val _selectedPage = MutableStateFlow(0)
-    private val _quickAddText = MutableStateFlow("")
-    private val _sheetForTaskId = MutableStateFlow<String?>(null)
-    private val _movePickerOpen = MutableStateFlow(false)
+    private val _draft = MutableStateFlow(TaskDraft())
+
+    /**
+     * Everything about the open item sheet and the surfaces it raises, held as ONE value.
+     *
+     * The v2 sheet used to be two booleans (`sheetForTaskId` + `movePickerOpen`); the v1 sheet it was
+     * replaced with opens five more surfaces (reminder, note, custom picker, permission sheet,
+     * attachment viewer) and every one of them is meaningless while no sheet is open. Sibling flows
+     * would make "reminder tab selected with no sheet" representable and reachable through any missed
+     * transition — the same reason [ListMenuState] is grouped.
+     */
+    private data class ItemSheetState(
+        val taskId: String? = null,
+        val movePickerOpen: Boolean = false,
+        val textEditing: Boolean = false,
+        val textDraft: String = "",
+        val noteDraft: String? = null,
+        val reminder: InboxItemReminderUi? = null,
+        val customPicker: InboxCustomPickerUi? = null,
+        val notificationPermissionOpen: Boolean = false,
+        val attachmentViewerFor: String? = null,
+        val pendingAttachmentTaskId: String? = null,
+        val triggerImagePicker: Boolean = false,
+        val triggerFilePicker: Boolean = false,
+    )
+
+    private val _itemSheet = MutableStateFlow(ItemSheetState())
+
+    /**
+     * Latest premium/limits snapshot. Its own flow rather than a field inside [_itemSheet] so a write
+     * path can read the CURRENT value synchronously (`_userLimits.value`) without going through the
+     * combined screen state, which is what the detail screen learned to do after its first emission
+     * kept racing the Loading → Content transition.
+     */
+    private val _userLimits = MutableStateFlow<UserLimits?>(null)
 
     /**
      * The toolbar overflow's three mutually-exclusive surfaces, held as ONE value.
@@ -133,12 +206,12 @@ class InboxViewModel(
             Triple(pages?.map { it.applyDisplayOptions(options) }, options, sheetOpen)
         },
         _selectedPage,
-        _quickAddText,
-        // Paired so the whole state still fits typed `combine`'s five-source ceiling; the task sheet
-        // and its move picker belong to one interaction, so pairing them costs no clarity.
-        combine(_sheetForTaskId, _movePickerOpen) { sheet, picker -> sheet to picker },
+        _draft,
+        // Paired so the whole state still fits typed `combine`'s five-source ceiling; the sheet and
+        // the limits that gate two of its rows belong to one interaction, so pairing costs no clarity.
+        combine(_itemSheet, _userLimits) { sheet, limits -> sheet to limits },
         _listMenu,
-    ) { (pages, displayOptions, displayOptionsOpen), selected, quickAddText, (sheetForTaskId, movePickerOpen), listMenu ->
+    ) { (pages, displayOptions, displayOptionsOpen), selected, draft, (itemSheet, userLimits), listMenu ->
         if (pages == null) {
             InboxScreenState.Loading
         } else {
@@ -150,10 +223,23 @@ class InboxViewModel(
             InboxScreenState.Content(
                 pages = pages,
                 selectedPage = safeSelected,
-                quickAddText = quickAddText,
-                sheetForTaskId = sheetForTaskId,
-                movePickerOpen = movePickerOpen,
+                draft = draft,
+                sheetForTaskId = itemSheet.taskId,
+                movePickerOpen = itemSheet.movePickerOpen,
                 moveTargets = pages.filter { !it.isInbox && it.checklistId != current?.checklistId },
+                sheetTextEditing = itemSheet.textEditing,
+                sheetTextDraft = itemSheet.textDraft,
+                noteDraft = itemSheet.noteDraft,
+                reminderSheet = itemSheet.reminder,
+                customPicker = itemSheet.customPicker,
+                notificationPermissionOpen = itemSheet.notificationPermissionOpen,
+                attachmentViewerFor = itemSheet.attachmentViewerFor,
+                triggerImagePicker = itemSheet.triggerImagePicker,
+                triggerFilePicker = itemSheet.triggerFilePicker,
+                pendingAttachmentTaskId = itemSheet.pendingAttachmentTaskId,
+                isPremium = userLimits?.isPremium == true,
+                maxAttachmentsPerItem = userLimits?.maxAttachmentsPerItem
+                    ?: InboxScreenState.FREE_ATTACHMENTS_FALLBACK,
                 // Forced shut on the Inbox page. The system Inbox cannot be renamed or deleted, so
                 // every entry of this menu would be inert there — and the page can change under an
                 // OPEN menu (a swipe, or a project deleted on another device shifting the pager),
@@ -181,6 +267,23 @@ class InboxViewModel(
             }
         }
         observePages()
+        observeUserLimits()
+    }
+
+    /**
+     * Keeps [_userLimits] fresh for the two sheet rows that are quota-gated (reminder, attachments).
+     *
+     * `catch` rather than an unguarded collect: this flow reads Remote Config, the paywall SDK and the
+     * checklist count, so it can fail on a cold start with no network. A crash there would take the
+     * whole home tab down over an OPTIONAL gate, and a silent stop would leave every gate reading
+     * "free forever" with no trace — so the failure is logged and the last known value kept.
+     */
+    private fun observeUserLimits() {
+        viewModelScope.launch {
+            getUserLimitsUseCase()
+                .catch { e -> logger.error(TAG, "user limits stream failed: ${e.message}", e) }
+                .collect { limits -> _userLimits.value = limits }
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -232,16 +335,131 @@ class InboxViewModel(
     override fun onIntent(intent: InboxIntent) {
         when (intent) {
             is InboxIntent.OnPageSelected -> _selectedPage.value = intent.index
-            is InboxIntent.OnQuickAddTextChanged -> _quickAddText.value = intent.text
+            is InboxIntent.OnQuickAddTextChanged ->
+                _draft.value = _draft.value.copy(text = intent.text)
+            is InboxIntent.OnCreateChipAction -> applyCreateChip(intent.action)
             InboxIntent.OnQuickAddSubmit -> addTask()
             is InboxIntent.OnTaskCheckedChanged -> setTaskChecked(intent.taskId, intent.checked)
-            is InboxIntent.OnTaskDetailsClick -> _sheetForTaskId.value = intent.taskId
+            // A fresh ItemSheetState, not a copy: every sub-surface (note draft, reminder tab, custom
+            // picker) belongs to the PREVIOUS task, and carrying one over would show the last task's
+            // note draft over this one.
+            is InboxIntent.OnTaskDetailsClick -> _itemSheet.value = ItemSheetState(taskId = intent.taskId)
             InboxIntent.OnTaskSheetDismiss -> closeSheets()
-            InboxIntent.OnMovePickerOpen -> _movePickerOpen.value = true
-            InboxIntent.OnMovePickerDismiss -> _movePickerOpen.value = false
+            InboxIntent.OnMovePickerOpen -> _itemSheet.update { it.copy(movePickerOpen = true) }
+            InboxIntent.OnMovePickerDismiss -> _itemSheet.update { it.copy(movePickerOpen = false) }
             is InboxIntent.OnMoveToProject -> moveTask(intent.targetChecklistId)
             InboxIntent.OnToggleImportant -> toggleImportant()
             InboxIntent.OnDeleteTask -> deleteTask()
+
+            // ── Item sheet: inline rename ────────────────────────────────────────────────
+            InboxIntent.OnTaskTextEditStart -> startTaskTextEdit()
+            is InboxIntent.OnTaskTextDraftChanged -> _itemSheet.update { it.copy(textDraft = intent.text) }
+            InboxIntent.OnTaskTextEditConfirm -> confirmTaskTextEdit()
+
+            // ── Item sheet: note ─────────────────────────────────────────────────────────
+            InboxIntent.OnTaskNoteClick -> openNoteDialog()
+            is InboxIntent.OnTaskNoteDraftChanged -> _itemSheet.update { it.copy(noteDraft = intent.text) }
+            InboxIntent.OnTaskNoteSave -> saveNote()
+            InboxIntent.OnTaskNoteDismiss -> _itemSheet.update { it.copy(noteDraft = null) }
+
+            // ── Item sheet: reminder / repeat ────────────────────────────────────────────
+            InboxIntent.OnTaskReminderClick -> openReminderSheet()
+            is InboxIntent.OnReminderTabSelected -> selectReminderTab(intent.tab)
+            is InboxIntent.OnReminderPresetSelected -> {
+                // Guarded exactly like the detail screen: a preset resolved before the sheet was
+                // opened can already be in the past by the time it is tapped, and AlarmManager fires
+                // a past trigger immediately — a reminder that "rings" the instant you set it.
+                if (intent.triggerAtMillis <= Clock.System.now().toEpochMilliseconds()) {
+                    logger.warning(TAG, "reminder preset ${intent.triggerAtMillis} is in the past — ignored")
+                } else {
+                    saveItemReminder(intent.triggerAtMillis, repeatRule = null, repeatTimeOfDayMinutes = null)
+                }
+            }
+
+            InboxIntent.OnReminderRemove, InboxIntent.OnRepeatRemove -> removeItemReminder()
+            InboxIntent.OnReminderSheetDismiss -> _itemSheet.update {
+                it.copy(reminder = null)
+            }
+
+            is InboxIntent.OnReminderFullScreenToggled -> _itemSheet.update {
+                it.copy(reminder = it.reminder?.copy(fullScreen = intent.enabled))
+            }
+
+            InboxIntent.OnReminderAddToCalendar -> addOpenTaskToCalendar()
+            InboxIntent.OnReminderUpgradeClick -> {
+                closeSheets()
+                navigator.navigateToPaywall(source = PAYWALL_SOURCE_ITEM_REMINDER)
+            }
+
+            is InboxIntent.OnRepeatTypeSelected -> selectRepeatType(intent.type)
+            is InboxIntent.OnSmartPresetSelected -> updateRepeatConfig { intent.config }
+            is InboxIntent.OnRepeatIntervalChanged -> updateRepeatConfig {
+                it.copy(interval = intent.interval.coerceIn(1, 99), isCustom = true)
+            }
+
+            is InboxIntent.OnWeekDayToggled -> updateRepeatConfig { config ->
+                val days = config.weekDays.toMutableSet()
+                if (!days.add(intent.dayNumber)) days.remove(intent.dayNumber)
+                config.copy(weekDays = days, isCustom = true)
+            }
+
+            is InboxIntent.OnResetChecksToggled -> updateRepeatConfig { it.copy(resetChecks = intent.enabled) }
+            is InboxIntent.OnRepeatTimeChanged -> updateRepeatConfig {
+                it.copy(timeHour = intent.hour, timeMinute = intent.minute)
+            }
+
+            InboxIntent.OnEndConditionClick -> _itemSheet.update {
+                it.copy(reminder = it.reminder?.copy(showEndConditionPicker = true))
+            }
+
+            is InboxIntent.OnEndConditionSelected -> {
+                updateRepeatConfig { it.copy(endCondition = intent.condition) }
+                _itemSheet.update { it.copy(reminder = it.reminder?.copy(showEndConditionPicker = false)) }
+            }
+
+            InboxIntent.OnEndConditionDismiss -> _itemSheet.update {
+                it.copy(reminder = it.reminder?.copy(showEndConditionPicker = false))
+            }
+
+            InboxIntent.OnRepeatSave -> saveRepeatSchedule()
+
+            // ── Item sheet: custom date/time picker ──────────────────────────────────────
+            InboxIntent.OnCustomDateRequested -> openCustomPicker()
+            is InboxIntent.OnCustomDateSelected -> selectCustomDate(intent.dateMillis)
+            is InboxIntent.OnCustomTimeChanged -> updateCustomTimeInPast(intent.hour, intent.minute)
+            is InboxIntent.OnCustomTimeSelected -> commitCustomDateTime(intent.hour, intent.minute)
+            InboxIntent.OnCustomPickerDismiss -> _itemSheet.update { it.copy(customPicker = null) }
+
+            // ── Item sheet: notification permission ──────────────────────────────────────
+            is InboxIntent.OnNotificationPermissionResult -> {
+                _itemSheet.update { it.copy(notificationPermissionOpen = false) }
+                if (!intent.granted) {
+                    // Not a silent close: without the permission every alarm this sheet schedules is
+                    // posted and dropped by the system, so the user has to be told the bell will not
+                    // ring rather than left believing the reminder is armed.
+                    logger.warning(TAG, "notification permission denied — item reminders will not be shown")
+                    emitMessage(Res.string.inbox_reminder_permission_denied)
+                }
+            }
+
+            InboxIntent.OnNotificationPermissionSkip -> {
+                _itemSheet.update { it.copy(notificationPermissionOpen = false) }
+                emitMessage(Res.string.inbox_reminder_permission_denied)
+            }
+
+            // ── Item sheet: attachments ──────────────────────────────────────────────────
+            InboxIntent.OnAddImageAttachment -> requestAttachment(isImage = true)
+            InboxIntent.OnAddFileAttachment -> requestAttachment(isImage = false)
+            InboxIntent.OnImagePickerLaunched -> _itemSheet.update { it.copy(triggerImagePicker = false) }
+            InboxIntent.OnFilePickerLaunched -> _itemSheet.update { it.copy(triggerFilePicker = false) }
+            is InboxIntent.OnAttachmentPicked -> storePickedAttachment(intent)
+            is InboxIntent.OnAttachmentClick -> _itemSheet.update {
+                it.copy(attachmentViewerFor = intent.attachmentId)
+            }
+
+            InboxIntent.OnAttachmentViewerClose -> _itemSheet.update { it.copy(attachmentViewerFor = null) }
+            is InboxIntent.OnAttachmentDelete -> deleteAttachment(intent.attachmentId)
+            is InboxIntent.OnAttachmentOpenExternally -> openAttachmentExternally(intent.attachmentId)
             is InboxIntent.OnOpenProject -> {
                 closeSheets()
                 _listMenu.value = ListMenuState()
@@ -354,6 +572,29 @@ class InboxViewModel(
     }
 
     /**
+     * Applies a capture-dock chip to the draft.
+     *
+     * Only the chips this screen can honour arrive here: [TaskCreateChipsRow] is asked to hide
+     * "Pick time…" and "Repeat", which need a date picker and the repeat sheet (plus its free-tier
+     * gate) that live on the detail screen. The two are still handled — with a log rather than a
+     * silent `else -> {}` — because a chip row is shared code and the next host may enable them.
+     */
+    private fun applyCreateChip(action: GistiItemCreateAction) {
+        when (action) {
+            GistiItemCreateAction.REMIND_1H ->
+                _draft.value = _draft.value.withPreset(ItemCreateReminderPreset.ONE_HOUR)
+            GistiItemCreateAction.REMIND_TOMORROW_MORNING ->
+                _draft.value = _draft.value.withPreset(ItemCreateReminderPreset.TOMORROW_MORNING)
+            GistiItemCreateAction.REMIND_TONIGHT ->
+                _draft.value = _draft.value.withPreset(ItemCreateReminderPreset.TONIGHT)
+            GistiItemCreateAction.IMPORTANT ->
+                _draft.value = _draft.value.withImportantToggled()
+            GistiItemCreateAction.REMIND_PICK, GistiItemCreateAction.REPEAT ->
+                logger.warning(TAG, "capture chip $action has no host on the Inbox tab")
+        }
+    }
+
+    /**
      * Appends the trimmed quick-add text to the CURRENTLY VISIBLE page's checklist.
      *
      * Targeting the visible page is what makes the pager pay for itself: page 0 is "capture into the
@@ -361,7 +602,8 @@ class InboxViewModel(
      */
     private fun addTask() {
         val content = screenState.value as? InboxScreenState.Content ?: return
-        val text = content.quickAddText.trim()
+        val draft = content.draft
+        val text = draft.text.trim()
         val page = content.pages.getOrNull(content.selectedPage)
         if (text.isEmpty() || page == null) {
             // Defensive only: the Add affordance is disabled while the text is blank, and the screen
@@ -381,18 +623,34 @@ class InboxViewModel(
                 // Template item FIRST so the fill row can carry its stable id from birth — the link
                 // is what keeps move/delete/edit from having to guess by text later.
                 val weekday = weekdayFor(checklist)
-                val templateItem = ChecklistItem(text = text, weekday = weekday)
+                val priority = if (draft.important) 1 else 0
+                // Resolved HERE, not when the chip was tapped: a dock left open across 18:00 would
+                // otherwise write a "Tonight" that is already in the past.
+                val reminderAt = draft.resolveReminderAtNow()
+                // Priority rides BOTH halves of the pair: the template feeds the edit screen and the
+                // fill feeds every list, and a star on only one of them is the template↔fill desync
+                // this domain keeps re-learning (rule `checklist-domain`).
+                val templateItem = ChecklistItem(text = text, weekday = weekday, priority = priority)
+                // reminderAt goes through withReminderAt, not the constructor: ChecklistFillItem's
+                // full parameter list is a PRIVATE constructor (the public one deliberately exposes
+                // only the birth fields), so the reminder is applied as an explicit transition.
                 val fillItem = ChecklistFillItem(
                     text = text,
                     checked = false,
                     note = null,
                     weekday = weekday,
+                    priority = priority,
                     templateItemId = templateItem.id,
-                )
+                ).let { item -> reminderAt?.let(item::withReminderAt) ?: item }
                 repository.updateFill(fill.copy(items = fill.items + fillItem))
                 repository.updateChecklistTemplate(checklist.copy(items = checklist.items + templateItem))
+                // Persisting reminderAt is only half a reminder — without the alarm the row shows a
+                // bell that never rings, which is worse than no chip at all.
+                reminderAt?.let { at ->
+                    reminderScheduler.scheduleItemReminder(page.checklistId, fill.id, fillItem.id, at)
+                }
             }.onSuccess {
-                _quickAddText.value = ""
+                _draft.value = _draft.value.cleared()
                 analytics.event(
                     AnalyticsEvents.Inbox.QUICK_ADDED,
                     mapOf(AnalyticsParams.SOURCE to if (page.isInbox) SOURCE_INBOX else SOURCE_PROJECT),
@@ -778,49 +1036,646 @@ class InboxViewModel(
     /**
      * Importance uses [ChecklistRepository.togglePriority], which already dual-writes fill+template
      * atomically — re-implementing the pair here would be a second, divergent copy of that logic.
+     *
+     * The sheet is left OPEN. It used to close, which made sense when it held four rows and starring
+     * was most of what it did; now it is the same sheet the detail screen shows, and that one stays
+     * open so the star flips under the user's finger. Closing here would make one composable behave
+     * differently depending on which screen opened it.
      */
     private fun toggleImportant() {
-        val content = screenState.value as? InboxScreenState.Content ?: return
-        val taskId = content.sheetForTaskId
-        val page = content.pages.getOrNull(content.selectedPage)
-        if (taskId == null || page == null) {
-            logger.warning(TAG, "importance toggle skipped: taskId=$taskId page=${page?.checklistId}")
+        withOpenTask("importance toggle") { target ->
+            // togglePriority returns a Result instead of throwing, so its failure would slip past
+            // withOpenTask's catch — the star would simply never appear with nothing said.
+            repository.togglePriority(target.fill.id, target.item.id).onFailure { e ->
+                logger.error(TAG, "importance toggle failed for task ${target.item.id}: ${e.message}", e)
+                emitMessage(Res.string.inbox_task_update_failed)
+            }
+        }
+    }
+
+    // ── Item sheet: the surfaces lifted from the checklist detail screen ─────────────────────
+
+    /**
+     * The stored row the open item sheet points at, resolved all the way down to the fill item.
+     *
+     * The page is found by SEARCHING every page for the task id instead of trusting `selectedPage`:
+     * a sync that adds or removes a project shifts the pager under the open sheet, and a write routed
+     * by index would then land on a different project's checklist. The id is unique across pages, so
+     * the search is exact.
+     */
+    private data class TaskTarget(
+        val page: InboxPage,
+        val checklist: Checklist,
+        val fill: ChecklistFill,
+        val item: ChecklistFillItem,
+    )
+
+    /** The open sheet's row as the pager currently holds it — no repository round trip. */
+    private fun openTaskInState(): InboxTask? {
+        val taskId = _itemSheet.value.taskId ?: return null
+        return _pages.value?.firstNotNullOfOrNull { page ->
+            page.tasks.firstOrNull { it.fillItemId == taskId }
+        }
+    }
+
+    /**
+     * Runs [block] against the stored row behind the open sheet, inside ONE coroutine.
+     *
+     * Every failure mode reports: no sheet and no row are logged, and anything that reaches the user
+     * as "my tap did nothing" also emits the update-failed message. [action] names the caller in the
+     * log line only — never user-facing.
+     */
+    private fun withOpenTask(action: String, block: suspend (TaskTarget) -> Unit) {
+        val taskId = _itemSheet.value.taskId
+        if (taskId == null) {
+            logger.warning(TAG, "$action skipped: no item sheet open")
+            return
+        }
+        val page = _pages.value?.firstOrNull { page -> page.tasks.any { it.fillItemId == taskId } }
+        if (page == null) {
+            logger.warning(TAG, "$action skipped: task $taskId is on no page")
+            emitMessage(Res.string.inbox_task_update_failed)
             return
         }
 
         viewModelScope.launch {
-            val fillId = runCatching {
-                repository.getDefaultFillByChecklistId(page.checklistId).first()?.id
+            runCatching {
+                val checklist = repository.getChecklistById(page.checklistId)
+                    ?: error("Checklist ${page.checklistId} not found")
+                val fill = repository.getDefaultFillByChecklistId(page.checklistId).first()
+                    ?: error("No default fill for checklist ${page.checklistId}")
+                val item = fill.items.firstOrNull { it.id == taskId }
+                    ?: error("Task $taskId not found in fill ${fill.id}")
+                block(TaskTarget(page, checklist, fill, item))
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.error(TAG, "$action failed for task $taskId: ${e.message}", e)
+                emitMessage(Res.string.inbox_task_update_failed)
+            }
+        }
+    }
+
+    // ── Inline rename ────────────────────────────────────────────────────────────────────────
+
+    private fun startTaskTextEdit() {
+        val task = openTaskInState()
+        if (task == null) {
+            logger.warning(TAG, "text edit skipped: no row behind the open sheet")
+            return
+        }
+        _itemSheet.update { it.copy(textEditing = true, textDraft = task.text) }
+    }
+
+    /**
+     * Commits the inline rename to BOTH halves of the pair (rule `checklist-domain`): the fill feeds
+     * every list, the template feeds the edit screen, and a rename on one side is the desync this
+     * domain keeps re-learning.
+     *
+     * Fires twice by design — the sheet commits on Save AND on blur — so the `textEditing` check is a
+     * double-fire guard, not a user-facing skip.
+     */
+    private fun confirmTaskTextEdit() {
+        val sheet = _itemSheet.value
+        if (!sheet.textEditing) {
+            logger.debug(TAG, "rename confirm ignored: edit mode already closed (Save + blur both fired)")
+            return
+        }
+        val newText = sheet.textDraft.trim()
+        val current = openTaskInState()
+        // Blank input or an unchanged name: close edit mode and write nothing. Both are the user
+        // deciding not to rename, not a failure — the headline snapping back to the stored text is
+        // the feedback, exactly as on the detail screen.
+        if (newText.isEmpty() || current == null || current.text == newText) {
+            _itemSheet.update { it.copy(textEditing = false, textDraft = "") }
+            return
+        }
+
+        _itemSheet.update { it.copy(textEditing = false, textDraft = "") }
+        withOpenTask("rename task") { target ->
+            val oldText = target.item.text
+            repository.updateFill(
+                target.fill.copy(
+                    items = target.fill.items.map { item ->
+                        if (item.id == target.item.id) item.withText(newText) else item
+                    },
+                )
+            )
+            // Match the template row by the stable link first — the TEXT is what is changing here, so
+            // a text-keyed match would either miss or hit a same-text sibling. The old text stays as
+            // the legacy fallback for fill rows written before the link existed.
+            val templateItems = target.checklist.items.map { templateItem ->
+                val matches = target.item.templateItemId?.let { templateItem.id == it }
+                    ?: (templateItem.text == oldText && !templateItem.isFolder)
+                if (matches) templateItem.withText(newText) else templateItem
+            }
+            repository.updateChecklistTemplate(target.checklist.copy(items = templateItems))
+            // Literal, not an AnalyticsEvents constant: `item_text_edited` has none — the detail
+            // screen emits the same literal, and the two must stay one series.
+            analytics.event(
+                "item_text_edited",
+                mapOf(
+                    AnalyticsParams.CHECKLIST_ID to target.page.checklistId.toString(),
+                    AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
+                ),
+            )
+        }
+    }
+
+    // ── Note ─────────────────────────────────────────────────────────────────────────────────
+
+    private fun openNoteDialog() {
+        val task = openTaskInState()
+        if (task == null) {
+            logger.warning(TAG, "note skipped: no row behind the open sheet")
+            return
+        }
+        _itemSheet.update { it.copy(noteDraft = task.item.note.orEmpty()) }
+    }
+
+    /** Notes are FILL-only data (the template carries no note), so this legitimately writes one side. */
+    private fun saveNote() {
+        val draft = _itemSheet.value.noteDraft
+        if (draft == null) {
+            logger.warning(TAG, "note save skipped: dialog is not open")
+            return
+        }
+        _itemSheet.update { it.copy(noteDraft = null) }
+        withOpenTask("save note") { target ->
+            repository.updateFill(
+                target.fill.copy(
+                    items = target.fill.items.map { item ->
+                        if (item.id == target.item.id) item.withNote(draft.takeIf { it.isNotBlank() }) else item
+                    },
+                )
+            )
+        }
+    }
+
+    // ── Reminder / repeat ────────────────────────────────────────────────────────────────────
+
+    /**
+     * Opens the shared reminder sheet over the task, running the same two gates the detail screen runs.
+     *
+     * The free-tier check mirrors `ChecklistDetailViewModel.handleItemReminderClick` — including its
+     * hardcoded "one active reminder" ceiling — deliberately: the two sheets are now the same
+     * composable, and gating them differently would let a free user arm from the Inbox a reminder the
+     * detail screen refuses. (That the ceiling is a constant rather than `UserLimits`
+     * is a pre-existing v1 issue; fixing it belongs in one place, for both call sites.)
+     */
+    private fun openReminderSheet() {
+        val task = openTaskInState()
+        if (task == null) {
+            logger.warning(TAG, "reminder skipped: no row behind the open sheet")
+            return
+        }
+        viewModelScope.launch {
+            val item = task.item
+            val isPremium = _userLimits.value?.isPremium == true
+            val atLimit = runCatching {
+                !isPremium && !item.hasActiveReminder && repository.countActiveReminders() >= FREE_ACTIVE_REMINDERS
             }.getOrElse { e ->
                 if (e is CancellationException) throw e
-                logger.error(TAG, "importance toggle: fill lookup failed for ${page.checklistId}", e)
-                null
+                // Counting failed — open the sheet UNLOCKED rather than locking a paying behaviour
+                // behind a read error, and record why the gate could not be evaluated.
+                logger.error(TAG, "reminder gate: countActiveReminders failed: ${e.message}", e)
+                false
             }
-            if (fillId == null) {
-                logger.error(
-                    TAG,
-                    "importance toggle: no default fill for checklist ${page.checklistId}",
-                    IllegalStateException("missing default fill"),
-                )
-                // closeSheets() below dismisses the sheet either way, so without this the star simply
-                // never appears and nothing explains why — a silent failure dressed as a completed tap.
-                emitMessage(Res.string.inbox_task_update_failed)
-                closeSheets()
+
+            if (atLimit) {
+                _itemSheet.update {
+                    it.copy(reminder = InboxItemReminderUi(locked = true, fullScreen = item.reminderFullScreen))
+                }
                 return@launch
             }
-            repository.togglePriority(fillId, taskId).onFailure { e ->
-                logger.error(TAG, "importance toggle failed for task $taskId: ${e.message}", e)
-                emitMessage(Res.string.inbox_task_update_failed)
+
+            // Reminder fields exist only on the fill row, so an item with a repeat and no one-shot
+            // opens straight on the tab that describes it.
+            val tab = if (item.repeatRule != null && item.reminderAt == null) ReminderTab.REPEAT else ReminderTab.ONCE
+            _itemSheet.update {
+                it.copy(
+                    reminder = InboxItemReminderUi(
+                        tab = tab,
+                        fullScreen = item.reminderFullScreen,
+                        pendingRepeatConfig = repeatConfigOf(item),
+                        repeatRuleSummary = repeatConfigOf(item)?.let(::buildRepeatSummary),
+                    ),
+                    // Android 13+: without the permission every alarm scheduled below is posted and
+                    // silently dropped. Asking first is what keeps "reminder set" from being a lie.
+                    notificationPermissionOpen = !reminderScheduler.hasNotificationPermission(),
+                )
             }
-            closeSheets()
+        }
+    }
+
+    private fun selectReminderTab(tab: ReminderTab) {
+        val item = openTaskInState()?.item
+        _itemSheet.update { sheet ->
+            val reminder = sheet.reminder ?: return@update sheet
+            sheet.copy(
+                reminder = reminder.copy(
+                    tab = tab,
+                    // Seed the repeat editor from the stored rule the first time the tab is opened;
+                    // an already-edited config is left alone so switching tabs never loses input.
+                    pendingRepeatConfig = if (tab == ReminderTab.REPEAT) {
+                        reminder.pendingRepeatConfig ?: item?.let(::repeatConfigOf) ?: PendingRepeatConfig()
+                    } else {
+                        reminder.pendingRepeatConfig
+                    },
+                ),
+            )
+        }
+    }
+
+    private fun selectRepeatType(type: RepeatType) = updateRepeatConfig {
+        // Same reset as the detail screen: a type switch drops the interval and weekday selection
+        // that belonged to the previous type, which would otherwise survive as an invisible rule.
+        it.copy(type = type, isCustom = false, interval = 1, weekDays = emptySet())
+    }
+
+    private inline fun updateRepeatConfig(update: (PendingRepeatConfig) -> PendingRepeatConfig) {
+        _itemSheet.update { sheet ->
+            val reminder = sheet.reminder ?: return@update sheet
+            sheet.copy(
+                reminder = reminder.copy(
+                    pendingRepeatConfig = update(reminder.pendingRepeatConfig ?: PendingRepeatConfig()),
+                ),
+            )
+        }
+    }
+
+    private fun saveRepeatSchedule() {
+        val config = _itemSheet.value.reminder?.pendingRepeatConfig
+        if (config == null) {
+            logger.warning(TAG, "repeat save skipped: no pending config")
+            emitMessage(Res.string.inbox_task_update_failed)
+            return
+        }
+        saveItemReminder(
+            reminderAt = null,
+            repeatRule = config.toRule(),
+            repeatTimeOfDayMinutes = config.timeHour * 60 + config.timeMinute,
+        )
+    }
+
+    /**
+     * Persists a one-shot and/or repeating reminder onto the fill row AND registers the alarm.
+     *
+     * Reminder fields live only on [ChecklistFillItem] — no template write here (verified against
+     * `ChecklistDetailViewModel.saveItemReminder`, which this mirrors step for step). The two halves
+     * that MUST stay together are the write and the schedule: persisting without scheduling is a bell
+     * that never rings, and scheduling without persisting is a notification for a reminder the UI
+     * says does not exist.
+     */
+    private fun saveItemReminder(
+        reminderAt: Long?,
+        repeatRule: ReminderRepeatRule?,
+        repeatTimeOfDayMinutes: Int?,
+    ) {
+        val fullScreen = _itemSheet.value.reminder?.fullScreen == true
+        withOpenTask("save reminder") { target ->
+            val checklistId = target.page.checklistId
+            val fillId = target.fill.id
+            val itemId = target.item.id
+
+            // Cancel first, both kinds: the row may be switching from a one-shot to a repeat, and a
+            // stale alarm of the other kind would keep firing against the same item.
+            if (target.item.hasActiveReminder) {
+                reminderScheduler.cancelItemReminder(checklistId, fillId, itemId)
+                reminderScheduler.cancelItemRepeat(checklistId, fillId, itemId)
+            }
+
+            val updatedItem = if (repeatRule != null && repeatTimeOfDayMinutes != null) {
+                target.item
+                    .withRepeatRule(
+                        repeatRule,
+                        repeatTimeOfDayMinutes,
+                        firstRepeatTriggerAt(
+                            timeOfDayMinutes = repeatTimeOfDayMinutes,
+                            now = Clock.System.now(),
+                            timeZone = TimeZone.currentSystemDefault(),
+                        ),
+                    )
+                    .withReminderAt(reminderAt)
+            } else {
+                target.item.withReminderCleared().withReminderAt(reminderAt)
+            }.withReminderFullScreen(fullScreen)
+
+            repository.updateFill(
+                target.fill.copy(items = target.fill.items.map { if (it.id == itemId) updatedItem else it })
+            )
+
+            if (reminderAt != null) {
+                reminderScheduler.scheduleItemReminder(checklistId, fillId, itemId, reminderAt)
+            }
+            val nextAt = updatedItem.repeatNextAt
+            if (repeatRule != null && nextAt != null) {
+                reminderScheduler.scheduleItemRepeat(checklistId, fillId, itemId, nextAt)
+            }
+
+            _itemSheet.update { it.copy(reminder = null, customPicker = null) }
+            analytics.event(
+                AnalyticsEvents.Reminder.ITEM_SET,
+                mapOf(
+                    AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
+                    "has_repeat" to (repeatRule != null).toString(),
+                    AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
+                ),
+            )
+        }
+    }
+
+    private fun removeItemReminder() {
+        withOpenTask("remove reminder") { target ->
+            // Cancel both regardless of which was active — the same defensive pair the detail screen
+            // uses, because a row can hold a one-shot and a repeat at once.
+            reminderScheduler.cancelItemReminder(target.page.checklistId, target.fill.id, target.item.id)
+            reminderScheduler.cancelItemRepeat(target.page.checklistId, target.fill.id, target.item.id)
+            repository.updateFill(
+                target.fill.copy(
+                    items = target.fill.items.map { item ->
+                        if (item.id == target.item.id) item.withReminderCleared() else item
+                    },
+                )
+            )
+            _itemSheet.update { it.copy(reminder = null, customPicker = null) }
+            analytics.event(
+                AnalyticsEvents.Reminder.ITEM_REMOVED,
+                mapOf(
+                    AnalyticsParams.CHECKLIST_ID to target.page.checklistId.toString(),
+                    AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Exports the open task's reminder to the device calendar.
+     *
+     * SYNCHRONOUS on purpose — no `viewModelScope.launch` around [CalendarEventLauncher.addEvent].
+     * On web the launcher is `window.open`, which the browser blocks unless it runs inside the
+     * click's own call stack; everything it needs is already in [_pages], so nothing has to suspend.
+     */
+    private fun addOpenTaskToCalendar() {
+        val item = openTaskInState()?.item
+        if (item == null) {
+            logger.warning(TAG, "calendar export skipped: no row behind the open sheet")
+            emitMessage(Res.string.inbox_task_update_failed)
+            return
+        }
+        val launched = calendarEventLauncher.addEvent(
+            buildCalendarEvent(
+                title = item.text,
+                startMillis = item.reminderAt ?: item.repeatNextAt,
+                rule = item.repeatRule,
+            )
+        )
+        if (!launched) {
+            logger.warning(TAG, "calendar export: no handler for the insert-event intent")
+            emitMessage(Res.string.calendar_app_not_found)
+        } else {
+            analytics.event(
+                "add_to_calendar",
+                mapOf(
+                    "recurring" to (item.repeatRule != null).toString(),
+                    "has_time" to ((item.reminderAt ?: item.repeatNextAt) != null).toString(),
+                    "level" to "item",
+                    AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
+                ),
+            )
+        }
+    }
+
+    // ── Custom date + time picker ────────────────────────────────────────────────────────────
+
+    private fun openCustomPicker() {
+        val tz = TimeZone.currentSystemDefault()
+        val today = Clock.System.now().toLocalDateTime(tz).date
+        // The Material date picker works in UTC millis, so "today" has to be expressed as UTC
+        // midnight or the day before becomes selectable east of Greenwich.
+        val todayUtcMidnight = LocalDateTime(today, LocalTime(0, 0))
+            .toInstant(TimeZone.UTC).toEpochMilliseconds()
+        // [reminder] is deliberately KEPT while the picker is up — the screen hides the sheet behind
+        // the picker instead. Nulling it (what the detail screen does) drops the full-screen-delivery
+        // toggle the user may have just flipped, so the reminder saved from the picker would silently
+        // ignore it; keeping it also means dismissing the picker returns to the sheet.
+        _itemSheet.update {
+            it.copy(customPicker = InboxCustomPickerUi(minDateMillis = todayUtcMidnight))
+        }
+    }
+
+    private fun selectCustomDate(dateMillis: Long) {
+        val tz = TimeZone.currentSystemDefault()
+        val nowLocal = Clock.System.now().toLocalDateTime(tz)
+        val selectedDate = Instant.fromEpochMilliseconds(dateMillis).toLocalDateTime(TimeZone.UTC).date
+        // Picking today pre-selects the next full hour; any other day starts at 09:00.
+        val initialHour = if (selectedDate == nowLocal.date) (nowLocal.hour + 1).coerceAtMost(23) else 9
+        _itemSheet.update {
+            it.copy(
+                customPicker = it.customPicker?.copy(
+                    dateMillis = dateMillis,
+                    initialHour = initialHour,
+                    timeInPast = false,
+                ),
+            )
+        }
+    }
+
+    private fun updateCustomTimeInPast(hour: Int, minute: Int) {
+        val dateMillis = _itemSheet.value.customPicker?.dateMillis
+        if (dateMillis == null) {
+            // Unreachable through the UI (the picker asks for a day before a time), so this is a
+            // contract violation worth a line rather than a quiet return.
+            logger.warning(TAG, "custom time changed with no date chosen — in-past hint skipped")
+            return
+        }
+        val tz = TimeZone.currentSystemDefault()
+        val nowLocal = Clock.System.now().toLocalDateTime(tz)
+        val selectedDate = Instant.fromEpochMilliseconds(dateMillis).toLocalDateTime(TimeZone.UTC).date
+        val inPast = selectedDate == nowLocal.date && LocalTime(hour, minute) <= nowLocal.time
+        _itemSheet.update { it.copy(customPicker = it.customPicker?.copy(timeInPast = inPast)) }
+    }
+
+    private fun commitCustomDateTime(hour: Int, minute: Int) {
+        val dateMillis = _itemSheet.value.customPicker?.dateMillis
+        if (dateMillis == null) {
+            logger.warning(TAG, "custom reminder skipped: no date chosen")
+            emitMessage(Res.string.inbox_task_update_failed)
+            return
+        }
+        val date = Instant.fromEpochMilliseconds(dateMillis).toLocalDateTime(TimeZone.UTC).date
+        val triggerAt = LocalDateTime(date, LocalTime(hour, minute))
+            .toInstant(TimeZone.currentSystemDefault())
+            .toEpochMilliseconds()
+        if (triggerAt <= Clock.System.now().toEpochMilliseconds()) {
+            // The picker already renders an in-past warning, so this is the last line of defence:
+            // AlarmManager fires a past trigger immediately, which reads as a broken reminder.
+            logger.warning(TAG, "custom reminder $triggerAt is in the past — not scheduled")
+            emitMessage(Res.string.inbox_reminder_time_in_past)
+            return
+        }
+        _itemSheet.update { it.copy(customPicker = null) }
+        saveItemReminder(triggerAt, repeatRule = null, repeatTimeOfDayMinutes = null)
+    }
+
+    // ── Attachments ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Quota check, then hand off to the platform picker through a one-shot trigger flag.
+     *
+     * At the limit the user gets the premium snackbar, never a picker that opens and then refuses to
+     * save — the quota is the reason the tap cannot succeed, so it is the thing to say out loud.
+     */
+    private fun requestAttachment(isImage: Boolean) {
+        val task = openTaskInState()
+        if (task == null) {
+            logger.warning(TAG, "attach skipped: no row behind the open sheet")
+            return
+        }
+        val limits = _userLimits.value
+        val blocked = if (limits != null) {
+            !limits.canAddAttachment(task.item.attachments.size)
+        } else {
+            // Limits have not arrived yet — fall back to the same static free-tier default the detail
+            // screen falls back to, so the two sheets cannot disagree on that first frame.
+            task.item.attachments.size >= ChecklistDetailViewModel.FREE_ATTACHMENT_LIMIT_PER_ITEM
+        }
+        if (blocked) {
+            logger.warning(
+                TAG,
+                "attach blocked by quota (have=${task.item.attachments.size}, " +
+                    "max=${limits?.maxAttachmentsPerItem}, premium=${limits?.isPremium})",
+            )
+            emitMessage(Res.string.attachment_premium_limit_reached_snackbar)
+            return
+        }
+        _itemSheet.update {
+            it.copy(
+                pendingAttachmentTaskId = task.fillItemId,
+                triggerImagePicker = isImage,
+                triggerFilePicker = !isImage,
+            )
+        }
+    }
+
+    /**
+     * Copies the picked file into app storage and attaches it to the row it was picked for.
+     *
+     * Targets `intent.taskId` rather than the open sheet: the picker is another app, so by the time
+     * the result lands the sheet may be gone (process backgrounded, user dismissed it).
+     */
+    private fun storePickedAttachment(intent: InboxIntent.OnAttachmentPicked) {
+        val page = _pages.value?.firstOrNull { page -> page.tasks.any { it.fillItemId == intent.taskId } }
+        if (page == null) {
+            logger.warning(TAG, "attachment dropped: task ${intent.taskId} is on no page")
+            emitMessage(Res.string.attachment_load_error)
+            return
+        }
+
+        // Cleared HERE, not in a trailing block: every early exit below (`return@launch`) would skip
+        // a clear placed after the work, and a stale pending id makes the NEXT picker result land on
+        // the previous row.
+        _itemSheet.update { it.copy(pendingAttachmentTaskId = null) }
+
+        viewModelScope.launch {
+            runCatching {
+                val fill = repository.getDefaultFillByChecklistId(page.checklistId).first()
+                    ?: error("No default fill for checklist ${page.checklistId}")
+                val attachmentId = Attachment.generateId()
+                val storedPath = attachmentStorage.storeAttachment(
+                    sourcePath = intent.sourcePath,
+                    fillId = fill.id,
+                    itemId = intent.taskId,
+                    attachmentId = attachmentId,
+                    originalFileName = intent.fileName,
+                )
+                if (storedPath == null) {
+                    logger.warning(TAG, "attachment ${intent.fileName}: storeAttachment returned null")
+                    emitMessage(Res.string.attachment_load_error)
+                    return@launch
+                }
+
+                val sizeBytes = attachmentStorage.sizeOf(storedPath)
+                if (sizeBytes > ChecklistDetailViewModel.MAX_ATTACHMENT_SIZE_BYTES) {
+                    // Delete the copy we just made — leaving it would consume the quota of a file the
+                    // user is being told was rejected.
+                    attachmentStorage.deleteAttachment(storedPath)
+                    logger.warning(TAG, "attachment ${intent.fileName}: $sizeBytes bytes over the limit")
+                    emitMessage(Res.string.attachment_size_too_large_snackbar)
+                    return@launch
+                }
+
+                val (width, height) = attachmentStorage.probeImage(storedPath, intent.mimeType)
+                repository.addAttachment(
+                    fill.id,
+                    intent.taskId,
+                    Attachment(
+                        id = attachmentId,
+                        path = storedPath,
+                        fileName = intent.fileName,
+                        mimeType = intent.mimeType,
+                        sizeBytes = sizeBytes,
+                        createdAt = currentTimeMillis(),
+                        width = width,
+                        height = height,
+                    ),
+                )
+                // review-rules:allow-observed-event — `attachment_added` is NOT in CsatManager's
+                // observed set, so it cannot shift CSAT survey eligibility.
+                analytics.event(
+                    AnalyticsEvents.Attachment.ADDED,
+                    mapOf<String, Any>(
+                        AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
+                        AnalyticsParams.MIME_TYPE to (intent.mimeType ?: "unknown"),
+                        AnalyticsParams.SIZE_BYTES to sizeBytes,
+                    ),
+                )
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.error(TAG, "attachment ${intent.fileName} failed: ${e.message}", e)
+                emitMessage(Res.string.attachment_load_error)
+            }
+        }
+    }
+
+    private fun deleteAttachment(attachmentId: String) {
+        withOpenTask("delete attachment") { target ->
+            // Close the viewer BEFORE the write when this was the last file, so it cannot flash empty
+            // while the repository Flow catches up.
+            if (target.item.attachments.size <= 1) {
+                _itemSheet.update { it.copy(attachmentViewerFor = null) }
+            }
+            repository.removeAttachment(target.fill.id, target.item.id, attachmentId)
+            emitMessage(Res.string.attachment_deleted_snackbar)
+        }
+    }
+
+    /**
+     * Hands a stored attachment to the platform viewer.
+     *
+     * The path is resolved to the form THIS platform can read (`opfs://…` on web for files synced
+     * from Android); the raw synced path opens to an error there.
+     */
+    private fun openAttachmentExternally(attachmentId: String) {
+        val attachment = openTaskInState()?.item?.attachments?.firstOrNull { it.id == attachmentId }
+        if (attachment == null) {
+            logger.warning(TAG, "open-externally skipped: attachment $attachmentId not on the open row")
+            emitMessage(Res.string.attachment_load_error)
+            return
+        }
+        viewModelScope.launch {
+            _sideEffect.emit(
+                InboxSideEffect.OpenAttachmentExternally(
+                    path = resolveAttachmentLocalPath(attachment.path, attachment.storagePath),
+                    mimeType = attachment.mimeType,
+                )
+            )
         }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────────────────
 
     private fun closeSheets() {
-        _sheetForTaskId.value = null
-        _movePickerOpen.value = false
+        _itemSheet.value = ItemSheetState()
     }
 
     /** Resolves [resource] off the UI thread and pushes it to the screen's snackbar host. */
@@ -873,15 +1728,7 @@ class InboxViewModel(
             isInbox = isInbox,
             tasks = fill?.items.orEmpty()
                 .filterNot { item -> item.templateItemId?.let { it in folderTemplateIds } == true }
-                .map { item ->
-                    InboxTask(
-                        fillItemId = item.id,
-                        templateItemId = item.templateItemId,
-                        text = item.text,
-                        checked = item.checked,
-                        priority = item.priority,
-                    )
-                },
+                .map(::InboxTask),
         )
     }
 
@@ -889,6 +1736,20 @@ class InboxViewModel(
         /** Wire values of [AnalyticsParams.SOURCE] on `inbox_quick_added`. */
         const val SOURCE_INBOX = "inbox"
         const val SOURCE_PROJECT = "project"
+
+        /**
+         * Free-tier ceiling on rows carrying an active reminder.
+         *
+         * Deliberately the same hardcoded 1 as `ChecklistDetailViewModel.handleItemReminderClick`.
+         * The Inbox and the detail screen now show the SAME sheet, so a different ceiling here would
+         * let a free user arm from one surface what the other refuses. It is a mirror, and mirrors
+         * drift — but a divergent gate on the same composable is the worse failure, and the fix
+         * belongs in one shared gate for both call sites.
+         */
+        const val FREE_ACTIVE_REMINDERS = 1
+
+        /** Paywall attribution for the locked banner inside the item reminder sheet. */
+        const val PAYWALL_SOURCE_ITEM_REMINDER = "inbox_item_reminder_limit"
 
         /**
          * Stamped on every emit this screen shares with the control arm (`item_checked`,

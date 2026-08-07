@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistF
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRow
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistTransactionRunner
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -18,8 +19,16 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.SyncStatus
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -352,6 +361,99 @@ class ChecklistRepositoryImplTest {
         assertEquals(SyncStatus.SYNCED.value, untouched.syncStatus, "an ordinary project must not be dirtied")
     }
 
+    // ─── Tests: observeRemindersInRange keeps emitting while a screen watches ─
+
+    /**
+     * The Today/Calendar capture defect. Both tabs subscribe to this flow and stay on screen while
+     * the user types, so a task captured there must reach the list without the screen being
+     * recreated. The implementation used to combine the live checklists query with a ONE-SHOT
+     * `flow { emit(fillDao.getAllDefaultFills()) }`: that flow completes after its single emission,
+     * `combine` then replays the cached (stale) fills forever, and per-item reminders live ONLY in
+     * fill rows — so the captured task was invisible until the 5 s `WhileSubscribed` window expired
+     * and the screen re-subscribed. Failing here means the freeze is back.
+     */
+    @Test
+    fun observeRemindersInRange_itemReminderCapturedWhileSubscribed_reEmitsWithTheNewTask() = runTest {
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Inbox", items = emptyList()).toEntityRow())
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = emptyList()))
+        val repo = newRepo()
+
+        val emissions = mutableListOf<List<TodayReminderInfo>>()
+        // UnconfinedTestDispatcher, not the default one: the collector has to be ATTACHED before the
+        // capture below, exactly as a screen already showing the list is. On the standard dispatcher
+        // this collect never starts and every emission list comes back empty, which reads like the
+        // bug under test and is not.
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repo.observeRemindersInRange(DAY_START, DAY_END).collect(emissions::add)
+        }
+        advanceUntilIdle()
+        assertEquals(listOf(emptyList<TodayReminderInfo>()), emissions, "nothing scheduled yet")
+
+        // Exactly what TodayViewModel.captureTask writes: fill item carrying the reminder, then the
+        // template half of the pair.
+        val templateItem = ChecklistItem(text = "Call the dentist")
+        val capturedItem = ChecklistFillItem(
+            text = "Call the dentist",
+            checked = false,
+            templateItemId = templateItem.id,
+        ).withReminderAt(TONIGHT)
+        val fill = fillDao.fills.single { it.id == 10L }.toDomain()
+        repo.updateFill(fill.copy(items = fill.items + capturedItem))
+        repo.updateChecklistTemplate(
+            Checklist(id = 1L, name = "Inbox", items = listOf(templateItem)),
+        )
+        advanceUntilIdle()
+
+        val latest = emissions.last()
+        val captured = latest.filterIsInstance<TodayReminderInfo.ItemLevel>()
+            .singleOrNull { it.itemId == capturedItem.id }
+        assertNotNull(captured, "the captured task must reach the open screen; got $latest")
+        assertEquals("Call the dentist", captured.itemText)
+        assertEquals(TONIGHT, captured.reminderAt)
+        assertEquals(10L, captured.fillId, "fillId drives the row's deep link into the fill detail")
+        assertEquals("Inbox", captured.checklistName)
+    }
+
+    /**
+     * Guards the other half of the [combine]: a checklist-level reminder edited while the screen is
+     * open must keep arriving too. This half was never broken — the assertion is here so a future
+     * "just swap the sources" refactor cannot fix the fills side by dropping the checklists side.
+     */
+    @Test
+    fun observeRemindersInRange_checklistLevelReminderSetWhileSubscribed_reEmitsWithIt() = runTest {
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Groceries", items = emptyList()).toEntityRow())
+        val repo = newRepo()
+
+        val emissions = mutableListOf<List<TodayReminderInfo>>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repo.observeRemindersInRange(DAY_START, DAY_END).collect(emissions::add)
+        }
+        advanceUntilIdle()
+
+        repo.updateChecklistTemplate(
+            Checklist(id = 1L, name = "Groceries", items = emptyList(), reminderAt = TONIGHT),
+        )
+        advanceUntilIdle()
+
+        val reminder = emissions.last().filterIsInstance<TodayReminderInfo.ChecklistLevel>().singleOrNull()
+        assertNotNull(reminder, "a checklist-level reminder must reach the open screen; got ${emissions.last()}")
+        assertEquals(1L, reminder.checklistId)
+        assertEquals(TONIGHT, reminder.reminderAt)
+    }
+
+    /** The window still filters: a reminder set for tomorrow must not leak into today's list. */
+    @Test
+    fun observeRemindersInRange_reminderOutsideTheWindow_isNotEmitted() = runTest {
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Inbox", items = emptyList()).toEntityRow())
+        val outOfRange = ChecklistFillItem(text = "Next week", checked = false)
+            .withReminderAt(DAY_END + 1L)
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = listOf(outOfRange)))
+
+        val emitted = newRepo().observeRemindersInRange(DAY_START, DAY_END).first()
+
+        assertEquals(emptyList(), emitted, "a reminder past the window end must stay out of the list")
+    }
+
     // ─── System under test factory + fakes ───────────────────────────────────
 
     private val checklistDao = FakeChecklistDao()
@@ -422,6 +524,13 @@ class ChecklistRepositoryImplTest {
     private class FakeChecklistDao : ChecklistDao {
         val checklists = mutableListOf<ChecklistEntity>()
 
+        /**
+         * Stand-in for Room's InvalidationTracker: every write to the table bumps the counter and the
+         * observable queries below re-map the current list. Without it the fake is strictly weaker
+         * than Room — an observable query that never re-emits would let a frozen list look correct.
+         */
+        private val writes = MutableStateFlow(0)
+
         override suspend fun getById(id: Long): ChecklistEntity? =
             checklists.firstOrNull { it.id == id }
 
@@ -429,6 +538,7 @@ class ChecklistRepositoryImplTest {
             val mapped = checklists.map { if (it.id == checklist.id) checklist else it }
             checklists.clear()
             checklists.addAll(mapped)
+            writes.update { it + 1 }
         }
 
         override suspend fun touchForSync(id: Long, updatedAt: Long) {
@@ -441,13 +551,16 @@ class ChecklistRepositoryImplTest {
             }
             checklists.clear()
             checklists.addAll(mapped)
+            writes.update { it + 1 }
         }
+
+        override fun observeChecklists(): Flow<List<ChecklistEntity>> =
+            writes.map { checklists.filter { entity -> !entity.isDeleted } }
 
         override suspend fun getInbox(): ChecklistEntity? =
             checklists.firstOrNull { it.isInbox && !it.isDeleted }
 
         // ── Unused stubs ──
-        override fun observeChecklists(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
         override fun observeChecklistRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
         override fun observeProjectRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
         override fun observeProjects(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
@@ -489,6 +602,9 @@ class ChecklistRepositoryImplTest {
     private class FakeFillDao : ChecklistFillDao {
         val fills = mutableListOf<ChecklistFillEntity>()
 
+        /** See [FakeChecklistDao.writes] — same InvalidationTracker stand-in for `checklist_fills`. */
+        private val writes = MutableStateFlow(0)
+
         override suspend fun getDefaultFillByChecklistId(checklistId: Long): ChecklistFillEntity? =
             fills.firstOrNull { it.checklistId == checklistId && it.isDefault && !it.isDeleted }
 
@@ -497,8 +613,12 @@ class ChecklistRepositoryImplTest {
         override suspend fun insert(fill: ChecklistFillEntity): Long {
             fills.removeAll { it.id == fill.id }
             fills.add(fill)
+            writes.update { it + 1 }
             return fill.id
         }
+
+        override fun observeAllDefaultFills(): Flow<List<ChecklistFillEntity>> =
+            writes.map { fills.filter { fill -> fill.isDefault } }
 
         // ── Unused stubs ──
         override fun observeFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFillEntity>> = flowOf(emptyList())
@@ -511,9 +631,11 @@ class ChecklistRepositoryImplTest {
             fills.filter { it.checklistId == checklistId }
         override suspend fun deleteById(id: Long) {
             fills.removeAll { it.id == id }
+            writes.update { it + 1 }
         }
         override suspend fun deleteByChecklistId(checklistId: Long) {
             fills.removeAll { it.checklistId == checklistId }
+            writes.update { it + 1 }
         }
         override suspend fun getPendingSync(): List<ChecklistFillEntity> = emptyList()
         override suspend fun getByCloudId(cloudId: String): ChecklistFillEntity? = null
@@ -561,5 +683,16 @@ class ChecklistRepositoryImplTest {
         override fun info(tag: String, message: String) {}
         override fun warning(tag: String, message: String) {}
         override fun error(tag: String, message: String, throwable: Throwable?) {}
+    }
+
+    /**
+     * A fixed 24 h window standing in for "today": the repository only compares reminder timestamps
+     * against the two bounds it is handed, so no real clock has to be pinned. [TONIGHT] stands for
+     * the default chip the v2 capture dock seeds (18:00) — inside the window by construction.
+     */
+    private companion object {
+        const val DAY_START = 1_700_000_000_000L
+        const val DAY_END = DAY_START + 86_399_999L
+        const val TONIGHT = DAY_START + 18L * 60L * 60L * 1000L
     }
 }

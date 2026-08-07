@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.flow.StateFlow
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -226,7 +227,7 @@ class TodayViewModelTest {
     @Test
     fun emptyState_whenNoReminders() = runTest {
         val repo = FakeRepository(remindersInRange = emptyList())
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
 
         val state = vm.awaitState()
         assertIs<TodayScreenState.Empty>(state)
@@ -253,7 +254,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 2L, reminderAt = FUTURE_TODAY_MS),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -286,7 +287,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 1L, reminderAt = earlierMs),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -300,7 +301,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_itemLevel_navigatesToFillDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, fillId = 42L))
 
@@ -313,7 +314,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_checklistLevel_navigatesToChecklistDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, fillId = null))
 
@@ -326,7 +327,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnCreateChecklistClick_navigatesToTemplates() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
 
         vm.sendIntent(TodayIntent.OnCreateChecklistClick)
 
@@ -342,7 +343,7 @@ class TodayViewModelTest {
                 itemLevelReminder(reminderAt = FUTURE_TODAY_MS, itemText = "Buy milk"),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -363,7 +364,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(reminderAt = FUTURE_TODAY_MS, isRecurring = true),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -403,7 +404,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnRefresh_doesNotNavigate() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
 
         // Refresh is a data concern — it must never move the user off the screen.
         vm.sendIntent(TodayIntent.OnRefresh)
@@ -459,7 +460,7 @@ class TodayViewModelTest {
             )
         )
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -517,7 +518,7 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw cause }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Error>(state)
@@ -543,7 +544,7 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw NullPointerException() }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
 
         assertIs<TodayScreenState.Error>(vm.awaitState())
         assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on failure")
@@ -566,7 +567,7 @@ class TodayViewModelTest {
                 }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
         assertIs<TodayScreenState.Error>(vm.awaitState())
 
         // Heal the repository, then retry: flatMapLatest must re-subscribe.
@@ -595,7 +596,7 @@ class TodayViewModelTest {
                 throw RuntimeException("DB failure")
             }
         }
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
 
         val seen = mutableListOf<TodayScreenState>()
         // Must be unconfined AND share runTest's scheduler: backgroundScope defaults to
@@ -643,6 +644,7 @@ class TodayViewModelTest {
             FakeRepository(),
             ensureInbox(FakeRepository()),
             FakeNavigator(),
+            NoOpScheduler(),
             NoOpAnalytics(),
             logger,
         )
@@ -684,6 +686,30 @@ class TodayViewModelTest {
         analytics = NoOpAnalytics(),
         logger = FakeAppLogger(),
     )
+
+    /**
+     * Records the item alarms a capture arms.
+     *
+     * Not a bare no-op: the Today capture now carries a reminder chip by default, and persisting
+     * `reminderAt` without arming the alarm renders a bell that never rings — a failure invisible to
+     * every assertion about the stored item. [scheduledItems] is what makes that half observable.
+     */
+    private class NoOpScheduler : ChecklistReminderScheduler {
+        val scheduledItems = mutableListOf<Triple<Long, String, Long>>()
+
+        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelReminder(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveReminders() {}
+        override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelRepeat(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveRepeats() {}
+        override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {
+            scheduledItems += Triple(checklistId, itemId, triggerAtMillis)
+        }
+        override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
+        override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
+    }
 
     private class NoOpAnalytics : AnalyticsTracker {
         override fun setUserId(userId: String) = Unit

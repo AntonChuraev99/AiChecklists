@@ -95,6 +95,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -164,7 +167,8 @@ fun CalendarScreen(
      * The dock is hoisted to the HOST for the same reason the Inbox one is — the v2 shell's FABs are
      * drawn above this screen and must hide while it is up.
      */
-    quickAddText: String = "",
+    draft: TaskDraft = TaskDraft(),
+    onCreateChipAction: (GistiItemCreateAction) -> Unit = {},
     captureDockOpen: Boolean = false,
     /**
      * Whether this HOST offers a capture affordance at all — NOT whether the dock is currently up
@@ -230,10 +234,24 @@ fun CalendarScreen(
         bottomBar = {
             if (captureVisible) {
                 QuickCaptureDock(
-                    text = quickAddText,
+                    text = draft.text,
                     onTextChange = onQuickAddTextChange,
                     onAdd = onQuickAddSubmit,
                     placeholder = stringResource(Res.string.today_quick_add_placeholder),
+                    // This tab draws the day's reminders, so its draft arrives with one chip already
+                    // selected ("Tonight", or "In 1 hour" once the evening has started) — that chip is
+                    // what keeps a task captured here visible on the screen that captured it.
+                    //
+                    // Pick-time and Repeat stay off: their picker and repeat sheet live on the detail
+                    // screen, and a chip that swallows its tap is worse than an absent one.
+                    aboveInput = {
+                        TaskCreateChipsRow(
+                            draft = draft,
+                            onAction = onCreateChipAction,
+                            showPickTime = false,
+                            showRepeat = false,
+                        )
+                    },
                 )
             }
         },

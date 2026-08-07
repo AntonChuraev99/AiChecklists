@@ -72,13 +72,17 @@ class ToolCallDispatcherImpl(
     private val analyticsTracker: AnalyticsTracker,
 ) : ToolCallDispatcher {
 
-    // NOTE: every checklist enumeration in this file reads `checklistRepository.projects`, never
-    // `.checklists`. The AI deliberately does NOT address the v2 system Inbox — it is hidden from
-    // every picker, so letting the chat resolve/rename/clear it would be the one surface where it
-    // leaks. It also keeps [FREE_CHECKLIST_LIMIT] counting the same population as
-    // GetUserLimitsUseCase; otherwise the v2 arm would hit the paywall one checklist early through
-    // the chat while the Home screen still showed a free slot.
-    // In the control arm no row is flagged, so `projects` == `checklists`.
+    // NOTE: an ID may reach the v2 system Inbox; a NAME may not. Every NAME lookup and every
+    // default ("no target given") resolution in this file enumerates `checklistRepository.projects`,
+    // which excludes the Inbox — the model must never be able to *name* its way into it, and the
+    // free-tier count must keep counting the same population as GetUserLimitsUseCase (otherwise
+    // the v2 arm hits the paywall one checklist early through the chat while the Home screen still
+    // shows a free slot). An id can only come from the CLIENT — a which-list chip the user tapped,
+    // the remembered default, or the screen the dock is open over — so `resolutionPool(id)` widens
+    // to `.checklists` exactly there, and nowhere else. Rename and the free-tier count stay on
+    // `projects` unconditionally.
+    // In the control arm no row is flagged, so `projects` == `checklists` and the distinction is
+    // inert.
 
     companion object {
         private const val TAG = "ToolCallDispatcher"
@@ -108,6 +112,7 @@ class ToolCallDispatcherImpl(
             is ToolCall.ReadChecklist -> handleReadChecklist(toolCall)
             is ToolCall.RenameChecklist -> handleRenameChecklist(toolCall)
             is ToolCall.ClearCompleted -> handleClearCompleted(toolCall)
+            is ToolCall.MoveItem -> handleMoveItem(toolCall)
         }
     }.getOrElse { e ->
         logger.error(TAG, "dispatch failed for ${toolCall::class.simpleName}", e)
@@ -656,9 +661,11 @@ class ToolCallDispatcherImpl(
     // ─── ReadChecklist ────────────────────────────────────────────────────────
 
     private suspend fun handleReadChecklist(toolCall: ToolCall.ReadChecklist): DispatchOutcome {
-        // Agent-only read: the model names a list, it never knows local row ids → name path.
-        val (checklist, fill) = resolveChecklistAndFill(id = null, hint = toolCall.name)
-            ?: return resolveChecklistFailure(id = null, hint = toolCall.name)
+        // The model only ever sends a NAME (it knows no local row ids). [checklistId] is the
+        // client's screen context, filled in by applyContextChecklist when the model named no
+        // other list — that is what lets "what is in my inbox?" read a row `projects` hides.
+        val (checklist, fill) = resolveChecklistAndFill(id = toolCall.checklistId, hint = toolCall.name)
+            ?: return resolveChecklistFailure(id = toolCall.checklistId, hint = toolCall.name)
 
         val items = fill.items.map { item ->
             ReadChecklistItem(text = item.text, checked = item.checked)
@@ -711,7 +718,10 @@ class ToolCallDispatcherImpl(
      * for a valid operation that happened to have no effect.
      */
     private suspend fun handleClearCompleted(toolCall: ToolCall.ClearCompleted): DispatchOutcome {
-        val allChecklists = checklistRepository.projects.first()
+        // Same pool rule as [resolveChecklistAndFill]: an id (screen context / tapped chip) may
+        // reach the system Inbox, a NAME may not. Without this, "clear the done ones" on the Inbox
+        // tab would fail on a screen whose own overflow menu offers exactly that action.
+        val allChecklists = resolutionPool(toolCall.checklistId)
         if (allChecklists.isEmpty()) {
             return DispatchOutcome.NotFound("chat_dispatch_no_checklists", emptyList())
         }
@@ -754,6 +764,94 @@ class ToolCallDispatcherImpl(
                 linkedChecklistId = checklist.id,
             )
         }
+    }
+
+    // ─── MoveItem ─────────────────────────────────────────────────────────────
+
+    /**
+     * Moves ONE item between lists, keeping its text and done state — the tool behind
+     * "sort my inbox into projects".
+     *
+     * Resolution is asymmetric by design:
+     * - the SOURCE goes through [resolveChecklistAndFill], so the client's screen-context id may
+     *   reach the system Inbox (that is the whole point of the tool);
+     * - the DESTINATION is name-only, so it resolves against `projects` and a move can never land
+     *   IN the Inbox — filing INTO quick-capture is not a thing the user ever asks for.
+     *
+     * Write order is destination-first: if the source removal fails the user sees a duplicate they
+     * can delete, whereas the reverse order would silently lose the item (same rule as
+     * [moveAddedItem]).
+     *
+     * CHECK order is the opposite of write order: the item must be found before any outcome is
+     * returned, including the "already in that list" one.
+     */
+    private suspend fun handleMoveItem(toolCall: ToolCall.MoveItem): DispatchOutcome {
+        val (source, sourceFill) = resolveChecklistAndFill(toolCall.fromChecklistId, toolCall.fromChecklistHint)
+            ?: return resolveChecklistFailure(toolCall.fromChecklistId, toolCall.fromChecklistHint)
+
+        val (target, targetFill) = resolveChecklistAndFill(id = null, hint = toolCall.toChecklistHint)
+            ?: return resolveChecklistFailure(id = null, hint = toolCall.toChecklistHint)
+
+        // EXISTENCE FIRST, same-list second. The reverse order reported "it is already in
+        // Errands" for an item that exists in no list at all — a success the model relays to the
+        // user as a fact about their data.
+        val item = sourceFill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
+            ?: return DispatchOutcome.NotFound(
+                "chat_dispatch_item_not_found",
+                listOf(toolCall.itemText, source.name),
+            )
+
+        if (target.id == source.id) {
+            return DispatchOutcome.Success(
+                "chat_dispatch_move_same_list",
+                listOf(item.text, target.name),
+                linkedChecklistId = target.id,
+            )
+        }
+
+        // A per-item alarm is keyed (checklistId, fillId, itemId) and this dispatcher owns no
+        // ChecklistReminderScheduler, so a moved reminder would fire against a fill row that no
+        // longer exists — and attachments are stored per fill item too. Refuse LOUDLY with the
+        // item named instead of moving and dropping them silently.
+        if (item.reminderAt != null || item.repeatRule != null || item.attachments.isNotEmpty()) {
+            return DispatchOutcome.NotFound("chat_dispatch_move_blocked", listOf(item.text))
+        }
+
+        // Template + fill in lockstep with a fresh templateItemId link — an unlinked fill row is
+        // what makes later items "land in the middle" in folder mode (see handleAddItem).
+        val newTemplateItem = ChecklistItem(text = item.text, checked = item.checked)
+        val newFillItem = ChecklistFillItem(
+            text = item.text,
+            checked = item.checked,
+            note = item.note,
+            priority = item.priority,
+            templateItemId = newTemplateItem.id,
+        )
+        checklistRepository.updateFill(targetFill.copy(items = targetFill.items + newFillItem))
+        checklistRepository.updateChecklistTemplate(target.copy(items = target.items + newTemplateItem))
+
+        // Remove from the source only after the destination write succeeded.
+        checklistRepository.updateFill(sourceFill.copy(items = sourceFill.items.filter { it.id != item.id }))
+        // Prefer the stable template link; fall back to text for legacy unlinked rows.
+        val sourceTemplateItem = source.items.firstOrNull { it.id == item.templateItemId }
+            ?: source.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
+        if (sourceTemplateItem != null) {
+            checklistRepository.updateChecklistTemplate(
+                source.copy(items = source.items.filter { it.id != sourceTemplateItem.id })
+            )
+        } else {
+            logger.warning(
+                TAG,
+                "handleMoveItem: no template row matched '${item.text}' in '${source.name}' — " +
+                    "the fill row moved but the template keeps a stale entry",
+            )
+        }
+
+        return DispatchOutcome.Success(
+            "chat_dispatch_moved_item",
+            listOf(item.text, target.name),
+            linkedChecklistId = target.id,
+        )
     }
 
     // ─── Attachment helpers ───────────────────────────────────────────────────
@@ -832,6 +930,25 @@ class ToolCallDispatcherImpl(
     // ─── Resolution helpers ───────────────────────────────────────────────────
 
     /**
+     * The rows a target may resolve against.
+     *
+     * NAME and default resolution stay on `projects`: the model must never be able to *name* its
+     * way into the system Inbox (see the class note above — pickers, the free-tier count, MCP and
+     * the widget all agree the Inbox is not a project).
+     *
+     * An ID is a different promise. It can only come from the CLIENT — a which-list chip the user
+     * tapped, the remembered default, or the screen the dock is open over — and on the v2 Inbox /
+     * day tabs that screen IS the Inbox. Refusing it there would make "add milk" on the Inbox
+     * screen land in some other list, which is the exact bug the id path exists to prevent.
+     *
+     * [resolveChecklistAndFill] and [resolveChecklistFailure] MUST agree on this pool: their KDoc
+     * already binds them to the same arguments, and a pool mismatch would make a resolvable id
+     * report "no checklists".
+     */
+    private suspend fun resolutionPool(id: Long?): List<Checklist> =
+        if (id != null) checklistRepository.checklists.first() else checklistRepository.projects.first()
+
+    /**
      * Resolves a tool call's target to a (Checklist, ChecklistFill) pair.
      * Returns null on failure — call [resolveChecklistFailure] with the SAME arguments to
      * turn that null into the [DispatchOutcome] explaining it.
@@ -848,7 +965,7 @@ class ToolCallDispatcherImpl(
      * reason on the rollback side).
      */
     private suspend fun resolveChecklistAndFill(id: Long?, hint: String?): Pair<Checklist, ChecklistFill>? {
-        val allChecklists = checklistRepository.projects.first()
+        val allChecklists = resolutionPool(id)
         if (allChecklists.isEmpty()) return null
 
         val checklist = when {
@@ -873,7 +990,7 @@ class ToolCallDispatcherImpl(
      * Must be called with the same [id] / [hint] the resolve was attempted with.
      */
     private suspend fun resolveChecklistFailure(id: Long?, hint: String?): DispatchOutcome {
-        val allChecklists = checklistRepository.projects.first()
+        val allChecklists = resolutionPool(id)
 
         if (id != null) {
             val byId = allChecklists.firstOrNull { it.id == id }

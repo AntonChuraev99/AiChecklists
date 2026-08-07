@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
@@ -80,10 +81,11 @@ internal class ChatAgentApiServiceImpl(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult = runCatching {
-        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} requestId=${requestId ?: "none"} responseLanguage=${responseLanguage ?: "auto"}")
+        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} screen=${screenSnapshot?.kind ?: "none"} requestId=${requestId ?: "none"} responseLanguage=${responseLanguage ?: "auto"}")
 
         val response: HttpResponse = httpClient.post(AGENT_URL) {
             contentType(ContentType.Application.Json)
@@ -110,6 +112,28 @@ internal class ChatAgentApiServiceImpl(
                     // explicitNulls=false drops the field entirely when null, so the server
                     // sees no `context_checklist` key (treated as "home screen, no focus").
                     contextChecklist = contextChecklistName?.let { ContextChecklistDto(name = it) },
+                    // The SCREEN behind the dock, for the surfaces `checklists_summary` cannot
+                    // carry (the system Inbox, the day). Same additive mechanism as the field
+                    // above: explicitNulls=false drops it entirely when the snapshot is null, so
+                    // the control arm — and an un-deployed server — see today's exact payload.
+                    contextScreen = screenSnapshot?.let { snap ->
+                        ContextScreenDto(
+                            kind = snap.kind,
+                            label = snap.label,
+                            focusedDate = snap.focusedDate,
+                            items = snap.items.map {
+                                ContextScreenItemDto(
+                                    text = it.text,
+                                    checked = it.checked,
+                                    list = it.listName,
+                                    due = it.dueIso,
+                                    hasReminder = it.hasReminder,
+                                    hasAttachment = it.hasAttachment,
+                                )
+                            },
+                            totalItems = snap.totalItems,
+                        )
+                    },
                     // Backward-compat gate: the server only emits type:"options" (present_options
                     // tool) when the client advertises support. Older clients omit this flag and
                     // never receive an "options" response they couldn't render.
@@ -269,6 +293,10 @@ internal class ChatAgentApiServiceImpl(
         // Optional: present only when the dock was opened with a checklist in focus.
         // Server contract: top-level `context_checklist: { name: "<name>" }`.
         @SerialName("context_checklist") val contextChecklist: ContextChecklistDto? = null,
+        // Optional: present only on the v2 shell tabs whose content the summary above cannot
+        // carry (the system Inbox, the day). Server contract: top-level `context_screen`.
+        // Dropped when null, so the control arm's request stays byte-identical.
+        @SerialName("context_screen") val contextScreen: ContextScreenDto? = null,
         // Backward-compat gate: when true the server may return type:"options" (present_options).
         @SerialName("supports_options") val supportsOptions: Boolean = false,
         // Optional: present only when the user pinned an explicit AI reply language (not Auto).
@@ -279,6 +307,31 @@ internal class ChatAgentApiServiceImpl(
     @Serializable
     private data class ContextChecklistDto(
         val name: String,
+    )
+
+    /**
+     * `context_screen` — the snapshot of the screen the dock was opened over.
+     *
+     * [totalItems] is the REAL total while [items] may be truncated; the server prompt renders
+     * "showing N of M" from the pair, so a truncated list never becomes an asserted count.
+     */
+    @Serializable
+    private data class ContextScreenDto(
+        val kind: String,
+        val label: String? = null,
+        @SerialName("focused_date") val focusedDate: String? = null,
+        val items: List<ContextScreenItemDto> = emptyList(),
+        @SerialName("total_items") val totalItems: Int = 0,
+    )
+
+    @Serializable
+    private data class ContextScreenItemDto(
+        val text: String,
+        val checked: Boolean = false,
+        val list: String? = null,
+        val due: String? = null,
+        @SerialName("has_reminder") val hasReminder: Boolean = false,
+        @SerialName("has_attachment") val hasAttachment: Boolean = false,
     )
 
     @Serializable

@@ -3,6 +3,8 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.data
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenItem
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
@@ -552,6 +554,53 @@ class ChatAgentApiServiceImplTest {
             !body.contains("context_checklist"),
             "context_checklist must be omitted when no checklist is focused, got: $body",
         )
+        // Same mechanism, same guarantee: the screen-aware field must also be absent. THIS is what
+        // makes a control-arm request byte-identical to the pre-experiment one — and what lets the
+        // client ship before the server deploy.
+        assertTrue(
+            !body.contains("context_screen"),
+            "context_screen must be omitted when there is no screen snapshot, got: $body",
+        )
+    }
+
+    // ── 12b. context_screen present (with its snake_case keys) when a snapshot is supplied ──
+
+    @Test
+    fun step_request_bodyContainsContextScreenWhenSnapshotProvided() = runTest {
+        var capturedBody: String? = null
+
+        val service = makeService { request ->
+            capturedBody = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":5}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            screenSnapshot = ChatScreenSnapshot(
+                kind = "inbox",
+                label = "Inbox",
+                items = listOf(
+                    ChatScreenItem(text = "Call the bank", hasReminder = true),
+                ),
+                totalItems = 4,
+            ),
+        )
+
+        val body = capturedBody ?: ""
+        assertContains(body, "context_screen")
+        assertContains(body, "Call the bank")
+        // The server reads snake_case; a camelCase key would silently render an empty screen block.
+        assertContains(body, "total_items")
+        assertContains(body, "has_reminder")
+        // totalItems > items.size is what drives the prompt's "showing N of M" line.
+        assertContains(body, "\"total_items\":4")
     }
 
     // ── Phase 2: type=options ──────────────────────────────────────────────────

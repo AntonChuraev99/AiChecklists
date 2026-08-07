@@ -102,6 +102,15 @@ import aichecklists.core.designsystem.generated.resources.gallery_deeplink_not_f
 import aichecklists.core.designsystem.generated.resources.gallery_deeplink_error
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
 import aichecklists.core.designsystem.generated.resources.chat_dock_ask_about
+import aichecklists.core.designsystem.generated.resources.chat_dock_context_inbox
+import aichecklists.core.designsystem.generated.resources.chat_dock_context_overview
+import aichecklists.core.designsystem.generated.resources.chat_dock_context_projects
+import aichecklists.core.designsystem.generated.resources.chat_dock_context_today
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_move_blocked
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_move_same_list
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_moved_item
+import aichecklists.core.designsystem.generated.resources.chat_prompt_triage_inbox
+import aichecklists.core.designsystem.generated.resources.chat_prompt_triage_inbox_query
 import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
 import aichecklists.core.designsystem.generated.resources.chat_apply_error
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_added
@@ -212,6 +221,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
@@ -219,7 +229,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFu
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiExpandableDockContent
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiFullChatOverlay
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiAgendaPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiInboxPromptChips
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
@@ -637,6 +649,47 @@ fun App() {
             val chatViewModel: ChatViewModel = koinViewModel()
             val chatUiState by chatViewModel.screenState.collectAsStateWithLifecycle()
 
+            // WHERE the dock is anchored — derived, never stored (see [chatSurfaceFor]). Keyed on
+            // the back stack App.kt already reads for currentTopRoute, so this adds no new
+            // recomposition source; `Unknown` in the control arm makes every screen-aware branch
+            // below inert there.
+            val chatSurface = remember(navigator.backStack.toList(), navVariant, chatSheetContextId) {
+                chatSurfaceFor(navigator.backStack.toList(), navVariant, chatSheetContextId)
+            }
+
+            // When the panel opens, seed the screen context so Layer 1/2/3 requests default to the
+            // right checklist AND know which screen they were asked from. Also re-seeds when the
+            // context changes without the panel closing (e.g. the user taps another checklist's
+            // dock while the panel is open, or the tab under an open dock changes).
+            //
+            // Declared ABOVE the ai_chat_opened effect on purpose: LaunchedEffects run in
+            // composition order, and `ai_chat_opened` reads `contextSurface` off the ViewModel
+            // state to stamp its `surface` param. Seeding after it would tag every open with the
+            // PREVIOUS screen — worse than no param, because a wrong value is still countable.
+            //
+            // The `else` branch is not symmetry for its own sake. The ChatViewModel outlives the
+            // dock, and the FULL-SCREEN chat route (AppNavRoute.AiChat, reachable from the drawer
+            // and the Overview tab) is a different screen with nothing behind it. Without the
+            // reset, a surface seeded on the Inbox tab stays set after the dock closes and
+            // retargets that screen's writes into the system Inbox — and ships the inbox snapshot
+            // from a screen that shows no inbox. Invariant: a surface is set only while the screen
+            // it names is showing. ChatRoute seeds the same "no screen behind me" value on entry,
+            // so the two ends of the invariant do not depend on each other.
+            LaunchedEffect(chatSheetOpen, chatSheetContextId, chatSurface) {
+                if (chatSheetOpen) {
+                    chatViewModel.sendIntent(
+                        ChatScreenIntent.OnSetScreenContext(chatSheetContextId, chatSurface)
+                    )
+                } else {
+                    // Surface only — the checklist id deliberately survives. Before screen-awareness
+                    // existed this effect wrote nothing on close, so the id outlived the dock; the
+                    // control arm's hintless writes are biased by that id, and moving where they land
+                    // would be a regression inside the frozen baseline of a live A/B. The surface is
+                    // the half that must go: it is what makes the Inbox and the day addressable.
+                    chatViewModel.sendIntent(ChatScreenIntent.OnScreenSurfaceCleared)
+                }
+            }
+
             // Funnel: fire ai_chat_opened + screenView(CHAT) each time the inline dock opens.
             // Keyed on chatSheetOpen so it fires on the false→true transition only (the
             // ViewModel is a singleton — its init can't count per-open dock toggles).
@@ -650,6 +703,8 @@ fun App() {
             val quickLinkPrefill = stringResource(Res.string.main_prompt_link_prefill)
             val quickRemindPrefill = stringResource(Res.string.main_prompt_remind_prefill)
             val quickPlanDayQuery = stringResource(Res.string.main_prompt_plan_day_query)
+            // v2 Inbox tab only — "file every captured task into a project".
+            val quickTriageInboxQuery = stringResource(Res.string.chat_prompt_triage_inbox_query)
             // Seed for the "✨ Create with AI" prompt chip on MainScreen: prefill only (the user
             // completes the topic and taps Send). "Create a checklist for …" hits the Layer-1
             // CreateChecklist trigger, so a create-preview card is shown on send.
@@ -672,7 +727,26 @@ fun App() {
             // - LINK / REMIND: open dock + prefill the input so the user completes the phrase.
             // - PLAN_DAY: open dock + prefill AND send immediately so the answer lands in the dock.
             val onQuickAction: (GistiQuickAction) -> Unit = { action ->
-                chatViewModel.sendIntent(ChatScreenIntent.OnSetContextChecklist(null))
+                // Clears the CHECKLIST (a home/tab chip is never about the list left behind) but
+                // KEEPS the SCREEN: in v2 these chips live inside the shell dock, so wiping the
+                // surface here is what used to make "Plan day" on the Calendar tab and "Triage
+                // inbox" on the Inbox tab context-blind.
+                //
+                // Recomputed instead of reading the hoisted `chatSurface` because the two are NOT
+                // the same value here: `chatSurface` is keyed on `chatSheetContextId`, which is
+                // rememberSaveable and may still hold the checklist a previous chip left behind —
+                // on Expanded two-pane that makes it ChecklistDetail. Passing openChecklistId=null
+                // is what lets the Inbox/Agenda branch fire for a chip that is about the TAB.
+                val chipSurface = chatSurfaceFor(navigator.backStack.toList(), navVariant, null)
+                // The v2 shell is the only place a tab surface exists (chatSurfaceFor returns
+                // Unknown for the control arm), so this doubles as "am I in the v2 shell".
+                val inV2Shell = chipSurface != ChatSurface.Unknown
+                chatViewModel.sendIntent(
+                    ChatScreenIntent.OnSetScreenContext(
+                        checklistId = null,
+                        surface = chipSurface,
+                    )
+                )
                 chatSheetContextId = null
                 chatSheetContextLabel = null
                 chatSheetOpen = true
@@ -691,8 +765,23 @@ fun App() {
                         chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickLinkPrefill))
                     GistiQuickAction.REMIND ->
                         chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickRemindPrefill))
+                    // forceAgent ONLY inside the v2 shell. The reasoning argument holds in both
+                    // arms (a reasoning request routed through Layer 2 comes back as FindItems →
+                    // "Nothing matches", Amplitude bug 2026-06-02), but MainScreen renders this
+                    // same chip in the CONTROL arm, and flipping it there turns a 1-credit classify
+                    // into an unconditional 3-credit agent turn inside the frozen baseline of the
+                    // live nav_v2_arm A/B — a Free-tier cost change on a 100-credit lifetime
+                    // wallet, and a contaminated credits-per-user read for the whole rollout.
+                    // Control keeps classify-then-escalate; only the v2 tabs, where the agenda
+                    // snapshot is what makes the answer worth the agent, pay the flat 3.
                     GistiQuickAction.PLAN_DAY ->
-                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickPlanDayQuery))
+                        chatViewModel.sendIntent(
+                            ChatScreenIntent.OnPrefillAndSend(quickPlanDayQuery, forceAgent = inV2Shell)
+                        )
+                    // v2 Inbox tab only — the whole point is a multi-step reasoning turn over the
+                    // inbox snapshot, which Layer 2 cannot produce.
+                    GistiQuickAction.TRIAGE_INBOX ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickTriageInboxQuery, forceAgent = true))
                 }
             }
 
@@ -737,16 +826,21 @@ fun App() {
             //    opens it with that checklist as context), and
             //  - the chips inside the already-open dock (context is re-seeded to the same id).
             //
-            // IMPORTANT (context-vs-send ordering): OnSetContextChecklist is sent SYNCHRONOUSLY here,
+            // IMPORTANT (context-vs-send ordering): OnSetScreenContext is sent SYNCHRONOUSLY here,
             // immediately before OnPrefillAndSend. Both are sequential sendIntent() calls processed in
             // order by the ViewModel, so the agent request carries the checklist context. We do NOT
-            // rely on the LaunchedEffect(chatSheetOpen, chatSheetContextId) below (it re-seeds context
-            // too, but only AFTER recomposition — too late for the synchronous send in OnPrefillAndSend).
+            // rely on the LaunchedEffect(chatSheetOpen, chatSheetContextId, chatSurface) declared
+            // ABOVE (at the chatSurface block): it re-seeds the same pair, but only AFTER
+            // recomposition — too late for the synchronous send in OnPrefillAndSend.
             val onChecklistQuickAction: (Long, String?, GistiChecklistAction) -> Unit = { checklistId, checklistName, action ->
                 chatSheetContextId = checklistId
                 chatSheetContextLabel = checklistName
                 chatSheetOpen = true
-                chatViewModel.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId))
+                // ChecklistDetail explicitly, not the derived surface: an open list always wins,
+                // and this path exists precisely because the list IS the context.
+                chatViewModel.sendIntent(
+                    ChatScreenIntent.OnSetScreenContext(checklistId, ChatSurface.ChecklistDetail)
+                )
                 when (action) {
                     // Reasoning chips: forceAgent=true routes straight to the reasoning agent,
                     // bypassing Layer 1/2 which mis-classify these as FindItems → "Nothing matches"
@@ -804,6 +898,10 @@ fun App() {
             val sm_dispatchFillLoadFailed = stringResource(Res.string.chat_dispatch_fill_load_failed)
             val sm_dispatchCompletedItemsRemoved = stringResource(Res.string.chat_dispatch_completed_items_removed)
             val sm_dispatchNoCompletedItems = stringResource(Res.string.chat_dispatch_no_completed_items)
+            // move_item outcomes. Same sync rule as every key here — also lives in ChatRoute.kt's map.
+            val sm_dispatchMovedItem = stringResource(Res.string.chat_dispatch_moved_item)
+            val sm_dispatchMoveSameList = stringResource(Res.string.chat_dispatch_move_same_list)
+            val sm_dispatchMoveBlocked = stringResource(Res.string.chat_dispatch_move_blocked)
             val sm_insufficientCredits = stringResource(Res.string.chat_insufficient_credits)
             val sm_completionError = stringResource(Res.string.chat_completion_error)
             // F1 connectivity-aware error replies. Keep in step with ChatRoute.kt's map.
@@ -889,6 +987,9 @@ fun App() {
                     "chat_dispatch_fill_load_failed" to sm_dispatchFillLoadFailed,
                     "chat_dispatch_completed_items_removed" to sm_dispatchCompletedItemsRemoved,
                     "chat_dispatch_no_completed_items" to sm_dispatchNoCompletedItems,
+                    "chat_dispatch_moved_item" to sm_dispatchMovedItem,
+                    "chat_dispatch_move_same_list" to sm_dispatchMoveSameList,
+                    "chat_dispatch_move_blocked" to sm_dispatchMoveBlocked,
                     "chat_insufficient_credits" to sm_insufficientCredits,
                     "chat_completion_error" to sm_completionError,
                     "chat_error_offline" to sm_errorOffline,
@@ -994,16 +1095,8 @@ fun App() {
                 }
             }
 
-            // When the panel opens, seed the context checklist so Layer 1/2/3 requests
-            // default to the right checklist. Also re-seeds when context changes without
-            // the panel closing (e.g. user taps another checklist's dock while panel is open).
-            LaunchedEffect(chatSheetOpen, chatSheetContextId) {
-                if (chatSheetOpen) {
-                    chatViewModel.sendIntent(
-                        ChatScreenIntent.OnSetContextChecklist(chatSheetContextId)
-                    )
-                }
-            }
+            // (The screen-context seed effect lives further up, immediately BEFORE the
+            // ai_chat_opened effect — that ordering is what makes its `surface` param truthful.)
 
             // Panel help sheet flag — shown when the "?" banner icon is tapped
             var chatPanelHelpSheetOpen by remember { mutableStateOf(false) }
@@ -1118,39 +1211,18 @@ fun App() {
 
             // True while ANY v2 tab route is anywhere in the stack — mirrors showShell's .any {} so the
             // shell stays mounted (and the tab state alive) under a pushed detail screen.
-            val v2AnyTabInStack = navigator.backStack.any { key ->
-                key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
-                key is AppNavRoute.Projects || key is AppNavRoute.Main ||
-                key is AppNavRoute.Overview
-            }
+            val v2AnyTabInStack = navigator.backStack.any(::isV2TabRoute)
 
-            // findLast, not last: on Expanded two-pane a ChecklistDetail sits on top while Main still
-            // renders in the list pane, and the bar must keep pointing at the tab underneath.
+            // findLast, not last (see [v2TabFor]): on Expanded two-pane a ChecklistDetail sits on
+            // top while Main still renders in the list pane, and the bar must keep pointing at the
+            // tab underneath.
             val v2SelectedTab = remember(navigator.backStack.toList()) {
-                val topTab = navigator.backStack.findLast { key ->
-                    key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
-                    key is AppNavRoute.Projects || key is AppNavRoute.Main ||
-                    key is AppNavRoute.Overview
-                }
-                when (topTab) {
-                    is AppNavRoute.Calendar -> V2Destination.Calendar
-                    is AppNavRoute.Projects -> V2Destination.Projects
-                    // Main is still mapped to the Projects tab: a deep link that re-roots the stack
-                    // around Main (gallery link, weekly-checklist create) can land here in v2, and
-                    // leaving it unmatched would highlight "Inbox" while a different screen renders.
-                    is AppNavRoute.Main -> V2Destination.Projects
-                    is AppNavRoute.Overview -> V2Destination.Overview
-                    else -> V2Destination.Inbox
-                }
+                v2TabFor(navigator.backStack)
             }
 
             // Chrome visibility is decided by the TOP entry (unlike showV2Shell): the bar and the FAB
             // must not float over ChecklistDetail / AiChat / Settings pushed on top of a tab.
-            val v2BarVisible = navigator.backStack.lastOrNull().let { top ->
-                top is AppNavRoute.Inbox || top is AppNavRoute.Calendar ||
-                top is AppNavRoute.Projects || top is AppNavRoute.Main ||
-                top is AppNavRoute.Overview
-            }
+            val v2BarVisible = isV2TabRoute(navigator.backStack.lastOrNull())
 
             val showV2Shell = navVariant == NavVariant.V2 && v2AnyTabInStack
 
@@ -1173,6 +1245,20 @@ fun App() {
             // the screen reacts to a CHANGE of key, so a flag would have to be reset by the receiver
             // and a second tap on the same tab would emit the same value and do nothing.
             var v2InboxHomeSignal by remember { mutableIntStateOf(0) }
+
+            /**
+             * Checklist the Inbox pager is settled on, held HERE rather than inside the Inbox entry.
+             *
+             * Opening a checklist pushes the detail route over that entry, and coming back neither its
+             * composition nor its ViewModel survives — verified on an emulator, where seeding the
+             * pager from the ViewModel's own selected page still landed on the Inbox. This composable
+             * is the nearest scope that outlives the push, so the anchor lives at this level and the
+             * screen only reports changes to it.
+             *
+             * rememberSaveable, so the page also survives process death and a configuration change.
+             * Null means "no anchor yet" and resolves to page 0, which is the Inbox by construction.
+             */
+            var v2InboxAnchorChecklistId by rememberSaveable { mutableStateOf<Long?>(null) }
             // Any route change closes both docks — each is anchored to the screen it was opened over,
             // so carrying one onto the next screen leaves a stale context (a chat banner reading
             // "Ask about <list>", or a capture input aimed at a page that is no longer showing).
@@ -1358,8 +1444,22 @@ fun App() {
             // slot — it captures the singleton ChatViewModel and all global wiring (recorder, pickers,
             // focusRequester) declared above. The screen passes its own (expanded, onExpand, onCollapse)
             // so a tablet two-pane never shares a draggable state across panes (it's just a Boolean).
+            // The banner must not promise more than the chat can do: it names the OPEN LIST when
+            // there is one, otherwise the SCREEN the dock is anchored to. `null` (the generic
+            // placeholder) stays the control-arm answer, since chatSurface is Unknown there.
+            val chatContextInbox = stringResource(Res.string.chat_dock_context_inbox)
+            val chatContextToday = stringResource(Res.string.chat_dock_context_today)
+            val chatContextProjects = stringResource(Res.string.chat_dock_context_projects)
+            val chatContextOverview = stringResource(Res.string.chat_dock_context_overview)
             val resolvedContextLabel = chatSheetContextLabel?.let { name ->
                 chatDockAskAboutFmt.replace("%1\$s", name)
+            } ?: when (chatSurface) {
+                ChatSurface.Inbox -> chatContextInbox
+                ChatSurface.Agenda -> chatContextToday
+                ChatSurface.Projects -> chatContextProjects
+                ChatSurface.Overview -> chatContextOverview
+                // Unknown / ChecklistDetail-without-a-label → the generic placeholder, as today.
+                ChatSurface.Unknown, ChatSurface.ChecklistDetail -> null
             }
             val lastAssistantMessage = remember(chatUiState.messages) {
                 chatUiState.messages.lastOrNull { it.role == ChatRole.Assistant }
@@ -1911,6 +2011,16 @@ fun App() {
                                         AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
                                         mapOf(AnalyticsParams.SOURCE to "detail_toolbar"),
                                     )
+                                    // Bind the dock to THIS checklist before opening it.
+                                    // `chatSheetContextId` is rememberSaveable and survives route
+                                    // changes, so without this the dock either had no context at
+                                    // all or was still pointing at the checklist a previous chip
+                                    // left behind — the banner would read 'Ask about "A"' over B.
+                                    // The name is not known here (App only sees route.checklistId),
+                                    // and a stale name is worse than none: null falls back to the
+                                    // generic banner while the id still targets the right list.
+                                    chatSheetContextId = route.checklistId
+                                    chatSheetContextLabel = null
                                     // Opens the shell's dock OVER this checklist instead of pushing
                                     // the chat route. Asking "what am I missing here?" only makes
                                     // sense while "here" is still on screen — navigating away took
@@ -2060,6 +2170,8 @@ fun App() {
                             // shell can hide its FABs while the dock is up (see fabsVisible).
                             createDockOpen = v2CreateDockOpen,
                             onCreateDockDismiss = { v2CreateDockOpen = false },
+                            anchorChecklistId = v2InboxAnchorChecklistId,
+                            onAnchorChecklistChanged = { v2InboxAnchorChecklistId = it },
                             // Swallow BACK only while the Inbox IS the top of the stack. On Expanded
                             // this entry is a listPane that stays composed beside a pushed
                             // ChecklistDetail, and a handler registered later than NavDisplay's wins —
@@ -2226,14 +2338,39 @@ fun App() {
                             chatFullContent = chatFullContent,
                             peekPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
                             chips = {
+                                // The chip set follows the SCREEN, so the capability the chat has
+                                // just gained on it is discoverable without typing. Projects /
+                                // Overview / a pushed detail route keep today's list unchanged.
+                                val createAiLabel = stringResource(Res.string.main_create_with_ai_action)
+                                val photoLabel = stringResource(Res.string.main_prompt_photo)
+                                val remindLabel = stringResource(Res.string.main_prompt_remind)
+                                val linkLabel = stringResource(Res.string.main_prompt_link)
+                                val planDayLabel = stringResource(Res.string.main_prompt_plan_day)
+                                val triageLabel = stringResource(Res.string.chat_prompt_triage_inbox)
                                 GistiPromptChips(
-                                    chips = gistiDefaultPromptChips(
-                                        createAiLabel = stringResource(Res.string.main_create_with_ai_action),
-                                        photoLabel = stringResource(Res.string.main_prompt_photo),
-                                        remindLabel = stringResource(Res.string.main_prompt_remind),
-                                        linkLabel = stringResource(Res.string.main_prompt_link),
-                                        planDayLabel = stringResource(Res.string.main_prompt_plan_day),
-                                    ),
+                                    chips = when (chatSurface) {
+                                        ChatSurface.Inbox -> gistiInboxPromptChips(
+                                            triageLabel = triageLabel,
+                                            planDayLabel = planDayLabel,
+                                            createAiLabel = createAiLabel,
+                                            photoLabel = photoLabel,
+                                            linkLabel = linkLabel,
+                                        )
+                                        ChatSurface.Agenda -> gistiAgendaPromptChips(
+                                            planDayLabel = planDayLabel,
+                                            createAiLabel = createAiLabel,
+                                            photoLabel = photoLabel,
+                                            remindLabel = remindLabel,
+                                            linkLabel = linkLabel,
+                                        )
+                                        else -> gistiDefaultPromptChips(
+                                            createAiLabel = createAiLabel,
+                                            photoLabel = photoLabel,
+                                            remindLabel = remindLabel,
+                                            linkLabel = linkLabel,
+                                            planDayLabel = planDayLabel,
+                                        )
+                                    },
                                     onChipClick = onQuickAction,
                                     onNewListClick = { navigator.navigateToCreateChecklistScreen() },
                                     newListLabel = stringResource(Res.string.main_prompt_new_list),
@@ -2458,6 +2595,70 @@ fun App() {
             } // AppLocaleEnvironment
         } // AppTheme
         } // CompositionLocalProvider(LocalEmojiFont)
+    }
+}
+
+// ─── v2 shell route predicates (single definition — they replaced four inline copies) ──────────
+
+/**
+ * The five routes the v2 shell treats as tabs.
+ *
+ * ONE definition on purpose: the same predicate used to be written out inline for
+ * `v2AnyTabInStack`, `v2SelectedTab` and `v2BarVisible`, so adding a tab meant remembering three
+ * places. Everything below reads this.
+ */
+private fun isV2TabRoute(key: Any?): Boolean =
+    key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
+        key is AppNavRoute.Projects || key is AppNavRoute.Main ||
+        key is AppNavRoute.Overview
+
+/**
+ * The [V2Destination] of the tab currently under the stack.
+ *
+ * findLast, not last: on Expanded two-pane a ChecklistDetail sits on top while Main still renders
+ * in the list pane, and the bar must keep pointing at the tab underneath.
+ */
+private fun v2TabFor(backStack: List<Any?>): String = when (backStack.findLast(::isV2TabRoute)) {
+    is AppNavRoute.Calendar -> V2Destination.Calendar
+    is AppNavRoute.Projects -> V2Destination.Projects
+    // Main is still mapped to the Projects tab: a deep link that re-roots the stack around Main
+    // (gallery link, weekly-checklist create) can land here in v2, and leaving it unmatched would
+    // highlight "Inbox" while a different screen renders.
+    is AppNavRoute.Main -> V2Destination.Projects
+    is AppNavRoute.Overview -> V2Destination.Overview
+    else -> V2Destination.Inbox
+}
+
+/**
+ * WHERE the chat is anchored, derived from state App.kt already reads.
+ *
+ * DERIVED, NEVER STORED. `chatSheetContextId` is `rememberSaveable` and outlives the dock — that is
+ * why the v2 FAB has to null it by hand. A second *saved* context field would inherit that trap; a
+ * pure function of (back stack, arm, open checklist) cannot go stale.
+ *
+ * Takes the arm and the back stack as PARAMETERS rather than reading window/configuration state:
+ * `rememberAppWindowSizeClass()` is not free (see the note at its call site), and this must not
+ * become a new recomposition source in the baseline arm.
+ *
+ * Pure and internal so the mapping is unit-testable without a composition.
+ */
+internal fun chatSurfaceFor(
+    backStack: List<Any?>,
+    navVariant: NavVariant,
+    openChecklistId: Long?,
+): ChatSurface = when {
+    // An open checklist wins over the tab beneath it: on Expanded two-pane both are on screen.
+    openChecklistId != null -> ChatSurface.ChecklistDetail
+    navVariant != NavVariant.V2 -> ChatSurface.Unknown
+    // A non-tab route (detail / settings / chat) is on top → the tab underneath is not what the
+    // user is looking at. Mirrors v2BarVisible's rule, from the same predicate.
+    !isV2TabRoute(backStack.lastOrNull()) -> ChatSurface.Unknown
+    else -> when (v2TabFor(backStack)) {
+        V2Destination.Inbox -> ChatSurface.Inbox
+        V2Destination.Calendar -> ChatSurface.Agenda
+        V2Destination.Projects -> ChatSurface.Projects
+        V2Destination.Overview -> ChatSurface.Overview
+        else -> ChatSurface.Unknown
     }
 }
 

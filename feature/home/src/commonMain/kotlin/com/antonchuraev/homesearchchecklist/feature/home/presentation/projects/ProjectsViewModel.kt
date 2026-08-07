@@ -40,18 +40,41 @@ private const val TAG = "ProjectsViewModel"
  *   apparently finished checklist.
  * - [ProjectRow.isComplete] requires a NON-EMPTY list. An empty checklist also has zero open items,
  *   and treating it as complete congratulates the user for a list they never wrote.
+ * - [ProjectRow.totalCount] is the size of the very same filtered list [ProjectRow.openCount] comes
+ *   from. Counting `checklist.items` for the total while counting the fill for the open items would
+ *   make the ring drift from the number next to it on any checklist whose fill has been edited.
+ * - [ProjectRow.reminderCount] is counted over the very same filtered leaf list, for the same reason
+ *   the total is: the card prints the three numbers side by side, so a reminder counted over a wider
+ *   set than the tasks would make one card contradict itself. A reminder on a folder mirror row is
+ *   therefore not counted, and neither is the checklist-level reminder — neither is one of the rows
+ *   these numbers are about. Reminders live on fill items only, so the no-fill fallback is 0.
+ * - [ProjectRow.isEmpty] is the ONE number here that counts folders, and it is not a count at all:
+ *   it asks "does opening this checklist show anything". The detail screen renders folder rows, so a
+ *   checklist holding a folder and no tasks has zero leaves but is not empty on screen — reporting
+ *   it as "Empty" from the leaf count is the counter-vs-rendered-node-set mismatch this project has
+ *   already shipped once on the detail screen.
  */
 internal fun toProjectRow(checklist: Checklist, fill: ChecklistFill?): ProjectRow {
     val folderTemplateIds = checklist.items.filter { it.isFolder }.map { it.id }.toSet()
-    val items = fill?.items
+    val nodes = fill?.items
+    val leaves = nodes
         ?.filterNot { item -> item.templateItemId?.let { it in folderTemplateIds } == true }
-    val total = items?.size ?: checklist.items.count { !it.isFolder }
-    val open = items?.count { !it.checked } ?: total
+    val total = leaves?.size ?: checklist.items.count { !it.isFolder }
+    val open = leaves?.count { !it.checked } ?: total
     return ProjectRow(
         checklistId = checklist.id,
         title = checklist.name,
         openCount = open,
+        totalCount = total,
+        // Counted over `leaves` — the SAME filtered set as the two counters above, so the three
+        // badges on the card can not describe three different sets of rows. No template fallback:
+        // reminders exist only on fill items, so "no fill" honestly means "no reminders", never a
+        // number borrowed from a source that does not carry the field.
+        reminderCount = leaves?.count { it.hasActiveReminder } ?: 0,
         isComplete = total > 0 && open == 0,
+        // Unfiltered on purpose — see the folder note above. Same fill-first / template-fallback
+        // source as the counts, so the three can not answer from two different snapshots.
+        isEmpty = (nodes?.size ?: checklist.items.size) == 0,
     )
 }
 

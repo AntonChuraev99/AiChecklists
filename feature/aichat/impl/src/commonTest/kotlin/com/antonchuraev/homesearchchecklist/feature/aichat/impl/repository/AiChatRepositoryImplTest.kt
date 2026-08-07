@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Remote
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteTranscriptionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
@@ -130,6 +131,7 @@ private class FakeChatAgentApiService : ChatAgentApiService {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult = AgentStepResult.ServiceError
