@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
@@ -172,6 +173,7 @@ internal class AiChatRepositoryImpl(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult {
@@ -187,6 +189,7 @@ internal class AiChatRepositoryImpl(
             locale = locale,
             checklistsSummary = checklistsSummary,
             contextChecklistName = contextChecklistName,
+            screenSnapshot = screenSnapshot,
             requestId = requestId,
             responseLanguage = responseLanguage,
         )

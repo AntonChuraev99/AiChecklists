@@ -848,6 +848,11 @@ object AnalyticsParams {
      * The paywall is rendered by more than one host (the standalone paywall screen AND the
      * onboarding paywall step), so a funnel that does not split on `surface` mixes two
      * populations with very different intent. Present on every event of the purchase funnel.
+     *
+     * Reused by `ai_chat_opened` for the same reason with a different vocabulary: the SCREEN the
+     * chat dock was opened over (`inbox` / `agenda` / `projects` / `overview`, `none` in the
+     * control arm and on non-tab routes — see `ChatSurface.wireValue`). One param, two value sets,
+     * disjoint by event name; a second key would split "which surface" across two columns.
      */
     const val SURFACE = "surface"
 

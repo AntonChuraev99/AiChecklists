@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import kotlinx.coroutines.CoroutineDispatcher
@@ -86,6 +87,7 @@ internal class ScriptedAiChatRepository(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult {

@@ -53,7 +53,15 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -97,11 +105,19 @@ private class FakeAiChatRepository(
     /** Captures the responseLanguage forwarded to each agentStep call (explicit reply-language override). */
     val agentStepResponseLanguages = mutableListOf<String?>()
 
+    /**
+     * Captures the screenSnapshot forwarded to each agentStep call. `null` is the load-bearing
+     * value: `explicitNulls = false` drops the whole `context_screen` key, which is what keeps the
+     * control arm's request byte-identical.
+     */
+    val agentStepScreenSnapshots = mutableListOf<ChatScreenSnapshot?>()
+
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult {
@@ -111,6 +127,7 @@ private class FakeAiChatRepository(
         agentStepChecklists.add(checklistsSummary.toList())
         agentStepRequestIds.add(requestId)
         agentStepResponseLanguages.add(responseLanguage)
+        agentStepScreenSnapshots.add(screenSnapshot)
         val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
@@ -177,7 +194,17 @@ private class ThrowingChatHistoryRepository(
 private class FakeChecklistRepository(
     /** Seed checklists used by [getChecklistById] / [checklists] for the P5 context-bias tests. */
     private val seed: List<Checklist> = emptyList(),
+    /**
+     * Default fills by checklist id. Empty by default (the P5 tests never read a fill); the
+     * screen-snapshot tests seed one, because an Inbox snapshot is built from its fill rows.
+     */
+    private val seedFills: Map<Long, com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill> = emptyMap(),
+    /** Rows [getRemindersInRange] returns — the agenda snapshot's only source. */
+    private val seedReminders: List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList(),
 ) : ChecklistRepository {
+    /** Every (fromMs, toMs) [getRemindersInRange] was called with — the agenda window under test. */
+    val reminderRanges = mutableListOf<Pair<Long, Long>>()
+
     override val checklists: Flow<List<Checklist>> = MutableStateFlow(seed)
     override val weeklyChecklistCount: Flow<Int> = MutableStateFlow(0)
     override suspend fun addChecklist(checklist: Checklist): Long = throw UnsupportedOperationException()
@@ -193,7 +220,7 @@ private class FakeChecklistRepository(
     override suspend fun setReminder(checklistId: Long, reminderAt: Long?) = Unit
     override suspend fun countActiveReminders(): Int = 0
     override suspend fun getActiveReminders() = emptyList<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo>()
-    override suspend fun getDefaultFillOneShot(checklistId: Long): com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill? = null
+    override suspend fun getDefaultFillOneShot(checklistId: Long): com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill? = seedFills[checklistId]
     override suspend fun getAllItemRemindersForRescheduling() = emptyList<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo>()
     override suspend fun setRepeatSchedule(checklistId: Long, rule: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long) = Unit
     override suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int) = Unit
@@ -205,7 +232,10 @@ private class FakeChecklistRepository(
     override suspend fun getTotalAdditionalFillCount(): Int = 0
     override suspend fun getWeeklyChecklistCount(): Int = 0
     override fun observeRemindersInRange(fromMs: Long, toMs: Long) = flowOf(emptyList<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>())
-    override suspend fun getRemindersInRange(fromMs: Long, toMs: Long) = emptyList<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>()
+    override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> {
+        reminderRanges.add(fromMs to toMs)
+        return seedReminders
+    }
     override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
     override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
     override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
@@ -2173,7 +2203,7 @@ class ChatViewModelTest {
         // Initially no context
         assertNull(vm.screenState.value.contextChecklistId)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 42L))
 
         assertEquals(42L, vm.screenState.value.contextChecklistId)
     }
@@ -2182,11 +2212,11 @@ class ChatViewModelTest {
     fun onSetContextChecklist_withNull_clearsContextChecklistId() {
         val vm = makeVm()
         // Seed a context first
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 99L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 99L))
         assertEquals(99L, vm.screenState.value.contextChecklistId)
 
         // Clear it
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = null))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = null))
 
         assertNull(vm.screenState.value.contextChecklistId)
     }
@@ -2194,7 +2224,7 @@ class ChatViewModelTest {
     @Test
     fun onSetContextChecklist_doesNotAffectMessages() {
         val vm = makeVm()
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 7L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 7L))
 
         // Message list stays untouched by context seeding
         assertEquals(0, vm.screenState.value.messages.size)
@@ -2203,10 +2233,10 @@ class ChatViewModelTest {
     @Test
     fun onSetContextChecklist_updatesIdRepeatedly() {
         val vm = makeVm()
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 1L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 1L))
         assertEquals(1L, vm.screenState.value.contextChecklistId)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 2L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 2L))
         assertEquals(2L, vm.screenState.value.contextChecklistId,
             "Re-opening the sheet for a different checklist must update the context ID")
     }
@@ -2252,7 +2282,7 @@ class ChatViewModelTest {
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
         // Focus the dock on Groceries, then send a list-less command.
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 42L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
@@ -2276,7 +2306,7 @@ class ChatViewModelTest {
         val fakeDispatcher = FakeToolCallDispatcher()
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 42L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
@@ -2296,7 +2326,7 @@ class ChatViewModelTest {
                 preBuiltToolCall = preBuilt,
             )
         )
-        // Seed present but no OnSetContextChecklist call → contextChecklistId stays null.
+        // Seed present but no OnSetScreenContext call → contextChecklistId stays null.
         // One list only, so the hintless add is NOT ambiguous: it falls through to the dispatcher
         // (which resolves a null hint itself) rather than stopping to ask "which list?".
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
@@ -2328,7 +2358,7 @@ class ChatViewModelTest {
         val fakeDispatcher = FakeToolCallDispatcher()
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 99L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 99L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
@@ -2352,7 +2382,7 @@ class ChatViewModelTest {
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
         val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 42L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("create checklist Party"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
@@ -2379,7 +2409,7 @@ class ChatViewModelTest {
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
         val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 42L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
@@ -2405,7 +2435,7 @@ class ChatViewModelTest {
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
         val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
 
-        // No OnSetContextChecklist call.
+        // No OnSetScreenContext call.
         vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
@@ -2534,7 +2564,7 @@ class ChatViewModelTest {
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
         val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 42L))
         vm.sendIntent(
             ChatScreenIntent.OnPrefillAndSend(
                 text = "What's missing from this checklist?",
@@ -2677,7 +2707,7 @@ class ChatViewModelTest {
         val analytics = FakeAnalyticsTracker()
         val vm = makeVm(repo = repo, analytics = analytics)
 
-        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 5L))
+        vm.sendIntent(ChatScreenIntent.OnSetScreenContext(checklistId = 5L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
@@ -3988,5 +4018,526 @@ class ChatViewModelTest {
         assertEquals(0, repo.classifyCallCount, "prefill must NOT classify")
         assertEquals(0, repo.agentStepCallCount, "prefill must NOT reach the agent loop")
         assertEquals(0, vm.screenState.value.messages.size, "prefill must NOT append a message")
+    }
+
+    // ══ 66. Screen-aware chat: the SURFACE half of the context ════════════════
+    //
+    // Two halves, two mechanisms, and the tests keep them apart:
+    //  - the TARGET travels by id through biasToolCallToContext — and now on the AGENT path too,
+    //    which is the regression these first tests guard (before this, L3 only ever saw a NAME in
+    //    the prompt, and a name can never resolve to the system Inbox);
+    //  - the SNAPSHOT travels as the additive `context_screen` field, which must be ABSENT on
+    //    every surface but the two the model is blind to.
+
+    /** The system Inbox (id 9) plus one ordinary project, with a populated Inbox fill. */
+    private fun inboxCheckistRepo(
+        inboxItems: List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem> =
+            listOf(
+                com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem(
+                    text = "Call the bank",
+                    checked = false,
+                ),
+            ),
+    ) = FakeChecklistRepository(
+        seed = listOf(
+            Checklist(id = 42L, name = "Groceries", items = emptyList()),
+            Checklist(id = 9L, name = "Inbox", items = emptyList(), isInbox = true),
+        ),
+        seedFills = mapOf(
+            9L to com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill(
+                id = 99L,
+                checklistId = 9L,
+                name = "Inbox",
+                items = inboxItems,
+                isDefault = true,
+            ),
+        ),
+    )
+
+    private fun addMilkAgentRepo() = FakeAiChatRepository(
+        classifyResult = IntentClassification(
+            intent = ChatIntent.FreeForm,
+            confidence = 1.0f,
+            layer = RoutingLayer.FullChat,
+        ),
+        agentStepResults = listOf(
+            AgentStepResult.ToolCalls(
+                calls = listOf(
+                    AgentToolCall(
+                        id = "call-1",
+                        name = "add_item",
+                        // No checklist_hint — the model does not know the Inbox exists.
+                        args = buildJsonObject { put("item_text", "milk") },
+                    ),
+                ),
+                creditsRemaining = 297,
+            ),
+            AgentStepResult.Final(content = "Added.", creditsRemaining = 297),
+        ),
+    )
+
+    @Test
+    fun agentPath_inboxSurface_dispatchesListlessAddWithTheInboxId() = runTest {
+        // THE F2 REGRESSION GUARD. The agent path used to dispatch mapped calls raw, so a list-less
+        // add on the Inbox tab fell through to the dispatcher's "first project" default.
+        val repo = addMilkAgentRepo()
+        val dispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = dispatcher, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Inbox),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val dispatched = dispatcher.lastDispatched
+        assertIs<ToolCall.AddItem>(dispatched, "the approved add must have reached the dispatcher")
+        assertEquals(
+            9L,
+            dispatched.checklistId,
+            "a list-less add on the Inbox tab must carry the INBOX id — a name can never reach it",
+        )
+    }
+
+    @Test
+    fun agentPath_unknownSurface_leavesTheListlessAddUnbiased() = runTest {
+        // Control arm / non-tab route: unchanged behaviour, no id injected.
+        val repo = addMilkAgentRepo()
+        val dispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = dispatcher, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Unknown),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val dispatched = dispatcher.lastDispatched
+        assertIs<ToolCall.AddItem>(dispatched)
+        assertNull(dispatched.checklistId, "no surface ⇒ no id, exactly as before this change")
+        assertNull(dispatched.checklistHint, "and no invented hint either")
+    }
+
+    @Test
+    fun inboxSurface_sendsContextScreenAndNoContextChecklist() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(AgentStepResult.Final(content = "ok", creditsRemaining = 1)),
+        )
+        val vm = makeVm(repo = repo, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Inbox),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in my inbox?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val snapshot = repo.agentStepScreenSnapshots.single()
+        assertNotNull(snapshot, "the Inbox is invisible to checklists_summary — it MUST be sent")
+        assertEquals("inbox", snapshot.kind)
+        assertEquals("Inbox", snapshot.label)
+        assertEquals(listOf("Call the bank"), snapshot.items.map { it.text })
+        assertEquals(1, snapshot.totalItems)
+        assertNull(
+            repo.agentStepContextNames.single(),
+            "the inbox name must NOT ride on context_checklist: hints resolve against `projects`, " +
+                "which excludes it, so the model would be taught a call that always fails",
+        )
+    }
+
+    @Test
+    fun checklistDetailSurface_sendsContextChecklistAndNoContextScreen() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(AgentStepResult.Final(content = "ok", creditsRemaining = 1)),
+        )
+        val vm = makeVm(repo = repo, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(
+                checklistId = 42L,
+                surface = ChatSurface.ChecklistDetail,
+            ),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what's missing?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Groceries", repo.agentStepContextNames.single())
+        assertNull(
+            repo.agentStepScreenSnapshots.single(),
+            "an open checklist already travels as context_checklist — two sources for one fact",
+        )
+    }
+
+    @Test
+    fun unknownSurface_sendsNeitherContextField() = runTest {
+        // The control arm's request must stay byte-identical: both optional fields absent.
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(AgentStepResult.Final(content = "ok", creditsRemaining = 1)),
+        )
+        val vm = makeVm(repo = repo, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("hello"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(repo.agentStepContextNames.single())
+        assertNull(repo.agentStepScreenSnapshots.single())
+    }
+
+    @Test
+    fun projectsSurface_sendsNoSnapshot_becauseChecklistsSummaryAlreadyCarriesIt() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(AgentStepResult.Final(content = "ok", creditsRemaining = 1)),
+        )
+        val vm = makeVm(repo = repo, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Projects),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("how am I doing?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(
+            repo.agentStepScreenSnapshots.single(),
+            "Projects/Overview are already in checklists_summary — paying tokens twice buys nothing",
+        )
+    }
+
+    // ══ 66b. The AGENDA surface — the branch that shipped with no coverage at all ═══
+    //
+    // Three separate things are asserted here because three separate defects lived in them:
+    // the date WINDOW (a fixed +24h is wrong on a DST day), the row MAPPING (a checklist-level
+    // reminder used to render as `Groceries in "Groceries"`), and the BIAS (the Calendar screen
+    // shows other lists' items, so only a capture may be aimed at the inbox).
+
+    private fun itemReminder(
+        checklistId: Long,
+        checklistName: String,
+        itemText: String,
+        at: Long,
+    ) = com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo.ItemLevel(
+        checklistId = checklistId,
+        checklistName = checklistName,
+        fillId = 1L,
+        itemId = "i1",
+        itemText = itemText,
+        reminderAt = at,
+        isRecurring = false,
+    )
+
+    private fun checklistReminder(
+        checklistId: Long,
+        checklistName: String,
+        at: Long,
+    ) = com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo.ChecklistLevel(
+        checklistId = checklistId,
+        checklistName = checklistName,
+        reminderAt = at,
+        isRecurring = false,
+    )
+
+    /** The Inbox repo plus today's agenda rows. */
+    private fun agendaRepo(
+        reminders: List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>,
+    ) = FakeChecklistRepository(
+        seed = listOf(
+            Checklist(id = 42L, name = "Groceries", items = emptyList()),
+            Checklist(id = 9L, name = "Inbox", items = emptyList(), isInbox = true),
+        ),
+        seedFills = mapOf(
+            9L to com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill(
+                id = 99L,
+                checklistId = 9L,
+                name = "Inbox",
+                items = emptyList(),
+                isDefault = true,
+            ),
+        ),
+        seedReminders = reminders,
+    )
+
+    @Test
+    fun agendaSurface_sendsTheDaySnapshotWithOneLinePerReminder() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(AgentStepResult.Final(content = "ok", creditsRemaining = 1)),
+        )
+        val at = 1_800_000_000_000L
+        val checklistRepo = agendaRepo(
+            listOf(
+                itemReminder(42L, "Groceries", "Buy milk", at),
+                checklistReminder(42L, "Groceries", at),
+            ),
+        )
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Agenda),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I do today?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val snapshot = repo.agentStepScreenSnapshots.single()
+        assertNotNull(snapshot, "no payload has ever carried the day — it MUST be sent")
+        assertEquals("agenda", snapshot.kind)
+        assertEquals(2, snapshot.totalItems)
+        assertEquals(listOf("Buy milk", "Groceries"), snapshot.items.map { it.text })
+        assertEquals(
+            "Groceries",
+            snapshot.items[0].listName,
+            "an ITEM-level reminder names the list it lives in",
+        )
+        assertNull(
+            snapshot.items[1].listName,
+            "a CHECKLIST-level reminder IS the list — repeating the name rendered as " +
+                "'- Groceries [in \"Groceries\"]' and invented a task named after its own list",
+        )
+        assertNull(
+            repo.agentStepContextNames.single(),
+            "the day is not a checklist — nothing may ride on context_checklist",
+        )
+    }
+
+    @Test
+    fun agendaSurface_windowIsLocalMidnightToMidnight_notAFixed24Hours() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(AgentStepResult.Final(content = "ok", creditsRemaining = 1)),
+        )
+        val checklistRepo = agendaRepo(emptyList())
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Agenda),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I do today?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val (from, to) = checklistRepo.reminderRanges.single()
+        val tz = TimeZone.currentSystemDefault()
+        val today = Clock.System.now().toLocalDateTime(tz).date
+        assertEquals(
+            today.atStartOfDayIn(tz).toEpochMilliseconds(),
+            from,
+            "the window opens at LOCAL midnight",
+        )
+        assertEquals(
+            today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz).toEpochMilliseconds() - 1,
+            to,
+            "and closes at the next local midnight — a fixed +24h drops tonight's 23:30 reminder " +
+                "on a fall-back day and adopts tomorrow's 00:30 one on a spring-forward day",
+        )
+    }
+
+    @Test
+    fun agendaSurface_hintlessCaptureGoesToTheInbox() = runTest {
+        // The one thing the Calendar screen itself files into the inbox (TodayViewModel does the
+        // same with its captures), so the bias is licensed here.
+        val repo = addMilkAgentRepo()
+        val dispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = dispatcher, checklistRepo = agendaRepo(emptyList()))
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Agenda),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val dispatched = assertIs<ToolCall.AddItem>(dispatcher.lastDispatched)
+        assertEquals(9L, dispatched.checklistId, "a bare capture on the day screen means the inbox")
+    }
+
+    @Test
+    fun agendaSurface_hintlessCompleteIsNotRetargetedToTheInbox() = runTest {
+        // "mark buy milk done" on the Calendar tab is about an item of SOME OTHER list that is due
+        // today — the screen renders those, the inbox is not even on it. Biasing this to the inbox
+        // answered `chat_dispatch_item_not_found` naming a list the user never mentioned.
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(
+                        AgentToolCall(
+                            id = "call-1",
+                            name = "complete_item",
+                            args = buildJsonObject { put("item_text", "Buy milk") },
+                        ),
+                    ),
+                    creditsRemaining = 297,
+                ),
+                AgentStepResult.Final(content = "Done.", creditsRemaining = 297),
+            ),
+        )
+        val dispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = dispatcher,
+            checklistRepo = agendaRepo(listOf(itemReminder(42L, "Groceries", "Buy milk", 1L))),
+        )
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Agenda),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("mark buy milk done"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val dispatched = assertIs<ToolCall.CompleteItem>(dispatcher.lastDispatched)
+        assertNull(dispatched.checklistId, "the day screen must not aim a completion at the inbox")
+        assertNull(dispatched.checklistHint, "and must not invent a hint either")
+    }
+
+    // ══ 66c. CONTROL-arm guard: the agent path is unbiased by an OPEN checklist ════
+    //
+    // The control arm's normal chat entry point is the dock on ChecklistDetailScreen. Before the
+    // screen-aware work the agent path dispatched mapped calls RAW. Both tests below pin that
+    // baseline: it must not move while the nav_v2_arm A/B is live.
+
+    @Test
+    fun agentPath_openChecklist_leavesTheListlessAddUnbiased() = runTest {
+        val repo = addMilkAgentRepo()
+        val dispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = dispatcher, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(
+                checklistId = 42L,
+                surface = ChatSurface.ChecklistDetail,
+            ),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val dispatched = assertIs<ToolCall.AddItem>(dispatcher.lastDispatched)
+        assertNull(
+            dispatched.checklistId,
+            "the agent path never carried the open checklist's id — the list still reaches the " +
+                "model as a NAME in the prompt, exactly as in the frozen baseline arm",
+        )
+        assertEquals(
+            "Groceries",
+            repo.agentStepContextNames.first(),
+            "…and the name half of the context is what does keep working",
+        )
+    }
+
+    @Test
+    fun agentPath_openChecklist_clearCompletedStillArrivesWithNoTarget() = runTest {
+        // A bulk clear is destructive enough that it never guesses: with no id and no hint the
+        // dispatcher raises the which-list picker. Biasing it to the open list silently removed
+        // that question in BOTH arms.
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(
+                        AgentToolCall(
+                            id = "call-1",
+                            name = "clear_completed_items",
+                            args = buildJsonObject { },
+                        ),
+                    ),
+                    creditsRemaining = 297,
+                ),
+                AgentStepResult.Final(content = "Cleared.", creditsRemaining = 297),
+            ),
+        )
+        val dispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = dispatcher, checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(
+                checklistId = 42L,
+                surface = ChatSurface.ChecklistDetail,
+            ),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("clear the ones I've finished"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val dispatched = assertIs<ToolCall.ClearCompleted>(dispatcher.lastDispatched)
+        assertNull(dispatched.checklistId, "a destructive bulk clear must keep refusing to guess")
+        assertNull(dispatched.checklistHint)
+    }
+
+    @Test
+    fun screenSnapshot_isSentOnTheFirstRoundOnly() = runTest {
+        // PRIVACY: the inbox rows are the one documented exception to "item text reaches Gemini
+        // only on explicit request". Re-sending them on every round multiplied that exception by
+        // AGENT_MAX_ROUNDS for a single question.
+        val repo = addMilkAgentRepo() // ToolCalls round, then Final round.
+        val vm = makeVm(repo = repo, dispatcher = FakeToolCallDispatcher(), checklistRepo = inboxCheckistRepo())
+
+        vm.sendIntent(
+            ChatScreenIntent.OnSetScreenContext(checklistId = null, surface = ChatSurface.Inbox),
+        )
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repo.agentStepScreenSnapshots.size, "this turn must have run two rounds")
+        assertNotNull(repo.agentStepScreenSnapshots[0], "round 1 grounds the model in the screen")
+        assertNull(
+            repo.agentStepScreenSnapshots[1],
+            "round 2 must NOT re-upload the inbox — the model's own tool results are authoritative",
+        )
     }
 }

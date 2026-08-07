@@ -19,6 +19,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenItem
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
@@ -48,7 +51,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolC
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolResultSerializer
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentTranscriptWindow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlin.concurrent.Volatile
@@ -69,7 +74,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.Instant
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_choice_action_add
 import aichecklists.core.designsystem.generated.resources.chat_choice_action_attach
@@ -581,11 +593,17 @@ class ChatViewModel(
 
             ChatScreenIntent.OnFeedbackSubmit -> handleFeedbackSubmit()
 
-            is ChatScreenIntent.OnSetContextChecklist -> {
+            is ChatScreenIntent.OnSetScreenContext -> {
                 _screenState.value = _screenState.value.copy(
                     contextChecklistId = intent.checklistId,
+                    contextSurface = intent.surface,
                 )
-                logger.debug(TAG, "context checklist set: ${intent.checklistId}")
+                logger.debug(TAG, "screen context set: surface=${intent.surface} checklist=${intent.checklistId}")
+            }
+
+            ChatScreenIntent.OnScreenSurfaceCleared -> {
+                _screenState.value = _screenState.value.copy(contextSurface = ChatSurface.Unknown)
+                logger.debug(TAG, "screen surface cleared (checklist context kept)")
             }
 
             is ChatScreenIntent.OnChatOpened -> {
@@ -595,9 +613,17 @@ class ChatViewModel(
                 analytics.screenView(AnalyticsScreens.CHAT)
                 analytics.event(
                     name = AnalyticsEvents.Chat.OPENED,
-                    params = mapOf(AnalyticsParams.SOURCE to intent.source),
+                    params = mapOf(
+                        AnalyticsParams.SOURCE to intent.source,
+                        // WHICH screen the dock was opened over. Reuses the existing `surface`
+                        // param — a name registers on first ingest, so no taxonomy change is
+                        // needed. "none" (not null) so the control arm has a countable
+                        // denominator instead of a missing property.
+                        AnalyticsParams.SURFACE to
+                            (_screenState.value.contextSurface.wireValue ?: "none"),
+                    ),
                 )
-                logger.debug(TAG, "chat opened: source=${intent.source}")
+                logger.debug(TAG, "chat opened: source=${intent.source} surface=${_screenState.value.contextSurface}")
             }
         }
     }
@@ -1250,6 +1276,23 @@ class ChatViewModel(
         // prompt carries the question, so no object rows.
         is ToolCall.ClearCompleted -> emptyList()
 
+        // The item moved, then where it lands. The destination is Accent, not Detail: it is the
+        // decision the user is approving — "this task belongs in THAT project".
+        is ToolCall.MoveItem -> buildList {
+            add(itemRow(toolCall.itemText))
+            add(
+                ChoiceObjectRow(
+                    value = toolCall.toChecklistHint,
+                    kind = RowKind.Destination,
+                    emphasis = RowEmphasis.Accent,
+                    contentDescription = choiceString(
+                        Res.string.chat_preview_checklist_label,
+                        toolCall.toChecklistHint,
+                    ),
+                ),
+            )
+        }
+
         // Read-only / agent-only variants never reach a write-intent choice block.
         is ToolCall.FindItemsQuery,
         is ToolCall.ReadChecklist,
@@ -1404,6 +1447,50 @@ class ChatViewModel(
 
     /** A list the client can name AND point at — see [ToolCall.withTarget]. */
     private data class ListTarget(val id: Long, val name: String)
+
+    /**
+     * WHERE the context list came from. It decides which calls may be retargeted to it — the
+     * licence is not the same for a list the user has OPEN and for a list a tab merely implies.
+     */
+    private enum class ContextOrigin {
+        /**
+         * A checklist the user actually has open behind the dock. Shipped behaviour (P5) and
+         * reachable in BOTH A/B arms — the control arm's dock is opened from ChecklistDetailScreen.
+         */
+        OpenChecklist,
+
+        /** The v2 Inbox tab: the screen IS the list, so it may stand in for any missing target. */
+        InboxTab,
+
+        /**
+         * The v2 Calendar tab. Its own CAPTURE target is the inbox (`TodayViewModel` writes new
+         * captures there), but everything the screen RENDERS lives in other lists — see
+         * [licenses].
+         */
+        AgendaTab,
+    }
+
+    /** The context list plus the [ContextOrigin] that produced it. */
+    private data class ScreenContext(val target: ListTarget, val origin: ContextOrigin)
+
+    /**
+     * Whether this origin licenses retargeting [toolCall] at the context list.
+     *
+     * The Calendar tab is the narrow case: "mark buy milk done" / "delete X" / "remind me about X"
+     * on that screen almost always mean an item of some OTHER list that happens to be due today,
+     * so aiming them at the inbox answers about a list the screen does not even show. Only a
+     * capture — the one thing the Calendar screen itself files into the inbox — is retargeted
+     * there; everything else, including a destructive `clear_completed_items`, falls through to
+     * normal resolution and therefore back to the which-list picker.
+     *
+     * The Inbox tab is the opposite case and gets the full licence including the destructive
+     * calls: there the screen IS the list, so "clear what's done" is not a guess — and `projects`
+     * excludes the Inbox, so without the id nothing the user asks for on that screen can land.
+     */
+    private fun ContextOrigin.licenses(toolCall: ToolCall): Boolean = when (this) {
+        ContextOrigin.OpenChecklist, ContextOrigin.InboxTab -> true
+        ContextOrigin.AgendaTab -> toolCall is ToolCall.AddItem || toolCall is ToolCall.AddItems
+    }
 
     // ─── Which-list candidates — ranking + disambiguating meta (D2) ───────────
 
@@ -2287,6 +2374,129 @@ class ChatViewModel(
         emptyList()
     }
 
+    // ─── Layer 3 screen snapshot (what checklists_summary structurally cannot carry) ──────
+
+    /**
+     * The content of the screen the dock was opened over — for the TWO surfaces the model cannot
+     * see any other way:
+     *  - the system **Inbox**, which [buildChecklistsSummary] excludes by construction (it reads
+     *    `ChecklistRepository.projects`), and
+     *  - the **day**, which no payload has ever carried.
+     *
+     * Projects / Overview / ChecklistDetail return null on purpose: their content is already in
+     * `checklists_summary` / `context_checklist`, and sending it twice would pay tokens per round
+     * to give the prompt two sources for one fact.
+     *
+     * Built ONCE per turn, exactly like [buildChecklistsSummary] — the agent's own tool results are
+     * the authority for anything that changed mid-turn, and the server prompt says so. Rebuilding
+     * per round would let two rounds of one turn disagree about the same screen.
+     *
+     * **PRIVACY CONTRACT.** [ToolCall.ReadChecklist] states the general rule: item text reaches
+     * Gemini only when the model explicitly asks for it. This snapshot is the ONE documented
+     * exception, and it is bounded on every axis:
+     *  - two surfaces only (Inbox, Agenda) — the two the model has no tool to reach, since
+     *    `read_checklist` resolves names against `projects` and the day is not a list at all;
+     *  - [SCREEN_SNAPSHOT_MAX_ITEMS] rows of [SCREEN_SNAPSHOT_MAX_TEXT] chars each;
+     *  - **the FIRST round of a turn only** (see [runAgentTurn]). Rounds 2..N re-send the
+     *    transcript, not the screen, so a five-round turn uploads the screen once rather than five
+     *    times. The prompt already tells the model its own tool results outrank the snapshot.
+     * Anything wider than that belongs behind an explicit `read_checklist`.
+     *
+     * A failure degrades to null (the turn still works, it just loses screen grounding) and is
+     * logged — never a silent swallow.
+     */
+    private suspend fun buildScreenSnapshot(): ChatScreenSnapshot? = runCatching {
+        when (_screenState.value.contextSurface) {
+            ChatSurface.Inbox -> {
+                // Both misses degrade the turn to "no screen grounding" — never silently. The
+                // symptom (the model answers as if there were no inbox while the banner says
+                // "Ask about your inbox") is otherwise unattributable in logcat.
+                val inbox = checklistRepository.observeInbox().first() ?: run {
+                    logger.warning(TAG, "buildScreenSnapshot: no inbox row on the Inbox surface — sending no screen context")
+                    return@runCatching null
+                }
+                val fill = checklistRepository.getDefaultFillOneShot(inbox.id) ?: run {
+                    logger.warning(TAG, "buildScreenSnapshot: inbox id=${inbox.id} has no materialised default fill — sending no screen context")
+                    return@runCatching null
+                }
+                ChatScreenSnapshot(
+                    kind = ChatSurface.Inbox.wireValue.orEmpty(),
+                    label = inbox.name,
+                    focusedDate = null,
+                    // Tail, not head: items are appended, so the freshest captures are what the
+                    // user means by "my inbox" when there are more than the budget allows.
+                    items = fill.items
+                        .takeLast(SCREEN_SNAPSHOT_MAX_ITEMS)
+                        .map { it.toScreenItem() },
+                    totalItems = fill.items.size,
+                )
+            }
+
+            ChatSurface.Agenda -> {
+                val tz = TimeZone.currentSystemDefault()
+                val today = Clock.System.now().toLocalDateTime(tz).date
+                val start = today.atStartOfDayIn(tz).toEpochMilliseconds()
+                // Local midnight to local midnight, NOT start + 24h: on a DST-shift day the
+                // calendar day is 23 or 25 hours long, and a fixed window either hides tonight's
+                // 23:30 reminder or reports tomorrow's 00:30 one as due today.
+                val end = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz).toEpochMilliseconds() - 1
+                val due = checklistRepository.getRemindersInRange(start, end)
+                ChatScreenSnapshot(
+                    kind = ChatSurface.Agenda.wireValue.orEmpty(),
+                    label = dateFormatter.formatDay(start),
+                    focusedDate = today.toString(),
+                    items = due.take(SCREEN_SNAPSHOT_MAX_ITEMS).map { it.toScreenItem() },
+                    totalItems = due.size,
+                )
+            }
+
+            // Projects / Overview / ChecklistDetail / Unknown → nothing new to tell the model.
+            ChatSurface.Projects,
+            ChatSurface.Overview,
+            ChatSurface.ChecklistDetail,
+            ChatSurface.Unknown -> null
+        }
+    }.getOrElse { e ->
+        logger.error(TAG, "buildScreenSnapshot failed for surface=${_screenState.value.contextSurface}", e)
+        null
+    }
+
+    private fun ChecklistFillItem.toScreenItem() = ChatScreenItem(
+        text = text.take(SCREEN_SNAPSHOT_MAX_TEXT),
+        checked = checked,
+        listName = null,
+        dueIso = null,
+        // Both flags exist so the model can SEE why move_item will refuse this row.
+        hasReminder = reminderAt != null || repeatRule != null,
+        hasAttachment = attachments.isNotEmpty(),
+    )
+
+    /**
+     * One agenda row → one prompt line.
+     *
+     * A CHECKLIST-level reminder is the whole list falling due, so it carries no `listName`:
+     * emitting the same string as both the item and its list rendered as `- Groceries [in
+     * "Groceries", …]` and taught the model there is a task named after the list inside it.
+     *
+     * `hasReminder` is true by construction — every row here came out of `getRemindersInRange` —
+     * and it is kept because it is the flag `move_item` refuses on, not because it distinguishes
+     * rows from each other.
+     */
+    private fun TodayReminderInfo.toScreenItem(): ChatScreenItem = ChatScreenItem(
+        text = when (this) {
+            is TodayReminderInfo.ItemLevel -> itemText
+            is TodayReminderInfo.ChecklistLevel -> checklistName
+        }.take(SCREEN_SNAPSHOT_MAX_TEXT),
+        checked = false,
+        listName = when (this) {
+            is TodayReminderInfo.ItemLevel -> checklistName
+            is TodayReminderInfo.ChecklistLevel -> null
+        },
+        dueIso = Instant.fromEpochMilliseconds(reminderAt).toString(),
+        hasReminder = true,
+        hasAttachment = false,
+    )
+
     // ─── Agentic loop (Phase 2d) ──────────────────────────────────────────────
 
     /**
@@ -2317,6 +2527,18 @@ class ChatViewModel(
         // P5: resolve the open checklist once for the whole turn so the agent biases
         // list-less commands toward it. Null when the dock was opened from the home screen.
         val contextChecklistName = resolveContextChecklistName()
+        // The id-side of the same context, resolved ONCE for the whole turn rather than per mapped
+        // tool call: a 10-item inbox triage would otherwise re-read the inbox row 20 times (plan
+        // card + dispatch). Safe to freeze — the dock closes on any route change, so the screen
+        // cannot move under a turn, and a list deleted mid-turn is still caught by the dispatcher's
+        // "a missed id never retries by name" rule.
+        //
+        // It biases the v2 TAB surfaces only; an open checklist is left alone here so the control
+        // arm's agent dispatch stays where it was before this work — see [withTurnContext].
+        val turnContext = resolveContextChecklist()
+        // The screen the dock is anchored to, for the two surfaces checklistsSummary cannot see.
+        // Null (and therefore absent from the wire) on every other surface and in the control arm.
+        val screenSnapshot = buildScreenSnapshot()
         val historyMessages = _screenState.value.messages
 
         // The turn these NEW rounds belong to = the most recent user message. Its id keys the
@@ -2383,6 +2605,12 @@ class ChatViewModel(
                 locale = locale,
                 checklistsSummary = checklistsSummary,
                 contextChecklistName = contextChecklistName,
+                // FIRST ROUND ONLY — see the privacy contract on [buildScreenSnapshot]. The screen
+                // cannot move under a turn (the dock closes on any route change), and rounds 2..N
+                // already carry the model's own tool results, which the prompt declares
+                // authoritative over the snapshot. Re-sending it every round would upload the same
+                // item text up to AGENT_MAX_ROUNDS times for one question.
+                screenSnapshot = screenSnapshot.takeIf { round == 0 },
                 requestId = requestId,
                 // Explicit reply-language override (null = Auto → server decides). Read from state,
                 // which mirrors the persisted preference loaded in init {}.
@@ -2414,7 +2642,10 @@ class ChatViewModel(
                     // Dispatch read-only calls immediately, no plan-card.
                     val readOnlyResults = mutableListOf<AgentToolResult>()
                     for (call in readOnlyCalls) {
-                        val toolCall = AgentToolCallMapper.map(call)
+                        // Bias by ID, exactly as the Layer-1/2 preview paths do. Without this the
+                        // agent path's only notion of "the screen" is the NAME in the prompt — and
+                        // a name can never reach the system Inbox, which `projects` excludes.
+                        val toolCall = AgentToolCallMapper.map(call)?.withTurnContext(turnContext)
                         val resultJson = if (toolCall == null) {
                             logger.warning(TAG, "runAgentTurn: unmappable read-only call '${call.name}' — sending error result")
                             buildJsonObjectError("unknown_tool", call.name)
@@ -2430,7 +2661,10 @@ class ChatViewModel(
                     if (mutatingCalls.isNotEmpty()) {
                         // Build numbered batch items for the prompt bubble.
                         val planItems = mutatingCalls.map { call ->
-                            val toolCall = AgentToolCallMapper.map(call)
+                            // Biased here too, not only at dispatch: the plan card is the consent,
+                            // so it must name the list the write will actually reach ("in Inbox"),
+                            // never the list the model happened to omit.
+                            val toolCall = AgentToolCallMapper.map(call)?.withTurnContext(turnContext)
                             val text = if (toolCall != null) previewRenderer.render(toolCall) else call.name
                             AgentPlanItem(
                                 text = text,
@@ -2493,7 +2727,8 @@ class ChatViewModel(
                             val resultJson = if (!approved) {
                                 AgentToolResultSerializer.declinedResult()
                             } else {
-                                val toolCall = AgentToolCallMapper.map(call)
+                                // Same id-bias as the plan card above — the two must agree.
+                                val toolCall = AgentToolCallMapper.map(call)?.withTurnContext(turnContext)
                                 if (toolCall == null) {
                                     logger.warning(TAG, "runAgentTurn: unmappable mutating call '${call.name}' — sending error result")
                                     buildJsonObjectError("unknown_tool", call.name)
@@ -2735,6 +2970,9 @@ class ChatViewModel(
             is ToolCall.ReadChecklist -> original
             // Agent-only: ClearCompleted — no user-editable item text
             is ToolCall.ClearCompleted -> original
+            // Agent-only: MoveItem arrives only inside the batch plan card, which has no inline
+            // edit field. Editing the source text here would silently re-point the match.
+            is ToolCall.MoveItem -> original
         }
     }
 
@@ -2753,8 +2991,17 @@ class ChatViewModel(
      * what the old name-only bias did — is indefensible. The name still rides along for the
      * result copy and the id-less fallback.
      */
-    private suspend fun resolveContextChecklist(): ListTarget? {
-        val contextId = _screenState.value.contextChecklistId ?: return null
+    private suspend fun resolveContextChecklist(): ScreenContext? {
+        val state = _screenState.value
+        val openId = state.contextChecklistId
+        val origin = when {
+            openId != null -> ContextOrigin.OpenChecklist
+            state.contextSurface == ChatSurface.Inbox -> ContextOrigin.InboxTab
+            state.contextSurface == ChatSurface.Agenda -> ContextOrigin.AgendaTab
+            // Projects / Overview / ChecklistDetail-without-id / Unknown carry no list of their own.
+            else -> return null
+        }
+        val contextId = openId ?: inboxIdForSurface(state.contextSurface) ?: return null
         val checklist = runCatching { checklistRepository.getChecklistById(contextId) }
             .getOrElse { e ->
                 logger.error(TAG, "resolveContextChecklist: lookup failed for id=$contextId — ${e.message}", e)
@@ -2764,14 +3011,40 @@ class ChatViewModel(
             logger.warning(TAG, "resolveContextChecklist: context checklist id=$contextId not found — falling back to default resolution")
             return null
         }
-        return ListTarget(id = checklist.id, name = checklist.name)
+        return ScreenContext(ListTarget(id = checklist.id, name = checklist.name), origin)
     }
 
     /**
-     * The open checklist's display NAME — the agent prompt takes a name, not an id (the model
-     * reasons over list names; ids mean nothing to it).
+     * The system Inbox row when the dock is open over a screen whose OWN capture target is the
+     * inbox — the Inbox tab, and the day screen (`TodayViewModel` writes its captures there too,
+     * so this matches the screen rather than inventing a rule for the chat).
+     *
+     * Null in the control arm (no row carries `isInbox`) and on every other surface, so the
+     * pre-experiment default-resolution path is untouched there.
      */
-    private suspend fun resolveContextChecklistName(): String? = resolveContextChecklist()?.name
+    private suspend fun inboxIdForSurface(surface: ChatSurface): Long? {
+        if (surface != ChatSurface.Inbox && surface != ChatSurface.Agenda) return null
+        val inbox = runCatching { checklistRepository.observeInbox().first() }
+            .getOrElse { e ->
+                logger.error(TAG, "inboxIdForSurface: inbox lookup failed for surface=$surface", e)
+                return null
+            }
+        if (inbox == null) {
+            logger.warning(TAG, "inboxIdForSurface: no inbox row for surface=$surface — falling back to default resolution")
+            return null
+        }
+        return inbox.id
+    }
+
+    /**
+     * The name for the WIRE (`context_checklist`). Only a genuinely open checklist may travel
+     * there: that server prompt block instructs the model to pass `checklist_hint="<name>"`, and
+     * hints resolve against `projects`, which EXCLUDES the system Inbox — so shipping the inbox's
+     * name would teach the model a call that always fails. The inbox reaches the model as
+     * `context_screen` instead (see [buildScreenSnapshot]).
+     */
+    private suspend fun resolveContextChecklistName(): String? =
+        if (_screenState.value.contextChecklistId != null) resolveContextChecklist()?.target?.name else null
 
     /**
      * Applies the active [context] checklist to a list-less command [toolCall].
@@ -2784,28 +3057,49 @@ class ChatViewModel(
      *
      * CreateChecklist / RenameChecklist are intentionally excluded: there the "list" is the
      * target/output of the action, not the context to operate within. CreateChecklistFromAttachment,
-     * MoveAllReminders, FindItemsQuery and ReadChecklist carry no per-list hint either.
+     * MoveAllReminders and FindItemsQuery carry no per-list hint either.
+     *
+     * ONE exception to "an explicit hint is never overwritten": a hint that EQUALS the context
+     * list's own name, and ONLY when the context came from a v2 screen surface. On the Inbox that
+     * is the difference between working and failing — "Inbox" is not in `projects`, so the name
+     * path would return `chat_dispatch_no_checklist_match` for the very list the user is staring
+     * at. It is deliberately NOT applied to [ContextOrigin.OpenChecklist]: an open checklist IS in
+     * `projects`, the name path already resolves it, and that path is shared with the frozen
+     * baseline arm of the live nav_v2_arm A/B — swapping name resolution for id resolution there
+     * would change where a control-arm write lands.
+     *
+     * [ContextOrigin.licenses] narrows this further per surface.
      */
-    private fun applyContextChecklist(toolCall: ToolCall, context: ListTarget): ToolCall {
-        val hasExplicitHint = when (toolCall) {
-            is ToolCall.AddItem -> toolCall.checklistHint != null
-            is ToolCall.AddItems -> toolCall.checklistHint != null
-            is ToolCall.CompleteItem -> toolCall.checklistHint != null
-            is ToolCall.DeleteItem -> toolCall.checklistHint != null
-            is ToolCall.SetItemReminder -> toolCall.checklistHint != null
-            is ToolCall.AttachToItem -> toolCall.checklistHint != null
-            is ToolCall.ClearCompleted -> toolCall.checklistHint != null
+    private fun applyContextChecklist(toolCall: ToolCall, context: ScreenContext): ToolCall {
+        val hintCarrier = when (toolCall) {
+            is ToolCall.AddItem,
+            is ToolCall.AddItems,
+            is ToolCall.CompleteItem,
+            is ToolCall.DeleteItem,
+            is ToolCall.SetItemReminder,
+            is ToolCall.AttachToItem,
+            is ToolCall.ClearCompleted,
+            // ReadChecklist is name-only on the wire (the model has no ids). Carrying the context
+            // id lets the ONE list the user is looking at be read even when `projects` hides it.
+            is ToolCall.ReadChecklist,
+            // MoveItem's SOURCE is the context; the destination is never overwritten.
+            is ToolCall.MoveItem -> true
             // Excluded by design — list is the target, not the context, or no hint field.
             // withTarget() returns null for these, so the elvis below keeps them untouched.
             is ToolCall.CreateChecklist,
             is ToolCall.RenameChecklist,
             is ToolCall.CreateChecklistFromAttachment,
             is ToolCall.MoveAllReminders,
-            is ToolCall.FindItemsQuery,
-            is ToolCall.ReadChecklist -> true
+            is ToolCall.FindItemsQuery -> false
         }
-        if (hasExplicitHint) return toolCall
-        return toolCall.withTarget(context.id, context.name) ?: toolCall
+        if (!hintCarrier) return toolCall
+        if (!context.origin.licenses(toolCall)) return toolCall
+        val hint = extractHint(toolCall)
+        val namesTheContextList = hint != null &&
+            context.origin != ContextOrigin.OpenChecklist &&
+            hint.equals(context.target.name, ignoreCase = true)
+        if (hint != null && !namesTheContextList) return toolCall
+        return toolCall.withTarget(context.target.id, context.target.name) ?: toolCall
     }
 
     /**
@@ -2816,6 +3110,25 @@ class ChatViewModel(
     private suspend fun biasToolCallToContext(toolCall: ToolCall): ToolCall {
         val context = resolveContextChecklist() ?: return toolCall
         return applyContextChecklist(toolCall, context)
+    }
+
+    /**
+     * The agent-loop counterpart of [biasToolCallToContext]: same rule, but against a [context]
+     * already resolved once for the whole turn (see [runAgentTurn]). Non-suspending, so it can be
+     * applied inside the plan-card `map` without re-hitting the repository per row.
+     *
+     * **[ContextOrigin.OpenChecklist] is deliberately NOT biased here.** Before the screen-aware
+     * work the agent path applied no context bias at all: a hintless `add_item` landed in
+     * `projects.first()` and a hintless `clear_completed_items` raised the which-list picker. An
+     * open checklist is reachable in BOTH arms of the live nav_v2_arm A/B — the control arm's dock
+     * is opened from ChecklistDetailScreen — so biasing on it would move the frozen baseline's
+     * dispatch destinations and silently stop a destructive bulk clear from asking which list.
+     * The two v2-only tab surfaces below are new ground and carry no baseline to preserve.
+     */
+    private fun ToolCall.withTurnContext(context: ScreenContext?): ToolCall = when {
+        context == null -> this
+        context.origin == ContextOrigin.OpenChecklist -> this
+        else -> applyContextChecklist(this, context)
     }
 
     /**
@@ -2831,11 +3144,13 @@ class ChatViewModel(
         is ToolCall.AttachToItem -> toolCall.checklistId
         is ToolCall.AddItems -> toolCall.checklistId
         is ToolCall.ClearCompleted -> toolCall.checklistId
+        is ToolCall.ReadChecklist -> toolCall.checklistId
+        // The SOURCE list — the one the context can fill in. The destination is the user's ask.
+        is ToolCall.MoveItem -> toolCall.fromChecklistId
         is ToolCall.CreateChecklist,
         is ToolCall.MoveAllReminders,
         is ToolCall.FindItemsQuery,
         is ToolCall.CreateChecklistFromAttachment,
-        is ToolCall.ReadChecklist,
         is ToolCall.RenameChecklist -> null
     }
 
@@ -2849,11 +3164,17 @@ class ChatViewModel(
         is ToolCall.CompleteItem -> toolCall.checklistHint
         is ToolCall.SetItemReminder -> toolCall.checklistHint
         is ToolCall.AttachToItem -> toolCall.checklistHint
+        // `name` IS ReadChecklist's target-list name (it has no separate hint field). Surfacing it
+        // here is what keeps applyContextChecklist from retargeting a read the model aimed at some
+        // OTHER list just because a screen context happened to be active.
+        is ToolCall.ReadChecklist -> toolCall.name
+        // The SOURCE list. `toChecklistHint` is deliberately absent: it is the user's destination,
+        // never something the screen context may overwrite.
+        is ToolCall.MoveItem -> toolCall.fromChecklistHint
         is ToolCall.CreateChecklist,
         is ToolCall.MoveAllReminders,
         is ToolCall.FindItemsQuery,
-        is ToolCall.CreateChecklistFromAttachment,
-        is ToolCall.ReadChecklist -> null
+        is ToolCall.CreateChecklistFromAttachment -> null
         // Agent-only: hint present on these variants, surface it for potential preview display
         is ToolCall.AddItems -> toolCall.checklistHint
         is ToolCall.RenameChecklist -> toolCall.checklistHint
@@ -2906,6 +3227,7 @@ class ChatViewModel(
         is ToolCall.CreateChecklist -> Res.string.chat_question_create
         is ToolCall.SetItemReminder -> Res.string.chat_question_set_reminder
         is ToolCall.MoveAllReminders -> Res.string.chat_choice_move_reminders
+        is ToolCall.MoveItem -> Res.string.chat_choice_move_to_list
         is ToolCall.AttachToItem -> Res.string.chat_question_attach
         is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_create_from_file
         // Agent-only / read variants never produce a write-intent choice; safe fallback.
@@ -2946,7 +3268,7 @@ class ChatViewModel(
         is ToolCall.CompleteItem -> Res.string.chat_choice_action_complete
         is ToolCall.CreateChecklist, is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_action_create
         is ToolCall.SetItemReminder -> Res.string.chat_choice_action_set_reminder
-        is ToolCall.MoveAllReminders -> Res.string.chat_choice_action_move
+        is ToolCall.MoveAllReminders, is ToolCall.MoveItem -> Res.string.chat_choice_action_move
         is ToolCall.AttachToItem -> Res.string.chat_choice_action_attach
         is ToolCall.FindItemsQuery,
         is ToolCall.ReadChecklist,
@@ -2961,7 +3283,7 @@ class ChatViewModel(
         is ToolCall.CompleteItem -> Res.string.chat_choice_executing_complete
         is ToolCall.CreateChecklist, is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_executing_create
         is ToolCall.SetItemReminder -> Res.string.chat_choice_executing_set_reminder
-        is ToolCall.MoveAllReminders -> Res.string.chat_choice_executing_move
+        is ToolCall.MoveAllReminders, is ToolCall.MoveItem -> Res.string.chat_choice_executing_move
         is ToolCall.AttachToItem -> Res.string.chat_choice_executing_attach
         is ToolCall.FindItemsQuery,
         is ToolCall.ReadChecklist,
@@ -2989,11 +3311,15 @@ class ChatViewModel(
         is ToolCall.AddItems -> copy(checklistId = id, checklistHint = name)
         // Lets a which-list chip retarget a bulk clear at ONE specific list, id-carrying.
         is ToolCall.ClearCompleted -> copy(checklistId = id, checklistHint = name)
+        // Id ONLY — the model's `name` stays as the fallback/failure copy. Carrying the id lets
+        // the list the user is looking at be read even when name resolution cannot reach it.
+        is ToolCall.ReadChecklist -> copy(checklistId = id)
+        // The context is the SOURCE of a move; `toChecklistHint` is never overwritten.
+        is ToolCall.MoveItem -> copy(fromChecklistId = id, fromChecklistHint = name)
         is ToolCall.CreateChecklist,
         is ToolCall.CreateChecklistFromAttachment,
         is ToolCall.MoveAllReminders,
         is ToolCall.FindItemsQuery,
-        is ToolCall.ReadChecklist,
         is ToolCall.RenameChecklist -> null
     }
 
@@ -3008,6 +3334,7 @@ class ChatViewModel(
         is ToolCall.AttachToItem -> toolCall.itemText
         is ToolCall.CreateChecklist -> toolCall.name
         is ToolCall.MoveAllReminders,
+        is ToolCall.MoveItem,
         is ToolCall.FindItemsQuery,
         is ToolCall.CreateChecklistFromAttachment,
         // Agent-only: no single editable item text for these variants
@@ -3609,6 +3936,14 @@ class ChatViewModel(
          * (and the amount of item text leaving the device) no matter how many lists the user has.
          */
         const val RECENT_ITEMS_TOTAL_BUDGET = 30
+        /**
+         * Rows of the screen snapshot (`context_screen`) sent per turn — same budgeting spirit as
+         * [RECENT_ITEMS_TOTAL_BUDGET]. The server clamps again at 20; the client stays below it so
+         * "showing N of M" is decided here, where the real total is known.
+         */
+        const val SCREEN_SNAPSHOT_MAX_ITEMS = 15
+        /** Per-row text clamp for the screen snapshot — guards a pasted wall of text. */
+        const val SCREEN_SNAPSHOT_MAX_TEXT = 80
         /** Free-tier attachment limit per chat message (mirrors item-attachments FREE_LIMIT = 3). */
         const val MAX_ATTACHMENTS_FREE = 3
         /** Premium users: generous cap to prevent accidental runaway picks. */

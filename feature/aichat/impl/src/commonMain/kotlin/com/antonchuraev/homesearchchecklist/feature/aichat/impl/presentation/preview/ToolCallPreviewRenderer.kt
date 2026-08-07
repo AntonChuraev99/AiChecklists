@@ -85,6 +85,11 @@ internal class ToolCallPreviewRendererImpl(
 
         is ToolCall.RenameChecklist -> "${toolCall.checklistHint} $ARROW ${toolCall.newName}"
 
+        // Agent batch plan line: "• Call the bank – Errands". The DESTINATION is what the user is
+        // approving, so it is what the arrow points at; the source is the screen they are on.
+        is ToolCall.MoveItem ->
+            bullet(toolCall.itemText) + " $ARROW ${toolCall.toChecklistHint}"
+
         // Agent batch plan line: "Clear completed items (in Shopping)".
         is ToolCall.ClearCompleted ->
             previewString(Res.string.chat_preview_clear_completed) + inListSuffix(toolCall.checklistHint)
