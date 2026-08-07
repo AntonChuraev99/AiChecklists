@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -162,6 +163,21 @@ fun AppNavigationDrawerContent(
      * Empty by default — the classic drawer passes nothing and is untouched.
      */
     hiddenDestinationIds: Set<String> = emptySet(),
+    /**
+     * Horizontal inset around each [NavigationDrawerItem] pill.
+     *
+     * The default is Material's own [NavigationDrawerItemDefaults.ItemPadding] (12.dp), which exists
+     * so the pill floats off the edges of a DRAWER SHEET. The item then adds its own `start = 16.dp`
+     * internally, putting the icon at 28.dp — while every non-item element here (section labels,
+     * divider, promo badge, profile row, footer) sits on [AppDimens.SpacingLg] = 16.dp. Inside a
+     * narrow sheet that offset reads as intentional float; on the full-width v2 Overview PAGE it
+     * reads as a stray gutter with the rows misaligned against their own section headers.
+     *
+     * A page host therefore passes `PaddingValues(0.dp)`: the item's internal 16.dp then lands on the
+     * same 16.dp gutter as everything else, and the press ripple runs edge to edge like any
+     * full-width list row. Defaulted to Material's value, so the classic drawer is untouched.
+     */
+    itemPadding: PaddingValues = NavigationDrawerItemDefaults.ItemPadding,
 ) {
     val uriHandler = LocalUriHandler.current
     val logger: AppLogger = koinInject()
@@ -221,7 +237,7 @@ fun AppNavigationDrawerContent(
                     onHomeClick()
                 },
                 colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                modifier = Modifier.padding(itemPadding)
             )
         }
         if (DrawerDestination.Calendar !in hiddenDestinationIds) {
@@ -234,7 +250,7 @@ fun AppNavigationDrawerContent(
                     onCalendarClick()
                 },
                 colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                modifier = Modifier.padding(itemPadding)
             )
         }
         NavigationDrawerItem(
@@ -246,7 +262,7 @@ fun AppNavigationDrawerContent(
                 onAiChatClick()
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.drawer_item_mcp)) },
@@ -257,7 +273,7 @@ fun AppNavigationDrawerContent(
                 onMcpClick()
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.update_feed_menu_item)) },
@@ -268,7 +284,7 @@ fun AppNavigationDrawerContent(
                 onUpdateFeedClick()
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.settings_title)) },
@@ -279,7 +295,7 @@ fun AppNavigationDrawerContent(
                 onSettingsClick()
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         if (isGoogleLinked) {
             NavigationDrawerItem(
@@ -291,7 +307,7 @@ fun AppNavigationDrawerContent(
                     onSignInClick()
                 },
                 colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                modifier = Modifier.padding(itemPadding)
             )
         } else {
             NavigationDrawerItem(
@@ -303,7 +319,7 @@ fun AppNavigationDrawerContent(
                     onSignInClick()
                 },
                 colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                modifier = Modifier.padding(itemPadding)
             )
         }
 
@@ -318,7 +334,7 @@ fun AppNavigationDrawerContent(
                 onRateAppClick()
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.main_menu_leave_feedback)) },
@@ -329,7 +345,7 @@ fun AppNavigationDrawerContent(
                 onLeaveFeedbackClick()
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.main_menu_support)) },
@@ -340,7 +356,7 @@ fun AppNavigationDrawerContent(
                 openLink("mailto:${PaywallConfig.SUPPORT_EMAIL}")
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
@@ -354,7 +370,7 @@ fun AppNavigationDrawerContent(
                 openLink(PaywallConfig.PRIVACY_POLICY_URL)
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.paywall_terms)) },
@@ -365,7 +381,7 @@ fun AppNavigationDrawerContent(
                 openLink(PaywallConfig.TERMS_OF_USE_URL)
             },
             colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            modifier = Modifier.padding(itemPadding)
         )
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
