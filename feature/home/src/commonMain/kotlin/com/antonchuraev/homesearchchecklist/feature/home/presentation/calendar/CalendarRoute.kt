@@ -62,7 +62,7 @@ fun CalendarRoute(
 ) {
     val todayState by todayViewModel.screenState.collectAsStateWithLifecycle()
     val calendarState by calendarViewModel.screenState.collectAsStateWithLifecycle()
-    val quickAddText by todayViewModel.quickAddText.collectAsStateWithLifecycle()
+    val draft by todayViewModel.draft.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(todayViewModel) {
@@ -90,12 +90,13 @@ fun CalendarRoute(
         calendarState = calendarState,
         drawerState = drawerState,
         contentBottomPadding = contentBottomPadding,
-        quickAddText = quickAddText,
+        draft = draft,
         captureDockOpen = captureDockOpen,
         captureEnabled = captureEnabled,
         onCaptureDockDismiss = onCaptureDockDismiss,
         onQuickAddTextChange = { todayViewModel.sendIntent(TodayIntent.OnQuickAddTextChanged(it)) },
         onQuickAddSubmit = { todayViewModel.sendIntent(TodayIntent.OnQuickAddSubmit) },
+        onCreateChipAction = { todayViewModel.sendIntent(TodayIntent.OnCreateChipAction(it)) },
         snackbarHostState = snackbarHostState,
         onTodayReminderClick = { checklistId, fillId ->
             todayViewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))

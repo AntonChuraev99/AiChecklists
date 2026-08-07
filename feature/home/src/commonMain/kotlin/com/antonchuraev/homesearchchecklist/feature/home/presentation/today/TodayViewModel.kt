@@ -19,7 +19,15 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dayScreenDraft
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveReminderAtNow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -77,6 +85,9 @@ class TodayViewModel(
     private val repository: ChecklistRepository,
     private val ensureInbox: EnsureInboxUseCase,
     private val appNavigator: AppNavigator,
+    // Captures made here now carry a reminder by default (see [_draft]); persisting reminderAt
+    // without arming the alarm would render a bell that never rings.
+    private val reminderScheduler: ChecklistReminderScheduler,
     private val analytics: AnalyticsTracker,
     private val logger: AppLogger,
 ) : AppViewModel<TodayScreenState, TodayIntent, TodaySideEffect>() {
@@ -84,8 +95,15 @@ class TodayViewModel(
     /** Stable snapshot of "now" at VM creation (epoch millis). */
     private val nowMs: Long = currentTimeMillis()
 
-    private val _quickAddText = MutableStateFlow("")
-    val quickAddText: StateFlow<String> = _quickAddText
+    /**
+     * The task being composed, seeded with THIS screen's default reminder chip.
+     *
+     * This screen draws the day's reminders, so a task captured here without one lands in the Inbox
+     * and disappears from the very screen that produced it. The chip is pre-selected rather than the
+     * time silently stamped: it is visible, and one tap removes it.
+     */
+    private val _draft = MutableStateFlow(dayScreenDraft())
+    val draft: StateFlow<TaskDraft> = _draft
 
     private val _sideEffect = MutableSharedFlow<TodaySideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<TodaySideEffect> = _sideEffect.asSharedFlow()
@@ -130,8 +148,10 @@ class TodayViewModel(
             }
             TodayIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
             TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
-            is TodayIntent.OnQuickAddTextChanged -> _quickAddText.value = intent.text
+            is TodayIntent.OnQuickAddTextChanged ->
+                _draft.value = _draft.value.copy(text = intent.text)
             TodayIntent.OnQuickAddSubmit -> captureTask()
+            is TodayIntent.OnCreateChipAction -> applyCreateChip(intent.action)
             TodayIntent.OnOpenCapturedChecklist -> {
                 val id = lastCapturedChecklistId
                 if (id == null) {
@@ -144,21 +164,48 @@ class TodayViewModel(
     }
 
     /**
+     * Applies a capture-dock chip to the draft.
+     *
+     * "Pick time…" and "Repeat" are hidden on this tab ([TaskCreateChipsRow] filters them) because
+     * their picker and repeat sheet live on the detail screen; they are still branched here — with a
+     * log, never a silent `else` — since the chip row is shared and a future host may enable them.
+     */
+    private fun applyCreateChip(action: GistiItemCreateAction) {
+        when (action) {
+            GistiItemCreateAction.REMIND_1H ->
+                _draft.value = _draft.value.withPreset(ItemCreateReminderPreset.ONE_HOUR)
+            GistiItemCreateAction.REMIND_TOMORROW_MORNING ->
+                _draft.value = _draft.value.withPreset(ItemCreateReminderPreset.TOMORROW_MORNING)
+            GistiItemCreateAction.REMIND_TONIGHT ->
+                _draft.value = _draft.value.withPreset(ItemCreateReminderPreset.TONIGHT)
+            GistiItemCreateAction.IMPORTANT ->
+                _draft.value = _draft.value.withImportantToggled()
+            GistiItemCreateAction.REMIND_PICK, GistiItemCreateAction.REPEAT ->
+                logger.warning(TAG, "capture chip $action has no host on the Today tab")
+        }
+    }
+
+    /**
      * Captures a task into the system Inbox from the Today screen.
      *
-     * ## Why the Inbox and not "today"
+     * ## Why the Inbox, and why it now carries a reminder
      * This screen renders REMINDERS inside today's window, so a task without one cannot appear in it.
-     * Giving the capture an automatic reminder would make it visible — and would also schedule a
-     * notification the user never asked for, which is a heavier side effect than a quick capture
-     * should have. The task therefore goes to the Inbox and the snackbar says where it went, with an
-     * Open action: nothing is hidden, and no alarm is created behind the user's back.
+     * The capture therefore lands in the Inbox — the one list that is always there — and the draft
+     * arrives with the day's reminder chip already selected, which is what puts the task back on the
+     * screen that created it.
+     *
+     * The chip is the whole point of the distinction: an earlier version of this screen refused to
+     * attach a reminder because scheduling a notification nobody asked for is a heavy side effect for
+     * a quick capture. A pre-selected, visible, one-tap-removable chip is not that — the user sees the
+     * alarm before it exists and can decline it. Nothing is scheduled behind their back either way.
      *
      * Mirrors `InboxViewModel.addTask`'s write shape (template item first so the fill row carries its
      * stable id from birth); it cannot call it directly because that one targets the pager's visible
      * page, which does not exist here.
      */
     private fun captureTask() {
-        val text = _quickAddText.value.trim()
+        val draft = _draft.value
+        val text = draft.text.trim()
         if (text.isEmpty()) {
             // Defensive: the Add affordance is disabled on blank input. Logged rather than a bare
             // return — an invisible drop reads as a freeze.
@@ -177,18 +224,30 @@ class TodayViewModel(
                 val fill = repository.getDefaultFillByChecklistId(inboxId).first()
                     ?: error("No default fill for checklist $inboxId")
 
-                val templateItem = ChecklistItem(text = text)
+                val priority = if (draft.important) 1 else 0
+                // Resolved at Send, not when the chip was tapped: a dock left open across 18:00 would
+                // otherwise write a "Tonight" that has already passed.
+                val reminderAt = draft.resolveReminderAtNow()
+                // Priority on BOTH halves of the pair — the template feeds the edit screen, the fill
+                // feeds every list (rule `checklist-domain`).
+                val templateItem = ChecklistItem(text = text, priority = priority)
                 val fillItem = ChecklistFillItem(
                     text = text,
                     checked = false,
                     note = null,
+                    priority = priority,
                     templateItemId = templateItem.id,
-                )
+                ).let { item -> reminderAt?.let(item::withReminderAt) ?: item }
                 repository.updateFill(fill.copy(items = fill.items + fillItem))
                 repository.updateChecklistTemplate(checklist.copy(items = checklist.items + templateItem))
+                reminderAt?.let { at ->
+                    reminderScheduler.scheduleItemReminder(inboxId, fill.id, fillItem.id, at)
+                }
                 inboxId
             }.onSuccess { inboxId ->
-                _quickAddText.value = ""
+                // Reset to a FRESH day draft, not an empty one: the next capture on this screen wants
+                // the same default chip, recomputed against the clock as it stands now.
+                _draft.value = dayScreenDraft()
                 lastCapturedChecklistId = inboxId
                 // Same event and param shape as `InboxViewModel.addTask`, with this tab's own SOURCE
                 // value: the create-FAB funnel counts `inbox_quick_added`, so a capture made here and
@@ -392,6 +451,9 @@ sealed interface TodayIntent : Intent {
     data object OnCreateChecklistClick : TodayIntent
 
     data class OnQuickAddTextChanged(val text: String) : TodayIntent
+
+    /** A capture-dock chip was tapped (reminder preset or Important). */
+    data class OnCreateChipAction(val action: GistiItemCreateAction) : TodayIntent
 
     /** Captures the typed text into the system Inbox. See `TodayViewModel.captureTask`. */
     data object OnQuickAddSubmit : TodayIntent

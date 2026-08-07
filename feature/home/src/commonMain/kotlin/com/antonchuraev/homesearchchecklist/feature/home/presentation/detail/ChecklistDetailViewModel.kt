@@ -28,6 +28,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.C
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.PendingItemAttachment
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.computePresetReminderAt
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.combinePickerResults
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.resolvePresetName
@@ -1302,34 +1305,10 @@ class ChecklistDetailViewModel(
         }
     }
 
-    /**
-     * Resolves a quick-preset reminder time using the same math as the reminder sheet:
-     * +1h, tomorrow 09:00, and "tonight" 18:00 (rolling to tomorrow 18:00 once past 18:00 today).
-     */
-    private fun computePresetReminderAt(preset: ItemCreateReminderPreset): Long {
-        val tz = TimeZone.currentSystemDefault()
-        val now = Clock.System.now()
-        val nowMs = now.toEpochMilliseconds()
-        val today = now.toLocalDateTime(tz).date
-        return when (preset) {
-            ItemCreateReminderPreset.ONE_HOUR -> nowMs + 3_600_000L
-            ItemCreateReminderPreset.TOMORROW_MORNING -> {
-                val tomorrow = today.plus(1, DateTimeUnit.DAY)
-                LocalDateTime(tomorrow, LocalTime(9, 0)).toInstant(tz).toEpochMilliseconds()
-            }
-            ItemCreateReminderPreset.TONIGHT -> {
-                val todaySix = LocalDateTime(today, LocalTime(18, 0)).toInstant(tz).toEpochMilliseconds()
-                if (todaySix > nowMs) {
-                    todaySix
-                } else {
-                    val tomorrow = today.plus(1, DateTimeUnit.DAY)
-                    LocalDateTime(tomorrow, LocalTime(18, 0)).toInstant(tz).toEpochMilliseconds()
-                }
-            }
-            // CUSTOM never reaches here — the picker result sets the time directly.
-            ItemCreateReminderPreset.CUSTOM -> nowMs
-        }
-    }
+    // computePresetReminderAt used to live here as a private member. It moved to
+    // `presentation.create.TaskDraft` verbatim when the create dock became shared: the Inbox and
+    // Today tabs resolve the same three presets, and a second copy of "tonight means 18:00, rolling
+    // to tomorrow past 18:00" is precisely the mirrored-constant drift this project keeps paying for.
 
     /**
      * Open the repeat-config sheet for the item-create Repeat chip. Reuses the existing repeat
