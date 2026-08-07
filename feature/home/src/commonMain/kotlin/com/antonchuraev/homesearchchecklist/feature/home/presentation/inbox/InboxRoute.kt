@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -47,10 +49,27 @@ fun InboxRoute(
     createDockOpen: Boolean,
     onCreateDockDismiss: () -> Unit,
     homeSignal: Int = 0,
+    /**
+     * Checklist the pager should open on, hoisted to the SHELL because nothing inside this entry
+     * outlives it.
+     *
+     * Opening a checklist pushes the detail route over this entry, and on the way back both the
+     * composition and the ViewModel are gone — measured on an emulator, not assumed: seeding the
+     * pager from the ViewModel's own `selectedPage` left it on the Inbox all the same, because that
+     * ViewModel had been rebuilt. The shell composable is the nearest scope that survives, so the
+     * anchor lives there.
+     *
+     * A checklist ID rather than a page index: a new checklist is inserted at position 0, so an index
+     * silently points at a different list after any create.
+     */
+    anchorChecklistId: Long? = null,
+    onAnchorChecklistChanged: (Long?) -> Unit = {},
     viewModel: InboxViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val attachmentOpener: AttachmentOpener = koinInject()
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffect.collect { effect ->
@@ -58,6 +77,10 @@ fun InboxRoute(
                 // The text is already resolved from Compose Resources by the ViewModel — the screen
                 // never maps a key, so a message can never silently fall through to a raw literal.
                 is InboxSideEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.text)
+                // Handing a file to the platform viewer is an ACTION, so it is done once, here, on
+                // arrival — not held in state and re-fired on every recomposition.
+                is InboxSideEffect.OpenAttachmentExternally ->
+                    attachmentOpener.openExternally(effect.path, effect.mimeType)
             }
         }
     }
@@ -71,5 +94,7 @@ fun InboxRoute(
         createDockOpen = createDockOpen,
         onCreateDockDismiss = onCreateDockDismiss,
         homeSignal = homeSignal,
+        anchorChecklistId = anchorChecklistId,
+        onAnchorChecklistChanged = onAnchorChecklistChanged,
     )
 }

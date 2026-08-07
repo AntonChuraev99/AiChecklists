@@ -380,6 +380,14 @@
     <string name="detail_item_sheet_subtitle_no_reminder">Нажмите, чтобы установить</string>
     <string name="detail_item_sheet_subtitle_no_note">Нажмите, чтобы добавить</string>
 
+    <!-- Шторка деталей элемента — вложения. Ключи существовали в en и hi, но не здесь: раздел
+         рисовался только на экране чек-листа, и по-русски он показывал английский текст. Теперь ту
+         же шторку открывает и вкладка «Входящие», так что дыра стала видимой. -->
+    <string name="detail_item_sheet_action_attachments">Вложения</string>
+    <string name="detail_item_sheet_subtitle_no_attachments">Нажмите, чтобы добавить</string>
+    <string name="detail_item_sheet_subtitle_attachment_count_one">%1$d вложение</string>
+    <string name="detail_item_sheet_subtitle_attachment_count_other">%1$d вложений</string>
+
     <!-- Приоритет элемента (звезда) -->
     <string name="item_priority_mark">Отметить как важный</string>
     <string name="item_priority_unmark">Снять пометку важного</string>
@@ -1230,6 +1238,10 @@
     <!-- clear_completed_items tool. %1$s — количество удалённых пунктов, %2$s — название чек-листа. -->
     <string name="chat_dispatch_completed_items_removed">Удалено выполненных пунктов из %2$s: %1$s.</string>
     <string name="chat_dispatch_no_completed_items">В %1$s нет выполненных пунктов для удаления.</string>
+    <!-- move_item tool. %1$s — текст пункта, %2$s — чек-лист назначения. -->
+    <string name="chat_dispatch_moved_item">&#171;%1$s&#187; перенесено в %2$s</string>
+    <string name="chat_dispatch_move_same_list">&#171;%1$s&#187; уже в %2$s</string>
+    <string name="chat_dispatch_move_blocked">Оставил &#171;%1$s&#187; на месте — при переносе пропало бы напоминание или вложение. Перенесите вручную, чтобы их сохранить.</string>
     <string name="chat_insufficient_credits">Недостаточно кредитов для AI-ответа. Пополните баланс или оформите Premium.</string>
     <string name="chat_completion_error">AI не смог ответить. Попробуйте ещё раз.</string>
     <string name="chat_history_load_error">Не удалось загрузить историю чата.</string>
@@ -1337,6 +1349,14 @@
 
     <!-- Chat dock / expandable sheet (App-level sheet host) -->
     <string name="chat_dock_ask_about">Спросить про &#171;%1$s&#187;…</string>
+    <!-- Screen-aware dock banner: shown instead of chat_dock_ask_about when no checklist is open
+         but the dock sits over a v2 shell tab. -->
+    <string name="chat_dock_context_inbox">Спросить про входящие</string>
+    <string name="chat_dock_context_today">Спросить про сегодня</string>
+    <string name="chat_dock_context_projects">Спросить про проекты</string>
+    <string name="chat_dock_context_overview">Спросить про прогресс</string>
+    <string name="chat_prompt_triage_inbox">Разобрать входящие</string>
+    <string name="chat_prompt_triage_inbox_query">Пройдись по моим входящим: для каждой задачи скажи, в какой проект она относится, и перенеси её туда.</string>
     <string name="chat_sheet_open_full">Открыть чат полностью</string>
     <string name="chat_sheet_close">Закрыть чат</string>
     <string name="chat_dock_placeholder">Спросить Gisti…</string>
@@ -1383,8 +1403,9 @@
     <string name="inbox_project_empty_description">В этом проекте пока нет задач.</string>
     <string name="inbox_open_project_action">Открыть проект</string>
     <string name="inbox_task_sheet_move">Перенести в проект</string>
-    <!-- Та же формулировка, что у item_priority_mark / item_priority_unmark — намеренно -->
     <string name="inbox_task_sheet_delete">Удалить задачу</string>
+    <string name="inbox_reminder_permission_denied">Для напоминаний нужно разрешение на уведомления — без него ничего не покажется.</string>
+    <string name="inbox_reminder_time_in_past">Выберите время в будущем.</string>
     <string name="inbox_move_picker_title">Перенести в</string>
     <string name="inbox_move_picker_empty">Проектов пока нет</string>
     <string name="inbox_task_moved_message">Задача перенесена</string>
@@ -1426,11 +1447,22 @@
     <string name="projects_title">Проекты</string>
     <string name="projects_add_checklist">Новый чек-лист</string>
     <string name="projects_complete">Всё выполнено</string>
-    <plurals name="projects_open_count">
-        <item quantity="one">осталась %1$d</item>
-        <item quantity="few">осталось %1$d</item>
-        <item quantity="many">осталось %1$d</item>
-        <item quantity="other">осталось %1$d</item>
+    <plurals name="projects_count">
+        <item quantity="one">%1$d чек-лист</item>
+        <item quantity="few">%1$d чек-листа</item>
+        <item quantity="many">%1$d чек-листов</item>
+        <item quantity="other">%1$d чек-листа</item>
+    </plurals>
+    <string name="projects_no_items">Пусто</string>
+    <!-- Только для скринридера (stateDescription строки). %1$d — сделано, %2$d — всего. -->
+    <string name="projects_progress">выполнено %1$d из %2$d</string>
+    <!-- Только для скринридера: добавляется к projects_progress. На карточке это бейдж-колокольчик
+         с одной цифрой. -->
+    <plurals name="projects_reminder_count">
+        <item quantity="one">%1$d напоминание</item>
+        <item quantity="few">%1$d напоминания</item>
+        <item quantity="many">%1$d напоминаний</item>
+        <item quantity="other">%1$d напоминания</item>
     </plurals>
     <string name="projects_empty_title">Чек-листов пока нет</string>
     <string name="projects_empty_description">Создайте чек-лист или собирайте задачи во Входящих, а потом разложите их по чек-листам.</string>

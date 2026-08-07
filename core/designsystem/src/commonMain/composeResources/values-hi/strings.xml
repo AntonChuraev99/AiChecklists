@@ -1390,6 +1390,10 @@
     <!-- clear_completed_items tool. %1$s is the count of removed items, %2$s the checklist name. -->
     <string name="chat_dispatch_completed_items_removed">%2$s से %1$s पूरे हुए आइटम हटाए गए।</string>
     <string name="chat_dispatch_no_completed_items">%1$s में हटाने के लिए कोई पूरा हुआ आइटम नहीं है।</string>
+    <!-- move_item tool. %1$s is the item text, %2$s the destination checklist. -->
+    <string name="chat_dispatch_moved_item">&#8220;%1$s&#8221; को %2$s में भेज दिया</string>
+    <string name="chat_dispatch_move_same_list">&#8220;%1$s&#8221; पहले से ही %2$s में है</string>
+    <string name="chat_dispatch_move_blocked">&#8220;%1$s&#8221; को वहीं छोड़ दिया — भेजने पर उसका रिमाइंडर या अटैचमेंट चला जाता। उन्हें बचाने के लिए इसे हाथ से भेजें।</string>
     <string name="chat_insufficient_credits">AI असिस्ट के लिए पर्याप्त क्रेडिट नहीं हैं। रीफ़िल करें या प्रीमियम में अपग्रेड करें।</string>
     <string name="chat_completion_error">AI जवाब नहीं दे सका। कृपया फिर से आज़माएं।</string>
     <!-- Connectivity-aware chat error messages (F1). Split by failure kind so an offline user
@@ -1503,6 +1507,14 @@
 
     <!-- Chat dock / expandable sheet (App-level sheet host) -->
     <string name="chat_dock_ask_about">&#8220;%1$s&#8221; के बारे में पूछें…</string>
+    <!-- Screen-aware dock banner: shown instead of chat_dock_ask_about when no checklist is open
+         but the dock sits over a v2 shell tab. -->
+    <string name="chat_dock_context_inbox">अपने इनबॉक्स के बारे में पूछें</string>
+    <string name="chat_dock_context_today">आज के बारे में पूछें</string>
+    <string name="chat_dock_context_projects">अपने प्रोजेक्ट्स के बारे में पूछें</string>
+    <string name="chat_dock_context_overview">अपनी प्रगति के बारे में पूछें</string>
+    <string name="chat_prompt_triage_inbox">इनबॉक्स छाँटें</string>
+    <string name="chat_prompt_triage_inbox_query">मेरे इनबॉक्स को देखें: हर कार्य के लिए बताएं कि वह किस प्रोजेक्ट में जाता है, फिर उसे वहां भेज दें।</string>
     <string name="chat_sheet_open_full">पूरी चैट स्क्रीन खोलें</string>
     <string name="chat_sheet_close">चैट बंद करें</string>
     <string name="chat_dock_placeholder">Gisti से पूछें…</string>
@@ -1567,8 +1579,9 @@
     <string name="inbox_project_empty_description">इस प्रोजेक्ट में अभी कोई टास्क नहीं है।</string>
     <string name="inbox_open_project_action">प्रोजेक्ट खोलें</string>
     <string name="inbox_task_sheet_move">प्रोजेक्ट में ले जाएं</string>
-    <!-- Same wording as item_priority_mark / item_priority_unmark, on purpose -->
     <string name="inbox_task_sheet_delete">टास्क हटाएं</string>
+    <string name="inbox_reminder_permission_denied">रिमाइंडर के लिए नोटिफिकेशन की अनुमति चाहिए — अनुमति दिए बिना कुछ नहीं दिखेगा।</string>
+    <string name="inbox_reminder_time_in_past">भविष्य का कोई समय चुनें।</string>
     <string name="inbox_move_picker_title">यहां ले जाएं</string>
     <string name="inbox_move_picker_empty">आपके पास अभी कोई प्रोजेक्ट नहीं है</string>
     <string name="inbox_task_moved_message">टास्क ले जाया गया</string>
@@ -1608,9 +1621,18 @@
     <string name="projects_title">प्रोजेक्ट्स</string>
     <string name="projects_add_checklist">नई चेकलिस्ट</string>
     <string name="projects_complete">सब पूरा</string>
-    <plurals name="projects_open_count">
-        <item quantity="one">%1$d बाकी</item>
-        <item quantity="other">%1$d बाकी</item>
+    <plurals name="projects_count">
+        <item quantity="one">%1$d चेकलिस्ट</item>
+        <item quantity="other">%1$d चेकलिस्ट</item>
+    </plurals>
+    <string name="projects_no_items">खाली</string>
+    <!-- Screen-reader only (row stateDescription). %1$d = done, %2$d = total. -->
+    <string name="projects_progress">%2$d में से %1$d पूरे</string>
+    <!-- Screen-reader only: appended to projects_progress. The card shows a bell badge with a bare
+         number instead. -->
+    <plurals name="projects_reminder_count">
+        <item quantity="one">%1$d रिमाइंडर</item>
+        <item quantity="other">%1$d रिमाइंडर</item>
     </plurals>
     <string name="projects_empty_title">अभी कोई चेकलिस्ट नहीं</string>
     <string name="projects_empty_description">एक चेकलिस्ट बनाएं, या इनबॉक्स में टास्क जोड़ें और बाद में चेकलिस्ट में बांट दें।</string>

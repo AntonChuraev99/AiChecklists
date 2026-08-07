@@ -33,6 +33,20 @@ interface ChecklistFillDao {
     @Query("SELECT * FROM checklist_fills WHERE isDefault = 1")
     suspend fun getAllDefaultFills(): List<ChecklistFillEntity>
 
+    /**
+     * Observable twin of [getAllDefaultFills] — Room's InvalidationTracker re-runs it after every
+     * write to `checklist_fills`, so a per-item reminder written while a screen is subscribed reaches
+     * that screen without it being recreated.
+     *
+     * Exists because per-item reminders live INSIDE the fill rows (items are stored as JSON, not as
+     * columns), so the Today/Calendar scan cannot be driven by the `checklists` table alone. Reading
+     * the suspend twin once inside a `flow { emit(...) }` looks equivalent and is not: that flow
+     * completes after its single emission and `combine` then serves its cached value forever, which
+     * froze the Today and Calendar lists for the whole subscription.
+     */
+    @Query("SELECT * FROM checklist_fills WHERE isDefault = 1")
+    fun observeAllDefaultFills(): Flow<List<ChecklistFillEntity>>
+
     /** Returns all fills (default + additional) for a checklist (used for attachment cleanup before checklist delete). */
     @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId")
     suspend fun getAllFillsByChecklistId(checklistId: Long): List<ChecklistFillEntity>
