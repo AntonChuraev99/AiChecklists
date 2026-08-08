@@ -27,6 +27,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Remote
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteTranscriptionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.LocalIntentRouterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AiChatRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -236,6 +237,7 @@ class FakeAgentApi(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult {
@@ -509,6 +511,7 @@ private class ParkedLayer1RoutingRepository(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
     ): AgentStepResult =
@@ -518,6 +521,7 @@ private class ParkedLayer1RoutingRepository(
             locale,
             checklistsSummary,
             contextChecklistName,
+            screenSnapshot,
             requestId,
             responseLanguage,
         )

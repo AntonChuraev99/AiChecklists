@@ -46,6 +46,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  *  - [LINK]     → create a checklist from a URL.
  *  - [PLAN_DAY] → open the "plan my day" flow.
  *  - [PDF]      → create a checklist from a PDF document.
+ *  - [TRIAGE_INBOX] → ask the AI to file every captured inbox task into a project. Only ever
+ *    rendered on the v2 Inbox tab (see [gistiInboxPromptChips]) — it is the one chip whose meaning
+ *    depends on the screen behind the dock.
  *
  * NOTE: [PDF] is intentionally kept in the enum (the document picker still
  * references it), but it is NO LONGER part of [gistiDefaultPromptChips] — the
@@ -63,6 +66,7 @@ enum class GistiQuickAction {
     LINK,
     PLAN_DAY,
     PDF,
+    TRIAGE_INBOX,
 }
 
 /**
@@ -284,6 +288,51 @@ fun gistiDefaultPromptChips(
     GistiPromptChip(emoji = "🔔", label = remindLabel, action = GistiQuickAction.REMIND),
     GistiPromptChip(emoji = "🔗", label = linkLabel, action = GistiQuickAction.LINK),
     GistiPromptChip(emoji = "📅", label = planDayLabel, action = GistiQuickAction.PLAN_DAY),
+)
+
+/**
+ * Factory for the **v2 Inbox tab** prompt chips.
+ *
+ * Same component and the same actions as [gistiDefaultPromptChips]; only the ORDER and the leading
+ * chip differ, because the screen behind the dock changes what the user most likely wants: on a
+ * page of captured tasks that is "sort these", not "create another list". Photo / Link keep their
+ * places so the create paths stay reachable without a second dock.
+ *
+ * Remind is dropped from this set — it needs a target item, and the inbox screen's own capture
+ * dock already sets reminders on the row the user is looking at.
+ */
+fun gistiInboxPromptChips(
+    triageLabel: String = "Triage inbox",
+    planDayLabel: String = "Plan day",
+    createAiLabel: String = "Create with AI",
+    photoLabel: String = "Photo ➡️ list",
+    linkLabel: String = "Link ➡️ list",
+): List<GistiPromptChip<GistiQuickAction>> = listOf(
+    GistiPromptChip(emoji = "🧹", label = triageLabel, action = GistiQuickAction.TRIAGE_INBOX),
+    GistiPromptChip(emoji = "📅", label = planDayLabel, action = GistiQuickAction.PLAN_DAY),
+    GistiPromptChip(emoji = "✨", label = createAiLabel, action = GistiQuickAction.CREATE_WITH_AI),
+    GistiPromptChip(emoji = "📷", label = photoLabel, action = GistiQuickAction.PHOTO),
+    GistiPromptChip(emoji = "🔗", label = linkLabel, action = GistiQuickAction.LINK),
+)
+
+/**
+ * Factory for the **v2 Calendar / day tab** prompt chips.
+ *
+ * [gistiDefaultPromptChips] with Plan day pulled to the front: on the day screen it is the reason
+ * the user opened the dock, and it was previously the LAST chip — off-screen without a scroll.
+ */
+fun gistiAgendaPromptChips(
+    planDayLabel: String = "Plan day",
+    createAiLabel: String = "Create with AI",
+    photoLabel: String = "Photo ➡️ list",
+    remindLabel: String = "Remind me…",
+    linkLabel: String = "Link ➡️ list",
+): List<GistiPromptChip<GistiQuickAction>> = listOf(
+    GistiPromptChip(emoji = "📅", label = planDayLabel, action = GistiQuickAction.PLAN_DAY),
+    GistiPromptChip(emoji = "✨", label = createAiLabel, action = GistiQuickAction.CREATE_WITH_AI),
+    GistiPromptChip(emoji = "📷", label = photoLabel, action = GistiQuickAction.PHOTO),
+    GistiPromptChip(emoji = "🔔", label = remindLabel, action = GistiQuickAction.REMIND),
+    GistiPromptChip(emoji = "🔗", label = linkLabel, action = GistiQuickAction.LINK),
 )
 
 /**

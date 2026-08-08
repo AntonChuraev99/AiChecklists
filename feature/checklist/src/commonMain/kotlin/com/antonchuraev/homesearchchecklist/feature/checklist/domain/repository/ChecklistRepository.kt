@@ -191,8 +191,10 @@ interface ChecklistRepository {
      * Checklist-level: [Checklist.reminderAt] or [Checklist.repeatNextAt] in range.
      * Per-item: [ChecklistFillItem.reminderAt] or [ChecklistFillItem.repeatNextAt] in range.
      *
-     * Emits a new list whenever the underlying checklists or fills change.
-     * Consumers use this to drive the Today screen.
+     * Emits a new list whenever the underlying checklists **or fills** change — including while a
+     * screen stays subscribed. The Today and Calendar tabs capture tasks into a list they are already
+     * showing, so an implementation that reads either table once per subscription silently freezes
+     * both (regression test: `observeRemindersInRange_itemReminderCapturedWhileSubscribed…`).
      *
      * Scans ALL checklists, [projects] and the system Inbox alike: a reminder must surface wherever
      * the task lives, and the detail deep-link resolves for the Inbox too. See the block comment

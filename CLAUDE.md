@@ -88,6 +88,8 @@ Outside Gradle: `firebase-functions/` (Python CFs) · `mcp-server/` (TS Cloudfla
 - **expect/actual:** logging, database, file pickers, audio, build config (`AppBuildConfig`), reminders, in-app review.
 - **StateFlow** for all reactive state. Navigation 3 (no `NavController`) — see rule `adaptive-navigation`.
 
+**Reuse the v1 surface, don't re-invent it in v2 (owner rule, 2026-08-07).** The classic layout is years of shipped, debugged UX; the v2 shell is a new arrangement of the SAME product. When a v2 screen needs a sheet, a row, an input or a flow that v1 already has, **lift the v1 component and extend it** — never write a thinner v2 twin. A reduced re-implementation reads to the user as lost features, and it is: it re-opens the defects v1 already closed and doubles every future fix. If the v1 component genuinely does not fit, say which part and why *before* writing a replacement. Precedent: the v2 Inbox shipped a 3-action triage sheet (move / complete / delete) beside v1's full `ItemDetailsSheet` (reminder, repeat, note, attachments, priority) — the owner's verdict was «пользователю просто не даёшь выбрать и настроить». The fix is v1's sheet plus a "move to project" row, not a second sheet.
+
 ### Error Logging — Mandatory for all new code
 
 Every error path **MUST** use `AppLogger.error(tag, message, throwable)` — never silent catch, never `println`. The `throwable` param triggers Crashlytics `recordException` (Android) / `console.error` (wasmJs).

@@ -1426,6 +1426,10 @@
     <!-- clear_completed_items tool. %1$s is the count of removed items, %2$s the checklist name. -->
     <string name="chat_dispatch_completed_items_removed">Removed %1$s completed items from %2$s.</string>
     <string name="chat_dispatch_no_completed_items">No completed items to remove in %1$s.</string>
+    <!-- move_item tool. %1$s is the item text, %2$s the destination checklist. -->
+    <string name="chat_dispatch_moved_item">Moved &#8220;%1$s&#8221; to %2$s</string>
+    <string name="chat_dispatch_move_same_list">&#8220;%1$s&#8221; is already in %2$s</string>
+    <string name="chat_dispatch_move_blocked">Left &#8220;%1$s&#8221; where it is — moving it would drop its reminder or attachment. Move it by hand to keep them.</string>
     <string name="chat_insufficient_credits">Not enough credits for AI assist. Refill or upgrade to Premium.</string>
     <string name="chat_completion_error">AI couldn't respond. Please try again.</string>
     <!-- Connectivity-aware chat error messages (F1). Split by failure kind so an offline user
@@ -1539,6 +1543,14 @@
 
     <!-- Chat dock / expandable sheet (App-level sheet host) -->
     <string name="chat_dock_ask_about">Ask about &#8220;%1$s&#8221;…</string>
+    <!-- Screen-aware dock banner: shown instead of chat_dock_ask_about when no checklist is open
+         but the dock sits over a v2 shell tab. -->
+    <string name="chat_dock_context_inbox">Ask about your inbox</string>
+    <string name="chat_dock_context_today">Ask about today</string>
+    <string name="chat_dock_context_projects">Ask about your projects</string>
+    <string name="chat_dock_context_overview">Ask about your progress</string>
+    <string name="chat_prompt_triage_inbox">Triage inbox</string>
+    <string name="chat_prompt_triage_inbox_query">Go through my inbox: for each task say which project it belongs in, then file it there.</string>
     <string name="chat_sheet_open_full">Open full chat screen</string>
     <string name="chat_sheet_close">Close chat</string>
     <string name="chat_dock_placeholder">Ask Gisti…</string>
@@ -1616,11 +1628,15 @@
     <string name="inbox_empty_description">Anything you capture lands here first. Add a task now and sort it into a project later.</string>
     <string name="inbox_project_empty_description">No tasks in this project yet.</string>
     <string name="inbox_open_project_action">Open project</string>
+    <!-- The "Move to project" row added to the shared ItemDetailsSheet when it is hosted by the
+         Inbox. Distinct from folder_move ("Move to…"), which re-parents inside ONE checklist. -->
     <string name="inbox_task_sheet_move">Move to project</string>
-    <!-- Word-for-word duplicates of item_priority_mark / item_priority_unmark (already localized
-         in every locale). Kept as separate keys only because InboxTaskSheet.kt references these
-         names; the translations below are intentionally identical so the two sheets never drift. -->
     <string name="inbox_task_sheet_delete">Delete task</string>
+    <!-- Reminder feedback for the Inbox item sheet. Both replace a silent no-op: without them a
+         denied notification permission, or a time already gone by, closes the picker with nothing
+         scheduled and nothing said. -->
+    <string name="inbox_reminder_permission_denied">Reminders need notification permission — nothing will be shown until you allow it.</string>
+    <string name="inbox_reminder_time_in_past">Pick a time in the future.</string>
     <string name="inbox_move_picker_title">Move to</string>
     <string name="inbox_move_picker_empty">You don't have any projects yet</string>
     <string name="inbox_task_moved_message">Task moved</string>
@@ -1662,13 +1678,28 @@
     <string name="inbox_display_sort_name">Name</string>
     <string name="inbox_display_sort_priority">Importance</string>
 
-    <!-- Projects tab (v2). Flat list of checklists with the number of tasks left in each. -->
+    <!-- Projects tab (v2). One card per checklist: progress ring, name, mini-stat badges. -->
     <string name="projects_title">Projects</string>
     <string name="projects_add_checklist">New checklist</string>
     <string name="projects_complete">All done</string>
-    <plurals name="projects_open_count">
-        <item quantity="one">%1$d left</item>
-        <item quantity="other">%1$d left</item>
+    <plurals name="projects_count">
+        <item quantity="one">%1$d checklist</item>
+        <item quantity="other">%1$d checklists</item>
+    </plurals>
+    <!-- Trailing count for a checklist that renders nothing when opened — no tasks AND no folders.
+         Owned by this screen: the v1 home card's main_no_items used to be borrowed here, and a
+         cross-screen borrow is a shared-vocabulary claim nothing enforces. -->
+    <string name="projects_no_items">Empty</string>
+    <!-- Screen-reader only (row stateDescription): the done/total the ring draws. The card itself
+         prints bare numbers in badges, which say nothing out loud. %1$d = done, %2$d = total.
+         There is deliberately no visible "N left" string any more: its RU form ("осталось 20")
+         truncated to "осталось …" in the card's trailing slot, eating the only informative part. -->
+    <string name="projects_progress">%1$d of %2$d done</string>
+    <!-- Screen-reader only: appended to projects_progress when the checklist's tasks carry
+         reminders. The card shows this as a bell badge with a bare number. -->
+    <plurals name="projects_reminder_count">
+        <item quantity="one">%1$d reminder</item>
+        <item quantity="other">%1$d reminders</item>
     </plurals>
     <string name="projects_empty_title">No checklists yet</string>
     <string name="projects_empty_description">Create one, or capture tasks in your Inbox and sort them into checklists later.</string>

@@ -116,9 +116,20 @@ sealed interface ToolCall {
      * model can ground an answer in real item text. This is the D3 privacy payload
      * — item text reaches Gemini only when the model explicitly requests it.
      * Resolves to [DispatchOutcome.ChecklistContent].
+     *
+     * ONE documented exception to that rule exists: the `context_screen` snapshot of the v2 Inbox
+     * and day tabs, which the model has no tool to reach (a name resolves against `projects`,
+     * which excludes the Inbox, and the day is not a list at all). It is bounded to those two
+     * surfaces, 15 rows, and the first round of a turn — see `ChatViewModel.buildScreenSnapshot`.
+     *
+     * [name] is all the model can send (it has no ids). [checklistId] is the client's screen
+     * context, filled in by `applyContextChecklist` when the model named no other list: it lets
+     * the ONE list the user is looking at be read even when it is not in `projects` (the system
+     * Inbox), which the name path can never reach.
      */
     data class ReadChecklist(
         val name: String,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     /** Rename an existing checklist (agent path). */
@@ -140,5 +151,24 @@ sealed interface ToolCall {
     data class ClearCompleted(
         val checklistHint: String?,
         val checklistId: Long? = null,
+    ) : ToolCall
+
+    /**
+     * Move ONE existing item from one list to another, keeping its text and done state
+     * (agent path — "разложи входящие по проектам").
+     *
+     * [fromChecklistId] is the client's screen context (the system Inbox on the v2 Inbox / day
+     * tabs); [fromChecklistHint] is the model's guess. Same id-beats-name precedence as every
+     * other variant — see the class KDoc.
+     *
+     * [toChecklistHint] is NAME-only by design: the destination is what the user asked for, it is
+     * never the screen context, and resolving it against `projects` is what keeps a move from ever
+     * landing IN the system Inbox.
+     */
+    data class MoveItem(
+        val itemText: String,
+        val toChecklistHint: String,
+        val fromChecklistHint: String? = null,
+        val fromChecklistId: Long? = null,
     ) : ToolCall
 }

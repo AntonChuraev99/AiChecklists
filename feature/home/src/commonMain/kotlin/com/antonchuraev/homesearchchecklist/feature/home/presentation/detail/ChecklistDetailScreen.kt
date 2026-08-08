@@ -228,6 +228,8 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.wee
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.WeeklyChecklistDetailContent
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.PendingItemAttachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
@@ -2763,10 +2765,17 @@ internal fun ChecklistItemCard(
 }
 
 /**
- * Things-style detail sheet for a checklist item.
+ * Things-style detail sheet for a checklist item: editable name plus one row per per-item action —
+ * Reminder, Note, Open link (one per URL in the text/note), Attachments, Priority, Move, Delete.
  *
- * Shows item name + three action rows: Reminder, Note, Delete.
- * Wiring (close + open target) is handled in Phase B (android-expert).
+ * Hosted by TWO screens. The checklist detail screen opens it from a `ChecklistItemCard`'s right 70%;
+ * the v2 Inbox tab opens it from a task row and adds the [showMoveToProjectAction] row. It stays one
+ * composable on purpose — the Inbox previously carried a four-row copy of it, and the copy read to
+ * the user as the Inbox having lost reminders, notes and attachments.
+ *
+ * Every host-specific surface (the reminder sheet, the note dialog, the file pickers, the fullscreen
+ * attachment viewer) is raised through a callback and rendered by the HOST, so wiring a row here
+ * without wiring its surface there produces a dead row. Both hosts wire all of them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2792,6 +2801,16 @@ internal fun ItemDetailsSheet(
     // existing call sites / tests compile unchanged.
     showMoveAction: Boolean = false,
     onMoveClick: () -> Unit = {},
+    /**
+     * Extra action rows contributed by the HOST, rendered between Move and Delete.
+     *
+     * A slot rather than one more `showX`/`onX` pair per host row: the Inbox adds two ("Move to
+     * project", "Open project"), a third host would add its own, and each pair widens this signature
+     * for every call site that will never use it. Build the rows with [ItemDetailsSheetRow] — it is
+     * `internal` for exactly this — so a host row is visually identical to a built-in one instead of
+     * being a look-alike copy.
+     */
+    hostActions: (@Composable () -> Unit)? = null,
 ) {
     val uriHandler = LocalUriHandler.current
     val logger = koinInject<AppLogger>()
@@ -2812,6 +2831,11 @@ internal fun ItemDetailsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Scrollable because the row set is not fixed: URLs add one row each, and RU/HI
+                // titles are 30-50% longer than the English they were laid out against, so the tall
+                // case (reminder + note + two links + attachments + priority + both moves + delete)
+                // overflows a short phone. Without this the Delete row simply cannot be reached.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 // The bottom sheet sits flush to the screen edge → keep full breathing room.
                 // The AlertDialog already adds Material's own bottom padding; stacking ours on top
@@ -3029,6 +3053,9 @@ internal fun ItemDetailsSheet(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
 
+            // ── Host-contributed rows (Inbox: "Move to project", "Open project") ──
+            hostActions?.invoke()
+
             Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
             // ── Delete row ──
@@ -3045,8 +3072,14 @@ internal fun ItemDetailsSheet(
     }
 }
 
+/**
+ * One action row of [ItemDetailsSheet]. `internal` so a host filling the `hostActions` slot renders
+ * rows identical to the built-in ones — the v2 Inbox previously kept a private look-alike copy of
+ * this that had neither [subtitle] nor [showChevron], which is why its sheet could not even show
+ * "Reminder — tomorrow 09:00".
+ */
 @Composable
-private fun ItemDetailsSheetRow(
+internal fun ItemDetailsSheetRow(
     icon: ImageVector,
     iconTint: Color,
     title: String,
@@ -3233,7 +3266,9 @@ internal fun formatItemReminderLabel(item: ChecklistFillItem): String {
 }
 
 @Composable
-private fun NoteDialog(
+// internal, not private: the v2 Inbox hosts the same ItemDetailsSheet and its Note row has to open
+// the same dialog. A second copy would drift (one already exists at FillDetailScreen.kt).
+internal fun NoteDialog(
     note: String,
     onNoteChanged: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -3691,7 +3726,9 @@ private fun FillLimitDialog(
 }
 
 @Composable
-private fun NotificationPermissionSheet(
+// internal: the Inbox item sheet runs the same pre-flight permission check before it schedules an
+// alarm, and skipping it there would arm reminders the system silently drops.
+internal fun NotificationPermissionSheet(
     onEnableClick: () -> Unit,
     onSkip: () -> Unit,
     onDismiss: () -> Unit

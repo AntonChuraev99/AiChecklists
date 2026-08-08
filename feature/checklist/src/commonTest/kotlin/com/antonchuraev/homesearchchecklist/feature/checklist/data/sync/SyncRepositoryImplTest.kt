@@ -1388,6 +1388,7 @@ class SyncRepositoryImplTest {
         override suspend fun getCountByChecklistId(checklistId: Long): Int = 0
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getAllDefaultFills(): List<ChecklistFillEntity> = emptyList()
+        override fun observeAllDefaultFills(): Flow<List<ChecklistFillEntity>> = flowOf(emptyList())
         override suspend fun getAllFillsByChecklistId(checklistId: Long): List<ChecklistFillEntity> =
             fills.filter { it.checklistId == checklistId }
         override suspend fun updateSyncStatus(id: Long, status: Int) {}

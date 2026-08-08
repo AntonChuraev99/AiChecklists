@@ -17,7 +17,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import org.jetbrains.compose.resources.stringResource
 import org.junit.After
 import org.junit.Before
@@ -63,7 +65,14 @@ class InboxAddTaskRowTest {
     fun startKoinWithNoopAnalytics() {
         stopKoin()
         startKoin {
-            modules(module { single<AnalyticsTracker> { NoopAnalyticsTracker } })
+            // AppLogger joined the graph when the v2 Inbox started hosting v1's ItemDetailsSheet:
+            // the screen koinInject()s it directly, so the test scope has to carry it too.
+            modules(
+                module {
+                    single<AnalyticsTracker> { NoopAnalyticsTracker }
+                    single<AppLogger> { NoopAppLogger }
+                }
+            )
         }
     }
 
@@ -250,13 +259,24 @@ class InboxAddTaskRowTest {
         ),
     )
 
+    // InboxTask wraps the whole ChecklistFillItem since the v2 Inbox started hosting v1's
+    // ItemDetailsSheet — the flat fields it used to carry are projections now. `id` stays a label
+    // for readability: these assertions match on row text, never on the generated fill-item id.
     private fun inboxTask(id: String, text: String) = InboxTask(
-        fillItemId = id,
-        templateItemId = "template-$id",
-        text = text,
-        checked = false,
-        priority = 0,
+        item = ChecklistFillItem(
+            text = text,
+            checked = false,
+            priority = 0,
+            templateItemId = "template-$id",
+        )
     )
+
+    private object NoopAppLogger : AppLogger {
+        override fun debug(tag: String, message: String) {}
+        override fun info(tag: String, message: String) {}
+        override fun warning(tag: String, message: String) {}
+        override fun error(tag: String, message: String, throwable: Throwable?) {}
+    }
 
     private object NoopAnalyticsTracker : AnalyticsTracker {
         override fun setUserId(userId: String) {}

@@ -35,6 +35,9 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_moved_ma
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_moved_one
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_checklist_match
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_checklists
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_move_blocked
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_move_same_list
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_moved_item
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_completed_items
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_reminders_on_day
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_operation_failed
@@ -79,6 +82,7 @@ import aichecklists.core.designsystem.generated.resources.chat_result_undone_com
 import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
@@ -130,7 +134,20 @@ fun ChatRoute(
 
     // Funnel: fire ai_chat_opened + screenView(CHAT) once per full-screen open.
     // key=Unit so it fires on entry only, not on every recomposition.
+    //
+    // The context reset comes FIRST, and it is not redundant with App.kt's dock effect. This
+    // ViewModel outlives both entry points, and the full-screen chat has NO screen behind it:
+    // whatever surface the dock last stood over (the Inbox tab, the day) would otherwise still be
+    // set here and would retarget hintless writes into the system Inbox and upload that screen's
+    // snapshot from a route that shows neither. Sending it before OnChatOpened also keeps the
+    // `surface` param of ai_chat_opened honest ("none" for the full-screen route).
+    //
+    // Surface only, NOT the checklist id: this route is reachable in the control arm too (drawer →
+    // "AI Chat"), where a user who just used the detail dock has their hintless writes biased to
+    // that checklist. Clearing the id here would move those writes to `projects.first()` — a
+    // destination change inside the arm this work must leave byte-identical.
     LaunchedEffect(Unit) {
+        viewModel.sendIntent(ChatScreenIntent.OnScreenSurfaceCleared)
         viewModel.sendIntent(ChatScreenIntent.OnChatOpened(source = "screen"))
     }
 
@@ -172,6 +189,10 @@ fun ChatRoute(
     val dispatchFillLoadFailedFmt = stringResource(Res.string.chat_dispatch_fill_load_failed)
     val dispatchCompletedItemsRemovedFmt = stringResource(Res.string.chat_dispatch_completed_items_removed)
     val dispatchNoCompletedItemsFmt = stringResource(Res.string.chat_dispatch_no_completed_items)
+    // move_item outcomes. Keep in step with App.kt's map — a key missing from either renders raw.
+    val dispatchMovedItemFmt = stringResource(Res.string.chat_dispatch_moved_item)
+    val dispatchMoveSameListFmt = stringResource(Res.string.chat_dispatch_move_same_list)
+    val dispatchMoveBlockedFmt = stringResource(Res.string.chat_dispatch_move_blocked)
     val insufficientCreditsText = stringResource(Res.string.chat_insufficient_credits)
     val completionErrorText = stringResource(Res.string.chat_completion_error)
     // F1 connectivity-aware error replies (offline / service / timeout). Keep both maps in step.
@@ -263,6 +284,9 @@ fun ChatRoute(
             "chat_dispatch_fill_load_failed" to dispatchFillLoadFailedFmt,
             "chat_dispatch_completed_items_removed" to dispatchCompletedItemsRemovedFmt,
             "chat_dispatch_no_completed_items" to dispatchNoCompletedItemsFmt,
+            "chat_dispatch_moved_item" to dispatchMovedItemFmt,
+            "chat_dispatch_move_same_list" to dispatchMoveSameListFmt,
+            "chat_dispatch_move_blocked" to dispatchMoveBlockedFmt,
             "chat_insufficient_credits" to insufficientCreditsText,
             "chat_completion_error" to completionErrorText,
             "chat_error_offline" to errorOfflineText,

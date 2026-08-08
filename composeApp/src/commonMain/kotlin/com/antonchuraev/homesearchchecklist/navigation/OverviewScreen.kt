@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -8,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.overview_title
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
@@ -88,6 +90,13 @@ fun OverviewScreen(
                 // The rows are HIDDEN, not removed: the same composable still renders them in the
                 // classic layout, where it IS the navigation.
                 hiddenDestinationIds = setOf(DrawerDestination.Main, DrawerDestination.Calendar),
+                // Material's 12.dp ItemPadding floats the pill off the edges of a DRAWER SHEET; this
+                // is a full-width PAGE. With it, each row's icon landed at 12 + the item's own
+                // internal 16 = 28.dp while the section labels above them sat at 16.dp — the rows
+                // read as a stray inset gutter, misaligned with their own headers. Zero here puts
+                // the icon on the same 16.dp gutter as every label, divider and the promo badge,
+                // and lets the press ripple run edge to edge like any full-width list row.
+                itemPadding = PaddingValues(0.dp),
                 // No drawer item is "current" while the user is standing on the Overview tab —
                 // every row here is a push target, not the screen itself.
                 selectedItemId = "",

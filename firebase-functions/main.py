@@ -3021,6 +3021,9 @@ CHAT_AGENT_TOOL_NAMES = {
     "add_item", "add_items", "create_checklist", "complete_item",
     "delete_item", "clear_completed_items", "set_item_reminder",
     "find_items", "read_checklist", "rename_checklist",
+    # move_item ships in the client BEFORE this line is deployed — the reverse order returns
+    # `unknown_tool` function_responses for a tool the dispatcher cannot execute yet.
+    "move_item",
 }
 
 
@@ -3140,6 +3143,27 @@ def _build_chat_agent_tools(include_options: bool = False) -> "list[types.Tool]"
             ),
         ),
         types.FunctionDeclaration(
+            name="move_item",
+            description=(
+                "Move an existing item from one list to another, keeping its text and done state. "
+                "Use this to file inbox tasks into projects. Omit from_checklist_hint to move OUT of "
+                "the list the user is currently looking at. NEVER emulate a move with add_item + "
+                "delete_item — that loses the item if only one half is approved. "
+                'A result of {"status":"not_found","reason":"move_blocked"} means the item EXISTS '
+                "but carries a reminder, a repeat or an attachment that a move would break: say so "
+                "and leave it where it is — do NOT report it as missing and do NOT retry."
+            ),
+            parameters=types.Schema(
+                type=OBJ,
+                properties={
+                    "item_text": s(STR, "Fuzzy text of the item to move."),
+                    "to_checklist_hint": s(STR, "Fuzzy name of the destination checklist."),
+                    "from_checklist_hint": hint,
+                },
+                required=["item_text", "to_checklist_hint"],
+            ),
+        ),
+        types.FunctionDeclaration(
             name="find_items",
             description="READ-ONLY. Search the user's items by text across all checklists. Free to call; use it to ground answers.",
             parameters=types.Schema(
@@ -3187,6 +3211,98 @@ CHAT_AGENT_TOOLS = _build_chat_agent_tools(include_options=False)
 CHAT_AGENT_TOOLS_WITH_OPTIONS = _build_chat_agent_tools(include_options=True)
 
 
+
+
+SCREEN_SNAPSHOT_MAX_ITEMS = 20          # hard clamp; the client sends 15
+SCREEN_SNAPSHOT_MAX_TEXT = 120
+
+
+def _build_screen_context_block(screen: dict) -> str:
+    """Turn the client's `context_screen` into the ONE prompt paragraph that describes the UI.
+
+    Kept INSIDE the existing {context_block} placeholder so the proprietary template
+    (prompts_private.py, gitignored) needs no new field — a template change could not be
+    reviewed in this repo.
+
+    The inbox and the day are the two screens the model is otherwise blind to:
+    `checklists_summary` is built from the client's `projects`, which structurally excludes the
+    system Inbox, and nothing has ever carried "what is scheduled today".
+    """
+    kind = (screen.get("kind") or "").strip()
+    label = (screen.get("label") or "").strip()[:SCREEN_SNAPSHOT_MAX_TEXT]
+    total = screen.get("total_items") or 0
+    raw_items = screen.get("items") or []
+    if not isinstance(raw_items, list):
+        raw_items = []
+
+    lines = []
+    for it in raw_items[:SCREEN_SNAPSHOT_MAX_ITEMS]:
+        if not isinstance(it, dict):
+            continue
+        text = (it.get("text") or "").strip()[:SCREEN_SNAPSHOT_MAX_TEXT]
+        if not text:
+            continue
+        marks = []
+        if it.get("checked"):
+            marks.append("done")
+        if it.get("list"):
+            marks.append('in "%s"' % str(it["list"])[:SCREEN_SNAPSHOT_MAX_TEXT])
+        if it.get("due"):
+            marks.append("due %s" % str(it["due"])[:40])
+        if it.get("has_reminder"):
+            marks.append("has reminder")
+        if it.get("has_attachment"):
+            marks.append("has attachment")
+        lines.append("- " + text + (" [%s]" % ", ".join(marks) if marks else ""))
+
+    listing = "\n".join(lines) if lines else "(nothing on this screen right now)"
+    # Truncation must be VISIBLE: without this the model asserts a count from a partial list.
+    shown_note = (
+        f"Showing {len(lines)} of {total} — say so instead of quoting a total you cannot see."
+        if total > len(lines) else ""
+    )
+
+    if kind == "inbox":
+        return (
+            f'The user is looking at their INBOX ("{label}") — the quick-capture list. Its contents '
+            "are below. The inbox is NOT part of the checklist summary above: it is deliberately "
+            "excluded from the user's projects, so these items appear nowhere else in this prompt.\n"
+            f"{listing}\n{shown_note}\n"
+            "To act on an inbox item (complete / delete / set a reminder / clear completed) call the "
+            "tool WITHOUT checklist_hint — the client targets the inbox itself. Do NOT pass "
+            f'checklist_hint="{label}": no project has that name and the call will fail.\n'
+            "To file an inbox task into a project, use move_item(item_text=..., to_checklist_hint="
+            '"<project>"). NEVER emulate a move with add_item + delete_item: that loses the item and '
+            "duplicates it if only one half is approved.\n"
+            "An item marked [has reminder] or [has attachment] cannot be moved — say so and leave it."
+        )
+    if kind == "agenda":
+        return (
+            f"The user is on the CALENDAR screen. What is scheduled for TODAY ({label}):\n"
+            f"{listing}\n{shown_note}\n"
+            "This covers today ONLY. The screen also renders overdue items and later days, and "
+            "they are NOT in this list — never answer 'nothing is overdue' or 'nothing is coming "
+            "up' from it. Use find_items / read_checklist for anything outside today, or say you "
+            "can only see today.\n"
+            "These entries live in the lists named beside them — pass that name as checklist_hint "
+            "when you act on one; an entry with no list name IS a whole checklist falling due. "
+            "Only a bare 'add X' goes to the inbox: call add_item WITHOUT checklist_hint. For "
+            "complete / delete / set_item_reminder ALWAYS pass the checklist_hint shown beside "
+            "the entry — a hintless one on this screen does NOT default to anything.\n"
+            "This is a snapshot taken when the turn started, and it is sent once per turn; your "
+            "own tool results are authoritative for anything that has changed since."
+        )
+    if kind == "projects":
+        return (
+            "The user is looking at the PROJECTS list — the checklists summarised above, nothing "
+            "more specific. Prefer read_checklist before answering about one list's contents."
+        )
+    if kind == "overview":
+        return (
+            "The user is looking at the OVERVIEW screen (progress and counts across their lists). "
+            "Ground any figure in read_checklist / find_items rather than estimating."
+        )
+    return "The user is on the home screen — no specific checklist is open."
 
 
 def _coerce_response_dict(result: Any) -> dict:
@@ -3424,6 +3540,18 @@ def chat_agent(request: Request):
         "timezone_offset_minutes": -720..840,
         "checklists_summary": [{"name": "...", "totalItems": N, "doneItems": N}, ...],
         "context_checklist": {"name": "..."},   # optional — the checklist the user is viewing
+        "context_screen": {                     # optional — the v2 shell TAB the user is on.
+            # Today's client only ever sends "inbox" or "agenda", and only on the FIRST round of a
+            # turn (privacy: see ChatViewModel.buildScreenSnapshot). The "projects"/"overview"
+            # branches of _build_screen_context_block are reachable only if a future client starts
+            # sending them — tuning them changes nothing until it does.
+            "kind": "inbox" | "agenda" | "projects" | "overview",
+            "label": "...",                     # inbox name / formatted day
+            "focused_date": "2026-08-07",       # agenda only
+            "items": [{"text": "...", "checked": false, "list": "...", "due": "...",
+                       "has_reminder": false, "has_attachment": false}, ...],
+            "total_items": N                    # REAL total; items[] may be truncated
+        },                                      # never sent together with context_checklist
         "transcript": [
             {"role": "user",  "text": "..."},
             {"role": "model", "tool_calls":   [{"id","name","args"}, ...]},
@@ -3564,6 +3692,15 @@ def chat_agent(request: Request):
     context_name = ""
     if isinstance(context_raw, dict):
         context_name = (context_raw.get("name") or "").strip()
+
+    # Optional: the v2 shell TAB the user is on, with the content of the screens the summary above
+    # cannot carry (the system Inbox, the day). Additive + optional in exactly the same way as
+    # `context_checklist`: clients that do not send it (control arm, older builds, non-tab routes)
+    # fall straight through to the legacy else-branch. The client never sends both, and the
+    # `if context_name` branch staying FIRST makes that belt-and-braces.
+    screen_raw = data.get("context_screen")
+    screen = screen_raw if isinstance(screen_raw, dict) else None
+
     if context_name:
         context_name = context_name[:120]  # clamp — guard against prompt bloat
         context_block = (
@@ -3575,6 +3712,8 @@ def chat_agent(request: Request):
             'this checklist WITHOUT naming another list, call read_checklist(name="'
             f'{context_name}") first — do NOT use find_items for these whole-list questions.'
         )
+    elif screen:
+        context_block = _build_screen_context_block(screen)
     else:
         context_block = "The user is on the home screen — no specific checklist is open."
 

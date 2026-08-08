@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,6 +50,19 @@ fun QuickCaptureDock(
     onAdd: () -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    /**
+     * Content rendered between the top hairline and the input — in practice the task-create chip row
+     * (reminder presets, Important, Repeat).
+     *
+     * A slot rather than a typed parameter because those chips are driven by feature-layer domain
+     * types (draft state, repeat config, the Smart-Add parse) that have no business in the design
+     * system. NULL by default rather than an empty lambda: an empty lambda would still occupy a
+     * padded slot and silently retune the spacing of a host that asked for nothing. A host that only
+     * wants a one-line capture field is therefore unchanged — and this component stays the SINGLE
+     * owner of the dock's keyboard-inset behaviour (three separate inset defects were fixed inside
+     * it; a second dock surface would inherit none of those fixes).
+     */
+    aboveInput: (@Composable () -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -66,6 +80,11 @@ fun QuickCaptureDock(
                 thickness = AppDimens.DividerThickness,
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
+            // Above the input, not below it: the input must stay the bottom-most element so it is the
+            // one riding the keyboard, and chips under a focused field would be pushed off-screen.
+            if (aboveInput != null) {
+                Box(modifier = Modifier.padding(top = AppDimens.SpacingMd)) { aboveInput() }
+            }
             AddItemInputField(
                 text = text,
                 onTextChange = onTextChange,

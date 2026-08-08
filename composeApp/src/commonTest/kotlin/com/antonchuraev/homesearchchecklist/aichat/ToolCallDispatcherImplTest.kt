@@ -807,4 +807,228 @@ class ToolCallDispatcherImplTest {
         val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
         assertEquals("chat_dispatch_no_checklists", notFound.messageKey)
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Screen-aware targeting: an ID may reach the system Inbox, a NAME may not.
+    //
+    // The asymmetry is the whole contract. An id can only come from the client (a tapped chip,
+    // the remembered default, the screen the dock is open over), so honouring it on the Inbox tab
+    // is what stops "add milk" landing in an unrelated list. A NAME comes from the model, and the
+    // Inbox is hidden from every picker and from the free-tier count — letting a name reach it
+    // would be the one surface where it leaks.
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun addItem_byId_reachesTheSystemInbox() = runTest {
+        val repo = inboxRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.AddItem(checklistHint = "Inbox", itemText = "Milk", checklistId = 9L),
+        )
+
+        assertIs<DispatchOutcome.Success>(outcome, "an id-targeted add must reach the Inbox; got $outcome")
+        assertEquals(listOf("Milk"), repo.fill(99L).items.map { it.text })
+        assertEquals(listOf("Milk"), repo.checklist(9L).items.map { it.text })
+    }
+
+    @Test
+    fun addItem_byName_cannotReachTheSystemInbox() = runTest {
+        val repo = inboxRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        // Only the Inbox is named "Inbox"; the pool for a name is `projects`, which excludes it.
+        val outcome = dispatcher.dispatch(ToolCall.AddItem(checklistHint = "Inbox", itemText = "Milk"))
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_no_checklist_match", notFound.messageKey)
+        assertTrue(repo.fill(99L).items.isEmpty(), "nothing may be written to the Inbox by name")
+    }
+
+    @Test
+    fun renameChecklist_byInboxName_stillFails() = runTest {
+        val repo = inboxRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.RenameChecklist(checklistHint = "Inbox", newName = "Junk"),
+        )
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_no_checklist_match", notFound.messageKey)
+        assertEquals("Inbox", repo.checklist(9L).name, "the Inbox must keep its name")
+    }
+
+    @Test
+    fun readChecklist_withContextId_readsTheInbox() = runTest {
+        val repo = inboxRepo(
+            inboxTemplate = listOf(templateItem("tpl_i", "Call the bank")),
+            inboxFill = listOf(fillItem("f_i", "Call the bank", templateItemId = "tpl_i")),
+        )
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ReadChecklist(name = "Inbox", checklistId = 9L))
+
+        val content = assertIs<DispatchOutcome.ChecklistContent>(outcome, "got $outcome")
+        assertEquals("Inbox", content.checklistName)
+        assertEquals(listOf("Call the bank"), content.items.map { it.text })
+    }
+
+    // ─── move_item ────────────────────────────────────────────────────────────
+
+    @Test
+    fun moveItem_movesTemplateAndFillOnBothSides() = runTest {
+        val repo = inboxRepo(
+            inboxTemplate = listOf(templateItem("tpl_i", "Call the bank")),
+            inboxFill = listOf(fillItem("f_i", "Call the bank", templateItemId = "tpl_i")),
+        )
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.MoveItem(
+                itemText = "Call the bank",
+                toChecklistHint = "Покупки",
+                fromChecklistId = 9L,
+            ),
+        )
+
+        val success = assertIs<DispatchOutcome.Success>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_moved_item", success.messageKey)
+        assertEquals(listOf("Call the bank", "Покупки"), success.args)
+        // Destination gained BOTH rows, linked (an unlinked fill row renders at the bottom in
+        // folder mode — the recurring template↔fill bug).
+        assertEquals(listOf("Call the bank"), repo.fill(11L).items.map { it.text })
+        assertEquals(listOf("Call the bank"), repo.checklist(1L).items.map { it.text })
+        val movedFillItem = repo.fill(11L).items.single()
+        assertEquals(
+            repo.checklist(1L).items.single().id,
+            movedFillItem.templateItemId,
+            "the new fill row must link to the new template row",
+        )
+        // Source lost BOTH rows.
+        assertTrue(repo.fill(99L).items.isEmpty(), "source fill row must be gone")
+        assertTrue(repo.checklist(9L).items.isEmpty(), "source template row must be gone")
+    }
+
+    @Test
+    fun moveItem_reminderBearingItem_isRefusedAndNothingIsWritten() = runTest {
+        val repo = inboxRepo(
+            inboxTemplate = listOf(templateItem("tpl_i", "Call the bank")),
+            inboxFill = listOf(
+                fillItem("f_i", "Call the bank", templateItemId = "tpl_i").withReminderAt(1_800_000_000_000L),
+            ),
+        )
+        val dispatcher = buildDispatcher(repo)
+        repo.calls.clear()
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.MoveItem(
+                itemText = "Call the bank",
+                toChecklistHint = "Покупки",
+                fromChecklistId = 9L,
+            ),
+        )
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_move_blocked", notFound.messageKey)
+        assertEquals(listOf("Call the bank"), notFound.args)
+        assertTrue(repo.calls.isEmpty(), "a refused move must write nothing at all; wrote ${repo.calls}")
+        assertEquals(1, repo.fill(99L).items.size, "the item stays where it is")
+        assertTrue(repo.fill(11L).items.isEmpty(), "the destination stays untouched")
+    }
+
+    @Test
+    fun moveItem_destinationEqualsSource_isANoOpSuccess() = runTest {
+        // The item must really BE in "Покупки" for "already in that list" to be a true statement —
+        // see moveItem_sameListButItemDoesNotExist_reportsNotFound for the other half.
+        val repo = inboxRepo(
+            projectTemplate = listOf(templateItem("tpl_p", "Call the bank")),
+            projectFill = listOf(fillItem("f_p", "Call the bank", templateItemId = "tpl_p")),
+        )
+        val dispatcher = buildDispatcher(repo)
+        repo.calls.clear()
+
+        // Source id and destination name resolve to different rows here, so aim both at "Покупки".
+        val outcome = dispatcher.dispatch(
+            ToolCall.MoveItem(
+                itemText = "Call the bank",
+                toChecklistHint = "Покупки",
+                fromChecklistId = 1L,
+            ),
+        )
+
+        val success = assertIs<DispatchOutcome.Success>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_move_same_list", success.messageKey)
+        assertEquals(listOf("Call the bank", "Покупки"), success.args)
+        assertTrue(repo.calls.isEmpty(), "a same-list move must write nothing; wrote ${repo.calls}")
+    }
+
+    @Test
+    fun moveItem_sameListButItemDoesNotExist_reportsNotFound() = runTest {
+        // REGRESSION: the same-list branch used to return Success BEFORE looking the item up, so a
+        // move of something that exists nowhere was reported to the model as "already filed there"
+        // and relayed to the user as a fact about their data.
+        val repo = inboxRepo()
+        val dispatcher = buildDispatcher(repo)
+        repo.calls.clear()
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.MoveItem(
+                itemText = "Pay rent",
+                toChecklistHint = "Покупки",
+                fromChecklistId = 1L,
+            ),
+        )
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_item_not_found", notFound.messageKey)
+        assertEquals(listOf("Pay rent", "Покупки"), notFound.args)
+        assertTrue(repo.calls.isEmpty(), "nothing may be written; wrote ${repo.calls}")
+    }
+
+    @Test
+    fun moveItem_unknownDestination_reportsItAndLeavesTheSourceIntact() = runTest {
+        val repo = inboxRepo(
+            inboxTemplate = listOf(templateItem("tpl_i", "Call the bank")),
+            inboxFill = listOf(fillItem("f_i", "Call the bank", templateItemId = "tpl_i")),
+        )
+        val dispatcher = buildDispatcher(repo)
+        repo.calls.clear()
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.MoveItem(
+                itemText = "Call the bank",
+                toChecklistHint = "Nowhere",
+                fromChecklistId = 9L,
+            ),
+        )
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_no_checklist_match", notFound.messageKey)
+        assertTrue(repo.calls.isEmpty(), "nothing may be written before the destination resolves")
+        assertEquals(1, repo.fill(99L).items.size, "the item stays in the Inbox")
+    }
 }
+
+/**
+ * "Покупки" (id 1, fill 11, empty) PLUS the system Inbox (id 9, fill 99, `isInbox = true`).
+ *
+ * The fake does not override [ChecklistRepository.projects], so it uses the interface default
+ * (`checklists` minus the flagged row) — exactly the filter production uses, which is what makes
+ * the id-vs-name asymmetry testable here at all.
+ */
+private fun inboxRepo(
+    inboxTemplate: List<ChecklistItem> = emptyList(),
+    inboxFill: List<ChecklistFillItem> = emptyList(),
+    projectTemplate: List<ChecklistItem> = emptyList(),
+    projectFill: List<ChecklistFillItem> = emptyList(),
+) = FakeChecklistRepository(
+    seedChecklists = listOf(
+        Checklist(id = 1L, name = "Покупки", items = projectTemplate),
+        Checklist(id = 9L, name = "Inbox", items = inboxTemplate, isInbox = true),
+    ),
+    seedFills = listOf(
+        ChecklistFill(id = 11L, checklistId = 1L, name = "Покупки", items = projectFill, isDefault = true),
+        ChecklistFill(id = 99L, checklistId = 9L, name = "Inbox", items = inboxFill, isDefault = true),
+    ),
+)

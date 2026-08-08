@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.api.repository
 
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 
@@ -82,6 +83,11 @@ interface AiChatRepository {
      * dedups on `{user_id}__{request_id}` — an id that leaks into the next turn makes that turn
      * free, which is the failure this parameter exists to make impossible to reach by accident.
      *
+     * [screenSnapshot] is WHAT THE USER IS LOOKING AT, for the two surfaces [checklistsSummary]
+     * structurally cannot carry: the system Inbox (excluded from `ChecklistRepository.projects`)
+     * and the day. Forwarded as `context_screen`; additive and nullable, so the control arm and
+     * every non-tab route send today's payload byte-for-byte.
+     *
      * [responseLanguage] is the BCP-47 primary subtag the user explicitly pinned for AI replies, or
      * null for Auto (server decides from the message). Forwarded as `response_language`; additive.
      *
@@ -93,6 +99,7 @@ interface AiChatRepository {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String? = null,
+        screenSnapshot: ChatScreenSnapshot? = null,
         requestId: String? = null,
         responseLanguage: String? = null,
     ): AgentStepResult

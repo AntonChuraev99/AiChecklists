@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.api.repository
 
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 
 /**
@@ -16,6 +17,11 @@ interface ChatAgentApiService {
      *   to the server as a top-level `context_checklist.name` field so the agent biases
      *   ambiguous, list-less commands toward this checklist instead of guessing the first one.
      *   Null → omit the field entirely (server treats absence as "home screen, no focus").
+     * @param screenSnapshot What the user is LOOKING AT, for the surfaces whose content
+     *   [checklistsSummary] structurally cannot carry (the system Inbox, the day). Sent as
+     *   top-level `context_screen`. Additive + nullable: `explicitNulls = false` drops the key, so
+     *   the control arm, every non-tab route and every older server see today's exact payload.
+     *   Never sent together with a `context_checklist` — the client gates the two apart.
      * @param requestId Idempotency key for the turn's credit reservation, sent as top-level
      *   `request_id`. It MUST be stable across every round AND every transport retry of ONE
      *   turn, and MUST differ between turns — the server dedups on `{user_id}__{request_id}`,
@@ -32,6 +38,7 @@ interface ChatAgentApiService {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,   // reuse type from ChatCompletionApiService.kt
         contextChecklistName: String? = null,
+        screenSnapshot: ChatScreenSnapshot? = null,
         requestId: String? = null,
         responseLanguage: String? = null,
     ): AgentStepResult
