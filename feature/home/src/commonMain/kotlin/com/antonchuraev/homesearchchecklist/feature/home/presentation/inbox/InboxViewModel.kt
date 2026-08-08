@@ -339,6 +339,18 @@ class InboxViewModel(
                 _draft.value = _draft.value.copy(text = intent.text)
             is InboxIntent.OnCreateChipAction -> applyCreateChip(intent.action)
             InboxIntent.OnQuickAddSubmit -> addTask()
+
+            // Analytics ONLY — raising the dock is the host's job (see InboxRoute).
+            //
+            // The emit moved here from the shell's "+" FAB handler, which is being deleted along with
+            // the FAB. Same EVENT name on purpose: `nav_create_fab_tapped` counts "the user reached
+            // for the manual create affordance", and renaming it when that affordance changed shape
+            // would split one series into two that cannot be summed. Only the SOURCE moves, from
+            // "fab" to "inline_row" — which is exactly what that param was added for.
+            InboxIntent.OnAddTaskRowClick -> analytics.event(
+                AnalyticsEvents.Nav.CREATE_FAB_TAPPED,
+                mapOf(AnalyticsParams.SOURCE to SOURCE_INLINE_ROW),
+            )
             is InboxIntent.OnTaskCheckedChanged -> setTaskChecked(intent.taskId, intent.checked)
             // A fresh ItemSheetState, not a copy: every sub-surface (note draft, reminder tab, custom
             // picker) belongs to the PREVIOUS task, and carrying one over would show the last task's
@@ -1766,6 +1778,21 @@ class InboxViewModel(
          * tab being the home screen, not from which checklist the row belongs to.
          */
         const val SOURCE_INBOX_TAB = "inbox_tab"
+
+        /**
+         * Wire value of [AnalyticsParams.SOURCE] on `nav_create_fab_tapped` since the floating "+"
+         * was replaced by the inline row at the end of the list.
+         *
+         * The old value `"fab"` is NOT reused: the two are the same intent reached through different
+         * affordances, and keeping them apart is the only way to read whether moving capture into the
+         * list changed how often people start one. Both values live under one event, so the total is
+         * still comparable across the change.
+         *
+         * Duplicated as a literal in `TodayViewModel` (the Calendar tab lost the same FAB and reports
+         * the same source); a shared constant would have to live in `core:common:api` next to the
+         * event name, which is where it belongs if a third surface ever appears.
+         */
+        const val SOURCE_INLINE_ROW = "inline_row"
     }
 }
 

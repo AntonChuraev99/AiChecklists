@@ -1236,6 +1236,24 @@ fun App() {
             // you go instead of help you get: the screen the question was about disappeared behind
             // it. It now opens over the current screen via V2ChatDockOverlay.
             var v2ChatDockOpen by remember { mutableStateOf(false) }
+            // "The chat dock has begun leaving", reported by the overlay at the START of its exit
+            // rather than at the end. The shell's raised AI button reads `chatOpen` to decide whether
+            // it is handed over to the dock, and the dock only clears v2ChatDockOpen once the pixels
+            // have stopped — so on this flag alone the button waited out the whole 160ms exit before
+            // starting its own 140ms return, and the middle of the bar sat empty in between. Opening
+            // overlaps by construction; closing has to be told to.
+            //
+            // It goes back to false on an interrupted exit (the user catches the dock and pulls it
+            // up), which is why it is the overlay that owns the transitions and not, say, a timer.
+            var v2ChatDockClosing by remember { mutableStateOf(false) }
+            // One reset for every path that closes the dock from OUTSIDE the overlay — a route
+            // change, a tab tap, opening the capture dock. Those unmount the overlay without it ever
+            // finishing an exit, so its last report would stay latched and the NEXT open would skip
+            // the hand-off animation. Keyed on the flag the overlay is mounted by, so there is
+            // exactly one place to keep in sync instead of one per call site.
+            LaunchedEffect(v2ChatDockOpen) {
+                if (!v2ChatDockOpen) v2ChatDockClosing = false
+            }
             // The Inbox capture dock. Held HERE, not inside the Inbox screen, for one reason: the
             // FABs are shell chrome drawn above the screen, so they have to hide while the dock is
             // up — and the shell can only know that if the flag lives above both of them. Passing a
@@ -1281,20 +1299,20 @@ fun App() {
             // BASELINE arm, which must stay untouched. Conditional @Composable calls are perfectly
             // legal: the runtime inserts and removes the group. The arm is latched at the first
             // mounted shell, so the branch cannot oscillate either.
-            // ONE value for every Compact v2 tab: the FAB band. The shell renders its bar outside the
-            // content slot AND consumes WindowInsets.navigationBars while the bar is visible, so a
-            // hosted screen never has to reserve either the bar or the system strip. An earlier
-            // second constant that also reserved the bar height left a blank ~88dp band on Projects.
+            // ONE value for EVERY Compact v2 tab now — the raised AI button's overhang, ~30dp. The
+            // shell renders its bar outside the content slot AND consumes WindowInsets.navigationBars
+            // while the bar is visible, so a hosted screen never has to reserve either the bar or the
+            // system strip; the only chrome still covering content is the part of the centre circle
+            // that pokes above the bar.
+            //
+            // The second, larger constant this replaced (132dp, "AI + '+' + gaps") went away with the
+            // right-hand floating stack it existed for. Reintroducing a per-tab reserve is the exact
+            // mistake that once left a blank band under the last card on Projects — one value, every
+            // tab, is the whole rule.
             val v2IsCompact =
                 navVariant == NavVariant.V2 &&
                     rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
             val v2FabBandPadding = if (v2IsCompact) V2ShellMetrics.FabBandPadding else 0.dp
-            // Inbox and Calendar show BOTH FABs, so they clear a 132dp stack instead of a 64dp button.
-            // Kept as a second value rather than raising the shared one: applying the taller reserve
-            // everywhere would cut 68dp off the bottom of Projects and Overview to clear a button
-            // they never render.
-            val v2FabStackBandPadding =
-                if (v2IsCompact) V2ShellMetrics.FabStackBandPadding else 0.dp
 
             // Re-root the stack at Inbox once per process, the first time a tab route appears.
             // The control arm never executes this (guarded on navVariant).
@@ -1909,6 +1927,12 @@ fun App() {
                             editChecklistId = route.editChecklistId,
                             templateId = route.templateId,
                             initialText = route.initialText,
+                            // The only production mount of this screen, so this line alone decides
+                            // which arm every entry point lands on. `useProjectForm` deliberately
+                            // carries NO default: a fail-soft `false` would render the classic form
+                            // to v2 users with a green compile and green tests, because the tests
+                            // set the flag themselves and thus only cover the gate's reader.
+                            useProjectForm = navVariant == NavVariant.V2,
                         )
                     }
 
@@ -2137,13 +2161,23 @@ fun App() {
                             drawerState = drawerState,
                             onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                             // 0.dp in control — Calendar's inner lists keep their current insets there.
-                            // The taller stack reserve in v2: this tab now renders the "+" FAB too.
-                            contentBottomPadding = v2FabStackBandPadding,
+                            // In v2 it is the same band every Compact tab reserves: the AI button's
+                            // overhang. There is no per-tab floating "+" left to clear.
+                            contentBottomPadding = v2FabBandPadding,
                             // Shares ONE flag with the Inbox dock rather than owning a second: only one
                             // tab is on screen at a time, and two flags would let a dock opened on
                             // Inbox stay latched open behind the Calendar tab.
                             captureDockOpen = v2CreateDockOpen,
                             onCaptureDockDismiss = { v2CreateDockOpen = false },
+                            // The inline add-task row replaced the shell's "+" FAB here. Chat first:
+                            // both are bottom docks and leaving the chat mounted would stack two of
+                            // them on one screen — the mirror of what onOpenChat does to capture.
+                            // No analytics here on purpose: TodayViewModel already emits
+                            // nav_create_fab_tapped with source = "inline_row" (CalendarRoute's KDoc).
+                            onAddTaskRowClick = {
+                                v2ChatDockOpen = false
+                                v2CreateDockOpen = true
+                            },
                             // Selects the empty-state copy. Only this host renders a "+" FAB, so only
                             // here may the text tell the user to add a task — the classic shell's
                             // Calendar and the standalone Today route have no capture affordance and
@@ -2165,11 +2199,19 @@ fun App() {
                         )
                     ) {
                         InboxRoute(
-                            contentBottomPadding = v2FabStackBandPadding,
-                            // Raised by the shell's "+" FAB, cleared on dismiss. Owned by App so the
-                            // shell can hide its FABs while the dock is up (see fabsVisible).
+                            contentBottomPadding = v2FabBandPadding,
+                            // Raised by the screen's own capture affordance (the shell's Compact "+"
+                            // FAB is gone), cleared on dismiss. Owned by App so the shell can hide its
+                            // remaining chrome while the dock is up (see the shell's captureOpen).
                             createDockOpen = v2CreateDockOpen,
                             onCreateDockDismiss = { v2CreateDockOpen = false },
+                            // Same contract as the Calendar tab above: raise the dock, closing the
+                            // chat first so two bottom surfaces never share the edge. InboxViewModel
+                            // owns the nav_create_fab_tapped emission (source = "inline_row").
+                            onAddTaskRowClick = {
+                                v2ChatDockOpen = false
+                                v2CreateDockOpen = true
+                            },
                             anchorChecklistId = v2InboxAnchorChecklistId,
                             onAnchorChecklistChanged = { v2InboxAnchorChecklistId = it },
                             // Swallow BACK only while the Inbox IS the top of the stack. On Expanded
@@ -2293,11 +2335,17 @@ fun App() {
                         v2CreateDockOpen = false
                         v2ChatDockOpen = true
                     },
-                    // The "+" FAB exists where a capture has an unambiguous target: the Inbox tab (the
-                    // visible page) and the Calendar tab (the system Inbox, with a snackbar naming
-                    // where it landed). On Overview / Projects it would be an affordance with no
-                    // target — a create button that has to ask "into what?" is a worse entry point
-                    // than no button.
+                    // MEDIUM AND EXPANDED ONLY since the bar redesign: Compact dropped the floating
+                    // "+" entirely (the inline add-task row in the list is the capture affordance
+                    // there), so the shell ignores this flag at that size. The rail and the permanent
+                    // drawer keep it — they have no list row to host a capture, and without a button
+                    // the Inbox would be read-only on a tablet.
+                    //
+                    // Where it still applies, it exists where a capture has an unambiguous target: the
+                    // Inbox tab (the visible page) and the Calendar tab (the system Inbox, with a
+                    // snackbar naming where it landed). On Overview / Projects it would be an
+                    // affordance with no target — a create button that has to ask "into what?" is a
+                    // worse entry point than no button.
                     //
                     // v2BarVisible is part of the condition, not decoration. v2SelectedTab is computed
                     // with findLast, so it still reads Inbox while a ChecklistDetail or Settings sits
@@ -2323,10 +2371,16 @@ fun App() {
                     onOpenSettings = { navigator.navigateToSettings() },
                     onOpenUpdates = { navigator.navigateToUpdateFeed() },
                     barVisible = v2BarVisible,
-                    // Hide the FABs while either dock is up: they are drawn above the content, so
-                    // they would float over the dock (and over the chat's scrim), inviting taps that
-                    // land on chrome the user has already left behind.
-                    fabsVisible = !v2ChatDockOpen && !v2CreateDockOpen,
+                    // The two dock flags, passed as themselves. The shell derives everything it needs
+                    // from them: the Compact button's hand-off (chat) and its sink into the bar
+                    // (capture), and — on the rail / permanent drawer, where a create button really
+                    // would float over its own dock — whether that button renders at all.
+                    //
+                    // `chatOpen` drops at the START of the dock's exit, not at its end, so the button
+                    // grows back while the dock is still fading; the two overlap on the way out as
+                    // they already did on the way in.
+                    chatOpen = v2ChatDockOpen && !v2ChatDockClosing,
+                    captureOpen = v2CreateDockOpen,
                     // The chat, hosted ONCE for every route the shell renders (tabs and pushed detail
                     // screens alike) — that is what makes "the AI button opens chat right here" true
                     // on all of them without a per-screen dock.
@@ -2377,6 +2431,10 @@ fun App() {
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             },
+                            // Starts the raised AI button's return in parallel with the dock's fade —
+                            // see v2ChatDockClosing. `false` arrives when the user catches the dock
+                            // on its way out, and the button leaves again.
+                            onClosingChanged = { v2ChatDockClosing = it },
                             // Seeds the chat context + fires ai_chat_opened, the same two things
                             // MainScreen's dock does in the control arm.
                             onExpandedChanged = { expandedNow ->

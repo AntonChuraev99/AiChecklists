@@ -41,6 +41,15 @@ data class ReminderSheetState(
     val activeTab: ReminderTab = ReminderTab.ONCE,
     val currentReminder: Long? = null,
     val currentRepeatRule: ReminderRepeatRule? = null,
+    /**
+     * Whether the "current repeat" card is shown — null hides it (no repeat configured, or the
+     * free-tier reminder limit was hit and the caller deliberately suppresses the card).
+     *
+     * The **content** of the card is no longer taken from here: the sheet renders
+     * `resolveRepeatSummaryLabel(currentRepeatRule)` so the phrasing follows the app locale. Callers
+     * still building this string with the deprecated `buildRepeatSummary` are passing an
+     * English-only value that is never displayed; once they migrate, this can become a `Boolean`.
+     */
     val repeatRuleSummary: String? = null,
     val pendingRepeatConfig: PendingRepeatConfig? = null,
     val showEndConditionPicker: Boolean = false,

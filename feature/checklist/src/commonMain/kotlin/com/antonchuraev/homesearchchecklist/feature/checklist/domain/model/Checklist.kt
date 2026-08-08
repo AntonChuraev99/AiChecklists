@@ -5,6 +5,27 @@ import kotlin.random.Random
 import kotlinx.serialization.Serializable
 
 /**
+ * Client-generated id for the entities that live inside a checklist's JSON blob (items, fill items,
+ * attachments) and therefore have no database sequence to draw from.
+ *
+ * Shape is `"<prefix><epochMillis>_<random>"`. Nothing parses it — it is an opaque key — but the
+ * timestamp half keeps it sortable and greppable in logs.
+ *
+ * **The random half carries the entire uniqueness burden.** These entities are created in tight
+ * loops (an AI-built list maps up to 100 items in one pass, a template application does the same),
+ * so `currentTimeMillis()` is identical across the whole batch. The previous 10^4 suffix space made
+ * a 100-item batch collide with probability ~39% by the birthday bound (`1 - exp(-N^2/2M)`), and two
+ * items sharing an id inside one checklist silently misroute toggles and collapse folder membership
+ * — the flake seen in `ProjectRowMappingTest` was this, not a test bug. 63 bits take the same batch
+ * to ~1e-16.
+ *
+ * Single definition on purpose: the three call sites used to carry three copies of the expression
+ * plus a comment claiming they matched, which is the drift pattern this repo has been bitten by.
+ */
+internal fun generateEntityId(prefix: String = ""): String =
+    "$prefix${currentTimeMillis()}_${Random.nextLong(0, Long.MAX_VALUE)}"
+
+/**
  * Checklist template - defines the items to check
  */
 @Serializable
@@ -91,12 +112,13 @@ data class ChecklistItem private constructor(
     /**
      * Assign an explicit [id] while preserving all other fields.
      *
-     * The default id is `"${currentTimeMillis()}_${Random.nextInt}"`, which can collide when
-     * many items are created in a tight loop (e.g. bulk-parsing dozens of AI nodes in the same
-     * millisecond — birthday-paradox ~12% over 50 nodes). A collision breaks parent linking
-     * because a child's [parentId] could point at a duplicated folder id. Callers building a
-     * folder tree from AI output should assign a guaranteed-unique id (e.g. `Uuid.random()`).
-     * Existing/persisted ids are NOT touched — this is only for freshly created nodes.
+     * Used when the caller already owns an id — restoring a persisted node, or mirroring a template
+     * item into a fill so the two stay linked.
+     *
+     * It is no longer needed as a collision workaround: [generateEntityId] now draws 63 bits, so a
+     * bulk parse of AI nodes inside one millisecond no longer risks a duplicate id (it did at ~12%
+     * over 50 nodes with the old 10^4 suffix, which broke parent linking whenever a child's
+     * [parentId] pointed at a duplicated folder id). Existing/persisted ids are NOT touched.
      */
     fun withId(id: String) = ChecklistItem(text, checked, id, weekday, priority, type, parentId)
 
@@ -116,7 +138,7 @@ data class ChecklistItem private constructor(
     val isFolder: Boolean get() = type == ChecklistNodeType.FOLDER
 
     companion object {
-        private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+        private fun generateId() = generateEntityId()
     }
 }
 
@@ -323,6 +345,6 @@ data class ChecklistFillItem private constructor(
         get() = reminderAt != null || repeatRule != null
 
     companion object {
-        private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+        private fun generateId() = generateEntityId()
     }
 }

@@ -1,7 +1,5 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.model
 
-import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
-import kotlin.random.Random
 import kotlinx.serialization.Serializable
 
 /**
@@ -44,7 +42,7 @@ data class Attachment(
         get() = mimeType?.startsWith("image/") == true
 
     companion object {
-        /** Generates a collision-resistant id. Same entropy strategy as [ChecklistItem.generateId]. */
-        fun generateId(): String = "att_${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+        /** Generates a collision-resistant id — see [generateEntityId] for the entropy rationale. */
+        fun generateId(): String = generateEntityId(prefix = "att_")
     }
 }

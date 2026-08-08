@@ -109,8 +109,9 @@ import org.koin.compose.koinInject
  * thumb tap near the screen edge used to open the project and has to keep doing so. See [ProjectCard]
  * for how the ripple still stays inside the rounded card.
  *
- * @param contentBottomPadding inset the v2 shell reserves for its bottom bar + chat FAB. Defaults to
- *   0.dp so previews and tests get the plain layout.
+ * @param contentBottomPadding inset the v2 shell reserves for the part of its raised AI button that
+ *   overhangs the bottom bar and is drawn over this screen. Defaults to 0.dp so previews and tests
+ *   get the plain layout.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

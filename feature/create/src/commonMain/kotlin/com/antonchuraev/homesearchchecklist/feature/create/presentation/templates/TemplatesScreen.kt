@@ -118,9 +118,18 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
+/**
+ * @param useProjectTitle v2 nav arm: title the gallery "New project" instead of "New Checklist".
+ *
+ * A flag rather than a straight swap because this screen is shared by BOTH arms of the live
+ * `nav_variant` experiment: the control arm's create path still says "checklist" end to end, and
+ * renaming its gallery would put a v2 word on a v1 flow. Default `false` = the control title,
+ * byte-identical to what shipped.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplatesScreen(
+    useProjectTitle: Boolean = false,
     viewModel: TemplatesViewModel = koinViewModel()
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -138,7 +147,11 @@ fun TemplatesScreen(
     }
 
     AppScaffold(
-        title = stringResource(Res.string.create_title),
+        title = if (useProjectTitle) {
+            stringResource(Res.string.create_project_title)
+        } else {
+            stringResource(Res.string.create_title)
+        },
         onBackButtonClick = { viewModel.sendIntent(TemplatesScreenIntent.OnBackClick) },
         scrollBehavior = scrollBehavior,
         actions = {

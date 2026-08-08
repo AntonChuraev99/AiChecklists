@@ -16,7 +16,12 @@ kotlin {
         namespace = "com.antonchuraev.aichecklists"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-        withHostTest {}
+        // isIncludeAndroidResources lets Robolectric resolve the Compose-Resources strings the
+        // navigation shells read from core/designsystem (Res.string.nav_*) during host tests.
+        // Mirrors feature/home.
+        withHostTest {
+            isIncludeAndroidResources = true
+        }
         androidResources {
             enable = true
         }
@@ -164,6 +169,13 @@ kotlin {
         // commonTest for this source set, so declare it explicitly.
         getByName("androidHostTest").dependencies {
             implementation(libs.kotlin.test)
+            // Robolectric + Compose UI test: the v2 navigation shell's contract is positional
+            // ("the AI button sits in the middle of the bar", "no floating create FAB on Compact"),
+            // which only a composed tree can answer. Same stack feature/home already uses.
+            implementation(libs.junit)
+            implementation(libs.robolectric)
+            implementation(libs.androidx.compose.ui.test.junit4)
+            implementation(libs.androidx.compose.ui.test.manifest)
         }
     }
 }

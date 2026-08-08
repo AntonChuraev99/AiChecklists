@@ -688,8 +688,20 @@ object AnalyticsEvents {
          * create affordance are one tap away, which one do people actually reach for. Folding them
          * into one event with a `source` param would erase exactly that comparison.
          *
-         * [AnalyticsParams.SOURCE] is `"fab"` today; the param exists so a future second create
-         * surface (empty-state CTA, long-press shortcut) stays distinguishable without a new event.
+         * [AnalyticsParams.SOURCE] now carries TWO values, and the split is by window size, not by
+         * user behaviour — read them together or the series breaks at the release that introduced
+         * the second one:
+         * - `"fab"` — the manual "+" in the navigation rail header (Medium) and the extended FAB in
+         *   the permanent drawer (Expanded). This was the ONLY value until the inline row shipped,
+         *   and on Compact it is no longer reachable at all: the v2 Compact shell dropped the FAB
+         *   stack when the AI button moved into the bottom bar.
+         * - `"inline_row"` — the inline "+ Add task" row: the last item of the Inbox list, and the
+         *   pinned row under the pager on the Calendar tab. Compact only.
+         *
+         * Versioning: `"inline_row"` cannot appear on any build with versionCode <= 78 (1.18.7) —
+         * that is the last version cut before the row existed. To compare create intent across
+         * releases, sum both values; splitting on `source` alone shows a phantom collapse of `"fab"`
+         * at the boundary, because the phone traffic moved to the new value rather than disappearing.
          *
          * NOTE this counts INTENT, not creation: the dock it opens can be dismissed without adding
          * anything. Join against [Inbox.QUICK_ADDED] for the completion rate.

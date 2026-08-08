@@ -57,6 +57,19 @@ fun CalendarRoute(
      */
     captureEnabled: Boolean = false,
     onCaptureDockDismiss: () -> Unit = {},
+    /**
+     * The inline "add task" row under the pager was tapped — the HOST must raise [captureDockOpen]
+     * (and close any other bottom dock first; two of them cannot share the bottom edge).
+     *
+     * No default, unlike the capture params above: those have a correct "off" value for the control
+     * arm, this one does not. A host that renders the row ([captureEnabled] = true) and forgets this
+     * callback ships a row that looks tappable and does nothing — the exact dead affordance this arm
+     * already shipped once on the rail. Let the compiler ask.
+     *
+     * ⚠️ Do NOT emit `nav_create_fab_tapped` here: this route already sends
+     * [TodayIntent.OnAddTaskRowClick], and the ViewModel emits it with `source = "inline_row"`.
+     */
+    onAddTaskRowClick: () -> Unit,
     todayViewModel: TodayViewModel = koinViewModel(),
     calendarViewModel: CalendarViewModel = koinViewModel(),
 ) {
@@ -94,6 +107,13 @@ fun CalendarRoute(
         captureDockOpen = captureDockOpen,
         captureEnabled = captureEnabled,
         onCaptureDockDismiss = onCaptureDockDismiss,
+        // Broadcast, not routed: the ViewModel gets the tap for the analytics (the event used to
+        // hang off the shell's "+" FAB, which is being deleted), the host gets it to raise the dock
+        // flag it owns. Same shape as onTodayCreateChecklistClick just below.
+        onAddTaskRowClick = {
+            todayViewModel.sendIntent(TodayIntent.OnAddTaskRowClick)
+            onAddTaskRowClick()
+        },
         onQuickAddTextChange = { todayViewModel.sendIntent(TodayIntent.OnQuickAddTextChanged(it)) },
         onQuickAddSubmit = { todayViewModel.sendIntent(TodayIntent.OnQuickAddSubmit) },
         onCreateChipAction = { todayViewModel.sendIntent(TodayIntent.OnCreateChipAction(it)) },

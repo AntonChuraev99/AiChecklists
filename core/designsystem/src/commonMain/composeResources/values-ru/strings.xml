@@ -352,6 +352,11 @@
     <string name="folder_delete_message_one">Будет удалена папка и 1 элемент внутри. Это действие нельзя отменить.</string>
     <!-- Количество в скобках: строка не plurals, а «%1$d элементов» неверно для 2–4 -->
     <string name="folder_delete_message_other">Будет удалена папка и элементы внутри (%1$d). Это действие нельзя отменить.</string>
+    <!-- Переключатель папок. Обе строки рисуются в блоке «Ещё настройки» на экране создания
+         проекта (арм v2) и в шите настроек на деталях чек-листа — без перевода русский
+         интерфейс показывал бы их по-английски. -->
+    <string name="folders_toggle">Папки</string>
+    <string name="folders_toggle_weekly_hint">Недоступно в недельном виде</string>
 
     <string name="checklist_fill_delete_title">Удалить заполнение?</string>
     <string name="checklist_fill_delete_message">Удалить «%1$s»? Это действие нельзя отменить.</string>
@@ -663,6 +668,42 @@
     <string name="reminder_repeat_summary_biweekly">Каждые 2 недели</string>
     <string name="reminder_repeat_summary_quarterly">Каждые 3 месяца</string>
     <string name="reminder_repeat_summary_yearly">Каждый год</string>
+    <!-- Произвольные интервалы повтора (интервал > 1 и не совпал с пресетом выше). Именно plurals,
+         а не шаблон «%1$d дней»: русскому нужны три числовые формы (день / дня / дней). -->
+    <plurals name="reminder_repeat_summary_every_n_days">
+        <item quantity="one">Каждый %1$d день</item>
+        <item quantity="few">Каждые %1$d дня</item>
+        <item quantity="many">Каждые %1$d дней</item>
+        <item quantity="other">Каждые %1$d дней</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_weeks">
+        <item quantity="one">Каждую %1$d неделю</item>
+        <item quantity="few">Каждые %1$d недели</item>
+        <item quantity="many">Каждые %1$d недель</item>
+        <item quantity="other">Каждые %1$d недель</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_months">
+        <item quantity="one">Каждый %1$d месяц</item>
+        <item quantity="few">Каждые %1$d месяца</item>
+        <item quantity="many">Каждые %1$d месяцев</item>
+        <item quantity="other">Каждые %1$d месяцев</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_years">
+        <item quantity="one">Каждый %1$d год</item>
+        <item quantity="few">Каждые %1$d года</item>
+        <item quantity="many">Каждые %1$d лет</item>
+        <item quantity="other">Каждые %1$d лет</item>
+    </plurals>
+    <!-- Сокращённые названия дней недели — только для склейки выбранных дней в сводку
+         («Пн, Ср, Пт»). Намеренно отдельно от reminder_weekday_* выше: там однобуквенные подписи
+         чипов выбора дня (П/В/С/Ч/П/С/В), в списке они неразличимы. -->
+    <string name="reminder_weekday_abbr_mon">Пн</string>
+    <string name="reminder_weekday_abbr_tue">Вт</string>
+    <string name="reminder_weekday_abbr_wed">Ср</string>
+    <string name="reminder_weekday_abbr_thu">Чт</string>
+    <string name="reminder_weekday_abbr_fri">Пт</string>
+    <string name="reminder_weekday_abbr_sat">Сб</string>
+    <string name="reminder_weekday_abbr_sun">Вс</string>
 
     <!-- Вкладки шторки напоминания -->
     <string name="reminder_tab_once">Один раз</string>
@@ -1398,6 +1439,10 @@
     <string name="inbox_title">Входящие</string>
     <string name="inbox_checklist_name">Входящие</string>
     <string name="inbox_quick_add_placeholder">Добавить задачу</string>
+    <!-- Видимая подпись инлайн-строки добавления в конце списка «Входящие» и «Календарь».
+         Намеренно не переиспользует inbox_quick_add_placeholder — та строка это подсказка внутри
+         поля дока быстрой записи, и обе видны одновременно. -->
+    <string name="inbox_add_task_row">Добавить задачу</string>
     <string name="inbox_empty_title">Во входящих пусто</string>
     <string name="inbox_empty_description">Всё, что вы записываете, сначала попадает сюда. Добавьте задачу сейчас, а разложить по проектам можно позже.</string>
     <string name="inbox_project_empty_description">В этом проекте пока нет задач.</string>
@@ -1481,4 +1526,41 @@
     <string name="debug_nav_arm_force_control">Включить control</string>
     <string name="debug_nav_arm_clear">Сбросить переопределение</string>
     <string name="debug_nav_arm_restart_hint">Перезапустите приложение — арм фиксируется на процесс.</string>
+
+    <!-- Экран создания проекта, арм v2. Галерея шаблонов перестаёт быть шлюзом: сначала имя,
+         шаблоны — опция, настройки проекта на том же экране.
+         Слово «проект» действует ТОЛЬКО на этом экране; глобальный ренейм чек-лист -> проект —
+         отдельное решение владельца, поэтому create_title, create_name_section,
+         create_error_name_required и все templates_* остаются про чек-лист (ветка v1/edit). -->
+    <string name="create_project_title">Новый проект</string>
+    <string name="create_project_name_placeholder">Название проекта</string>
+    <string name="create_error_project_name_required">Введите название проекта</string>
+    <string name="create_submit">Создать</string>
+    <!-- Подпись строки шаблонов после того, как шаблон уже применён (до этого — create_choose_template). -->
+    <string name="create_change_template">Сменить шаблон</string>
+    <!-- Подзаголовок топбара: откуда взялось предзаполнение. %1$s = название шаблона. -->
+    <string name="create_from_template_subtitle">Из шаблона: %1$s</string>
+    <string name="create_section_settings">Настройки проекта</string>
+    <string name="create_setting_reminder">Напоминание</string>
+    <string name="create_setting_reminder_none">Не задано</string>
+    <string name="create_setting_weekly">Недельный вид</string>
+    <string name="create_setting_weekly_description">Планируйте список по дням недели</string>
+    <!-- Раскрывашка скрытых по умолчанию настроек. Намеренно не more_options: та строка —
+         заголовок шита настроек на деталях чек-листа и подпись его иконки-меню. -->
+    <string name="create_more_options">Ещё настройки</string>
+    <string name="create_hide_options">Скрыть настройки</string>
+    <string name="create_tasks_section">Задачи</string>
+    <string name="create_tasks_empty_hint">Добавьте первые задачи. Дополнить список можно в любой момент.</string>
+    <!-- Недельный проект создаётся пустым, поэтому секция задач заменяется этой подсказкой. -->
+    <string name="create_weekly_tasks_hint">Недельные списки заполняются по дням недели уже после создания.</string>
+    <!-- Подтверждение показывается, только если недельный вид включают при непустом черновике.
+         %1$d = число задач, которые будут удалены. Число вынесено в скобки, чтобы не согласовывать
+         окончание существительного с произвольным значением лимита. -->
+    <string name="create_weekly_switch_title">Перейти на недельный вид?</string>
+    <string name="create_weekly_switch_message">Недельные списки заполняются по дням недели, поэтому добавленные здесь задачи (%1$d) будут удалены.</string>
+    <!-- Баннер лимита показывается до заполнения формы, а не после. %1$d = max_checklists_free
+         из GetUserLimitsUseCase, не локальная константа. Число вынесено после двоеточия —
+         значение приходит из Remote Config, и согласовать окончание заранее нельзя. -->
+    <string name="create_limit_reached_title">Проектов на бесплатном тарифе: %1$d</string>
+    <string name="create_limit_reached_description">Перейдите на Премиум для безлимитных проектов или удалите тот, который больше не нужен.</string>
 </resources>

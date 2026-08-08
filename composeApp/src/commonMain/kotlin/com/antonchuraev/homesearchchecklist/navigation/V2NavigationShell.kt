@@ -1,22 +1,27 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -33,6 +38,10 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
@@ -42,14 +51,25 @@ import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.nav_add_task_fab_content_description
@@ -61,7 +81,7 @@ import aichecklists.core.designsystem.generated.resources.settings_title
 import aichecklists.core.designsystem.generated.resources.update_feed_menu_item
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppNavigationBar
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.components.calendarNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.components.inboxNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.components.overviewNavBarItem
@@ -100,30 +120,103 @@ object V2Destination {
  */
 object V2ShellMetrics {
     /**
-     * The ONLY bottom reserve a Compact v2 tab screen needs: the floating chat FAB, which is the only
-     * chrome that actually overlaps the content (FAB 56 + gap 8).
+     * Diameter of the AI button that sits in the middle of the Compact bar (variant A).
      *
-     * The bar needs no reservation because [V2NavigationShell] renders it OUTSIDE the content slot
-     * (`Column { Box(weight(1f)) { content() }; AppNavigationBar() }`) — the content box already ends
-     * at the bar's top edge — and because that same box now CONSUMES `WindowInsets.navigationBars`
-     * while the bar is visible, so a hosted screen cannot reserve the system strip twice either.
-     *
-     * There used to be a second, larger constant (bar + gap + FAB + gap = 152dp) for the screens that
-     * pass `contentExtendsBehindNavBar = true`. It was wrong on both counts: that flag only disables
-     * AppScaffold's inset, it does not make the content box grow past the bar — so the extra bar
-     * height became a permanently blank ~88dp band under the last card, on top of the screen's own
-     * `navBottom`. One value, applied to every Compact tab, is the whole rule now.
+     * Full-size, not a 40dp small FAB: it is the single most important action in the whole chrome and
+     * the only affordance that is present on every tab.
      */
-    val FabBandPadding: Dp = 64.dp
+    val AiButtonSize: Dp = 56.dp
 
     /**
-     * The reserve for the TWO-button stack on the Inbox tab: AI 56 + gap 12 + "+" 56 + gap 8 = 132dp.
+     * How far the button's TOP edge rises above the bar's top edge — the "raised" part of a raised
+     * centre button.
      *
-     * A second constant rather than one raised value, because only the Inbox shows both buttons —
-     * applying 132dp everywhere would cut 68dp off the bottom of Calendar, Projects and Overview to
-     * clear a button they never render.
+     * 22 of the 56dp overhang, i.e. the circle keeps 34dp inside the bar. Enough that it visually
+     * belongs to the bar (it is not a detached floating button) while still breaking its silhouette,
+     * which is what makes it read as the primary action rather than a fifth tab. This number is also
+     * the whole content reserve — see [FabBandPadding].
      */
-    val FabStackBandPadding: Dp = 132.dp
+    val AiButtonOverhang: Dp = 22.dp
+
+    /**
+     * The 2+2 split: total empty width the bar leaves in its middle, and the width of the button's
+     * hit area.
+     *
+     * 76dp against a 56dp circle = 10dp of clearance per side. The hit area spans the WHOLE gap on
+     * purpose: a near-miss beside the circle lands in a strip where every other pixel is a target, so
+     * "nothing happened" would be the only silent response in the entire bar.
+     */
+    val AiButtonGapWidth: Dp = 76.dp
+
+    /**
+     * Width of the spacer that actually opens the gap inside the bar.
+     *
+     * M3's `NavigationBar` lays its items out with `Arrangement.spacedBy(8.dp)`, so a spacer placed
+     * between two items already gets 8dp on each side. Subtracting those 16dp is what makes the
+     * VISIBLE gap equal [AiButtonGapWidth] instead of overshooting it to 92dp.
+     *
+     * ## Verified, not remembered
+     * This is an INTERNAL M3 constant, so it was read off the artifact this project actually resolves
+     * rather than from memory: `androidx.compose.material3:material3-android:1.5.0-alpha17` (what CMP
+     * 1.11.0 pulls in), `commonMain/androidx/compose/material3/NavigationBar.kt` — the default
+     * `NavigationBar` override lays its `Row` out with
+     * `horizontalArrangement = Arrangement.spacedBy(NavigationBarItemHorizontalPadding)` (line 156)
+     * and `internal val NavigationBarItemHorizontalPadding: Dp = 8.dp` (line 760). The same file also
+     * confirms the two other numbers this shell depends on: the bar's `defaultMinSize(minHeight =
+     * NavigationBarHeight)` where `NavigationBarHeight = NavigationBarTokens.TallContainerHeight =
+     * 80.dp` (= [AppDimens.BottomBarHeight]), and `placeLabelAndIcon`, which sizes an item from its
+     * CONTENT height — i.e. a wrapped label really does make the bar taller than 80dp, which is why
+     * the button's offset is measured rather than assumed.
+     *
+     * A bump of the material3 version invalidates the 16dp, and the failure is not visual but
+     * behavioural: the hit area is [AiButtonGapWidth] wide, so a narrower real gap would put it over
+     * the inner edges of Calendar and Projects and swallow their taps. That is pinned by
+     * `V2ShellAiButtonTest.compactShell_tapOnTheInnerEdgeOfANeighbourTab_navigates_insteadOfOpeningChat`,
+     * which fails on a composed tree instead of leaving the drift to be found in production.
+     */
+    val AiButtonBarSpacer: Dp = AiButtonGapWidth - 16.dp
+
+    /**
+     * TalkBack traversal position of the AI button.
+     *
+     * ## What this actually guarantees — and what it does not
+     * `traversalIndex` sorts SIBLINGS inside the nearest traversal group. The button is a sibling of
+     * the bar's `Column`, not of the four `NavigationBarItem`s (they sit two levels deeper), so this
+     * 2f is compared against the Column — not against the per-item indices — and the resulting order
+     * is "the four destinations, then the AI button". It is deliberately NOT the interleaved order an
+     * earlier revision of this comment claimed: putting the button between Calendar and Projects would
+     * require it to be a CHILD of the bar, which is exactly what it cannot be (see
+     * [V2NavigationShell]'s Compact variant — a rectangle-clipped `Surface` swallows the overhang).
+     *
+     * The value is kept, rather than dropped, because it makes the fallback deterministic: without it
+     * the geometric heuristic could read the button FIRST (its top edge is the highest node of the
+     * bottom chrome). "Primary action announced after the tabs it belongs to" is a predictable order;
+     * "sometimes first, sometimes last" is not.
+     *
+     * Note it is Android-only semantics — a no-op on wasmJs and iOS, both of which render this shell —
+     * and the actual TalkBack walk has not been verified on a device.
+     */
+    const val AiButtonTraversalIndex: Float = 2f
+
+    /**
+     * The ONLY bottom reserve a Compact v2 tab screen needs: the part of the AI button that overhangs
+     * the content, plus one 8dp breathing gap.
+     *
+     * The bar needs no reservation because [V2NavigationShell] renders it OUTSIDE the content slot
+     * (`Column { Box(weight(1f)) { content() }; bar }`) — the content box already ends at the bar's
+     * top edge — and because that same box CONSUMES `WindowInsets.navigationBars` while the bar is
+     * visible, so a hosted screen cannot reserve the system strip twice either.
+     *
+     * ## Why this is now ~30dp and not 64 / 132
+     * Two earlier constants are gone with the right-hand floating stack that justified them:
+     * `FabBandPadding = 64dp` (one 56dp FAB + 8dp) and `FabStackBandPadding = 132dp` (AI + "+" +
+     * gaps). Nothing floats over the bottom-right corner any more — capture is an inline row in the
+     * list — so the only chrome still overlapping the content is the 22dp of circle poking above the
+     * bar, in the middle. A single value for every Compact tab is the whole rule; a second, larger
+     * reserve is exactly the mistake that once left a blank ~88dp band under the last card on
+     * Projects.
+     */
+    val FabBandPadding: Dp = AiButtonOverhang + AppDimens.SpacingSm
 }
 
 /**
@@ -137,7 +230,8 @@ object V2ShellMetrics {
  *
  * Layout by window size (mirrors the control shell's breakpoints so the two arms differ in content,
  * never in responsiveness):
- * - Compact (<600dp): bottom [AppNavigationBar] + a chat FAB floating 8dp above it.
+ * - Compact (<600dp): bottom navigation bar whose four destinations are split 2+2 around a raised
+ *   56dp AI button in the middle (variant A). Nothing floats in the bottom-right corner any more.
  * - Medium (600–839dp): [NavigationRail] whose header slot holds the chat FAB.
  * - Expanded (≥840dp): [PermanentNavigationDrawer] with the four tabs plus Settings / Updates,
  *   which have no tab of their own and would otherwise be unreachable at this size.
@@ -160,21 +254,33 @@ object V2ShellMetrics {
  * @param selectedTab one of [V2Destination]'s constants — the tab drawn as active.
  * @param onNavigate invoked with a [V2Destination] constant when the user picks a tab. Debounced
  *   here (see below), so App.kt may mutate the back stack unguarded.
- * @param onOpenChat the AI chat entry point. In v2 the bottom chat dock is gone, so this FAB (rail
- *   header / drawer button on larger windows) is the only chat affordance on a tab screen. It opens
- *   the chat IN PLACE via [overlayContent], over whatever screen the user is on.
- * @param showCreateFab whether the manual "+" create FAB is offered alongside the AI one. True only
- *   where there is a task list to add to (the Inbox tab and its project pages) — elsewhere a create
- *   button would have no target.
+ * @param onOpenChat the AI chat entry point. In v2 the bottom chat dock is gone, so this button (the
+ *   raised centre circle on Compact, the rail header / drawer button on larger windows) is the only
+ *   chat affordance on a tab screen. It opens the chat IN PLACE via [overlayContent], over whatever
+ *   screen the user is on.
+ * @param showCreateFab whether the manual "+" create FAB is offered alongside the AI one. **Medium
+ *   and Expanded only** — Compact dropped the floating create button entirely (capture is an inline
+ *   add-task row inside the list now), so this flag is inert there. True only where there is a task
+ *   list to add to (the Inbox tab and its project pages).
  * @param onOpenCreate tapped "+". The host opens its create surface; the shell owns no create state.
+ * @param chatOpen whether the host's chat dock is currently up (and not already on its way out — the
+ *   host drops this at the START of the dock's exit so the two movements overlap). Compact-only, and
+ *   purely for MOTION: the raised AI button stays composed while it is true so it can hand off to the
+ *   dock (scale up + fade) instead of being cut mid-frame. It is drawn UNDER [overlayContent], so the
+ *   dock's scrim takes every touch while this is true, and the button drops out of the a11y tree.
+ * @param captureOpen whether the host's quick-capture dock is up. Also motion, and NOT the same
+ *   movement as [chatOpen]: capture dims nothing, so the bar stays fully visible under it. The button
+ *   therefore does not fade — it sinks the [V2ShellMetrics.AiButtonOverhang] back into the bar, which
+ *   both keeps the 2+2 gap filled (an empty 76dp notch is the one thing the split must never look
+ *   like) and keeps the circle off the capture input it would otherwise be drawn over. It stays
+ *   tappable there: a tap swaps capture for chat, which is what the host's own onOpenChat does.
+ *   On Medium/Expanded it hides the rail / drawer create button instead — that one really would float
+ *   over its own dock.
  * @param onOpenSettings / [onOpenUpdates] Expanded-only extras — destinations that are drawer items
  *   in the control arm and Overview-tab rows on Compact/Medium.
- * @param barVisible false hides the bar and the FAB while a non-tab route (ChecklistDetail, AiChat,
- *   Settings…) is on top of the stack, so the chrome never floats over a detail screen. The shell
- *   itself stays mounted, which is what keeps the tab state alive underneath.
- * @param fabsVisible false hides BOTH FABs without hiding the bar — used while the chat dock is up,
- *   where they would float over its scrim and invite taps that do nothing. Separate from
- *   [barVisible], which answers a different question (is this route a tab at all).
+ * @param barVisible false hides the bar and the AI button while a non-tab route (ChecklistDetail,
+ *   AiChat, Settings…) is on top of the stack, so the chrome never floats over a detail screen. The
+ *   shell itself stays mounted, which is what keeps the tab state alive underneath.
  * @param overlayContent rendered ABOVE the screen at every window size. This is where the v2 chat
  *   dock lives: hosting it once here is what makes "the AI button opens the chat right on this
  *   screen" true for every route the shell renders, including pushed detail screens, with no
@@ -195,7 +301,8 @@ fun V2NavigationShell(
     showCreateFab: Boolean = false,
     onOpenCreate: () -> Unit = {},
     barVisible: Boolean = true,
-    fabsVisible: Boolean = true,
+    chatOpen: Boolean = false,
+    captureOpen: Boolean = false,
     overlayContent: (@Composable () -> Unit)? = null,
     content: @Composable (drawerState: DrawerState?) -> Unit,
 ) {
@@ -226,10 +333,9 @@ fun V2NavigationShell(
                 selectedTab = selectedTab,
                 onNavigate = ::guardedNavigate,
                 onOpenChat = onOpenChat,
-                showCreateFab = showCreateFab,
-                onOpenCreate = onOpenCreate,
                 barVisible = barVisible,
-                fabsVisible = fabsVisible,
+                chatOpen = chatOpen,
+                captureOpen = captureOpen,
                 overlayContent = overlayContent,
                 content = content,
             )
@@ -238,11 +344,13 @@ fun V2NavigationShell(
                 selectedTab = selectedTab,
                 onNavigate = ::guardedNavigate,
                 onOpenChat = onOpenChat,
-                // fabsVisible is folded into showCreateFab here (and in the drawer below) rather than
-                // hiding the rail's whole header: the rail is permanent chrome, so blanking it while
-                // a dock is open would make the navigation itself flicker. Only the create button —
-                // the one that would float over its own dock — goes away.
-                showCreateFab = showCreateFab && fabsVisible,
+                // "A dock is up" is folded into showCreateFab here (and in the drawer below) rather
+                // than hiding the rail's whole header: the rail is permanent chrome, so blanking it
+                // while a dock is open would make the navigation itself flicker. Only the create
+                // button — the one that would float over its own dock — goes away. Derived from the
+                // two dock flags instead of taking a third parameter: one source of truth, so the
+                // shell cannot be told "no dock is open" and "the chat is open" in the same call.
+                showCreateFab = showCreateFab && !chatOpen && !captureOpen,
                 onOpenCreate = onOpenCreate,
                 overlayContent = overlayContent,
                 content = content,
@@ -252,7 +360,7 @@ fun V2NavigationShell(
                 selectedTab = selectedTab,
                 onNavigate = ::guardedNavigate,
                 onOpenChat = onOpenChat,
-                showCreateFab = showCreateFab && fabsVisible,
+                showCreateFab = showCreateFab && !chatOpen && !captureOpen,
                 onOpenCreate = onOpenCreate,
                 onOpenSettings = onOpenSettings,
                 onOpenUpdates = onOpenUpdates,
@@ -268,22 +376,47 @@ fun V2NavigationShell(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Compact: bottom navigation bar + floating chat FAB.
+ * Compact: bottom navigation bar split 2+2 around a raised 56dp AI button (variant A).
  *
- * The FAB is a sibling of the Column (not a Scaffold `floatingActionButton`) so its offset can be
- * expressed against the bar's own height. Inset order matters: `navigationBarsPadding()` is applied
- * FIRST (outermost), then the bar-height offset — the reverse would place the FAB inside the
- * gesture-nav strip on devices with a non-zero bottom inset.
+ * ## Why the button is a SIBLING of the bar and not one of its children
+ * It overhangs the bar's top edge by [V2ShellMetrics.AiButtonOverhang], and Compose does not deliver
+ * touch events outside a parent's bounds — `NavigationBar` is a rectangle-clipped `Surface`, so a
+ * circle parented to it would render clipped AND swallow every tap on the overhanging half. Drawn
+ * here, as the child of the shell's own Box that follows the Column, it is both fully visible and
+ * fully tappable, and it stays UNDER [overlayContent] so the chat's scrim takes over the moment the
+ * dock opens.
+ *
+ * ## Why the offset is measured, not `AppDimens.BottomBarHeight`
+ * The bar is `defaultMinSize(minHeight = 80.dp)` plus its own `WindowInsets.navigationBars`, and M3
+ * sizes each item from its CONTENT (`placeLabelAndIcon`), so at `fontScale ≥ 1.3` — or in a locale
+ * whose labels wrap — it is taller than that minimum. Everything that has to line up with the bar is
+ * therefore sized from its REAL measured height (`onSizeChanged`): the button's hit area AND the
+ * inset the content box consumes.
+ *
+ * The seed is `BottomBarHeight + WindowInsets.navigationBars`, not the bare 80dp constant. Insets are
+ * measured from the bottom of the WINDOW and the bar applies its own, so on a device with 3-button
+ * navigation the bare constant is up to 48dp short — the circle drew that far below its place on the
+ * first frame and jumped once `onSizeChanged` landed. With the inset in the seed the common path
+ * measures exactly what it guessed, so the state is never written and the shell never recomposes for
+ * it; a wrapped label still costs the one recomposition it always did.
+ *
+ * ## Where the hit area stops
+ * It spans the full gap and the full bar HEIGHT, bottom-aligned so it also covers the gesture strip
+ * the bar paints — a tap anywhere in the middle of the bar opens the chat, which is the only way a
+ * raised circle in a strip of targets never produces a silent miss. It deliberately does NOT extend
+ * over the overhang: `Modifier.clickable` installs a pointer-input node that does not share events
+ * with siblings, so a hit area covering the 22dp above the bar would eat every gesture STARTED in the
+ * bottom-centre strip of the content — including the flick that scrolls the list, begun exactly where
+ * a thumb rests. Above the bar only the circle itself answers, which is what any FAB does.
  */
 @Composable
 private fun V2ShellCompactBar(
     selectedTab: String,
     onNavigate: (String) -> Unit,
     onOpenChat: () -> Unit,
-    showCreateFab: Boolean,
-    onOpenCreate: () -> Unit,
     barVisible: Boolean,
-    fabsVisible: Boolean,
+    chatOpen: Boolean,
+    captureOpen: Boolean,
     overlayContent: (@Composable () -> Unit)?,
     content: @Composable (DrawerState?) -> Unit,
 ) {
@@ -295,8 +428,48 @@ private fun V2ShellCompactBar(
         projectsNavBarItem(stringResource(Res.string.nav_tab_projects)),
         overviewNavBarItem(stringResource(Res.string.nav_tab_overview)),
     )
-    val fabDescription = stringResource(Res.string.nav_chat_fab_content_description)
-    val createFabDescription = stringResource(Res.string.nav_add_task_fab_content_description)
+    val aiDescription = stringResource(Res.string.nav_chat_fab_content_description)
+
+    val density = LocalDensity.current
+    // Seeded with the inset included — see the KDoc: the bare 80dp constant is short by the whole
+    // gesture/button strip on the first frame, which is what made the circle jump into place.
+    val seedBarHeightPx = with(density) { AppDimens.BottomBarHeight.roundToPx() } +
+        WindowInsets.navigationBars.getBottom(density)
+    var barHeightPx by remember(seedBarHeightPx) { mutableIntStateOf(seedBarHeightPx) }
+    val barHeight = with(density) { barHeightPx.toDp() }
+
+    // 0 = button at rest, 1 = fully handed over to the chat dock. Asymmetric by design: the button is
+    // the EXITING element of the transition (M3 emphasized-accelerate, and shorter than the dock's
+    // entrance, so it is gone before the dock finishes growing), and it comes back on a short
+    // decelerate as soon as the dock BEGINS its own exit (the host drops chatOpen there, not at the
+    // end of it), so the two overlap the way they do on the way in. Duration 0 when the platform's
+    // animator scale is off — `animateFloatAsState` reads MotionDurationScale from the composition's
+    // coroutine context, so "system animations disabled" lands here for free.
+    val handoff by animateFloatAsState(
+        targetValue = if (chatOpen) 1f else 0f,
+        animationSpec = if (chatOpen) {
+            tween(V2ChatMotion.ButtonHandoffMs, easing = V2ChatMotion.ExitEasing)
+        } else {
+            tween(V2ChatMotion.ButtonReturnMs, easing = V2ChatMotion.EnterEasing)
+        },
+        label = "v2AiButtonHandoff",
+    )
+
+    // 0 = raised, 1 = sunk flush into the bar. The quick-capture dock's answer to the same question
+    // the chat answers with `handoff`, and a different one because capture dims nothing: the bar stays
+    // in full view under it, so fading the circle out would leave a 76dp hole in the middle of a bar
+    // the user is looking at, and leaving it raised would draw it across the capture input (the dock
+    // sits in the scaffold's bottomBar slot, i.e. its bottom edge IS the bar's top edge). Sinking it
+    // solves both, on the same clocks as the chat hand-off so the bottom chrome has one motion vocabulary.
+    val tuckAway by animateFloatAsState(
+        targetValue = if (captureOpen) 1f else 0f,
+        animationSpec = if (captureOpen) {
+            tween(V2ChatMotion.ButtonHandoffMs, easing = V2ChatMotion.ExitEasing)
+        } else {
+            tween(V2ChatMotion.ButtonReturnMs, easing = V2ChatMotion.EnterEasing)
+        },
+        label = "v2AiButtonTuck",
+    )
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -316,15 +489,18 @@ private fun V2ShellCompactBar(
                     // Insets are measured from the bottom of the WINDOW, but this box stops one bar
                     // higher — so a hosted screen lifting its bottomBar by the raw `ime` inset lifts
                     // it by a bar height too much and strands the input in a blank band above the
-                    // keyboard (seen live on the Inbox capture dock). Consuming bar + system strip
-                    // states the truth: that much of any bottom inset is already accounted for by
-                    // this box ending where it does.
+                    // keyboard (seen live on the Inbox capture dock). Consuming the bar states the
+                    // truth: that much of any bottom inset is already accounted for by this box
+                    // ending where it does.
+                    //
+                    // The MEASURED height, not `navigationBars + BottomBarHeight`. The two agree on
+                    // the common path (the bar is 80dp plus exactly that inset), and they stop
+                    // agreeing at fontScale ≥ 1.3, where a wrapped label makes the bar taller — the
+                    // very case the button's offset is measured for. Two answers to "how tall is the
+                    // bar" in one composable is how one of them silently rots.
                     .then(
                         if (barVisible) {
-                            Modifier.consumeWindowInsets(
-                                WindowInsets.navigationBars
-                                    .add(WindowInsets(bottom = AppDimens.BottomBarHeight))
-                            )
+                            Modifier.consumeWindowInsets(WindowInsets(bottom = barHeight))
                         } else {
                             Modifier
                         }
@@ -333,66 +509,175 @@ private fun V2ShellCompactBar(
                 content(null)
             }
             if (barVisible) {
-                AppNavigationBar(
+                V2SplitNavigationBar(
                     items = items,
                     selectedItemId = selectedTab,
-                    onItemSelected = { onNavigate(it.id) },
+                    onItemSelected = onNavigate,
+                    modifier = Modifier.onSizeChanged { barHeightPx = it.height },
                 )
             }
         }
 
-        if (barVisible && fabsVisible) {
-            // Vertical stack: AI on top, manual "+" at the bottom.
-            //
-            // The BOTTOM slot is the ergonomic anchor — it holds whichever create action is primary
-            // on this tab. On the Inbox that is the manual "+" (filled `primary`), with the AI button
-            // tonal above it; on the other three tabs the AI button is the only one and takes the
-            // anchor itself. The AI button therefore shifts down by one slot when leaving the Inbox.
-            // That is deliberate: freezing it would mean reserving an empty 68dp slot — and 68dp of
-            // list — on three tabs to hold a button they never show.
-            //
-            // Both are full-size 56dp FABs; the hierarchy is carried by colour (filled `primary` over
-            // tonal `primaryContainer`), not by size. Shrinking the AI button to a 40dp small FAB
-            // would make it change size between tabs, since it is the ONLY affordance on three of
-            // them and a lone 40dp FAB is below the M3 bar for a screen's main action.
-            //
-            // Inset order matters: navigationBarsPadding() FIRST (outermost), then the bar-height
-            // offset — the reverse drops the stack into the gesture-nav strip on devices with a
-            // non-zero bottom inset.
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        // Composed for as long as the bar is — no dock unmounts it. Both docks are MOTION states
+        // here, not visibility ones: cutting the circle out of the tree on the frame a dock opens is
+        // the "jump" the whole V2ChatMotion table exists to remove, and while the capture dock is up
+        // it would also leave the 2+2 split as a bare 76dp notch in a bar the user is still looking
+        // at (capture draws no scrim). While the CHAT is open the button is unreachable anyway — the
+        // dock's scrim is drawn after it and takes every touch — and `clearAndSetSemantics` takes it
+        // out of the a11y tree with it, so "open" costs nothing but the outgoing animation.
+        if (barVisible) {
+            Box(
+                contentAlignment = Alignment.TopCenter,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(
-                        end = AppDimens.ScreenPaddingHorizontal,
-                        bottom = AppDimens.BottomBarHeight + AppDimens.SpacingSm,
-                    ),
+                    .align(Alignment.BottomCenter)
+                    .width(V2ShellMetrics.AiButtonGapWidth)
+                    // Tall enough to POSITION the circle above the bar. This box installs no pointer
+                    // input of its own, so the strip beside the circle stays transparent to touch and
+                    // the list underneath keeps every gesture that starts there.
+                    .height(barHeight + V2ShellMetrics.AiButtonOverhang)
+                    // Outermost on purpose: it wipes the click action and the description below it,
+                    // which is exactly what "the dock owns the screen now" should mean to TalkBack.
+                    .then(if (chatOpen) Modifier.clearAndSetSemantics { } else Modifier),
             ) {
+                // The gap filler: the WHOLE 2+2 split, and only as tall as the bar. Bottom-aligned so
+                // it also covers the strip the bar paints over the gesture nav — a near-miss beside
+                // the circle lands on a target instead of on nothing, which is the only reason the
+                // hit area is wider than the circle at all.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(barHeight)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            // No ripple on the gap: the visible feedback is the FAB's own state layer
+                            // plus the dock rising. A ripple over a 76dp transparent rectangle
+                            // sitting on the bar reads as a rendering glitch.
+                            indication = null,
+                            role = Role.Button,
+                            onClick = onOpenChat,
+                        )
+                        .semantics {
+                            contentDescription = aiDescription
+                            traversalIndex = V2ShellMetrics.AiButtonTraversalIndex
+                        },
+                )
                 FloatingActionButton(
                     onClick = onOpenChat,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = CircleShape,
+                    // The loudest role in the palette, at every window size (the rail and the drawer
+                    // use it too): this is the flagship action of the whole product, and the raised
+                    // centre circle only reads as "primary" rather than "fifth tab" if its colour
+                    // says so as well as its position. The CIRCLE, on the other hand, is Compact-only
+                    // on purpose — it exists to break the bar's silhouette, and there is no
+                    // silhouette to break in a rail header, where M3's default FAB shape is the norm.
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .size(V2ShellMetrics.AiButtonSize)
+                        // Read in the DRAW phase (lambda form), so neither the 180ms hand-off nor the
+                        // sink recomposes the shell — and with it the hosted screen.
+                        .graphicsLayer {
+                            val scale = lerp(1f, V2ChatMotion.ButtonHandoffScale, handoff)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 1f - handoff
+                            translationY = V2ShellMetrics.AiButtonOverhang.toPx() * tuckAway
+                        }
+                        // The hit area above is the one node TalkBack and the tests see; leaving the
+                        // FAB's own button semantics in place would announce the AI entry point
+                        // twice and make `onNodeWithContentDescription` ambiguous. Its POINTER input
+                        // survives this, which is what keeps the overhanging half tappable.
+                        .clearAndSetSemantics { },
                 ) {
-                    Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
-                }
-                if (showCreateFab) {
-                    FloatingActionButton(
-                        onClick = onOpenCreate,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = createFabDescription)
-                    }
+                    Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
                 }
             }
         }
 
-        // Last child of the same fillMaxSize Box the bar and the FABs live in, so the dock keeps
+        // Last child of the same fillMaxSize Box the bar and the button live in, so the dock keeps
         // covering both — on Compact they float OVER the content and a dock drawn under them would
         // be poked through by taps that do nothing.
         overlayContent?.invoke()
+    }
+}
+
+/**
+ * The Compact bar itself: the four v2 destinations, split 2+2 around the gap the raised AI button
+ * occupies.
+ *
+ * ## Why this is not `AppNavigationBar`
+ * It is the same component, item-for-item — same `AppNavBarItem` descriptors from designsystem, same
+ * colour roles, same `alwaysShowLabel`, same M3 container — with ONE structural difference the shared
+ * wrapper cannot express: a `Spacer` in the middle of its `RowScope` content. `NavigationBarItem`
+ * applies `weight(1f)` to itself, so the four items split whatever the spacer leaves; there is no
+ * modifier a caller can pass to `AppNavigationBar` that produces a centre gap. Keeping the shared
+ * component untouched also keeps it byte-identical for every other caller, which is the same reason
+ * the v2 shell duplicates `guardedNavigate` instead of extracting it.
+ *
+ * `traversalIndex` is set per item to keep the four in visual order; slot 2 is left free for the AI
+ * button, though see [V2ShellMetrics.AiButtonTraversalIndex] for what that does and does not buy.
+ *
+ * ## Labels wrap, they are not truncated
+ * They were `maxLines = 1, overflow = Ellipsis` for one revision, on the reasoning that the 76dp gap
+ * leaves ~61dp per item on a 320dp window and an unconstrained label would grow the bar. It grows the
+ * bar — that is the correct outcome, and it is measured (see [V2ShellCompactBar]). Truncating instead
+ * turns "Календарь", "Проекты" and "कैलेंडर" into "Кал…" at fontScale 1.3, i.e. the treatment arm
+ * ships an unreadable bar against a control arm that wraps the same words: a legibility difference
+ * the A/B would then charge to the redesign. Two lines is the cap — `AppNavigationBar` has none, but
+ * it also has no gap eating 76dp of the row, and a three-line item would push the bar past a third of
+ * a short window.
+ */
+@Composable
+private fun V2SplitNavigationBar(
+    items: List<AppNavBarItem>,
+    selectedItemId: String,
+    onItemSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val gapAfter = items.size / 2
+    NavigationBar(
+        modifier = modifier,
+        containerColor = NavigationBarDefaults.containerColor,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        tonalElevation = NavigationBarDefaults.Elevation,
+    ) {
+        items.forEachIndexed { index, item ->
+            if (index == gapAfter) {
+                Spacer(modifier = Modifier.width(V2ShellMetrics.AiButtonBarSpacer))
+            }
+            val isSelected = item.id == selectedItemId
+            // Items after the gap shift one slot down the traversal order to leave room for the
+            // button; see V2ShellMetrics.AiButtonTraversalIndex.
+            val traversal = (index + if (index >= gapAfter) 1 else 0).toFloat()
+            NavigationBarItem(
+                selected = isSelected,
+                onClick = { onItemSelected(item.id) },
+                icon = {
+                    Icon(
+                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                        contentDescription = item.contentDescription ?: item.label,
+                    )
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier.semantics { traversalIndex = traversal },
+            )
+        }
     }
 }
 
@@ -441,21 +726,31 @@ private fun V2ShellRail(
             NavigationRail(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 header = {
+                    // Same colour role as the Compact raised button — one action, one look. It used
+                    // to be primaryContainer here and primary there, which made the flagship
+                    // affordance change emphasis with the window width and, worse, ranked it BELOW
+                    // the create button on the two sizes that show both.
                     FloatingActionButton(
                         onClick = onOpenChat,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ) {
                         Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
                     }
-                    // Not a Compact-only affordance: the capture row that used to be pinned to the
-                    // Inbox was removed on ALL window sizes, so without this button there is no way
-                    // to add a task at rail width at all.
+                    // Kept at rail width on purpose: the redesign that replaced this button with an
+                    // inline add-task row was scoped to Compact, and a rail is not a list — it has
+                    // no row to put a capture in. Note the row DOES currently render at this width
+                    // too (feature/home does not gate it by window size), so the Inbox tab offers two
+                    // ways into the same dock on a tablet. That is a duplicated affordance, not a
+                    // lost one; whichever way the owner settles it, this comment is the place the
+                    // answer lands. Demoted to the CONTAINER role now that the AI button owns
+                    // `primary`: the two stay distinguishable, and the order of emphasis matches the
+                    // product's (chat first, manual create second).
                     if (showCreateFab) {
                         FloatingActionButton(
                             onClick = onOpenCreate,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         ) {
                             Icon(Icons.Filled.Add, contentDescription = createFabDescription)
                         }
@@ -549,10 +844,12 @@ private fun V2ShellPermanent(
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
                 ) {
+                    // primary/onPrimary, matching the rail header and the Compact raised button —
+                    // see the rail for why the AI action holds the loudest role at every width.
                     ExtendedFloatingActionButton(
                         onClick = onOpenChat,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                         icon = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
                         text = { Text(chatLabel) },
                         modifier = Modifier.padding(
@@ -562,14 +859,14 @@ private fun V2ShellPermanent(
                             bottom = if (showCreateFab) AppDimens.SpacingSm else AppDimens.SpacingMd,
                         ),
                     )
-                    // Same reasoning as the rail: the pinned capture row is gone at every width, so
-                    // desktop-class windows need their own create affordance or the Inbox becomes
-                    // read-only there.
+                    // Same reasoning as the rail, colour role and the duplicated-affordance caveat
+                    // included: the inline-row redesign was scoped to Compact, a drawer has no list
+                    // row of its own, and this button sits one step below the AI one in emphasis.
                     if (showCreateFab) {
                         ExtendedFloatingActionButton(
                             onClick = onOpenCreate,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                             text = { Text(createLabel) },
                             modifier = Modifier.padding(
