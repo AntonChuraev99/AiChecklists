@@ -72,8 +72,9 @@ import org.koin.compose.koinInject
  * `.claude/rules/ui-card-patterns.md`), a project row has exactly one action: open it. A split here
  * would invent a second gesture with nothing to bind it to.
  *
- * @param contentBottomPadding inset the v2 shell reserves for its bottom bar + chat FAB. Defaults to
- *   0.dp so previews and tests get the plain layout.
+ * @param contentBottomPadding inset the v2 shell reserves for the part of its raised AI button that
+ *   overhangs the bottom bar and is drawn over this screen. Defaults to 0.dp so previews and tests
+ *   get the plain layout.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

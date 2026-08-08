@@ -96,7 +96,22 @@ class ProjectsViewModel(
     override fun onIntent(intent: ProjectsIntent) {
         when (intent) {
             is ProjectsIntent.OnProjectClick -> navigator.navigateToChecklistDetail(intent.checklistId)
-            ProjectsIntent.OnCreateChecklistClick -> navigator.navigateToTemplatesScreen()
+
+            // The CREATE screen, not the template gallery. Both of this tab's create affordances
+            // (toolbar "+" and the empty-state CTA) go through this one branch, so this is the whole
+            // change.
+            //
+            // The gallery used to be the front door because the old create form was a bare
+            // name + items pair — a template was the faster way to a useful list. The v2 form owns
+            // that job now: it opens focused on the name field, carries the project settings, and
+            // offers "Choose a template" as a ROW inside itself, so the gallery is one tap further
+            // away rather than gone. Landing on the gallery instead skips the step the user asked
+            // for ("new project") and makes naming a list a two-screen detour.
+            //
+            // v2-only surface, so the classic arm is untouched: the Projects tab does not exist
+            // there, and the v1 home screen keeps its own routing (MainScreenViewModel).
+            ProjectsIntent.OnCreateChecklistClick -> navigator.navigateToCreateChecklistScreen()
+
             ProjectsIntent.OnRetry -> _retryTrigger.update { it + 1 }
         }
     }

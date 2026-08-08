@@ -94,7 +94,12 @@ class CreateChecklistViewModelTest {
             checklistRepository = fakeRepo,
             appNavigator = fakeNavigator,
             analyticsTracker = fakeAnalytics,
-            getUserLimitsUseCase = getUserLimitsUseCase
+            getUserLimitsUseCase = getUserLimitsUseCase,
+            reminderScheduler = RecordingReminderScheduler(),
+            logger = RecordingCreateLogger(),
+            // This file is the v1 ("Classic view") regression suite — the CONTROL arm. Leaving the
+            // flag off is the point: these assertions are the baseline the redesign must not move.
+            useProjectForm = false,
         )
     }
 
@@ -199,9 +204,10 @@ class CreateChecklistViewModelTest {
         vm.onIntent(CreateChecklistIntent.OnNewItemTextChange("clean room"))
         vm.onIntent(CreateChecklistIntent.OnAddItemFromInput)
         advanceUntilIdle()
-        // New items appear at the TOP — [clean room, buy milk]
-        val cleanRoomId = vm.screenState.value.items[0].id
-        val buyMilkId = vm.screenState.value.items[1].id
+        // Resolved by text, not by index: this test is about auto-committing the previous edit, and
+        // it should not also encode WHERE a new task lands (v2 appends, v1 prepended).
+        val cleanRoomId = vm.screenState.value.items.first { it.text == "clean room" }.id
+        val buyMilkId = vm.screenState.value.items.first { it.text == "buy milk" }.id
 
         vm.onIntent(CreateChecklistIntent.OnStartItemEdit(buyMilkId))
         vm.onIntent(CreateChecklistIntent.OnItemEditTextChange("buy milk 2L"))
@@ -311,7 +317,14 @@ class CreateChecklistViewModelTest {
         advanceUntilIdle()
 
         assertNull(fakeNavigator.paywallSource, "No paywall when below limit")
+        // CONTROL arm landing, unchanged: the classic screen resets the stack to the app root. The
+        // v2 arm lands in the created project instead — asserted in CreateProjectArmGateTest, and
+        // the two must not converge while the experiment is running.
         assertTrue(fakeNavigator.navigatedToMainScreen, "Expected navigation to main after save")
+        assertNull(
+            fakeNavigator.detailChecklistId,
+            "The classic arm must NOT open the created project — that is the v2 behaviour"
+        )
     }
 
     // ── Fakes ───────────────────────────────────────────────────────
@@ -391,6 +404,7 @@ class CreateChecklistViewModelTest {
         var backInvoked = false
         var navigatedToMainScreen = false
         var paywallSource: String? = null
+        var detailChecklistId: Long? = null
 
         override val backStack: NavBackStack<NavKey> = NavBackStack()
 
@@ -412,7 +426,9 @@ class CreateChecklistViewModelTest {
         override fun navigateToTemplatePreview(templateId: String) {}
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
-        override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
+        override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {
+            detailChecklistId = checklistId
+        }
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         override fun navigateToPaywall(source: String) { paywallSource = source }
@@ -443,9 +459,18 @@ class CreateChecklistViewModelTest {
         private val delegate: FakeChecklistRepository,
         private val count: Int
     ) : ChecklistRepository by delegate {
-        override val checklists: Flow<List<Checklist>> = flowOf(
+        private val rows: List<Checklist> =
             List(count) { Checklist(id = it.toLong(), name = "C$it", items = emptyList()) }
-        )
+
+        override val checklists: Flow<List<Checklist>> = flowOf(rows)
+
+        /**
+         * Must be overridden explicitly, NOT left to the interface's default body.
+         * `ChecklistRepository by delegate` forwards `projects` to the delegate, whose `checklists`
+         * is `emptyFlow()` — so `GetUserLimitsUseCase` (which counts `projects`, not `checklists`)
+         * combined over a flow that never emits and the limit gate silently never engaged.
+         */
+        override val projects: Flow<List<Checklist>> = flowOf(rows)
     }
 
     private class FakePaywallRepository(

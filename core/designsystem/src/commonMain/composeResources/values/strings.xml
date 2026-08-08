@@ -794,6 +794,35 @@
     <string name="reminder_repeat_summary_biweekly">Every 2 weeks</string>
     <string name="reminder_repeat_summary_quarterly">Every 3 months</string>
     <string name="reminder_repeat_summary_yearly">Every year</string>
+    <!-- Custom repeat intervals (interval > 1 and not one of the presets above). Plurals, not a
+         "%1$d days" template: RU needs three numeric forms (день / дня / дней) that a plain
+         placeholder cannot express. -->
+    <plurals name="reminder_repeat_summary_every_n_days">
+        <item quantity="one">Every %1$d day</item>
+        <item quantity="other">Every %1$d days</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_weeks">
+        <item quantity="one">Every %1$d week</item>
+        <item quantity="other">Every %1$d weeks</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_months">
+        <item quantity="one">Every %1$d month</item>
+        <item quantity="other">Every %1$d months</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_years">
+        <item quantity="one">Every %1$d year</item>
+        <item quantity="other">Every %1$d years</item>
+    </plurals>
+    <!-- Abbreviated weekday names, used ONLY to join an explicit weekday selection into a summary
+         ("Mon, Wed, Fri"). Deliberately separate from reminder_weekday_* above: those are the
+         single-letter labels of the day-picker chips (M/T/W/T/F/S/S) and are ambiguous in a list. -->
+    <string name="reminder_weekday_abbr_mon">Mon</string>
+    <string name="reminder_weekday_abbr_tue">Tue</string>
+    <string name="reminder_weekday_abbr_wed">Wed</string>
+    <string name="reminder_weekday_abbr_thu">Thu</string>
+    <string name="reminder_weekday_abbr_fri">Fri</string>
+    <string name="reminder_weekday_abbr_sat">Sat</string>
+    <string name="reminder_weekday_abbr_sun">Sun</string>
 
     <!-- Reminder sheet tabs -->
     <string name="reminder_tab_once">Once</string>
@@ -1578,6 +1607,11 @@
          passed into EnsureInboxUseCase — the domain layer must never touch Compose Resources. -->
     <string name="inbox_checklist_name">Inbox</string>
     <string name="inbox_quick_add_placeholder">Add a task</string>
+    <!-- Visible label of the inline "add task" row that lives at the end of the Inbox and Calendar
+         lists. Deliberately NOT inbox_quick_add_placeholder: that one is the hint text inside the
+         capture dock's field, and the two are on screen together — editing one copy must not
+         silently rewrite the other. Same reason detail_add_task_fab does not reuse add_item. -->
+    <string name="inbox_add_task_row">Add task</string>
     <string name="inbox_empty_title">Your inbox is empty</string>
     <string name="inbox_empty_description">Anything you capture lands here first. Add a task now and sort it into a project later.</string>
     <string name="inbox_project_empty_description">No tasks in this project yet.</string>
@@ -1666,4 +1700,43 @@
          description, and in v2 both are on screen at once — a screen reader would announce two
          indistinguishable "Add item" buttons. -->
     <string name="detail_add_task_fab">Add task</string>
+
+    <!-- Create-project screen, v2 arm. The templates gallery stops being the gate, so this screen
+         becomes the entry point: name first, templates as an option, project settings inline.
+         The word "project" is scoped to THIS screen (and the templates title reached from it) —
+         a global checklist->project rename is a separate owner decision, so create_title,
+         create_name_section, create_error_name_required and every templates_* string keep saying
+         "checklist" and stay in use by the v1/edit path. -->
+    <string name="create_project_title">New project</string>
+    <string name="create_project_name_placeholder">Project name</string>
+    <string name="create_error_project_name_required">Enter a project name</string>
+    <string name="create_submit">Create</string>
+    <!-- Label of the templates row once a template has already been applied (create_choose_template
+         is the label before that). -->
+    <string name="create_change_template">Change template</string>
+    <!-- Top-bar subtitle showing where the prefilled content came from. %1$s = template name. -->
+    <string name="create_from_template_subtitle">From template: %1$s</string>
+    <string name="create_section_settings">Project settings</string>
+    <string name="create_setting_reminder">Reminder</string>
+    <string name="create_setting_reminder_none">Not set</string>
+    <string name="create_setting_weekly">Weekly view</string>
+    <string name="create_setting_weekly_description">Plan this list by day of the week</string>
+    <!-- Expander for the settings that are hidden by default. Deliberately NOT more_options: that
+         key titles the checklist-detail options sheet and labels its overflow icon, so the two
+         would drift into each other on any copy edit. -->
+    <string name="create_more_options">More options</string>
+    <string name="create_hide_options">Hide options</string>
+    <string name="create_tasks_section">Tasks</string>
+    <string name="create_tasks_empty_hint">Add your first tasks. You can add more anytime.</string>
+    <!-- Weekly projects are created empty by CreateWeeklyChecklistUseCase, so the tasks section is
+         replaced by this hint instead of silently dropping whatever was typed. -->
+    <string name="create_weekly_tasks_hint">Weekly lists are filled in per weekday after you create them.</string>
+    <!-- Confirmation shown only when Weekly is switched on with a non-empty draft. %1$d = number of
+         tasks that will be discarded. -->
+    <string name="create_weekly_switch_title">Switch to Weekly view?</string>
+    <string name="create_weekly_switch_message">Weekly lists are filled in per weekday, so the %1$d tasks you added here will be removed.</string>
+    <!-- Limit banner shown before the form is filled in, not after. %1$d = max_checklists_free, read
+         from GetUserLimitsUseCase — never a local constant. -->
+    <string name="create_limit_reached_title">Free plan includes %1$d projects</string>
+    <string name="create_limit_reached_description">Go Pro for unlimited projects, or delete one you no longer need.</string>
 </resources>

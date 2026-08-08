@@ -794,6 +794,33 @@
     <string name="reminder_repeat_summary_biweekly">हर 2 हफ्ते</string>
     <string name="reminder_repeat_summary_quarterly">हर 3 महीने</string>
     <string name="reminder_repeat_summary_yearly">हर साल</string>
+    <!-- Custom repeat intervals (interval > 1 and not one of the presets above). -->
+    <plurals name="reminder_repeat_summary_every_n_days">
+        <item quantity="one">हर %1$d दिन</item>
+        <item quantity="other">हर %1$d दिन</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_weeks">
+        <item quantity="one">हर %1$d हफ्ता</item>
+        <item quantity="other">हर %1$d हफ्ते</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_months">
+        <item quantity="one">हर %1$d महीना</item>
+        <item quantity="other">हर %1$d महीने</item>
+    </plurals>
+    <plurals name="reminder_repeat_summary_every_n_years">
+        <item quantity="one">हर %1$d साल</item>
+        <item quantity="other">हर %1$d साल</item>
+    </plurals>
+    <!-- Abbreviated weekday names, used ONLY to join an explicit weekday selection into a summary
+         ("सोम, बुध, शुक्र"). Deliberately separate from reminder_weekday_* above: those are the
+         single-letter labels of the day-picker chips and are ambiguous in a list. -->
+    <string name="reminder_weekday_abbr_mon">सोम</string>
+    <string name="reminder_weekday_abbr_tue">मंगल</string>
+    <string name="reminder_weekday_abbr_wed">बुध</string>
+    <string name="reminder_weekday_abbr_thu">गुरु</string>
+    <string name="reminder_weekday_abbr_fri">शुक्र</string>
+    <string name="reminder_weekday_abbr_sat">शनि</string>
+    <string name="reminder_weekday_abbr_sun">रवि</string>
 
     <!-- Reminder sheet tabs -->
     <string name="reminder_tab_once">एक बार</string>
@@ -1562,6 +1589,10 @@
     <string name="inbox_title">इनबॉक्स</string>
     <string name="inbox_checklist_name">इनबॉक्स</string>
     <string name="inbox_quick_add_placeholder">टास्क जोड़ें</string>
+    <!-- Visible label of the inline "add task" row at the end of the Inbox and Calendar lists.
+         Deliberately NOT inbox_quick_add_placeholder — that is the hint inside the capture dock
+         field, and both are on screen at the same time. -->
+    <string name="inbox_add_task_row">टास्क जोड़ें</string>
     <string name="inbox_empty_title">आपका इनबॉक्स खाली है</string>
     <string name="inbox_empty_description">आप जो कुछ भी नोट करेंगे वह पहले यहीं आएगा। अभी टास्क जोड़ें और बाद में उसे किसी प्रोजेक्ट में लगा दें।</string>
     <string name="inbox_project_empty_description">इस प्रोजेक्ट में अभी कोई टास्क नहीं है।</string>
@@ -1629,4 +1660,36 @@
     <string name="debug_nav_arm_force_control">control चालू करें</string>
     <string name="debug_nav_arm_clear">ओवरराइड हटाएँ</string>
     <string name="debug_nav_arm_restart_hint">लागू करने के लिए ऐप रीस्टार्ट करें — आर्म हर प्रोसेस पर लॉक होता है।</string>
+
+    <!-- Create-project screen, v2 arm. Name first, templates as an option, project settings inline.
+         The word "project" is scoped to THIS screen — create_title, create_name_section,
+         create_error_name_required and every templates_* string keep saying "checklist". -->
+    <string name="create_project_title">नया प्रोजेक्ट</string>
+    <string name="create_project_name_placeholder">प्रोजेक्ट का नाम</string>
+    <string name="create_error_project_name_required">प्रोजेक्ट का नाम दर्ज करें</string>
+    <string name="create_submit">बनाएं</string>
+    <!-- Templates row label once a template has been applied (create_choose_template before that). -->
+    <string name="create_change_template">टेम्पलेट बदलें</string>
+    <!-- Top-bar subtitle. %1$s = template name. -->
+    <string name="create_from_template_subtitle">टेम्पलेट से: %1$s</string>
+    <string name="create_section_settings">प्रोजेक्ट सेटिंग्स</string>
+    <string name="create_setting_reminder">रिमाइंडर</string>
+    <string name="create_setting_reminder_none">सेट नहीं है</string>
+    <string name="create_setting_weekly">वीकली व्यू</string>
+    <string name="create_setting_weekly_description">इस लिस्ट को हफ़्ते के दिनों के हिसाब से प्लान करें</string>
+    <!-- Expander for the settings hidden by default. Deliberately NOT more_options: that key titles
+         the checklist-detail options sheet and labels its overflow icon. -->
+    <string name="create_more_options">और विकल्प</string>
+    <string name="create_hide_options">विकल्प छिपाएँ</string>
+    <string name="create_tasks_section">टास्क</string>
+    <string name="create_tasks_empty_hint">अपने पहले टास्क जोड़ें। बाद में कभी भी और जोड़ सकते हैं।</string>
+    <!-- Weekly projects are created empty, so the tasks section is replaced by this hint. -->
+    <string name="create_weekly_tasks_hint">वीकली लिस्ट बनने के बाद हर दिन के हिसाब से भरी जाती हैं।</string>
+    <!-- Shown only when Weekly is switched on with a non-empty draft. %1$d = tasks to be discarded. -->
+    <string name="create_weekly_switch_title">वीकली व्यू पर स्विच करें?</string>
+    <string name="create_weekly_switch_message">वीकली लिस्ट हर दिन के हिसाब से भरी जाती हैं, इसलिए यहाँ जोड़े गए %1$d टास्क हटा दिए जाएँगे।</string>
+    <!-- Limit banner shown before the form is filled in. %1$d = max_checklists_free from
+         GetUserLimitsUseCase, never a local constant. -->
+    <string name="create_limit_reached_title">फ्री प्लान में %1$d प्रोजेक्ट शामिल हैं</string>
+    <string name="create_limit_reached_description">अनलिमिटेड प्रोजेक्ट के लिए प्रीमियम लें, या जिसकी अब ज़रूरत नहीं उसे हटा दें।</string>
 </resources>

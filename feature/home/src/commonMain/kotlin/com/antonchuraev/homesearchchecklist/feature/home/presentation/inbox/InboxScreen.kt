@@ -26,6 +26,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -95,6 +96,8 @@ import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxLayout
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
@@ -103,6 +106,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCapture
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.AddTaskRow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -120,16 +124,24 @@ import org.koin.compose.koinInject
  * count is unbounded — a fixed row collapses its overflow to zero width instead of shrinking, see
  * [InboxPagerDots]. The pill row it replaced was scrollable for the same reason.
  *
- * ## Why capture is behind a FAB now
- * The row used to be PINNED — always visible above the bottom bar. It moved behind the shell's "+"
- * FAB on the owner's call, so the tab reads as a task list rather than as an input form, and the
- * two create paths (AI and manual) sit side by side as sibling FABs instead of living on opposite
- * edges of the screen. The trade-off is real and was accepted knowingly: capture costs one extra tap
- * and the affordance is no longer self-evident on first open.
+ * ## Where capture is reached from
+ * On COMPACT, an [AddTaskRow] at the END of the task list, scrolling with it — Todoist's anatomy,
+ * picked by the owner after seeing it and a pinned variant rendered side by side. It replaced the
+ * shell's floating "+" FAB, which read as chrome hovering over the content and left the tab's
+ * primary action off the list it acts on. Two earlier shapes were tried and rejected: a row PINNED
+ * above the bottom bar (it made the tab read as an input form) and the FAB (self-evident, but
+ * detached). At rail and permanent-drawer width the shell KEEPS its "+" and the row is withheld —
+ * see `showAddTaskRow` in the body.
  *
- * @param contentBottomPadding inset the v2 shell reserves for its bottom bar + FABs. Applied to the
- *   BOTTOMMOST element (the capture dock while it is up, the pager's content padding otherwise) —
- *   applying it to both would reserve the space twice.
+ * The row is composed for EVERY page state, empty ones included — see the empty-state item in
+ * [InboxPageList]. A new user's Inbox is empty by definition, so an add affordance that only appears
+ * once there is something to add is no affordance at all.
+ *
+ * @param contentBottomPadding inset the v2 shell reserves for the part of its raised AI button that
+ *   overhangs the bottom bar and is drawn over this screen. (The bar itself needs no reserve: the
+ *   shell renders it outside the content slot and consumes `WindowInsets.navigationBars` there.)
+ *   Applied to the BOTTOMMOST element — the capture dock while it is up, the pager's content padding
+ *   otherwise — because applying it to both would reserve the space twice.
  * @param swallowRootBack whether BACK is swallowed here. Same shape as `MainScreen.swallowRootBack`.
  *   Default true = today's behaviour: at the v2 root BACK must not reach the Activity. The host has
  *   to pass false whenever this screen is NOT the top of the back stack — on Expanded the Inbox is a
@@ -150,8 +162,8 @@ fun InboxScreen(
     snackbarHostState: SnackbarHostState,
     swallowRootBack: Boolean = true,
     // No defaults on these two, deliberately. A host that mounts this screen without wiring them
-    // would render a "+" FAB whose dock never appears — a silently dead button, which is exactly the
-    // failure this arm already shipped once on the rail. Make the compiler ask.
+    // would render an add-task row whose dock never appears — a silently dead affordance, which is
+    // exactly the failure this arm already shipped once on the rail. Make the compiler ask.
     createDockOpen: Boolean,
     onCreateDockDismiss: () -> Unit,
     homeSignal: Int = 0,
@@ -178,6 +190,24 @@ fun InboxScreen(
     }
 
     val content = state as? InboxScreenState.Content
+
+    // Whether the trailing add-task row is composed at all. Two independent reasons to withhold it,
+    // and both are decided here rather than inside the list, which knows neither:
+    //
+    //  1. NOT COMPACT. The v2 shell drops its floating "+" on Compact only; at rail and
+    //     permanent-drawer width it still renders one, and `showCreateFab` covers this tab. Drawing
+    //     the row there as well gave ONE action two doors on one screen, and made the shell's own
+    //     rationale ("without this button there is no way to add a task at rail width at all")
+    //     false. Nothing is lost by narrowing it: every window size keeps exactly one way in.
+    //  2. THE DOCK IS UP. The dock is the expanded form of this row; leaving both composed puts two
+    //     task inputs on one screen (the Calendar tab hides its pinned copy for the same reason),
+    //     and the row is unreachable anyway under the dismiss overlay — a visible control that
+    //     cannot be tapped.
+    //
+    // This screen is mounted by the v2 arm only, so there is no arm gate to read first: the classic
+    // shell never composes it.
+    val showAddTaskRow = !createDockOpen &&
+        rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
 
     // The toolbar names the page the pager is on — this is what replaced the tab row. Read from the
     // ViewModel's settled index rather than from the pager, because the bar lives OUTSIDE the pager's
@@ -248,9 +278,10 @@ fun InboxScreen(
                     pages = content.pages,
                     layout = content.displayOptions.layout,
                     // While the dock is up it occupies the bottomBar slot, so the Scaffold has already
-                    // shortened the content by its height — reserving the FAB band on top of that
-                    // would strand the list above a gap the size of a stack that is not on screen.
+                    // shortened the content by its height — reserving the AI button's band on top of
+                    // that would strand the list above a gap the size of chrome that is not on screen.
                     contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
+                    showAddTaskRow = showAddTaskRow,
                     onIntent = onIntent,
                     homeSignal = homeSignal,
                 )
@@ -457,6 +488,7 @@ private fun InboxContent(
     pages: List<InboxPage>,
     layout: InboxLayout,
     contentBottomPadding: Dp,
+    showAddTaskRow: Boolean,
     onIntent: (InboxIntent) -> Unit,
     homeSignal: Int = 0,
 ) {
@@ -516,9 +548,10 @@ private fun InboxContent(
         }
     }
 
-    // No imePadding here: the keyboard inset is owned by the PINNED ROW (see [PinnedQuickAddRow]).
-    // Insetting this Column instead pushes the row out of the visible area entirely, because
-    // AppScaffold's content slot already sits inside the resolved window insets.
+    // No imePadding here: the keyboard inset is owned by the capture dock, and the dock lives in the
+    // scaffold's bottomBar slot, which applies it already. Insetting this Column on top of that
+    // shortens the content twice — AppScaffold's content slot already sits inside the resolved
+    // window insets.
     Column(modifier = Modifier.fillMaxSize()) {
         if (pages.isEmpty()) {
             // Defensive only: the ViewModel holds InboxScreenState.Loading until the system Inbox row
@@ -552,77 +585,171 @@ private fun InboxContent(
                 val page = pages.getOrNull(pageIndex)
                 when {
                     page == null -> Box(modifier = Modifier.fillMaxSize())
-                    page.tasks.isEmpty() && page.isInbox -> EmptyState(
-                        icon = Icons.Outlined.Inbox,
-                        title = stringResource(Res.string.inbox_empty_title),
-                        description = stringResource(Res.string.inbox_empty_description),
+                    else -> InboxPageList(
+                        page = page,
+                        compact = layout == InboxLayout.COMPACT,
+                        contentBottomPadding = contentBottomPadding,
+                        showAddTaskRow = showAddTaskRow,
+                        onIntent = onIntent,
                     )
-                    page.tasks.isEmpty() -> EmptyState(
-                        icon = Icons.Outlined.ChecklistRtl,
-                        title = page.title,
-                        description = stringResource(Res.string.inbox_project_empty_description),
-                    )
-                    else -> {
-                        val compact = layout == InboxLayout.COMPACT
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                // wrapContentWidth sits between the fill and the cap, and it is what
-                                // makes the cap bind at all: fillMaxSize pins minWidth == maxWidth
-                                // to the pane, and a widthIn(max) coerced into a fixed range does
-                                // nothing — on a 1280dp window the rows spanned the whole pane,
-                                // checkbox at one edge and star at the other. This relaxes the
-                                // minimum back to 0 so adaptiveContentWidth can actually cut the
-                                // width, then centres the capped column in the pane it still holds.
-                                .wrapContentWidth(Alignment.CenterHorizontally)
-                                .adaptiveContentWidth()
-                                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-                            // Cards: 8dp, matching the checklist detail list — the cards are the same
-                            // object there and the two screens must not use two different rhythms for
-                            // it. Compact: zero, because the rows are separated by a rule instead, and
-                            // a gap on top of a divider reads as a broken card list.
-                            verticalArrangement = if (compact) {
-                                Arrangement.spacedBy(0.dp)
-                            } else {
-                                Arrangement.spacedBy(AppDimens.SpacingSm)
-                            },
-                            // Top padding so the first card does not touch the dots row; the bottom
-                            // reserve is the shell's FAB band, passed in by the host.
-                            contentPadding = PaddingValues(
-                                top = AppDimens.SpacingSm,
-                                bottom = AppDimens.SpacingXl + contentBottomPadding,
-                            ),
-                        ) {
-                            itemsIndexed(page.tasks, key = { _, task -> task.fillItemId }) { index, task ->
-                                InboxTaskRow(
-                                    task = task,
-                                    compact = compact,
-                                    onCheckedChange = { checked ->
-                                        onIntent(
-                                            InboxIntent.OnTaskCheckedChanged(task.fillItemId, checked)
-                                        )
-                                    },
-                                    onDetailsClick = {
-                                        onIntent(InboxIntent.OnTaskDetailsClick(task.fillItemId))
-                                    },
-                                )
-                                // Between rows only — a trailing rule under the last item would read
-                                // as "the list continues below" at the end of a short list.
-                                if (compact && index < page.tasks.lastIndex) {
-                                    HorizontalDivider(
-                                        thickness = AppDimens.DividerThickness,
-                                        color = MaterialTheme.colorScheme.outlineVariant,
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
 
-        // The capture row is NOT here — it is the scaffold's bottomBar (see InboxScreen), which is the
-        // only slot that gets lifted above the keyboard automatically.
+        // The capture DOCK is not here — it is the scaffold's bottomBar (see InboxScreen), the only
+        // slot that gets lifted above the keyboard automatically. What this Column owns is the
+        // add-task ROW that raises it, and that row sits INSIDE the pager's LazyColumn rather than
+        // pinned here. No imePadding() belongs anywhere in this content: the dock owns the keyboard
+        // inset from its slot, and a second reader of it here would fight the scaffold for the same
+        // space (that defect already shipped once on this screen).
+    }
+}
+
+/**
+ * One page of the pager: the task list of a single checklist, its empty state, and the add-task row.
+ *
+ * A composable of its own rather than a lambda body inside [InboxContent] — it is the page anatomy,
+ * and inlined it sat eight levels deep, where the horizontal inset below could not be read against
+ * the list it applies to.
+ *
+ * @param showAddTaskRow whether the trailing add-task row is composed. Decided by [InboxScreen] (see
+ *   its `showAddTaskRow`), never here: the reasons are the window size and the host's dock flag, and
+ *   neither is this composable's business.
+ */
+@Composable
+private fun InboxPageList(
+    page: InboxPage,
+    compact: Boolean,
+    contentBottomPadding: Dp,
+    showAddTaskRow: Boolean,
+    onIntent: (InboxIntent) -> Unit,
+) {
+    // The screen's horizontal inset, applied PER ITEM instead of once on the list. It used to sit on
+    // the LazyColumn's own modifier, and that broke the moment the empty state moved INSIDE the
+    // list: `EmptyState` applies `ScreenPaddingHorizontal` itself, so it was inset twice (32dp, plus
+    // the 16dp it puts on its own description = 48dp of margin around a two-sentence paragraph) —
+    // the "avoid double padding" rule in `.claude/rules/ui-card-patterns.md`, and a visible
+    // difference from the very same empty state on every other screen. Per item, each element
+    // carries exactly one inset and the empty state carries only its own.
+    val rowInset = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+
+    // BoxWithConstraints for ONE number: the page height the empty state is sized against. It has to
+    // come from the page rather than from the list because `fillParentMaxHeight` — the only
+    // list-side option — can set a FIXED height and nothing else, which is the defect below.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val emptyStateMinHeight = maxHeight * InboxEmptyStateHeightFraction
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                // wrapContentWidth sits between the fill and the cap, and it is what makes the cap
+                // bind at all: fillMaxSize pins minWidth == maxWidth to the pane, and a widthIn(max)
+                // coerced into a fixed range does nothing — on a 1280dp window the rows spanned the
+                // whole pane, checkbox at one edge and star at the other. This relaxes the minimum
+                // back to 0 so adaptiveContentWidth can actually cut the width, then centres the
+                // capped column in the pane it still holds.
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .adaptiveContentWidth(),
+            // Cards: 8dp, matching the checklist detail list — the cards are the same object there
+            // and the two screens must not use two different rhythms for it. Compact: zero, because
+            // the rows are separated by a rule instead, and a gap on top of a divider reads as a
+            // broken card list.
+            verticalArrangement = if (compact) {
+                Arrangement.spacedBy(0.dp)
+            } else {
+                Arrangement.spacedBy(AppDimens.SpacingSm)
+            },
+            // Top padding so the first card does not touch the dots row; the bottom reserve is the
+            // band the shell's raised AI button overhangs, passed in by the host.
+            contentPadding = PaddingValues(
+                top = AppDimens.SpacingSm,
+                bottom = AppDimens.SpacingXl + contentBottomPadding,
+            ),
+        ) {
+            // The empty state is an ITEM of the list rather than a replacement for it, and that is
+            // the whole point: it used to be rendered INSTEAD of the LazyColumn, so an add-task row
+            // that lives inside the list would have been composed nowhere on an empty page — and a
+            // brand-new user, whose Inbox is empty by definition, would have had no visible way to
+            // add anything at all.
+            //
+            // Height-capped instead of filling the viewport: at 100% the row below would sit exactly
+            // one screen down, i.e. off-screen, which is the same defect one scroll further out. At
+            // 60% the illustration still reads as a centred empty state and the row lands just under
+            // it.
+            //
+            // A MINIMUM, not a fixed height. `EmptyState` is an 88dp icon plus two text blocks, so
+            // on a short viewport at fontScale 1.3 in the longest locale it outgrows 60% — and a
+            // fixed box does not clip the overflow, it lets it draw straight over the add-task row
+            // underneath. Lazy items are measured with an unbounded height, so `fillMaxSize()`
+            // inside `EmptyState` resolves to wrap-content here and this Box takes whichever is
+            // taller: the 60% band or the content.
+            if (page.tasks.isEmpty()) {
+                item(key = "empty_state") {
+                    Box(
+                        modifier = Modifier.heightIn(min = emptyStateMinHeight),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (page.isInbox) {
+                            EmptyState(
+                                icon = Icons.Outlined.Inbox,
+                                title = stringResource(Res.string.inbox_empty_title),
+                                description = stringResource(Res.string.inbox_empty_description),
+                            )
+                        } else {
+                            EmptyState(
+                                icon = Icons.Outlined.ChecklistRtl,
+                                title = page.title,
+                                description = stringResource(
+                                    Res.string.inbox_project_empty_description
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            itemsIndexed(page.tasks, key = { _, task -> task.fillItemId }) { index, task ->
+                // Row and rule share ONE inset wrapper: the divider has to line up with the card
+                // edges, and two separate paddings drift apart the first time one is edited.
+                Column(modifier = rowInset) {
+                    InboxTaskRow(
+                        task = task,
+                        compact = compact,
+                        onCheckedChange = { checked ->
+                            onIntent(InboxIntent.OnTaskCheckedChanged(task.fillItemId, checked))
+                        },
+                        onDetailsClick = {
+                            onIntent(InboxIntent.OnTaskDetailsClick(task.fillItemId))
+                        },
+                    )
+                    // Between rows only — a trailing rule under the last item would read as "the
+                    // list continues below" at the end of a short list.
+                    if (compact && index < page.tasks.lastIndex) {
+                        HorizontalDivider(
+                            thickness = AppDimens.DividerThickness,
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                    }
+                }
+            }
+
+            // LAST element of the list, and it scrolls with it — the Todoist anatomy the owner
+            // picked after seeing a pinned variant rendered too.
+            //
+            // The extra top gap is what keeps it from reading as one more task: in the compact
+            // layout the list's arrangement spacing is zero and the rows are separated by rules, so
+            // without it the row would butt straight against the last task with no divider between
+            // them. No rule is drawn above it on purpose — a divider would enrol it into the list it
+            // must stand apart from.
+            if (showAddTaskRow) {
+                item(key = "inline_add_task") {
+                    AddTaskRow(
+                        onClick = { onIntent(InboxIntent.OnAddTaskRowClick) },
+                        modifier = rowInset.padding(top = AppDimens.SpacingSm),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -742,6 +869,16 @@ private val InboxDotsRowHeight = 32.dp
 private val InboxDotTouchTarget = 32.dp
 private val InboxDotSize = 6.dp
 private val InboxDotSizeSelected = 8.dp
+
+/**
+ * Share of the pager viewport the empty-state illustration gets while it lives INSIDE the list.
+ *
+ * Not 1f: the add-task row is composed right after it, and a full-height empty state would push that
+ * row exactly one screen down — invisible on open, which is the very defect moving the empty state
+ * into the list was meant to fix. 0.6 leaves the illustration comfortably centred in the upper part
+ * of the page and the row just below it, on every window this tab renders on.
+ */
+private const val InboxEmptyStateHeightFraction = 0.6f
 
 /**
  * One task, with the project-wide 30/70 hit-zone split: the left 30% toggles the checkbox, the right

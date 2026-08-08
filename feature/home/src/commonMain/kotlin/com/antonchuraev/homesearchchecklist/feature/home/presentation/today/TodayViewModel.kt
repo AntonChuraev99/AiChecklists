@@ -50,6 +50,16 @@ private const val TAG = "TodayViewModel"
 private const val SOURCE_CALENDAR = "calendar"
 
 /**
+ * Wire value of [AnalyticsParams.SOURCE] on `nav_create_fab_tapped` since the floating "+" was
+ * replaced by the inline row under the pager.
+ *
+ * Deliberately the SAME literal `InboxViewModel` reports: both tabs lost the same FAB and gained the
+ * same affordance, so one value keeps them summable. The two copies are a smell only if a third
+ * surface appears — at that point the constant belongs in `core:common:api`, next to the event name.
+ */
+private const val SOURCE_INLINE_ROW = "inline_row"
+
+/**
  * ViewModel for the Today screen.
  *
  * Observes all reminders (checklist-level + per-item) scheduled within today's
@@ -132,6 +142,15 @@ class TodayViewModel(
             TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
             is TodayIntent.OnQuickAddTextChanged -> _quickAddText.value = intent.text
             TodayIntent.OnQuickAddSubmit -> captureTask()
+
+            // Analytics ONLY — raising the dock is the host's job (see CalendarRoute). Same EVENT
+            // name the shell's "+" FAB used, because it counts "the user reached for the manual
+            // create affordance"; renaming it when that affordance changed shape would split one
+            // series into two that cannot be summed. Only SOURCE moves, "fab" → "inline_row".
+            TodayIntent.OnAddTaskRowClick -> analytics.event(
+                AnalyticsEvents.Nav.CREATE_FAB_TAPPED,
+                mapOf(AnalyticsParams.SOURCE to SOURCE_INLINE_ROW),
+            )
             TodayIntent.OnOpenCapturedChecklist -> {
                 val id = lastCapturedChecklistId
                 if (id == null) {
@@ -395,6 +414,16 @@ sealed interface TodayIntent : Intent {
 
     /** Captures the typed text into the system Inbox. See `TodayViewModel.captureTask`. */
     data object OnQuickAddSubmit : TodayIntent
+
+    /**
+     * The inline "add task" row under the Calendar tab's pager was tapped.
+     *
+     * ANALYTICS ONLY here — the dock's open flag is host state, so `CalendarRoute` sends this intent
+     * AND calls the host back. The emit moved down from the v2 shell's "+" FAB handler, which is
+     * being deleted with the FAB: an event that lives on a deleted button is an event that silently
+     * stops, and this one belongs to a series that has to stay comparable across the change.
+     */
+    data object OnAddTaskRowClick : TodayIntent
 
     /** Snackbar action after a capture — opens the checklist the task landed in. */
     data object OnOpenCapturedChecklist : TodayIntent

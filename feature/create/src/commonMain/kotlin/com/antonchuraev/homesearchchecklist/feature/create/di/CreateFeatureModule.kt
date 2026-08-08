@@ -33,7 +33,13 @@ val createFeatureModule = module {
             checklistRepository = get(),
             appNavigator = get(),
             analyticsTracker = get(),
-            getUserLimitsUseCase = get()
+            getUserLimitsUseCase = get(),
+            reminderScheduler = get(),
+            logger = get(),
+            // The nav arm, forwarded by CreateChecklistScreen. Absent (older call sites / previews)
+            // means the CONTROL arm, whose form must stay exactly what it was before the redesign.
+            useProjectForm = params.getOrNull<Boolean>() ?: false,
+            createWeeklyChecklistUseCase = get()
         )
     }
     viewModelOf(::TemplatesViewModel)

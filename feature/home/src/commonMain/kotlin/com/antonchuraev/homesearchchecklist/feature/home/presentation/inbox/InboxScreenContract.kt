@@ -89,6 +89,19 @@ sealed interface InboxIntent : Intent {
     /** Appends the trimmed quick-add text to the CURRENT page's checklist (template + fill pair). */
     data object OnQuickAddSubmit : InboxIntent
 
+    /**
+     * The inline "add task" row at the end of the list was tapped — the entry point that replaced the
+     * shell's floating "+" FAB.
+     *
+     * Raised through the normal intent channel even though the ViewModel cannot open the dock: the
+     * dock's open flag is HOST state (the shell hides its own chrome while it is up), so `InboxRoute`
+     * forwards this to the host AND to the ViewModel. The ViewModel's job here is the ANALYTICS —
+     * `nav_create_fab_tapped` with `source = "inline_row"`. That emit deliberately moved down here
+     * from the shell: the "+" FAB it used to hang off is being deleted, and an event that lives on a
+     * deleted button is an event that silently stops, which would break the series it belongs to.
+     */
+    data object OnAddTaskRowClick : InboxIntent
+
     data class OnTaskCheckedChanged(val taskId: String, val checked: Boolean) : InboxIntent
 
     /** Right 70% of a task row — opens the triage sheet. Per-item actions never live on the row. */

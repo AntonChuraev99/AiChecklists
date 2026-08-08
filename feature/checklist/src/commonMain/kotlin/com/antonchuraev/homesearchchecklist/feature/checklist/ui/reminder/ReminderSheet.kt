@@ -314,10 +314,15 @@ private fun RepeatTabContent(
             .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingXxl),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
-        // Current repeat schedule card
+        // Current repeat schedule card.
+        //
+        // [repeatRuleSummary] is only read as a visibility flag here — null still means "hide the
+        // card" (the free-tier reminder limit and the per-item sheet both rely on that, see the
+        // note at the ChecklistDetailScreen call site). The text itself is derived from
+        // [currentRepeatRule] so it follows the app locale; the caller-built string is English-only.
         if (currentRepeatRule != null && repeatRuleSummary != null) {
             CurrentRepeatCard(
-                summary = repeatRuleSummary,
+                summary = resolveRepeatSummaryLabel(currentRepeatRule),
                 timeHour = config.timeHour,
                 timeMinute = config.timeMinute
             )

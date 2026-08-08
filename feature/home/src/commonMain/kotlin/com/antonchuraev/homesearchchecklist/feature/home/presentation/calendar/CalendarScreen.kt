@@ -89,6 +89,8 @@ import aichecklists.core.designsystem.generated.resources.calendar_title
 import aichecklists.core.designsystem.generated.resources.today_open_menu
 import aichecklists.core.designsystem.generated.resources.today_quick_add_placeholder
 import androidx.compose.material3.TopAppBarDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
@@ -100,6 +102,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveCont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.AddTaskRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayBody
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayScreenState
 import kotlinx.coroutines.launch
@@ -152,9 +155,13 @@ fun CalendarScreen(
     onTodayRetry: () -> Unit,
     onCalendarIntent: (CalendarIntent) -> Unit,
     /**
-     * Extra bottom inset the HOST reserves below this screen (v2 shell: bottom bar + chat FAB),
-     * threaded into both tab bodies' LazyColumn contentPadding. 0.dp (the default, and what the
-     * control arm passes) keeps the previous padding exactly.
+     * Extra bottom inset the HOST reserves below this screen — in the v2 shell, the part of the
+     * raised AI button that overhangs the bar and is drawn over this screen's content.
+     *
+     * Applied to the BOTTOMMOST element and to that one only: the pinned add-task row where it is
+     * drawn, the pager bodies' `contentPadding` where it is not. Giving it to both reserves the
+     * space twice and leaves a dead strip in the middle. 0.dp (the default, and what the control arm
+     * passes) keeps the previous padding exactly.
      */
     contentBottomPadding: Dp = 0.dp,
     /**
@@ -170,12 +177,33 @@ fun CalendarScreen(
      * Whether this HOST offers a capture affordance at all — NOT whether the dock is currently up
      * ([captureDockOpen]), which is false most of the time on a host that can still open it.
      *
-     * Only the Today body's empty-state copy reads it, to choose between naming the capture input
-     * and staying neutral. Default false = the classic layout's wording, which has neither FAB nor
-     * dock, so that arm needs no call-site change.
+     * TWO readers, and it is checked FIRST in both — before any window-size, window-inset or layout
+     * state is touched — so the control arm's composition is byte-for-byte what it was:
+     *  1. it gates the [AddTaskRow] below the pager, the entry point that replaced the v2 shell's
+     *     floating "+" (on Compact this tab's ONLY way into the capture dock, so dropping the FAB
+     *     without it would silently delete the feature). See `captureRowVisible` in the body: the
+     *     row is drawn on Compact ONLY, because the rail and the permanent drawer keep a "+" of
+     *     their own and two doors to one action on one screen is the defect, not the feature.
+     *  2. the Today body's empty-state copy reads it to choose between naming the capture input and
+     *     staying neutral. NOT narrowed to Compact: at rail width the "+" is still there, so
+     *     "add a task" is still a true promise — only its shape differs.
+     *
+     * Default false = the classic layout: no row, no dock, the neutral wording — so the control arm
+     * needs no call-site change.
      */
     captureEnabled: Boolean = false,
     onCaptureDockDismiss: () -> Unit = {},
+    /**
+     * The inline "add task" row was tapped — the HOST must raise [captureDockOpen].
+     *
+     * Defaulted here (unlike on `CalendarRoute`) only so previews and screenshot tests of this
+     * stateless composable keep compiling; every production path goes through the route, which
+     * requires it.
+     *
+     * ⚠️ Must NOT emit `nav_create_fab_tapped` — `TodayViewModel` already does, with
+     * `source = "inline_row"`.
+     */
+    onAddTaskRowClick: () -> Unit = {},
     onQuickAddTextChange: (String) -> Unit = {},
     onQuickAddSubmit: () -> Unit = {},
     snackbarHostState: SnackbarHostState? = null,
@@ -199,10 +227,44 @@ fun CalendarScreen(
     // page carries no ambiguity to resolve, and the snackbar names where the task went either way.
     val captureVisible = captureDockOpen
 
-    // While the dock is up it occupies the bottomBar slot, so the Scaffold has already shortened the
-    // content by its height; reserving the FAB band on top of that strands the list above a blank
-    // band the height of a button stack that is not on screen. Mirrors InboxScreen.
-    val bodyBottomPadding = if (captureVisible) 0.dp else contentBottomPadding
+    // Whether the pinned add-task ROW is drawn this frame. Three gates, in this order and
+    // deliberately:
+    //
+    //  1. [captureEnabled] — the ARM gate, evaluated FIRST so the control arm never reaches the rest
+    //     of the expression. In particular it never reads the window size, so its composition (and
+    //     its invalidation scope) is byte-for-byte what it was.
+    //  2. the dock — it IS the expanded form of this row, and leaving both on screen stacks two
+    //     inputs on one edge.
+    //  3. window size — COMPACT ONLY, and this is the part that changed after review. The v2 shell
+    //     drops its floating "+" on Compact alone; at rail and permanent-drawer width it still
+    //     renders one, and `showCreateFab` covers this tab as well as the Inbox
+    //     (`v2SelectedTab == Inbox || v2SelectedTab == Calendar`). Drawing the row there too gave
+    //     ONE action two doors on one screen and made the shell's own rationale ("without this
+    //     button there is no way to add a task at rail width at all") false. Gating here rather than
+    //     widening the host's flag keeps that comment true and costs no capture path: every window
+    //     size still has exactly one way into the dock.
+    val captureRowVisible = if (captureEnabled && !captureVisible) {
+        rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
+    } else {
+        false
+    }
+
+    // The host's reserve goes to whatever is actually the BOTTOMMOST element, never to two things at
+    // once — that is the whole contract of [contentBottomPadding].
+    //
+    // With the row pinned under the pager, the row is that element and the reserve belongs to IT
+    // (see the row's own modifier below): the v2 shell's raised AI button overhangs the bar's top
+    // edge by 22dp and is drawn OVER this screen's content box, so a row flush against the bar was
+    // covered by the circle for its bottom third — visually and, because the button's hit zone is a
+    // sibling drawn after the content, by touch as well: a tap on the middle of the row opened the
+    // CHAT instead of the capture dock.
+    //
+    // The pager therefore gets 0: it is no longer the bottommost element (the row bounds it from
+    // below), and leaving the reserve on it left a dead ~30dp strip between the last reminder and
+    // the row. While the dock is up, the Scaffold has already shortened the content by the dock's
+    // height, so the reserve would strand the list above a band the height of chrome that is not on
+    // screen. Both of those collapse to the same rule: whoever is last carries it.
+    val bodyBottomPadding = if (captureVisible || captureRowVisible) 0.dp else contentBottomPadding
 
     // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
     PlatformBackHandler(enabled = captureVisible) { onCaptureDockDismiss() }
@@ -275,8 +337,13 @@ fun CalendarScreen(
                 //    vertical scroll or a page swipe consumes the movement first and cancels the
                 //    tap, and a row's own `clickable` consumes the down, so tapping a reminder
                 //    opens it instead of being spent on dismissing the dock.
+                // weight(1f) rather than fillMaxSize(): the add-task row below is a sibling in this
+                // Column and a filling pager would push it off the bottom. With no row composed
+                // (control arm) a single weighted child occupies exactly the space fillMaxSize gave
+                // it, so that arm's layout is unchanged.
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .weight(1f)
                     .then(
                         if (captureVisible) {
                             Modifier.pointerInput(Unit) {
@@ -302,6 +369,44 @@ fun CalendarScreen(
                         contentBottomPadding = bodyBottomPadding,
                     )
                 }
+            }
+
+            // The add-task row, PINNED under the pager rather than appended to a list — the one place
+            // this tab differs from the Inbox, and deliberately.
+            //
+            // Both of this tab's pages show REMINDERS, not a checklist you append to, and a capture
+            // here always lands in the system Inbox (see TodayViewModel.captureTask) — never on the
+            // day under the finger. A row sitting at the end of the agenda would promise "add to this
+            // date", which is the one thing it does not do. Pinned, it reads as the tab's action.
+            //
+            // One insertion point also covers BOTH pages and every state the bodies can be in
+            // (loading, empty, error, agenda) — the "+" it replaces was visible across all of them,
+            // and reproducing that inside two independent list bodies and their five empty branches
+            // is where the affordance would go missing on one of them.
+            //
+            // Gating and gate ORDER live in [captureRowVisible] at the top of this composable — see
+            // there for why the arm flag is read before the window size.
+            if (captureRowVisible) {
+                AddTaskRow(
+                    onClick = onAddTaskRowClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // Same chain as the bodies above: fillMaxWidth pins minWidth == maxWidth, and
+                        // a widthIn(max) coerced into a fixed range is a no-op, so the relax step in
+                        // the middle is what lets the cap bind on a tablet.
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                        .adaptiveContentWidth()
+                        .padding(
+                            horizontal = AppDimens.ScreenPaddingHorizontal,
+                            vertical = AppDimens.SpacingXs,
+                        )
+                        // The host's reserve, applied to the row because the row is the bottommost
+                        // element of this tab (see [bodyBottomPadding] above). It sits OUTSIDE
+                        // AddTaskRow's own `clickable`, which the component applies after the caller's
+                        // modifier — so this is dead space, not an enlarged target overlapping the
+                        // shell's AI button. 0.dp in the control arm, which draws no row at all.
+                        .padding(bottom = contentBottomPadding),
+                )
             }
         }
     }

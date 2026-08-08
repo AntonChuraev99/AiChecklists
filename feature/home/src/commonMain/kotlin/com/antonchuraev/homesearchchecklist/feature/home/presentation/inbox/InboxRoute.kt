@@ -21,18 +21,28 @@ import org.koin.compose.viewmodel.koinViewModel
  * host share one instance — collecting in the screen would recreate the host on every state change
  * and drop in-flight messages.
  *
- * @param contentBottomPadding inset the v2 shell reserves for its bottom bar + chat FAB. Defaults to
- *   0.dp so any caller that is not the v2 shell (previews, tests) gets the plain layout.
+ * @param contentBottomPadding inset the v2 shell reserves for the part of its raised AI button that
+ *   overhangs the bottom bar and is drawn over this screen. Defaults to 0.dp so any caller that is
+ *   not the v2 shell (previews, tests) gets the plain layout.
  * @param swallowRootBack forwarded to [InboxScreen]. Defaults to true (today's behaviour: BACK at the
  *   v2 root is swallowed so it can never finish() the app). The host MUST pass false while this entry
  *   is not the top of the back stack — on Expanded the Inbox is a two-pane listPane that stays
  *   composed beside a pushed ChecklistDetail, and swallowing there kills the BACK that should dismiss
  *   the detail pane.
  * @param createDockOpen whether the capture dock is showing. Hoisted to the shell host rather than
- *   held here because the shell's FABs are drawn ABOVE this screen and must hide while the dock is
- *   up — a flag private to this screen would leave the "+" FAB floating over its own dock.
+ *   held here because the shell's own chrome — the raised AI button, and the "+" it still renders on
+ *   the rail and the permanent drawer — is drawn ABOVE this screen and must hide while the dock is
+ *   up; a flag private to this screen would leave that chrome floating over the dock it raised.
  * @param onCreateDockDismiss fired when the user dismisses the dock (BACK, scrim tap). The host
  *   clears [createDockOpen]; this screen never hides the dock on its own.
+ * @param onAddTaskRowClick the inline "add task" row at the end of the list was tapped — the host
+ *   must RAISE [createDockOpen] (and close any other bottom dock first, since two of them cannot
+ *   share the bottom edge). Deliberately without a default, matching [createDockOpen] above: a host
+ *   that forgets it renders a row that looks tappable and does nothing, which is exactly the dead
+ *   affordance this arm already shipped once on the rail.
+ *
+ *   ⚠️ The host must NOT emit `nav_create_fab_tapped` in this callback — [InboxViewModel] already
+ *   does, with `source = "inline_row"`. Emitting there as well double-counts the series.
  * @param homeSignal monotonic counter the shell increments every time the Inbox TAB is tapped. The
  *   pager page lives in the screen and survives the tab's pop-to-root, so without this signal the tab
  *   named "Inbox" reopens whatever project page was last swiped to. A counter rather than a Boolean:
@@ -46,6 +56,7 @@ fun InboxRoute(
     // silent compiler, which is how the rail shipped one.
     createDockOpen: Boolean,
     onCreateDockDismiss: () -> Unit,
+    onAddTaskRowClick: () -> Unit,
     homeSignal: Int = 0,
     viewModel: InboxViewModel = koinViewModel(),
 ) {
@@ -62,10 +73,26 @@ fun InboxRoute(
         }
     }
 
+    // The add-task row's intent is BROADCAST, not routed: the ViewModel gets it for the analytics,
+    // the host gets it to raise the dock it owns. Same shape as CalendarRoute's
+    // OnCreateChecklistClick, and the reason it is not simply a screen parameter is that the screen
+    // would then have two ways to report a tap and a future action could pick the wrong one.
+    //
+    // Remembered rather than allocated inline: `onIntent` used to be the method reference
+    // `viewModel::sendIntent`, which is a stable instance, and replacing it with a fresh lambda every
+    // composition would hand the screen a new value each time — i.e. re-invalidate the whole tab on
+    // any recomposition of this route, for a callback that never changes.
+    val onIntent = remember(viewModel, onAddTaskRowClick) {
+        { intent: InboxIntent ->
+            if (intent is InboxIntent.OnAddTaskRowClick) onAddTaskRowClick()
+            viewModel.sendIntent(intent)
+        }
+    }
+
     InboxScreen(
         state = state,
         contentBottomPadding = contentBottomPadding,
-        onIntent = viewModel::sendIntent,
+        onIntent = onIntent,
         snackbarHostState = snackbarHostState,
         swallowRootBack = swallowRootBack,
         createDockOpen = createDockOpen,
