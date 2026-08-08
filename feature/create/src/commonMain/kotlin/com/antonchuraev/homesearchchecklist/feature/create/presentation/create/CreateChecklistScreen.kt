@@ -146,7 +146,11 @@ fun CreateChecklistScreen(
     editChecklistId: Long? = null,
     templateId: Int? = null,
     initialText: String? = null,
-    useProjectForm: Boolean = false,
+    // NO DEFAULT ON PURPOSE. A `= false` here is fail-soft: the one production call site that
+    // forgets it ships the classic form to the v2 arm silently — no crash, no failing test, since
+    // every test passes the flag explicitly and therefore verifies the reader, never the writer.
+    // Requiring it makes the compiler the check.
+    useProjectForm: Boolean,
     viewModel: CreateChecklistViewModel = koinViewModel(
         key = "create_checklist_${editChecklistId}_${initialText?.hashCode()}"
     ) { parametersOf(editChecklistId, initialText, useProjectForm) }

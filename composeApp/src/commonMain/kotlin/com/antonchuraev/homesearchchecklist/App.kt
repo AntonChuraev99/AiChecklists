@@ -1827,6 +1827,12 @@ fun App() {
                             editChecklistId = route.editChecklistId,
                             templateId = route.templateId,
                             initialText = route.initialText,
+                            // The only production mount of this screen, so this line alone decides
+                            // which arm every entry point lands on. `useProjectForm` deliberately
+                            // carries NO default: a fail-soft `false` would render the classic form
+                            // to v2 users with a green compile and green tests, because the tests
+                            // set the flag themselves and thus only cover the gate's reader.
+                            useProjectForm = navVariant == NavVariant.V2,
                         )
                     }
 
