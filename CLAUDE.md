@@ -158,7 +158,9 @@ All dependency versions live in `gradle/libs.versions.toml` — the single sourc
 | Attachments per item | 3 | unlimited | `:86` |
 | Items per checklist | 100 | 100 | `:70` |
 
-⚠️ **Read limits from `GetUserLimitsUseCase`, never from a local constant.** Several stale mirrors exist and are tracked in `docs/todos/` + `docs/backlog/`: `ToolCallDispatcherImpl.kt:77` hardcodes `FREE_CHECKLIST_LIMIT = 4` (RC default is 5), `PaywallScreen.kt:572` carries the same stale comment, and `main.py:292` holds a third value for the premium daily cap. A comment saying "mirrors X" is not checked by the compiler — treat it as a smell, not as documentation.
+⚠️ **Read limits from Remote Config, never from a local constant.** A comment saying "mirrors X" is not checked by the compiler — treat it as a smell, not as documentation. Known stale mirrors, tracked in `docs/todos/` + `docs/backlog/`: `ToolCallDispatcherImpl.kt` still hardcodes `FREE_ATTACH_LIMIT_PER_ITEM = 3` against `max_attachments_per_item_free`, `PaywallScreen.kt:572` carries the same stale comment, and `main.py:292` holds a third value for the premium daily cap.
+
+The shape of that class of defect matters more than any one number: a gate copy-pasted into two handlers drifts, so fixing one site leaves the other wrong — collapse it into one helper. Regression tests must pin **two different** config values; a fake pinned to the served value passes against a hardcoded number just as happily. Reference fix: `ToolCallDispatcherImpl.freeChecklistCeilingReached()` (2026-08-10).
 
 ## `.claude/rules/` map (file-scoped, auto-loaded on matching edits)
 
