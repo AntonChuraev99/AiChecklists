@@ -54,11 +54,13 @@ import kotlinx.coroutines.flow.first
  *      If no checklists exist → [DispatchOutcome.NotFound].
  *
  * Premium gate:
- *   [ToolCall.CreateChecklist] checks [UserData.isPremium] + current checklist count
- *   against a hard-coded free limit (4). This mirrors [GetUserLimitsUseCase] logic
- *   without introducing a cross-feature use-case dependency into composeApp/aichat.
- *   Phase B: replace with [GetUserLimitsUseCase] injection for RC-driven limits.
- *   // Pending: docs/todos/2026-05-13-ai-chat-assistant.md
+ *   [ToolCall.CreateChecklist] and [ToolCall.CreateChecklistFromAttachment] check
+ *   [UserData.isPremium] + current checklist count against the free ceiling served by
+ *   Remote Config ([RemoteConfigKeys.MAX_CHECKLISTS_FREE]), read on every call through the
+ *   single [freeChecklistCeilingReached] helper — never a compiled-in number.
+ *   GetUserLimitsUseCase reads the same key for the rest of the app; the value is deliberately
+ *   NOT injected as that use case, which would pull a feature/paywall dependency into
+ *   composeApp/aichat. Reading the key directly keeps both surfaces on one console value.
  */
 class ToolCallDispatcherImpl(
     private val checklistRepository: ChecklistRepository,
@@ -86,7 +88,6 @@ class ToolCallDispatcherImpl(
 
     companion object {
         private const val TAG = "ToolCallDispatcher"
-        private const val FREE_CHECKLIST_LIMIT = 4 // mirrors RemoteConfigDefaults.MAX_CHECKLISTS_FREE
         private const val MAX_FIND_RESULTS = 10
         /** Free-tier max attachments per item (mirrors item-attachments FREE_ATTACHMENT_LIMIT_PER_ITEM). */
         private const val FREE_ATTACH_LIMIT_PER_ITEM = 3
@@ -335,15 +336,37 @@ class ToolCallDispatcherImpl(
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
 
+    /**
+     * True when a FREE user already owns as many checklists as the free tier allows.
+     *
+     * The ceiling is read from Remote Config on every call — [RemoteConfigKeys.MAX_CHECKLISTS_FREE],
+     * falling back to [RemoteConfigDefaults.MAX_CHECKLISTS_FREE] — so the console moves the chat's
+     * limit together with every other surface. It must never become a compiled-in number again:
+     * the client shipped a hard-coded 4 against a served 5, so the chat refused the very checklist
+     * the Home screen offered a free slot for. The refusal is invisible in the purchase funnel —
+     * this path returns `requires_premium` to the agent and surfaces a snackbar, it never opens the
+     * paywall — so the only symptom was a user told to buy what they already had room for.
+     *
+     * This is ONE function for both create paths on purpose. The block used to be copy-pasted into
+     * [handleCreateChecklist] and [handleCreateChecklistFromAttachment], and the copy is how the two
+     * drifted apart — fixing one site would have left the other refusing.
+     *
+     * Counts `checklistRepository.projects` (system Inbox excluded) to keep the free-tier population
+     * identical to GetUserLimitsUseCase — see the note at the top of this class.
+     * Premium users have no ceiling and short-circuit before the count is read.
+     */
+    private suspend fun freeChecklistCeilingReached(): Boolean {
+        if (userDataRepository.getUserData().isPremium) return false
+        val maxChecklistsFree = remoteConfigProvider.getLong(
+            RemoteConfigKeys.MAX_CHECKLISTS_FREE,
+            RemoteConfigDefaults.MAX_CHECKLISTS_FREE,
+        ).toInt()
+        return checklistRepository.projects.first().size >= maxChecklistsFree
+    }
+
     private suspend fun handleCreateChecklist(toolCall: ToolCall.CreateChecklist): DispatchOutcome {
-        // Premium gate: check if free user is at checklist limit
-        val userData = userDataRepository.getUserData()
-        if (!userData.isPremium) {
-            val allChecklists = checklistRepository.projects.first()
-            if (allChecklists.size >= FREE_CHECKLIST_LIMIT) {
-                return DispatchOutcome.RequiresPremium
-            }
-        }
+        // Premium gate: check if free user is at the RC-served checklist ceiling
+        if (freeChecklistCeilingReached()) return DispatchOutcome.RequiresPremium
 
         val items = toolCall.initialItems.map { ChecklistItem(text = it, checked = false) }
         val newChecklist = Checklist(
@@ -456,8 +479,9 @@ class ToolCallDispatcherImpl(
      * Routes attachment(s) through the [AiAnalyzer] service (same path as "Create via AI")
      * and creates a new checklist from the extracted items.
      *
-     * Premium gate: same as [handleCreateChecklist] — free users are limited to
-     * [FREE_CHECKLIST_LIMIT] total checklists (RC-driven; hardcoded here as fallback).
+     * Premium gate: same as [handleCreateChecklist] — both share [freeChecklistCeilingReached],
+     * which reads the free ceiling from Remote Config. The gate deliberately runs BEFORE
+     * [AiAnalyzer.analyze]: a refused create must not spend an AI call (and the credits with it).
      * Credits gate: server-side. The Cloud Function (analyze_and_fill_checklist /
      * generate_checklist) atomically deducts credits inside a Firestore transaction
      * and returns the updated balance in the response.
@@ -465,14 +489,8 @@ class ToolCallDispatcherImpl(
     private suspend fun handleCreateChecklistFromAttachment(
         toolCall: ToolCall.CreateChecklistFromAttachment,
     ): DispatchOutcome {
-        // Premium gate
-        val userData = userDataRepository.getUserData()
-        if (!userData.isPremium) {
-            val allChecklists = checklistRepository.projects.first()
-            if (allChecklists.size >= FREE_CHECKLIST_LIMIT) {
-                return DispatchOutcome.RequiresPremium
-            }
-        }
+        // Premium gate — before any AI call, so a refusal never burns credits
+        if (freeChecklistCeilingReached()) return DispatchOutcome.RequiresPremium
 
         if (toolCall.attachments.isEmpty()) {
             return DispatchOutcome.NotFound("chat_attach_no_files", emptyList())

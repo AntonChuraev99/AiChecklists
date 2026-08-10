@@ -7,6 +7,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
+import com.antonchuraev.homesearchchecklist.core.common.api.CreateFormVariant
+import com.antonchuraev.homesearchchecklist.core.common.api.CreatedListKind
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -113,6 +115,17 @@ class CreateChecklistViewModel(
 
     /** Latest emission of [GetUserLimitsUseCase]; null until the first one arrives. */
     private var latestLimits: UserLimits? = null
+
+    /**
+     * Which form this instance is rendering, as the [AnalyticsParams.FORM_VARIANT] wire value.
+     *
+     * Derived from [useProjectForm] — the same flag the UI branches on — so the reported arm cannot
+     * disagree with the form the user actually saw. Deliberately NOT read from the sticky `nav_arm`
+     * user-property: that one is written once per process and goes stale as soon as the shell is
+     * switched in Settings, which would attribute creates to the arm the user just left.
+     */
+    private val formVariant: String =
+        if (useProjectForm) CreateFormVariant.V2.wire else CreateFormVariant.CLASSIC.wire
 
     init {
         if (editChecklistId != null) {
@@ -233,8 +246,10 @@ class CreateChecklistViewModel(
             is CreateChecklistIntent.OnAutoDeleteToggled -> _screenState.update {
                 it.copy(autoDeleteCompleted = intent.enabled)
             }
-            CreateChecklistIntent.OnLimitBannerUpgradeClick ->
+            CreateChecklistIntent.OnLimitBannerUpgradeClick -> {
+                trackChecklistLimitHit(AnalyticsEvents.Checklist.LIMIT_SOURCE_CREATE_BANNER)
                 appNavigator.navigateToPaywall(source = PAYWALL_SOURCE_CHECKLIST_LIMIT)
+            }
 
             // ── Reminder ────────────────────────────────────────────────────────────────────────
             CreateChecklistIntent.OnReminderClick -> onReminderClick()
@@ -389,7 +404,13 @@ class CreateChecklistViewModel(
             // GetUserLimitsUseCase's "never falsely gate" intent.
             val canCreate = limits?.canCreateRecurringReminder(activeCount) ?: true
             if (!canCreate) {
-                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
+                // Sourced, unlike the checklist-detail emit sites of the same event: an unqualified
+                // `recurring_limit_hit` cannot say WHERE the quota bit, so the create screen's share
+                // of it was invisible.
+                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT, mapOf(
+                    AnalyticsParams.SOURCE to AnalyticsEvents.Reminder.LIMIT_SOURCE_CREATE_PROJECT,
+                    AnalyticsParams.FORM_VARIANT to formVariant,
+                ))
                 _screenState.update { it.copy(reminderSheetOpen = false) }
                 appNavigator.navigateToPaywall(source = PAYWALL_SOURCE_RECURRING_LIMIT)
                 return@launch
@@ -518,7 +539,8 @@ class CreateChecklistViewModel(
                 analyticsTracker.event(AnalyticsEvents.Reminder.REPEAT_SCHEDULE_SET, mapOf(
                     "type" to repeat.type.name,
                     "interval" to repeat.interval.toString(),
-                    AnalyticsParams.SOURCE to "create_project",
+                    AnalyticsParams.SOURCE to AnalyticsEvents.Reminder.LIMIT_SOURCE_CREATE_PROJECT,
+                    AnalyticsParams.FORM_VARIANT to formVariant,
                 ))
             }
         } catch (e: CancellationException) {
@@ -587,6 +609,7 @@ class CreateChecklistViewModel(
 
         // Gate: redirect free users at the checklist limit to paywall (create mode only)
         if (!currentState.isEditMode && !currentState.canCreateChecklist) {
+            trackChecklistLimitHit(AnalyticsEvents.Checklist.LIMIT_SOURCE_CREATE_SAVE)
             appNavigator.navigateToPaywall(source = PAYWALL_SOURCE_CHECKLIST_LIMIT)
             return
         }
@@ -689,19 +712,52 @@ class CreateChecklistViewModel(
         appNavigator.onBack()
     }
 
+    /**
+     * The free project ceiling was reached — reported wherever the user meets it.
+     *
+     * Both affordances are the SAME ceiling but not the same act: the banner is a v2-only surface
+     * the user chose to tap, the Save gate is a refusal in both arms. They shared one
+     * `paywall_opened{source=checklist_limit}` and neither carried the arm, so the v2 banner was the
+     * one create-screen path the rest of this instrumentation still could not see.
+     */
+    private fun trackChecklistLimitHit(source: String) {
+        analyticsTracker.event(AnalyticsEvents.Checklist.LIMIT_HIT, mapOf(
+            AnalyticsParams.SOURCE to source,
+            AnalyticsParams.FORM_VARIANT to formVariant,
+        ))
+    }
+
+    /**
+     * The reported [AnalyticsParams.LIST_KIND] of a persisted row, mapped from the mode it was
+     * written with.
+     *
+     * An exhaustive `when` rather than a literal per branch: a third [ChecklistViewMode] then fails
+     * to compile here instead of silently reporting itself as `standard` forever — which is exactly
+     * what [CreatedListKind]'s own contract promises.
+     */
+    private fun ChecklistViewMode.toCreatedListKind(): CreatedListKind = when (this) {
+        ChecklistViewMode.Standard -> CreatedListKind.STANDARD
+        ChecklistViewMode.Weekly -> CreatedListKind.WEEKLY
+    }
+
     private suspend fun createProject(state: CreateChecklistState) {
-        val checklistId = checklistRepository.addChecklist(
-            Checklist(
-                name = state.name.trim(),
-                items = state.items,
-                foldersEnabled = state.foldersEnabled,
-                separateCompleted = state.separateCompleted,
-                autoDeleteCompleted = state.autoDeleteCompleted,
-            )
+        val checklist = Checklist(
+            name = state.name.trim(),
+            items = state.items,
+            foldersEnabled = state.foldersEnabled,
+            separateCompleted = state.separateCompleted,
+            autoDeleteCompleted = state.autoDeleteCompleted,
         )
+        val checklistId = checklistRepository.addChecklist(checklist)
+        // SOURCE stays MANUAL on purpose — it is the reference value of every live create
+        // dashboard, and re-pointing it would trade one blind spot for a broken series. The arm and
+        // the list kind arrive as their own dimensions instead; the kind is read off the row that
+        // was actually written, not asserted by the branch that got here.
         analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
             AnalyticsParams.SOURCE to ChecklistSource.MANUAL.wire,
-            AnalyticsParams.ITEM_COUNT to state.items.size
+            AnalyticsParams.ITEM_COUNT to state.items.size,
+            AnalyticsParams.FORM_VARIANT to formVariant,
+            AnalyticsParams.LIST_KIND to checklist.viewMode.toCreatedListKind().wire,
         ))
         applyStagedReminder(checklistId, state)
         landOnCreatedProject(checklistId)
@@ -710,9 +766,21 @@ class CreateChecklistViewModel(
     private suspend fun createWeeklyProject(state: CreateChecklistState) {
         when (val result = createWeeklyChecklistUseCase(state.name.trim())) {
             is CreateWeeklyChecklistUseCase.Result.Created -> {
+                // A Weekly project is `source = manual, item_count = 0` — byte-identical to an
+                // ordinary empty project until LIST_KIND says otherwise. Not reported as
+                // ChecklistSource.WEEKLY: that value belongs to the "My Week" entry point, and
+                // reusing it here would make the two entry points indistinguishable while also
+                // draining the `manual` series the create dashboards are keyed on.
+                //
+                // The mode is named rather than read back: `CreateWeeklyChecklistUseCase` is the
+                // single writer of `viewMode = Weekly` and returns only the new id. Re-reading the
+                // row for a analytics param would add a DB round-trip and a nullable that the event
+                // has no sensible answer for.
                 analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
                     AnalyticsParams.SOURCE to ChecklistSource.MANUAL.wire,
-                    AnalyticsParams.ITEM_COUNT to 0
+                    AnalyticsParams.ITEM_COUNT to 0,
+                    AnalyticsParams.FORM_VARIANT to formVariant,
+                    AnalyticsParams.LIST_KIND to ChecklistViewMode.Weekly.toCreatedListKind().wire,
                 ))
                 applyStagedReminder(result.checklistId, state)
                 landOnCreatedProject(result.checklistId)

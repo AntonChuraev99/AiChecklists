@@ -4,7 +4,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinato
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
@@ -245,6 +247,47 @@ private object DefaultsRemoteConfig : RemoteConfigProvider {
     override fun getLong(key: String, defaultValue: Long): Long = defaultValue
 }
 
+/**
+ * Remote config whose free-checklist ceiling is settable per test.
+ *
+ * The ceiling is a PARAMETER on purpose. [DefaultsRemoteConfig] above answers every key with the
+ * caller's own default, so a limit test built on it passes just as happily against a number compiled
+ * into the client — which is exactly the defect these tests exist for. Mirrors
+ * `ConfigurableRemoteConfigProvider` in feature/create's test source set (that one is `internal` to
+ * its module, so it cannot be imported here).
+ */
+private class ConfigurableRemoteConfig(private val maxChecklistsFree: Long) : RemoteConfigProvider {
+    override suspend fun fetchAndActivate(): Boolean = true
+    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+    override fun getString(key: String, defaultValue: String): String = defaultValue
+    override fun getLong(key: String, defaultValue: Long): Long = when (key) {
+        RemoteConfigKeys.MAX_CHECKLISTS_FREE -> maxChecklistsFree
+        else -> defaultValue
+    }
+}
+
+/**
+ * An analyzer that succeeds AND counts its invocations. The count is the assertion that the
+ * free-tier gate runs BEFORE the paid Cloud Function call — a gate placed after it would still
+ * return RequiresPremium while having already spent the user's credits.
+ */
+private class RecordingAnalyzer(
+    private val suggested: List<String> = listOf("Milk", "Bread"),
+) : AiAnalyzer {
+    var callCount = 0
+        private set
+
+    override suspend fun analyze(inputData: AnalyzeInputData, targetChecklist: Checklist?): Result<AnalyzeResult> {
+        callCount++
+        return Result.success(
+            AnalyzeResult(suggestedItems = suggested.map { ChecklistItem(text = it, checked = false) }),
+        )
+    }
+
+    override suspend fun isAvailable(): Boolean = true
+    override fun getSupportedInputTypes(): Set<KClass<out AnalyzeInputData>> = emptySet()
+}
+
 /** Deterministic, resource-free date copy (the real one needs Compose Resources). */
 private object TokenDateFormatter : ChatDateFormatter {
     override suspend fun formatDateTime(epochMs: Long): String = "DT($epochMs)"
@@ -275,14 +318,19 @@ private fun fillItem(
 private fun templateItem(id: String, text: String): ChecklistItem =
     ChecklistItem(text = text, checked = false).withId(id)
 
-private fun buildDispatcher(repo: FakeChecklistRepository, premium: Boolean = true) = ToolCallDispatcherImpl(
+private fun buildDispatcher(
+    repo: FakeChecklistRepository,
+    premium: Boolean = true,
+    remoteConfig: RemoteConfigProvider = DefaultsRemoteConfig,
+    analyzer: AiAnalyzer = UnusedAnalyzer,
+) = ToolCallDispatcherImpl(
     checklistRepository = repo,
     userDataRepository = FakeUserDataRepository(premium),
-    aiAnalyzer = UnusedAnalyzer,
+    aiAnalyzer = analyzer,
     attachmentStorage = UnusedAttachmentStorage,
     logger = NoOpLogger,
     activationCoordinator = NoOpActivationCoordinator,
-    remoteConfigProvider = DefaultsRemoteConfig,
+    remoteConfigProvider = remoteConfig,
     dateFormatter = TokenDateFormatter,
     analyticsTracker = NoOpAnalytics,
 )
@@ -344,6 +392,21 @@ private fun twoListRepo(name1: String, name2: String) = FakeChecklistRepository(
         ChecklistFill(id = 11L, checklistId = 1L, name = name1, isDefault = true, items = emptyList()),
         ChecklistFill(id = 22L, checklistId = 2L, name = name2, isDefault = true, items = emptyList()),
     ),
+)
+
+/**
+ * [count] ordinary projects (no Inbox), i.e. exactly the population the free-tier ceiling counts.
+ * Fills are irrelevant here — creating a checklist never resolves an existing one.
+ */
+private fun repoWithProjects(count: Int) = FakeChecklistRepository(
+    seedChecklists = (1..count).map { Checklist(id = it.toLong(), name = "List $it", items = emptyList()) },
+)
+
+/** A supported (image) attachment, so the create-from-attachment path reaches the analyzer. */
+private val photoAttachment = ChatAttachment(
+    sourcePath = "/tmp/receipt.jpg",
+    mimeType = "image/jpeg",
+    fileName = "receipt.jpg",
 )
 
 private fun DispatchOutcome.addedHandle(): UndoHandle.AddedItem {
@@ -1007,6 +1070,172 @@ class ToolCallDispatcherImplTest {
         assertEquals("chat_dispatch_no_checklist_match", notFound.messageKey)
         assertTrue(repo.calls.isEmpty(), "nothing may be written before the destination resolves")
         assertEquals(1, repo.fill(99L).items.size, "the item stays in the Inbox")
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Free-tier ceiling — read from Remote Config, never compiled in
+    //
+    // The chat refuses a checklist the Home screen happily creates: the dispatcher gates on
+    // `FREE_CHECKLIST_LIMIT = 4` while GetUserLimitsUseCase (and therefore every other surface)
+    // reads `max_checklists_free`, which Remote Config serves as 5. A free user with 4 lists is
+    // told to buy premium for the 5th. The refusal never opens the paywall — it comes back as a
+    // snackbar — so nothing in the purchase funnel records it; the whole symptom is the bad refusal.
+    //
+    // Each test pairs TWO Remote Config values on purpose. One value cannot tell a read from a
+    // literal: pinning the fake to the live 5 would pass against a constant bumped to 5, which is
+    // the wrong fix (the number moves in the console, not in the client). Same argument as
+    // feature/create's `observeUserLimits_exposesTheRemoteConfigFreeLimit_notAConstant`.
+    //
+    // Both call sites are covered because the gate block is duplicated verbatim
+    // (handleCreateChecklist and handleCreateChecklistFromAttachment) — fixing one leaves the
+    // other refusing.
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun createChecklist_freeUserBelowTheRemoteConfigLimit_createsInsteadOfDemandingPremium() = runTest {
+        // (a) the shipped symptom: RC serves 5, the user owns 4, the chat must create the 5th.
+        val atLiveValue = repoWithProjects(4)
+        val liveOutcome = buildDispatcher(
+            atLiveValue,
+            premium = false,
+            remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 5L),
+        ).dispatch(ToolCall.CreateChecklist(name = "Trip", initialItems = listOf("Passport")))
+
+        assertIs<DispatchOutcome.Success>(
+            liveOutcome,
+            "max_checklists_free = 5 and the user owns 4 — the 5th list is inside the free tier, got $liveOutcome",
+        )
+        assertTrue(
+            atLiveValue.calls.any { it is RepoCall.AddChecklist && it.name == "Trip" },
+            "the checklist must actually be written, not merely reported; calls = ${atLiveValue.calls}",
+        )
+
+        // (b) the discriminator: raising the console value must move the chat's ceiling with it.
+        // A constant — 4 today, 5 after a "just bump it" fix — cannot follow.
+        val atRaisedValue = repoWithProjects(6)
+        val raisedOutcome = buildDispatcher(
+            atRaisedValue,
+            premium = false,
+            remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 7L),
+        ).dispatch(ToolCall.CreateChecklist(name = "Renovation", initialItems = emptyList()))
+
+        assertIs<DispatchOutcome.Success>(
+            raisedOutcome,
+            "raising max_checklists_free to 7 must let a free user with 6 lists create a 7th, got $raisedOutcome",
+        )
+        assertTrue(
+            atRaisedValue.calls.any { it is RepoCall.AddChecklist && it.name == "Renovation" },
+            "the checklist must actually be written; calls = ${atRaisedValue.calls}",
+        )
+    }
+
+    /**
+     * The other half of the same contract: reading the limit must not become "no limit". Free users
+     * standing exactly ON the served ceiling still hit the paywall, and nothing is written.
+     */
+    @Test
+    fun createChecklist_freeUserAtTheRemoteConfigLimit_stillRequiresPremium() = runTest {
+        val atLiveValue = repoWithProjects(5)
+        assertEquals(
+            DispatchOutcome.RequiresPremium,
+            buildDispatcher(
+                atLiveValue,
+                premium = false,
+                remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 5L),
+            ).dispatch(ToolCall.CreateChecklist(name = "Sixth", initialItems = emptyList())),
+            "5 lists against a served ceiling of 5 is the paywall case",
+        )
+        assertTrue(atLiveValue.calls.isEmpty(), "a refused create must write nothing; calls = ${atLiveValue.calls}")
+
+        // A LOWERED console value must bite too — this is what a constant bumped to 5 would ignore.
+        val atLoweredValue = repoWithProjects(4)
+        assertEquals(
+            DispatchOutcome.RequiresPremium,
+            buildDispatcher(
+                atLoweredValue,
+                premium = false,
+                remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 4L),
+            ).dispatch(ToolCall.CreateChecklist(name = "Fifth", initialItems = emptyList())),
+            "lowering max_checklists_free to 4 must refuse a free user's 5th list",
+        )
+        assertTrue(atLoweredValue.calls.isEmpty(), "a refused create must write nothing; calls = ${atLoweredValue.calls}")
+    }
+
+    @Test
+    fun createChecklistFromAttachment_freeUserBelowTheRemoteConfigLimit_createsInsteadOfDemandingPremium() = runTest {
+        val atLiveValue = repoWithProjects(4)
+        val liveAnalyzer = RecordingAnalyzer()
+        val liveOutcome = buildDispatcher(
+            atLiveValue,
+            premium = false,
+            remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 5L),
+            analyzer = liveAnalyzer,
+        ).dispatch(ToolCall.CreateChecklistFromAttachment(attachments = listOf(photoAttachment)))
+
+        val liveSuccess = assertIs<DispatchOutcome.Success>(
+            liveOutcome,
+            "max_checklists_free = 5 and the user owns 4 — the attachment must become the 5th list, got $liveOutcome",
+        )
+        assertEquals("chat_dispatch_created_from_attachment", liveSuccess.messageKey)
+        assertEquals(1, liveAnalyzer.callCount, "the attachment must actually be analyzed")
+        assertTrue(
+            atLiveValue.calls.any { it is RepoCall.AddChecklist && it.name == "receipt" },
+            "the generated checklist must be written; calls = ${atLiveValue.calls}",
+        )
+
+        val atRaisedValue = repoWithProjects(6)
+        val raisedOutcome = buildDispatcher(
+            atRaisedValue,
+            premium = false,
+            remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 7L),
+            analyzer = RecordingAnalyzer(),
+        ).dispatch(ToolCall.CreateChecklistFromAttachment(attachments = listOf(photoAttachment)))
+
+        assertIs<DispatchOutcome.Success>(
+            raisedOutcome,
+            "raising max_checklists_free to 7 must let a free user with 6 lists build a 7th from a file, got $raisedOutcome",
+        )
+        assertTrue(
+            atRaisedValue.calls.any { it is RepoCall.AddChecklist && it.name == "receipt" },
+            "the generated checklist must be written; calls = ${atRaisedValue.calls}",
+        )
+    }
+
+    /**
+     * The gate stays, and it stays IN FRONT of the Cloud Function: a paywall shown after the AI
+     * call has already burned the user's credits for a checklist they never got.
+     */
+    @Test
+    fun createChecklistFromAttachment_freeUserAtTheRemoteConfigLimit_requiresPremiumWithoutSpendingAnAiCall() = runTest {
+        val atLiveValue = repoWithProjects(5)
+        val liveAnalyzer = RecordingAnalyzer()
+        assertEquals(
+            DispatchOutcome.RequiresPremium,
+            buildDispatcher(
+                atLiveValue,
+                premium = false,
+                remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 5L),
+                analyzer = liveAnalyzer,
+            ).dispatch(ToolCall.CreateChecklistFromAttachment(attachments = listOf(photoAttachment))),
+            "5 lists against a served ceiling of 5 is the paywall case",
+        )
+        assertEquals(0, liveAnalyzer.callCount, "the free-tier gate must run BEFORE the paid analyze call")
+        assertTrue(atLiveValue.calls.isEmpty(), "a refused create must write nothing; calls = ${atLiveValue.calls}")
+
+        val atLoweredValue = repoWithProjects(4)
+        val loweredAnalyzer = RecordingAnalyzer()
+        assertEquals(
+            DispatchOutcome.RequiresPremium,
+            buildDispatcher(
+                atLoweredValue,
+                premium = false,
+                remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 4L),
+                analyzer = loweredAnalyzer,
+            ).dispatch(ToolCall.CreateChecklistFromAttachment(attachments = listOf(photoAttachment))),
+            "lowering max_checklists_free to 4 must refuse a free user's 5th list",
+        )
+        assertEquals(0, loweredAnalyzer.callCount, "the free-tier gate must run BEFORE the paid analyze call")
+        assertTrue(atLoweredValue.calls.isEmpty(), "a refused create must write nothing; calls = ${atLoweredValue.calls}")
     }
 }
 
