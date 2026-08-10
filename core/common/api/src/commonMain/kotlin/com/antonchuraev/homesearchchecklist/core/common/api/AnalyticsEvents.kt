@@ -72,6 +72,30 @@ object AnalyticsEvents {
          *    (not a user act — counting it here would inflate the create funnel by one per install).
          */
         const val CREATED = "checklist_created"
+
+        /**
+         * The free checklist ceiling refused, or announced itself to, a create attempt.
+         *
+         * The counterpart of [Reminder.RECURRING_LIMIT_HIT] for the project quota, and it exists for
+         * the same reason: the ceiling was only observable downstream as
+         * `paywall_opened{source=checklist_limit}`, which carries no
+         * [AnalyticsParams.FORM_VARIANT] — so the v2-only limit banner and the both-arms Save gate
+         * were one undifferentiated blob, and the redesigned surface was invisible exactly where the
+         * rest of the create funnel had just been made visible.
+         *
+         * ALWAYS carries [AnalyticsParams.SOURCE] (a `LIMIT_SOURCE_*` value below) and
+         * [AnalyticsParams.FORM_VARIANT]. This is a UI-affordance event, NOT a create — it must
+         * never be counted in the create funnel.
+         */
+        const val LIMIT_HIT = "checklist_limit_hit"
+
+        // ── Values of [AnalyticsParams.SOURCE] on [LIMIT_HIT] ─────────────────
+        /** The in-form limit banner's upgrade CTA was tapped. v2 project form only. */
+        const val LIMIT_SOURCE_CREATE_BANNER = "create_banner"
+
+        /** Save was tapped while the ceiling was already reached, so the create never ran. */
+        const val LIMIT_SOURCE_CREATE_SAVE = "create_save"
+
         const val DELETED = "checklist_deleted"
         const val FILL_CREATED = "fill_created"
         const val DEFAULT_FILL_UPDATED = "default_fill_updated"
@@ -202,6 +226,24 @@ object AnalyticsEvents {
         const val RECURRING_ENDED = "recurring_reminder_ended"
         const val RECURRING_RECOVERED = "recurring_reminder_recovered"
         const val RECURRING_CANCELLED = "recurring_reminder_cancelled"
+
+        // ── Values of [AnalyticsParams.SOURCE] on [RECURRING_LIMIT_HIT] / [REPEAT_SCHEDULE_SET] ──
+        /**
+         * WHICH surface hit the recurring ceiling. Three screens emit [RECURRING_LIMIT_HIT], so an
+         * unqualified event answers "did it happen" and never "where" — and a discriminator built
+         * on "source is absent" breaks the moment a fourth emitter appears. **Every** emit site
+         * passes one of these; adding a site means adding a value, not omitting the key.
+         *
+         * The two detail values intentionally repeat the `navigateToPaywall(source = …)` literals of
+         * the same methods, so the limit hit and the paywall it opens join on one value.
+         */
+        const val LIMIT_SOURCE_CREATE_PROJECT = "create_project"
+
+        /** Repeat tab opened from the checklist-detail reminder sheet. */
+        const val LIMIT_SOURCE_CHECKLIST_DETAIL = "detail_recurring_limit"
+
+        /** The retention nudge banner on checklist detail, accepted by the user. */
+        const val LIMIT_SOURCE_RECURRING_NUDGE = "recurring_nudge_limit"
     }
 
     // ─── Push / re-engagement (FCM campaigns + notification lifecycle) ────────
@@ -770,6 +812,39 @@ object AnalyticsParams {
     const val ITEM_COUNT = "item_count"
 
     /**
+     * WHICH create form the event came from — a [CreateFormVariant] wire value.
+     *
+     * ADDITIVE to [SOURCE], never a replacement for it. The v2 "New project" form and the classic
+     * create-checklist form are one mount point behind one flag, so both used to emit a
+     * byte-identical `checklist_created` (`source = manual`): the redesign was unmeasurable even at
+     * 100% rollout. Splitting [SOURCE] instead would have moved volume out of
+     * [ChecklistSource.MANUAL] — the reference value every live create dashboard is built on — so
+     * the arm arrives as its own dimension and every existing `source` breakdown keeps its meaning.
+     *
+     * Read at the EMIT SITE from the form's own gate, not from the `nav_arm` user-property: the
+     * property is sticky per process and goes stale the moment the user flips the shell in Settings,
+     * whereas this says what the user was actually looking at when the event fired. Absent on every
+     * non-form creation path (chat, gallery, analyze, template) — absence means "not the create
+     * form", so a form funnel filters on presence rather than joining two events.
+     */
+    const val FORM_VARIANT = "form_variant"
+
+    /**
+     * WHAT KIND of list the create form persisted — a [CreatedListKind] wire value.
+     *
+     * Without it a Weekly project (created empty by design) and an ordinary empty project are the
+     * same row: `source = manual`, `item_count = 0`. Emitted for BOTH kinds, never only for the
+     * interesting one — absence-as-a-value cannot be counted as a share of anything.
+     *
+     * ⚠️ Counting ALL weekly lists means `list_kind = weekly` **OR** `source = weekly`: the
+     * "My Week" entry point in `TemplatesViewModel` reports itself through
+     * [ChecklistSource.WEEKLY], while the create form stays [ChecklistSource.MANUAL] plus this key.
+     * Deliberate — the two are different product acts and folding them into one value would have
+     * both perturbed the `manual` series and made the entry points indistinguishable again.
+     */
+    const val LIST_KIND = "list_kind"
+
+    /**
      * Slug of a PUBLIC gallery template — the Firestore doc id under `gallery_templates`, as
      * carried on the `?g=create&template={slug}` deep-link. Gallery surface only.
      *
@@ -1037,6 +1112,41 @@ enum class ChecklistSource(val wire: String) {
     TEMPLATE("template"),
 
     /** Recurring weekly checklist spawned from its parent — a Premium feature. */
+    WEEKLY("weekly"),
+}
+
+/**
+ * Which create form produced an event, reported as [AnalyticsParams.FORM_VARIANT].
+ *
+ * A type rather than two literals for the same reason as [ChecklistSource]: the two call sites that
+ * emit it are the only thing standing between "the redesign shipped" and "the redesign is
+ * measurable", and a typo in either is silent — it just reads as a third arm nobody can explain.
+ *
+ * CONTRACT — [wire] values are frozen. [V2] pairs with the `nav_arm` user-property value `"v2"`;
+ * [CLASSIC] pairs with `nav_arm = "control"` (experiment vocabulary, kept as-is on that key so the
+ * historical nav series stays whole). The mismatch is deliberate: this key describes a FORM, and
+ * "control" only means something while an experiment is running.
+ */
+enum class CreateFormVariant(val wire: String) {
+    /** The redesigned "New project" form (v2 nav shell). */
+    V2("v2"),
+
+    /** The original create-checklist form, still reachable by switching the shell in Settings. */
+    CLASSIC("classic"),
+}
+
+/**
+ * What kind of list a create form persisted, reported as [AnalyticsParams.LIST_KIND].
+ *
+ * Mirrors the domain's `ChecklistViewMode`, which lives in `feature:checklist` and therefore cannot
+ * be referenced from here — so the wire values are restated, and adding a view mode means adding a
+ * value here too or the new mode silently reports as [STANDARD].
+ */
+enum class CreatedListKind(val wire: String) {
+    /** An ordinary project: the user's own items, possibly none. */
+    STANDARD("standard"),
+
+    /** Weekly-mode project — created empty by definition, filled per weekday. */
     WEEKLY("weekly"),
 }
 

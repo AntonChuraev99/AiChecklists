@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
@@ -495,17 +497,63 @@ class ChecklistDetailRepeatRuleTest {
 
     // --- Analytics ---
 
+    /**
+     * Three screens raise `recurring_limit_hit`, so "did it fire" is only half the assertion — the
+     * event has to say WHERE. Asserting only the name let the detail sites ship param-less while the
+     * create screen was being instrumented, which made the whole breakdown rest on "source is
+     * absent" and would have broken on the next emitter.
+     */
     @Test
-    fun onRepeatRuleClick_limitHit_tracksAnalytics() = runTest {
+    fun onRepeatRuleClick_limitHit_tracksAnalyticsWithItsSource() = runTest {
         repository.repeatScheduleCount = 10
         val tracker = FakeAnalyticsTracker()
-        val vm = createViewModel(analyticsTracker = tracker)
+        val navigator = FakeAppNavigator()
+        val vm = createViewModel(analyticsTracker = tracker, navigator = navigator)
         vm.onIntent(ChecklistDetailIntent.OnReminderClick)
         vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
 
 
-        assertTrue(tracker.events.any { it.first == "recurring_limit_hit" })
+        val limitHit = tracker.events.single { it.first == AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT }
+        assertEquals(
+            AnalyticsEvents.Reminder.LIMIT_SOURCE_CHECKLIST_DETAIL,
+            limitHit.second[AnalyticsParams.SOURCE],
+            "The detail sheet's recurring-limit hit must be separable from the create screen's",
+        )
+        assertEquals(
+            limitHit.second[AnalyticsParams.SOURCE],
+            navigator.lastPaywallSource,
+            "One value for the hit and the paywall it opens, so the two join without a mapping table",
+        )
+    }
+
+    /**
+     * The nudge is its OWN source, not the sheet's: here the app asked first and the ceiling refused
+     * the user's yes. Folding it into the sheet's value would hide the only path where the refusal
+     * follows our own prompt — the one most likely to read as a broken promise.
+     */
+    @Test
+    fun onRecurringNudgeAccepted_limitHit_tracksItsOwnSource() = runTest {
+        repository.repeatScheduleCount = 10
+        val tracker = FakeAnalyticsTracker()
+        val navigator = FakeAppNavigator()
+        val vm = createViewModel(analyticsTracker = tracker, navigator = navigator)
+
+        vm.onIntent(ChecklistDetailIntent.OnRecurringNudgeAccepted)
+
+
+
+        val limitHit = tracker.events.single { it.first == AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT }
+        assertEquals(
+            AnalyticsEvents.Reminder.LIMIT_SOURCE_RECURRING_NUDGE,
+            limitHit.second[AnalyticsParams.SOURCE],
+            "A refusal that followed our nudge must not be filed under the reminder sheet",
+        )
+        assertEquals(
+            AnalyticsEvents.Reminder.LIMIT_SOURCE_RECURRING_NUDGE,
+            navigator.lastPaywallSource,
+            "The paywall it opens carries the same value",
+        )
     }
 
     @Test

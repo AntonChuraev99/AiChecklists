@@ -2327,8 +2327,14 @@ class ChecklistDetailViewModel(
             // (mirrors awaitUserLimits' intent of never falsely flipping a user to the gated path).
             val canCreate = limits?.canCreateRecurringReminder(activeCount) ?: true
             if (!canCreate) {
-                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
-                navigator.navigateToPaywall(source = "detail_recurring_limit")
+                // Sourced like every other emitter of this event: three screens raise it, so an
+                // unqualified one cannot say where the quota bit. Same value as the paywall below,
+                // so the limit hit and the paywall it opens join on one string.
+                analyticsTracker.event(
+                    AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT,
+                    mapOf(AnalyticsParams.SOURCE to AnalyticsEvents.Reminder.LIMIT_SOURCE_CHECKLIST_DETAIL),
+                )
+                navigator.navigateToPaywall(source = AnalyticsEvents.Reminder.LIMIT_SOURCE_CHECKLIST_DETAIL)
             } else {
                 updateContentState {
                     it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
@@ -2529,8 +2535,14 @@ class ChecklistDetailViewModel(
             val activeCount = repository.countActiveRepeatSchedules()
             val canCreate = limits?.canCreateRecurringReminder(activeCount) ?: true
             if (!canCreate) {
-                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
-                navigator.navigateToPaywall(source = "recurring_nudge_limit")
+                // Its own value, not the detail sheet's: the nudge is a different act (we asked,
+                // the user said yes, the ceiling refused) and folding it into the sheet's source
+                // would hide the one path where the refusal follows OUR prompt.
+                analyticsTracker.event(
+                    AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT,
+                    mapOf(AnalyticsParams.SOURCE to AnalyticsEvents.Reminder.LIMIT_SOURCE_RECURRING_NUDGE),
+                )
+                navigator.navigateToPaywall(source = AnalyticsEvents.Reminder.LIMIT_SOURCE_RECURRING_NUDGE)
                 return@launch
             }
             // Default weekly schedule at 09:00, applied via the shared save path.
