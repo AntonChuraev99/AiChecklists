@@ -417,7 +417,7 @@
           <a href="https://gisti-ai.com/#how" class="text-on-surface-variant hover:text-primary">How it works</a>
           <a href="https://gisti-ai.com/#pricing" class="text-on-surface-variant hover:text-primary">Pricing</a>
           <a href="https://gisti-ai.com/#faq" class="text-on-surface-variant hover:text-primary">FAQ</a>
-          <a href="/mcp" class="text-on-surface-variant hover:text-primary">Use in Claude</a>
+          <a href="/mcp/" class="text-on-surface-variant hover:text-primary">Use in Claude</a>
           <a href="https://app.gisti-ai.com" class="btn btn-text h-10 px-4" aria-label="Log in to the Gisti web app">Log in</a>
         </nav>
 
@@ -569,8 +569,13 @@
           <!-- Deep-link: opens the app's create flow pre-seeded with this template. The app-side
                ?g=create&template= handler parses the slug AND these utm_* params (wasmJs main.kt /
                Android MainActivity) and attaches them to checklist_created — plain query params are
-               correct here, this is a web/app link, not a Play Store link. -->
+               correct here, this is a web/app link, not a Play Store link.
+               rel="nofollow": app.gisti-ai.com disallows crawling in its robots.txt (empty Skiko
+               canvas = nothing to index), so every per-template deep link Googlebot follows comes
+               back as "Blocked by robots.txt" / "Duplicate without user-selected canonical" noise
+               in the indexing report (GSC email 2026-08-07). -->
           <a href="https://app.gisti-ai.com/?g=create&amp;template=moving-house-checklist&amp;utm_source=gallery&amp;utm_medium=organic&amp;utm_campaign=checklist_detail"
+             rel="nofollow"
              class="btn btn-primary btn-pill" style="height:52px;font-size:16px">
             <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">public</span>
             इस चेकलिस्ट को Gisti में इस्तेमाल करें
@@ -687,7 +692,7 @@
           <li><a href="https://gisti-ai.com/#pricing" class="hover:text-primary">Pricing</a></li>
           <li><a href="https://gisti-ai.com/#faq" class="hover:text-primary">FAQ</a></li>
           <li><a href="/checklists/" class="hover:text-primary">Checklist gallery</a></li>
-          <li><a href="/mcp" class="hover:text-primary">Use in Claude (MCP)</a></li>
+          <li><a href="/mcp/" class="hover:text-primary">Use in Claude (MCP)</a></li>
           <li><a href="https://app.gisti-ai.com" class="hover:text-primary">Open the web app</a></li>
           <li><a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists" class="hover:text-primary">Download for Android</a></li>
         </ul>
