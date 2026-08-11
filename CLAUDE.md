@@ -141,6 +141,7 @@ Strategy + phased plan: **`docs/plans/2026-07-14-seo-organic-growth-strategy.md`
 - **Public gallery = curated/opt-in content ONLY** — never expose Firestore user checklists (private data under `users/{google_uid}`).
 - Phase 0 foundation LIVE: `robots.txt` + `sitemap.xml` (**196 URLs, 97 hi + ~96 en**, verified 2026-08-03) + IndexNow, all serving; GSC domain property verified. Pages **are** indexed — the gap is **ranking / domain authority** (0 backlinks, position ~72), not infra or indexing. Current GSC state + owner actions live in the SEO plan's verification block (gitignored).
 - Landing infra + deploy account trap (gmail acct, `wrangler whoami` first): `docs/plans/2026-07-01-landing-root-swap-migration-plan.md`; SEO-landing history: `docs/completed/seo-landing-page-2026-07-01.md`.
+- **Legal pages live on Firebase Hosting, NOT on `gisti-ai.com`:** `https://gisti-app.web.app/privacy-policy` and `/terms` (files `hosting/public/*.html`, `firebase.json` sets `cleanUrls: true`). Both the landing footer and the app (`PaywallConfig.kt:12-13`) already point there. ⚠️ `gisti-ai.com/privacy` has never existed — its 404 is not a defect. **A 404 is only a finding once you have grepped who links that URL**; no linker, no finding (precedent 2026-08-11: typical paths were probed blind and the 404s reported as a broken landing page).
 
 ## Dependencies & Economics
 
