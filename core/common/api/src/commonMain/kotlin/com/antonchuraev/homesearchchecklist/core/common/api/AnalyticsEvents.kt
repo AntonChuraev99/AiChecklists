@@ -782,6 +782,30 @@ object AnalyticsEvents {
         /** A task was deleted from the triage sheet. */
         const val TASK_DELETED = "inbox_task_deleted"
     }
+
+    // ─── Install attribution (ad vs organic acquisition) ─────────────────────
+    object Attribution {
+        /**
+         * Fired ONCE per install, the moment the Play install referrer is read (Android only —
+         * `InstallReferrerCapture`, composeApp/androidMain).
+         *
+         * Why an event and not only the sticky utm_ + [AnalyticsParams.GCLID] user-properties that
+         * already exist: a user-property has no date. It answers "was this user ever attributed",
+         * never "who arrived on THIS day" — an install from May is indistinguishable from one from
+         * today, so an acquisition cohort cannot be put on a timeline at all. An event carries its
+         * own timestamp, so "who came from ads on 12 Aug and what did they do next" becomes a
+         * normal funnel starting at this event.
+         *
+         * Fires for EVERY install, paid or not: the organic ones are the denominator the paid
+         * cohort is measured against.
+         *
+         * Params — only the keys the referrer actually carried, never a default:
+         *  [AnalyticsParams.SOURCE] / [AnalyticsParams.MEDIUM] / [AnalyticsParams.CAMPAIGN] /
+         *  [AnalyticsParams.TERM] / [AnalyticsParams.CONTENT] / [AnalyticsParams.GCLID], plus
+         *  [AnalyticsParams.IS_PAID] which is always present.
+         */
+        const val INSTALL_ATTRIBUTED = "install_attributed"
+    }
 }
 
 /**
@@ -900,6 +924,32 @@ object AnalyticsParams {
 
     /** Google Ads click identifier — captured only from the Play install referrer (see InstallReferrerCapture). */
     const val GCLID = "gclid"
+
+    /**
+     * Campaign identity as it travels on [AnalyticsEvents.Attribution.INSTALL_ATTRIBUTED].
+     *
+     * Deliberately UNPREFIXED (`medium`, not `utm_medium`): the utm_* names above are the sticky
+     * user-properties, these are event params. Keeping the two namespaces apart is what makes
+     * "users whose INSTALL was attributed to X" (event) distinguishable from "users currently
+     * tagged X" (property) in a segment. [SOURCE] is reused as-is — same meaning as everywhere
+     * else, "what this came from".
+     *
+     * A key is present only when the referrer really carried it; an absent one stays absent.
+     */
+    const val MEDIUM = "medium"
+    const val CAMPAIGN = "campaign"
+    const val TERM = "term"
+    const val CONTENT = "content"
+
+    /**
+     * Paid-install verdict on [AnalyticsEvents.Attribution.INSTALL_ATTRIBUTED]. Always present.
+     *
+     * Derived from the presence of [GCLID], NOT from the medium: Google Ads auto-tagging attaches a
+     * bare `gclid` and no utm at all (a `utm_medium == "cpc"` rule misses those installs entirely),
+     * while Play labels its own organic store traffic `utm_medium=organic` and any hand-tagged link
+     * can claim `cpc` for free.
+     */
+    const val IS_PAID = "is_paid"
     const val PROGRESS = "progress"
     const val COMPLETED_COUNT = "completed_count"
     const val HAD_TEXT = "had_text"

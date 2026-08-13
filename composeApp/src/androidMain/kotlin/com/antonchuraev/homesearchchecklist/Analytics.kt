@@ -84,6 +84,40 @@ object Analytics : AnalyticsTracker {
         }
     }
 
+    /**
+     * Set-ONCE semantics: the first value written for a property survives every later write.
+     *
+     * MUST stay overridden. [AnalyticsTracker.setUserPropertiesOnce] has a default body that
+     * delegates to [setUserProperties], so dropping this override compiles, keeps every test green,
+     * and silently degrades install-scoped facts (`install_date`) to a plain `set` that any later
+     * app start can rewrite — moving the user into a different acquisition cohort with nothing in
+     * the report to reveal the move.
+     *
+     * Firebase has no set-once primitive (`setUserProperty` is always a plain set), so the once-ness
+     * is guaranteed on the Amplitude side only — which is where the cohort analysis lives.
+     */
+    override fun setUserPropertiesOnce(properties: Map<String, Any>) {
+        // Firebase — plain set, one call per property (only accepts String values).
+        properties.forEach { (name, value) ->
+            firebase.setUserProperty(name, value.toString())
+        }
+        // Amplitude — a single Identify carrying setOnce for every property.
+        amplitude?.let { amp ->
+            val identify = Identify()
+            properties.forEach { (name, value) ->
+                when (value) {
+                    is String -> identify.setOnce(name, value)
+                    is Int -> identify.setOnce(name, value)
+                    is Long -> identify.setOnce(name, value)
+                    is Double -> identify.setOnce(name, value)
+                    is Boolean -> identify.setOnce(name, value)
+                    else -> identify.setOnce(name, value.toString())
+                }
+            }
+            amp.identify(identify)
+        }
+    }
+
     override fun screenView(name: String) {
         firebase.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW) {
             param(FirebaseAnalytics.Param.SCREEN_NAME, name)

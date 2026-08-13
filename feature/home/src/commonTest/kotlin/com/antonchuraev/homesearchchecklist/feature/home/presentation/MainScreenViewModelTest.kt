@@ -11,6 +11,7 @@ import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleUser
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncState
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -227,6 +228,12 @@ private class FakeUserDataRepository(
      */
     private val linkResult: Result<LinkGoogleAccountResult> =
         Result.failure(IllegalStateException("User not registered")),
+    /**
+     * Install timestamp as the repository would report it. `0L` is the repository's "unknown"
+     * answer — the state ~26 prod users a day are in, because the key is only written on a
+     * successful registration.
+     */
+    private val firstLaunchAtMillis: Long = 0L,
 ) : UserDataRepository {
     var linkCallCount = 0
         private set
@@ -245,7 +252,7 @@ private class FakeUserDataRepository(
     override suspend fun isPaywallLinked(): Boolean = false
     override suspend fun setPaywallLinked(linked: Boolean) {}
     override suspend fun restoreCreditsAfterPurchase(): Result<Int> = Result.success(0)
-    override suspend fun getFirstLaunchAtMillis(): Long = 0L
+    override suspend fun getFirstLaunchAtMillis(): Long = firstLaunchAtMillis
 }
 
 private class FakeRemoteConfigProvider : RemoteConfigProvider {
@@ -258,12 +265,28 @@ private class FakeRemoteConfigProvider : RemoteConfigProvider {
 private class FakeAnalyticsTracker : AnalyticsTracker {
     /** Latest value per user property, so tests can assert what segmentation actually received. */
     val userProperties = mutableMapOf<String, Any>()
+
+    /**
+     * The raw payloads, per call and per channel. The merged map above cannot answer "was this key
+     * left out entirely?" once several calls exist, and it cannot tell a `set` from a `setOnce`.
+     */
+    val propertyWrites = mutableListOf<Map<String, Any>>()
+    val onceWrites = mutableListOf<Map<String, Any>>()
+
     override fun setUserId(userId: String) {}
     override fun setUserProperties(properties: Map<String, Any>) {
+        propertyWrites.add(properties)
+        userProperties.putAll(properties)
+    }
+    override fun setUserPropertiesOnce(properties: Map<String, Any>) {
+        onceWrites.add(properties)
         userProperties.putAll(properties)
     }
     override fun screenView(name: String) {}
     override fun event(name: String, params: Map<String, Any>) {}
+
+    /** Every key that reached segmentation, over both channels. */
+    fun publishedKeys(): Set<String> = (propertyWrites + onceWrites).flatMap { it.keys }.toSet()
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -596,6 +619,99 @@ class MainScreenViewModelTest {
         )
     }
 
+    // ─── Install-cohort user properties ──────────────────────────────────────
+
+    /**
+     * `getFirstLaunchAtMillis() == 0` means UNKNOWN — the key is only written after a successful
+     * registration, so every user whose `register_user` failed has none. Folding that into
+     * `days_since_install = 0` mints a fake "installed today" cohort: on 2026-08-12 the property
+     * read `0` for 26 users against 0–2 real installs that day, i.e. the day-0 bucket was ~13x
+     * noise. An absent property is filterable; a wrong one is not.
+     *
+     * Same for `install_date`: with no timestamp there is no date to claim.
+     */
+    @Test
+    fun userProperties_whenFirstLaunchUnknown_omitDaysSinceInstallAndInstallDate() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklists = checklists(2),
+            userDataRepository = FakeUserDataRepository(firstLaunchAtMillis = 0L),
+            analyticsTracker = analytics,
+        )
+
+        vm.awaitSuccess()
+
+        assertFalse(
+            "days_since_install" in analytics.publishedKeys(),
+            "Unknown install date must publish NO days_since_install (never 0) — got " +
+                "${analytics.publishedKeys()}",
+        )
+        assertFalse(
+            "install_date" in analytics.publishedKeys(),
+            "Unknown install date must publish NO install_date — got ${analytics.publishedKeys()}",
+        )
+        // The other three segmentation properties are unaffected by the missing timestamp.
+        assertEquals(false, analytics.userProperties["is_premium"])
+        assertEquals(2, analytics.userProperties["checklist_count"])
+        assertEquals(0, analytics.userProperties["total_fills"])
+    }
+
+    /**
+     * Two different bases, because a single one is satisfied by any hardcoded constant. Derived from
+     * the same clock the ViewModel reads, so the expected 3 and 40 are exact.
+     */
+    @Test
+    fun daysSinceInstall_whenFirstLaunchKnown_countsWholeDaysFromIt() = runTest {
+        val threeDaysOld = propertiesAfterSync(currentTimeMillis() - 3 * DAY_MILLIS)
+        val fortyDaysOld = propertiesAfterSync(currentTimeMillis() - 40 * DAY_MILLIS)
+
+        assertEquals(3, threeDaysOld.userProperties["days_since_install"])
+        assertEquals(40, fortyDaysOld.userProperties["days_since_install"])
+    }
+
+    /**
+     * The owner's question is "who arrived on THIS day" — answering it needs the install day on the
+     * user, not just an age that changes with every session.
+     *
+     * Set-once, not set: the value is derived on every main-screen open, so a plain write lets any
+     * later change of the source (a repaired timestamp, a restored backup) silently move the user
+     * into a different install cohort, and nothing in the resulting report reveals the move.
+     * UTC, so the same install never lands on two dates depending on where the device is.
+     */
+    @Test
+    fun installDate_whenFirstLaunchKnown_isPublishedOnceAsUtcCalendarDay() = runTest {
+        // Hand-derived: 1_783_726_200_000 ms = 2026-07-10T23:30:00Z — deliberately close to the UTC
+        // day boundary. A noon-UTC instant would carry the same calendar date in every zone from
+        // UTC-11 to UTC+11, so `TimeZone.currentSystemDefault()` would pass this test while
+        // violating what it claims to check. At 23:30Z any zone east of UTC+00:30 reads 2026-07-11.
+        val analytics = propertiesAfterSync(firstLaunchAtMillis = 1_783_726_200_000L)
+
+        assertEquals(
+            "2026-07-10",
+            analytics.userProperties["install_date"],
+            "install_date must be the YYYY-MM-DD of the stored first launch — got " +
+                "${analytics.publishedKeys()}",
+        )
+        assertTrue(
+            analytics.onceWrites.any { "install_date" in it },
+            "install_date must travel on the set-once channel — got set=${analytics.propertyWrites} " +
+                "setOnce=${analytics.onceWrites}",
+        )
+    }
+
+    /** Builds a ViewModel with the given install timestamp and returns what analytics received. */
+    private suspend fun propertiesAfterSync(firstLaunchAtMillis: Long): FakeAnalyticsTracker {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            userDataRepository = FakeUserDataRepository(firstLaunchAtMillis = firstLaunchAtMillis),
+            analyticsTracker = analytics,
+        )
+        vm.awaitSuccess()
+        return analytics
+    }
+
     // ── Failure observability ───────────────────────────────────────────────
 
     /**
@@ -750,6 +866,8 @@ class MainScreenViewModelTest {
         )
     }
 }
+
+private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 
 /** A repository whose checklist stream fails with [cause] before emitting anything. */
 private fun throwingRepository(cause: Throwable): FakeChecklistRepository =

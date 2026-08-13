@@ -134,12 +134,29 @@ class UserDataRepositoryImpl(
         logger.debug(TAG, "ensureUserRegistered: currentUserId='${currentUserId.take(8)}...'")
 
         if (currentUserId.isNotBlank()) {
-            // User already registered, sync with server to get fresh data
+            // User already registered, sync with server to get fresh data.
+            //
+            // Deliberately NOT stamping first_launch_at here. A device with a user_id but no stamp
+            // installed BEFORE this key existed — its real install date is unknown and unknowable.
+            // Stamping now would claim "installed on the day of this release" for every such user,
+            // and `install_date` is published with Amplitude setOnce, so that lie would be frozen
+            // permanently: no later start and no manual write can correct it. An absent property is
+            // filterable; an invented one is indistinguishable from a real one forever.
             logger.debug(TAG, "ensureUserRegistered: user exists, syncing with server...")
             return syncWithServer()
         }
 
-        // User not registered, call the server
+        // Genuinely new install (no user_id yet) — this start IS the first launch.
+        //
+        // Stamped BEFORE the server call, not inside `registerAndSave(...).onSuccess { }` where it
+        // used to live: a device whose `register_user` fails (offline first launch, Firebase
+        // Installations unavailable, 5xx) otherwise never gets a timestamp, and never gets one
+        // later either, because every following start takes the branch above. Cost in prod on
+        // 2026-08-12: `days_since_install` read `(none)` for 34 users and `0` for 26 more, against
+        // 0-2 real installs that day. `ensureFirstLaunchRecorded()` keeps its own `isBlank()` guard
+        // so a retry after a failed registration never re-stamps.
+        ensureFirstLaunchRecorded()
+
         val deviceId = deviceIdProvider.getOrCreateDeviceId()
         logger.debug(TAG, "ensureUserRegistered: registering new user with deviceId=${deviceId.take(8)}...")
 
@@ -315,7 +332,10 @@ class UserDataRepositoryImpl(
             appDatastore.saveString(USER_ID_KEY, result.userId)
             appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
             appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
-            ensureFirstLaunchRecorded()
+            // No first_launch_at stamp here. This method serves BOTH the new-user branch (already
+            // stamped before the call, see ensureUserRegistered) and every per-start sync of an
+            // existing user — and on that second path a stamp would date a long-installed user to
+            // today, which `install_date`'s setOnce then freezes forever.
             logger.debug(TAG, "registerAndSave: saved to datastore")
         }.onFailure { error ->
             logger.error(TAG, "registerAndSave: FAILED - ${error.message}", error)

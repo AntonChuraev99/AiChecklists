@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.android.installreferrer.api.InstallReferrerClient
 import com.android.installreferrer.api.InstallReferrerStateListener
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -11,8 +12,12 @@ import java.net.URLDecoder
 
 /**
  * Captures the Google Play Install Referrer (utm_source / utm_medium / utm_campaign / utm_content /
- * utm_term + gclid) ONCE per install and forwards it to Amplitude/Firebase as user-properties via
- * [AnalyticsTracker.setUserProperties].
+ * utm_term + gclid) ONCE per install and publishes it two ways:
+ *  - as user-properties via [AnalyticsTracker.setUserProperties] — sticky segmentation dimensions,
+ *    what today's dashboards read;
+ *  - as the one-shot [AnalyticsEvents.Attribution.INSTALL_ATTRIBUTED] event, fired for EVERY
+ *    install including organic ones. The properties never expire and carry no date, so they cannot
+ *    answer "who arrived from ads on this day"; the event can, because it is timestamped.
  *
  * Why this exists: the Amplitude Android/Kotlin SDK has NO built-in install-referrer / UTM
  * autocapture (that is a Browser-SDK-only feature), so ad-install cohorts were previously
@@ -25,8 +30,9 @@ import java.net.URLDecoder
  *  - OK (incl. an organic install with no utm params) -> mark captured.
  *  - FEATURE_NOT_SUPPORTED / DEVELOPER_ERROR / PERMISSION_ERROR / unknown -> mark captured
  *    (retrying cannot help — device/store limitation or a caller bug).
- *  - SERVICE_UNAVAILABLE or a thrown RemoteException while reading -> do NOT mark captured, so the
- *    next cold start retries.
+ *  - SERVICE_UNAVAILABLE / SERVICE_DISCONNECTED, or a thrown RemoteException while reading -> do
+ *    NOT mark captured, so the next cold start retries. Both codes are transient; marking either
+ *    one captured loses that install's attribution forever, with no event and nothing to grep.
  *
  * Threading: [capture] does a SharedPreferences disk read, so callers should invoke it off the
  * cold-start main thread (GistiApplication dispatches it on its IO application scope). The
@@ -39,6 +45,15 @@ class InstallReferrerCapture(
     private val context: Context,
     private val analytics: AnalyticsTracker,
     private val logger: AppLogger? = null,
+    /**
+     * Test seam. The Play library builds its client through a static factory, so without this the
+     * only reachable response codes in a host test are the ones a machine without Play Services
+     * happens to produce — never OK with a real referrer payload. Production callers keep the
+     * default and the real client.
+     */
+    private val clientFactory: (Context) -> InstallReferrerClient = {
+        InstallReferrerClient.newBuilder(it).build()
+    },
 ) {
 
     // Written on the IO thread in capture(), read/written on the main thread in the listener
@@ -55,7 +70,7 @@ class InstallReferrerCapture(
         if (prefs.getBoolean(KEY_CAPTURED, false)) return
 
         runCatching {
-            val referrerClient = InstallReferrerClient.newBuilder(context).build()
+            val referrerClient = clientFactory(context)
             client = referrerClient
             referrerClient.startConnection(object : InstallReferrerStateListener {
                 override fun onInstallReferrerSetupFinished(responseCode: Int) {
@@ -89,6 +104,13 @@ class InstallReferrerCapture(
                     } else {
                         logger?.debug(TAG, "install referrer had no utm/gclid params (organic install)")
                     }
+                    // Unconditional, including the organic/empty case: this event is the acquisition
+                    // timeline itself, and skipping the unattributed installs would leave the paid
+                    // cohort without the denominator it is judged against.
+                    analytics.event(
+                        AnalyticsEvents.Attribution.INSTALL_ATTRIBUTED,
+                        attributionEventParams(props),
+                    )
                     // Mark captured on any successful read (empty referrer is a valid answer).
                     markCaptured(prefs)
                 }.onFailure { e ->
@@ -105,9 +127,14 @@ class InstallReferrerCapture(
                 endConnection()
             }
 
-            InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE -> {
-                // Transient — do NOT mark captured so the next cold start retries.
-                logger?.warning(TAG, "install referrer SERVICE_UNAVAILABLE — will retry next start")
+            InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE,
+            InstallReferrerClient.InstallReferrerResponse.SERVICE_DISCONNECTED,
+            -> {
+                // Both are TRANSIENT (service down / the binding died mid-call) — do NOT mark
+                // captured, so the next cold start retries. SERVICE_DISCONNECTED used to fall into
+                // the `else` below and burn the one-shot: the flag was set, no event had been sent,
+                // and the install lost its attribution permanently and silently.
+                logger?.warning(TAG, "install referrer transient failure code=$responseCode — will retry next start")
                 endConnection()
             }
 
@@ -118,6 +145,26 @@ class InstallReferrerCapture(
                 endConnection()
             }
         }
+    }
+
+    /**
+     * Maps the captured referrer keys onto the event's param names, dropping every key the referrer
+     * did not carry.
+     *
+     * No defaults on purpose. An absent campaign written as `""` / `"organic"` / `"unknown"` is
+     * indistinguishable in Amplitude from a real value of that name: it silently inflates whichever
+     * segment it lands in, and no report reveals that the value was invented. An absent key is
+     * filterable; a defaulted one is not.
+     */
+    private fun attributionEventParams(props: Map<String, Any>): Map<String, Any> {
+        val params = LinkedHashMap<String, Any>()
+        EVENT_PARAM_BY_REFERRER_KEY.forEach { (referrerKey, eventParam) ->
+            props[referrerKey]?.let { params[eventParam] = it }
+        }
+        // Always present — see AnalyticsParams.IS_PAID for why the verdict follows the gclid and
+        // never the medium.
+        params[AnalyticsParams.IS_PAID] = props.containsKey(AnalyticsParams.GCLID)
+        return params
     }
 
     /**
@@ -160,13 +207,20 @@ class InstallReferrerCapture(
         const val PREFS = "install_attribution"
         const val KEY_CAPTURED = "referrer_captured"
 
-        val TRACKED_KEYS: Set<String> = setOf(
-            AnalyticsParams.UTM_SOURCE,
-            AnalyticsParams.UTM_MEDIUM,
-            AnalyticsParams.UTM_CAMPAIGN,
-            AnalyticsParams.UTM_CONTENT,
-            AnalyticsParams.UTM_TERM,
-            AnalyticsParams.GCLID,
+        /**
+         * Referrer key -> event-param name. Single list: [TRACKED_KEYS] is derived from it, so a
+         * key can never be parsed-and-persisted as a user-property while silently missing from the
+         * event (or the reverse).
+         */
+        val EVENT_PARAM_BY_REFERRER_KEY: Map<String, String> = linkedMapOf(
+            AnalyticsParams.UTM_SOURCE to AnalyticsParams.SOURCE,
+            AnalyticsParams.UTM_MEDIUM to AnalyticsParams.MEDIUM,
+            AnalyticsParams.UTM_CAMPAIGN to AnalyticsParams.CAMPAIGN,
+            AnalyticsParams.UTM_CONTENT to AnalyticsParams.CONTENT,
+            AnalyticsParams.UTM_TERM to AnalyticsParams.TERM,
+            AnalyticsParams.GCLID to AnalyticsParams.GCLID,
         )
+
+        val TRACKED_KEYS: Set<String> = EVENT_PARAM_BY_REFERRER_KEY.keys
     }
 }

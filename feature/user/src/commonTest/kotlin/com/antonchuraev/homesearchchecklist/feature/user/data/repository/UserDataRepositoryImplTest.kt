@@ -644,6 +644,125 @@ class UserDataRepositoryImplTest {
     }
 
     // ============================================
+    // first_launch_at — the base every install-age metric is computed from
+    // ============================================
+
+    /**
+     * `first_launch_at` is written ONLY inside `registerAndSave(...).onSuccess { }`, so a device
+     * whose `register_user` call fails (no network at first launch, Firebase Installations
+     * unavailable, server 5xx) never gets a timestamp — and never gets one later either, because
+     * every subsequent start takes the same path and the key stays blank until a registration
+     * happens to succeed while this code runs.
+     *
+     * Cost in prod: `days_since_install` then has no base at all. On 2026-08-12 the property read
+     * `(none)` for 34 users and `0` for 26 more, against 0–2 real installs that day — i.e. the
+     * install-age dimension is mostly noise, and the ad-cohort question ("who arrived today")
+     * cannot be answered for those users at all.
+     *
+     * The stamp belongs to the START, not to the server's answer.
+     */
+    @Test
+    fun ensureUserRegistered_whenRegistrationFails_stillStampsFirstLaunch() = runTest {
+        val datastore = createStubDatastore() // brand-new install: no user_id, no first_launch_at
+        val repo = createRepositoryWith(datastore, NoOpUserApiService(), NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.ensureUserRegistered()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(result.isFailure, "Precondition: this start's registration call failed")
+        // Read the storage directly: this proves the value was WRITTEN during the start, not
+        // conjured on demand by the getter (which would restart the clock on every read).
+        val stamped = datastore.observeString("first_launch_at", "").first()
+        assertTrue(
+            (stamped.toLongOrNull() ?: 0L) > 0L,
+            "A failed registration must still stamp first_launch_at — got '$stamped'",
+        )
+    }
+
+    /**
+     * The opposite guard, and the one that costs more if it is wrong: a device that ALREADY has a
+     * `user_id` but no `first_launch_at` installed before this key existed. Its real install date is
+     * unknown and unknowable, so this start must NOT claim one.
+     *
+     * Stamping here would date every such user to the day of the release — and `install_date` is
+     * published with Amplitude `setOnce`, so that value is frozen permanently: no later start and no
+     * manual write can correct it. Trading ~26 fake "day 0" users for ~32 fake "installed at release"
+     * users is a worse deal, because the second group is unfixable. An absent property is filterable;
+     * an invented one is indistinguishable from a real one forever.
+     *
+     * The sync SUCCEEDS here on purpose. That is the discriminating case: it runs through
+     * `syncWithServer() -> registerAndSave(...).onSuccess { }`, the old stamp site. A failing sync
+     * would never reach it and would pass against the defect.
+     */
+    @Test
+    fun ensureUserRegistered_whenAlreadyRegistered_doesNotInventAFirstLaunch() = runTest {
+        val datastore = createStubDatastore(strings = mapOf("user_id" to "existing-user-1"))
+        val apiService = FakeUserApiService(
+            registerResults = listOf(
+                Result.success(
+                    RegisterUserResult(
+                        userId = "existing-user-1",
+                        isNewUser = false,
+                        isPremium = false,
+                        aiCredits = 10,
+                        createdAt = "2023-11-14T00:00:00Z",
+                    )
+                )
+            ),
+        )
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        repo.ensureUserRegistered()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val stamped = datastore.observeString("first_launch_at", "").first()
+        assertEquals(
+            "",
+            stamped,
+            "An install date we never recorded must stay absent, not be minted today — got '$stamped'",
+        )
+    }
+
+    /**
+     * Guards the repair itself: stamping on every start must not RE-stamp. An overwritten
+     * timestamp resets install age to 0 on each launch, which reads in Amplitude exactly like the
+     * bug being fixed — a permanent day-0 population — while looking correct in the code.
+     */
+    @Test
+    fun ensureUserRegistered_onALaterStart_keepsTheOriginalFirstLaunch() = runTest {
+        val originalStamp = 1_700_000_000_000L // 2023-11-14, i.e. long before this start
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "existing-user-1", "first_launch_at" to "$originalStamp"),
+        )
+        val apiService = FakeUserApiService(
+            registerResults = listOf(
+                Result.success(
+                    RegisterUserResult(
+                        userId = "existing-user-1",
+                        isNewUser = false,
+                        isPremium = false,
+                        aiCredits = 10,
+                        createdAt = "2023-11-14T00:00:00Z",
+                    )
+                )
+            ),
+        )
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        repo.ensureUserRegistered()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            originalStamp,
+            repo.getFirstLaunchAtMillis(),
+            "An existing first_launch_at must survive every later start untouched",
+        )
+    }
+
+    // ============================================
     // Helper Functions
     // ============================================
 

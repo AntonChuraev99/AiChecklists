@@ -21,6 +21,9 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUs
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -329,20 +332,49 @@ class MainScreenViewModel(
         val checklistCount = repository.projects.first().size
         val totalFills = repository.getTotalAdditionalFillCount()
         val firstLaunchAt = userDataRepository.getFirstLaunchAtMillis()
-        val daysSinceInstall = if (firstLaunchAt > 0) {
-            ((currentTimeMillis() - firstLaunchAt) / (24 * 60 * 60 * 1000)).toInt()
+
+        val properties = mutableMapOf<String, Any>(
+            "is_premium" to userData.isPremium,
+            "checklist_count" to checklistCount,
+            "total_fills" to totalFills,
+        )
+
+        // `getFirstLaunchAtMillis() == 0` means UNKNOWN, not "installed today". Folding it into
+        // `days_since_install = 0` mints a fake day-0 cohort: on 2026-08-12 the property read 0 for
+        // 26 users against 0-2 real installs. An ABSENT property is filterable in Amplitude; a
+        // wrong one is indistinguishable from a real one, so publish nothing instead.
+        if (firstLaunchAt > 0) {
+            properties["days_since_install"] =
+                ((currentTimeMillis() - firstLaunchAt) / DAY_MILLIS).toInt()
         } else {
-            0
+            // Silent fallbacks must be greppable: after the rollout this line is the only way to
+            // tell "the install base is genuinely unknown for this user" from "the sync stopped
+            // running", which look identical in Amplitude (both are an absent property).
+            logger.warning(
+                TAG,
+                "syncUserProperties: first_launch_at unknown — omitting days_since_install and " +
+                    "install_date rather than claiming day 0",
+            )
         }
 
-        analyticsTracker.setUserProperties(
-            mapOf(
-                "is_premium" to userData.isPremium,
-                "checklist_count" to checklistCount,
-                "total_fills" to totalFills,
-                "days_since_install" to daysSinceInstall
-            )
-        )
+        analyticsTracker.setUserProperties(properties)
+
+        if (firstLaunchAt > 0) {
+            // The install DAY, so "who arrived on this date" is answerable — `days_since_install`
+            // alone cannot answer it, it changes with every session.
+            //
+            // set-ONCE, not set: this is derived on every main-screen open, so a plain write would
+            // let a later change of the source (repaired timestamp, restored backup) silently move
+            // the user into another install cohort, with nothing in the report revealing the move.
+            //
+            // UTC, deliberately not the device zone: the same install must not land on two
+            // different dates depending on where the phone happens to be.
+            val installDate = Instant.fromEpochMilliseconds(firstLaunchAt)
+                .toLocalDateTime(TimeZone.UTC)
+                .date
+                .toString()
+            analyticsTracker.setUserPropertiesOnce(mapOf("install_date" to installDate))
+        }
     }
 
     private fun handlePremiumOrCreditsClick() {
@@ -480,6 +512,9 @@ class MainScreenViewModel(
          * activation hero), so there is nothing worth syncing yet — keep the first-run quiet.
          */
         const val SYNC_BANNER_MIN_CHECKLISTS = 1
+
+        /** Whole-day divisor for `days_since_install`. */
+        const val DAY_MILLIS = 24L * 60 * 60 * 1000
 
         /** After this many lifetime dismissals the sync banner never appears again. */
         const val SYNC_BANNER_MAX_DISMISSALS = 3
