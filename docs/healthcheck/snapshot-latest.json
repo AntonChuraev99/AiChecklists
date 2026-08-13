@@ -1,31 +1,25 @@
 {
- "run_date": "2026-08-11",
- "prev_run": "2026-08-10",
- "delta_days": 1,
- "window": "7d = 08-04..08-11 · 30d = 07-12..08-11 · crashes 7d = 08-05..08-11",
+ "run_date": "2026-08-13",
+ "prev_run": "2026-08-11",
+ "delta_days": 2,
+ "window": "7d = 08-06..08-13 · 30d = 07-14..08-13 · crashes 7d = 08-07..08-13 · CSAT d90",
  "report_url": "https://claude.ai/code/artifact/7d659450-d640-479b-9496-bce69c27dc6b",
  "bot_filter": "ПОВЕДЕНЧЕСКИЙ сегмент products_load_failed = 0, окно сегмента = окну измерения. gp:products_load_failed НЕ существует. gp:userRole тоже нет ⇒ внутренние тестеры неотделимы.",
- "headline": "Прогон через сутки. ДВА HIGH прошлого прогона ЗАКРЫТЫ: (1) vc79 промоутнут до 100% и держит 0 FATAL / 0 ANR при crash-free 100% — теперь это РЕАЛЬНЫЙ ноль, а не 'нет данных'; (2) серверная половина релиза задеплоена, ревизия chat-agent-00024-xuk, подтверждено АРТЕФАКТОМ. Реклама (запрос владельца): Gisti_V3 кампания Gisti_EN_Tier1_v2_2026-08 за 09-10.08 дала 99 показов / 0 кликов / $0.01 при бюджете $2/день; цель-конверсия настроена ВЕРНО (Google Play install, primary, активна) — узкое место бюджет и Tier-1 гео, не настройка. 🆕 ПЕРВЫЙ органический клик в GSC (0 → 1). 🆕 /.git/config отдаёт 301 вместо 404 — side-effect canonical-фикса dd34beb6.",
+ "headline": "Техническое здоровье безупречно (FATAL 0, ANR 0, crash-free 100%, 0 пятисоток на 2085 вызовов) ИМЕННО ПОТОМУ, что нагрузки нет. 🔴 ГЛАВНОЕ: знаменатель `_active` разоблачён — Amplitude считает активными 80–121/сут, а экран открывают 3–21/сут (разрыв 5–27×, проверено главным лично через query_dataset). Все продуктовые доли на этом знаменателе занижены на порядок. AI-пути стоят: chat-agent 3.9 суток без реального запроса, classify 4.2 суток, generate 0 успешных за 7д, 0 сообщений в чат за 08-10..08-13. 21 сутки без покупки, 9 суток без тапа. 🟢 Единственное движение вверх — реклама: 499 показов / 5 кликов / 2 конверсии по $0.77 (было 99/0/0).",
  "notes": [
-  "🔴 ИНСТРУМЕНТ: Firebase MCP (mcp__plugin_firebase_firebase__*) в этой сессии НЕ ПОДКЛЮЧЁН вовсе — ни у главного, ни у субагента. Краши сняты через Firebase Console браузером (Claude in Chrome). Если MCP не вернётся, следующий прогон должен идти тем же путём, а НЕ репортить '0 крашей' по отсутствию данных.",
-  "ПРОВЕРЕНО ЛИЧНО: rollout production 1.19.0(79) status=completed, поля userFraction НЕТ (оно существует только у inProgress/halted) ⇒ 100%. Метод: edits().insert → tracks().list → edits().delete, без commit.",
-  "ПРОВЕРЕНО ЛИЧНО (браузер): Crashlytics 7д при СНЯТЫХ фильтрах (state=all, все типы): Crashes '- - -', ANRs '- - -', Non-fatals 435 (−37%) / 78 users (−12.4%), crash-free users 100%, crash-free sessions 100%. Ловушка 'фильтр state=open скрывает closed/muted' обойдена.",
-  "ПРОВЕРЕНО АРТЕФАКТОМ (субагент): chat_agent updateTime 2026-08-10T06:13:02Z, ревизия chat-agent-00024-xuk; в скачанном function-source.zip есть move_item (3026 регистрация / 3146 определение), _build_screen_context_block (3220), context_screen (3701, 3716); prompts_private.py 286 строк (не стаб).",
-  "НО: move_item / context_screen НИ РАЗУ не вызывались — grep по логам 0 совпадений; после деплоя единственная запись в chat-agent = CORS-preflight OPTIONS 204 от python-requests. Подтверждает, что vc79 руками так и не прогонялся.",
-  "МЕТОД: baseline CSAT всё это время мерился в окне d90, НЕ lifetime — на lifetime числа воронки выше (shown 49, opened 99, rating 123, chip_toggled 25). Зафиксировать: CSAT = d90.",
-  "МЕТОД: rc_error хранит ПОЛНЫЙ текст исключения, а не enum — фильтр по литералу 'not_authorized' возвращает пусто, нужен contains по подстроке.",
-  "МЕТОД: Amplitude пресеты 'Last N Days' возвращают N+1 дневных бакетов, последний — неполный день.",
-  "🆕 SEO: bangkok.gisti-ai.com по-прежнему в domain-ресурсе; доменный срез не чистый."
+  "🔴 ИНСТРУМЕНТ: Firebase MCP ВТОРОЙ прогон подряд НЕ ПОДКЛЮЧЁН — краши снова сняты через Firebase Console браузером. Считать это новой нормой, а не разовым сбоем.",
+  "ПРОВЕРЕНО ЛИЧНО (query_dataset, уники по дням 08-06..08-12): _active 97/121/104/99/81/108/80 · session_start 91/93/86/96/72/79/62 · screen_view 10/4/8/21/4/6/3. _active идёт вплотную к session_start и расходится со screen_view в 5–27×.",
+  "ПРОВЕРЕНО ЛИЧНО (код): SplashViewModel.kt:415-417 ставит setNewUserPending ОБОИМ армам с 2026-07-26 ⇒ утверждение субагента «контроль структурно недостижим» верно только для истории. Гейт починен, но событий нет вовсе.",
+  "ПРОВЕРЕНО ЛИЧНО (шаблон + код): activation_bundle_v1 в client-шаблоне = 'false', in-app дефолт RemoteConfigKeys.kt:144 = true ⇒ автоистечение #7 ~16.09 вернёт всех на шаблонный false и МОЛЧА ВЫКЛЮЧИТ бандл у 100%. Риск подтверждён замером, не памятью.",
+  "ПРОВЕРЕНО ЛИЧНО (curl): /mcp, /checklists, /privacy-policy отдают 301 (не 307) ⇒ landing-worker не откатился, canonical-фикс на месте.",
+  "МЕТОД (субагент, conf 95%): Amplitude `interval:30` схлопывает бакеты в КАЛЕНДАРНЫЕ МЕСЯЦЫ и расширяет диапазон ЗА `start`. Замер CSAT d90 на interval:30 дал 46/20/40/18/47, на interval:7 — 44/19/37/16/46; разница = данные 05-01..05-14, вне окна. Мерить на interval:7 или :1.",
+  "МЕТОД (субагент): недели в Amplitude размечены по ДАТЕ НАЧАЛА (Пн) ⇒ неделя 08-10 = 08-10..08-16, на 08-13 она 4/7, а НЕ полная.",
+  "МЕТОД (субагент): вызовы tool'ов chat_agent грепом по логам не измеряются в принципе — logger без хендлера пишет только от WARNING, успешный tool-call следа не оставляет. Только request_count.",
+  "ПЕРЕКЛАССИФИКАЦИЯ: бурст 08-09 (register_user 55 запросов с тайского /64, HeadlessChrome+ktor+python-urllib; chat-agent 8; chat-completion 4; transcribe-audio 1) — это СЕТЬ ВЛАДЕЛЬЦА, dev-прогон, не органика и не abuse. conf 85%.",
+  "Google Ads: модальное окно про политрекламу ЕС закрыто Escape БЕЗ выбора варианта (ответ = изменение настроек аккаунта). Всплывёт снова."
  ],
  "rollout": {
-  "production": {
-   "version": "1.19.0",
-   "code": 79,
-   "status": "completed",
-   "user_fraction": null,
-   "changed_since_prev": true,
-   "note": "БЫЛО inProgress 0.3 ⇒ промоутнут до 100% владельцем 10.08"
-  },
+  "production": { "version": "1.19.0", "code": 79, "status": "completed", "user_fraction": null, "changed_since_prev": false },
   "beta": "1.5 (6) completed",
   "alpha": "1.17.10 (60) completed",
   "internal": "1.17.10 (60) completed",
@@ -33,810 +27,464 @@
   "mutation": "НЕТ — edits().insert → tracks().list → edits().delete, без commit"
  },
  "crashes": {
-  "_SOURCE": "Firebase Console через браузер (MCP недоступен), 7д Aug 5–11, state=all, все типы",
+  "_SOURCE": "Firebase Console через браузер (MCP недоступен), 7д Aug 7–13, state=all, все типы",
   "crash_free_users": "100%",
-  "crash_free_sessions": "100%",
-  "fatal_7d": {
-   "n": 0,
-   "zero_kind": "РЕАЛЬНЫЙ НОЛЬ",
-   "conf": "95%",
-   "note": "подтверждён двумя независимыми индикаторами: % crash-free против живого потока + прочерк в Trends при 435 живых non-fatal рядом"
-  },
-  "anr_7d": {
-   "n": 0,
-   "zero_kind": "РЕАЛЬНЫЙ НОЛЬ",
-   "conf": "95%"
-  },
-  "nonfatal_7d": {
-   "events": 435,
-   "users": 78,
-   "delta_events": "−37%",
-   "delta_users": "−12.4%"
-  },
-  "new_issues": "НЕТ НОВЫХ — множество issue_id совпадает с baseline",
-  "top_nonfatal": {
-   "GaiException_EAI_NODATA@Dns.kt:50": {
-    "n": "182/62",
-    "prev": "228/65",
-    "verdict": "network benign"
-   },
-   "UnknownHost_cloudfunctions": {
-    "n": "57/17",
-    "prev": "81/19",
-    "verdict": "network"
-   },
-   "ECONNABORTED@Platform.kt:148": {
-    "n": "29/14",
-    "verdict": "network"
-   },
-   "SocketException_read@DefaultSocket.kt:124": {
-    "n": "25/17",
-    "verdict": "network"
-   },
-   "ktor_timeout_chat_completion": {
-    "n": "22/4",
-    "verdict": "network"
-   },
-   "FIS_AUTH_ERROR@GmsRpc": {
-    "n": "17/6",
-    "verdict": "FCM"
-   },
-   "Connection_reset@ConnectPlan.kt:351": {
-    "n": "14/8",
-    "verdict": "network"
-   },
-   "SocketTimeout30s@Platform.kt:148": {
-    "n": "12/6",
-    "verdict": "network"
-   },
-   "Http2_SETTINGS_preface": {
-    "n": "11/3",
-    "verdict": "network"
-   },
-   "LeftCompositionCancellation": {
-    "n": "10/3",
-    "verdict": "compose-noise"
-   },
-   "p13_left_composition": {
-    "n": "8/2",
-    "verdict": "compose-noise + R8-мангл"
-   },
-   "MISSING_INSTANCEID_SERVICE@GmsRpc.java:247": {
-    "n": "8/1",
-    "versions": "1.19.0",
-    "verdict": "client-induced dev-эмулятор без GMS"
-   },
-   "VoiceCallViewModel.releaseEngine": {
-    "n": "1/1",
-    "versions": "1.19.0",
-    "verdict": "client-induced dev sideload"
-   },
-   "registerPushToken_HTTP403@UserApiService.kt:270": {
-    "n": "2/1",
-    "versions": "1.18.6",
-    "verdict": "живой юзер, релизная сборка — свидетель работы R8-маппинга"
+  "fatal_7d": { "n": 0, "zero_kind": "РЕАЛЬНЫЙ НОЛЬ", "conf": "95%" },
+  "anr_7d": { "n": 0, "zero_kind": "РЕАЛЬНЫЙ НОЛЬ", "conf": "95%" },
+  "nonfatal_7d": { "events": 407, "users": 68, "prev": "435 / 78" },
+  "fatal_30d": {
+   "events": 6, "users": 4,
+   "note": "все 3 issue не выше 1.18.1, НИ ОДНО не достаёт до 1.19.0",
+   "issues": {
+    "libsqliteJni_UnsatisfiedLink": "4/2, теперь формально Closed 7/22/26, device-side, spread не рос",
+    "ActionTrampolineKt_launchTrampolineAction": "1/1, 1.16.2–1.18.1, тег Regressed. Стек целиком внутри androidx.glance ⇒ library-bug, до 1.19.0 не достаёт",
+    "ProxyBillingActivity_NPE": "1/1, замьючен владельцем 7/6/26"
    }
   },
-  "vc79_contamination": "ветка worktree-ai-voice-call собрана с теми же versionCode 79 / versionName 1.19.0 — Crashlytics не отделяет её от реальных юзеров. Обе строки на 1.19.0 = по одному устройству с признаками dev-сборки",
-  "play_vitals": "rows=0 при exit=0 ⇒ `не меряется` (ниже порога анонимизации ~470 активных). Скрипт исправен — тот же прогон вернул данные из errors:query"
+  "anr_30d": "12 событий / 3 users, все issue по 1/1, версии 1.17.4–1.18.3, ни одно не достаёт до 1.19.0. Классический паттерн «одно устройство с плохим cold-start», критерий пересмотра (расширение spread) НЕ выполнен",
+  "new_issues_on_1_19_0": {
+   "ChatAgentApiServiceImpl.kt:469": {
+    "n": "1/1",
+    "verdict": "НЕ ПОДТВЕРЖДЁН — вердикт our-bug не ставится",
+    "detail": "CancellationException StandaloneCoroutine. Файл содержит 417 строк — строки 469 не существует ни в HEAD, ни в релизном коммите cdaa7a05, ни в одном worktree (проверено субагентом). Механизм неверифицируем",
+    "action": "перепроверить следующим прогоном, если повторится с бóльшим объёмом"
+   },
+   "ConfigFetchHttpClient.java:382": { "n": "1/1", "verdict": "network — таймаут загрузки RC, известное семейство" }
+  },
+  "grew": { "SocketTimeout30s@Platform.kt:148": "12/6 → 19/9 (+58% событий), вердикт network" },
+  "improved": { "ECONNABORTED@Platform.kt:148": "29/14 → 17/9 (−41%)", "GaiException@Dns.kt:50": "182/62 → 174/58" },
+  "play_vitals": "rows=0 при HTTP 200 ⇒ `не меряется` (ниже порога анонимизации ~470 активных). errorIssues:search дал 5 остаточных issue по 1/1, все на vc61/65/66, ни одного на vc79",
+  "vc79_contamination": "держится — ветка worktree-ai-voice-call собрана с тем же versionCode 79 / versionName 1.19.0"
  },
  "backend": {
-  "_window": "2026-08-04 .. 08-11",
+  "_window": "2026-08-06T04:50 .. 08-13T04:50Z",
   "_source": "Monitoring API run.googleapis.com/request_count, ALIGN_SUM",
-  "totals_7d": {
-   "invocations": 2264,
-   "prev": 2318,
-   "delta": "−2.3%",
-   "non_2xx": 4,
-   "rate": "0.1767%",
-   "real_user_facing_errors": 0
-  },
-  "note": "прошлая дельта была −14.3% ⇒ падение вызовов выположилось",
+  "totals_7d": { "invocations": 2085, "prev": 2264, "delta": "−7.9%", "non_2xx": 4, "rate": "0.1918%", "real_user_facing_errors": 0, "5xx": 0 },
   "services": {
-   "register_push_token": {
-    "inv": 2058,
-    "prev": 2115,
-    "delta": "−2.7%"
-   },
-   "register_user": {
-    "inv": 126,
-    "prev": 126
-   },
-   "chat_agent": {
-    "inv": 34,
-    "prev": 33
-   },
-   "classify_chat_intent": {
-    "inv": 18,
-    "prev": 18
-   },
-   "chat_completion": {
-    "inv": 4,
-    "verdict": "DEAD 4-е окно"
-   },
-   "generate_checklist": {
-    "inv": 3
-   },
-   "link_google_account": {
-    "inv": 2,
-    "prev": 0,
-    "verdict": "вышел из нуля — 2 ktor POST 200 с одного IPv6 за 16 секунд 08-10T05:33, conf 40% что это ручная проба владельца"
-   },
-   "refill_premium_credits": {
-    "inv": 7
-   },
-   "send_promotions_batch": {
-    "inv": 7
-   },
-   "on_rc_event_created": {
-    "inv": 4
-   },
-   "transcribe_audio": {
-    "inv": 1
-   },
-   "analyze_and_fill_checklist": {
-    "inv": 0,
-    "verdict": "реальный ноль ЧЕТВЁРТОЕ окно — AI-Fill мёртв"
-   },
-   "get_credits_info": {
-    "inv": 0
-   },
-   "get_usage_stats": {
-    "inv": 0
-   },
-   "restore_credits_after_purchase": {
-    "inv": 0
-   }
+   "register_push_token": { "inv": 1896, "err": 0 },
+   "register_user": { "inv": 115, "err": 0, "note": "census; 55 из них — сеть владельца" },
+   "chat_agent": { "inv": 32, "err": 0, "last_real_request": "2026-08-09T07:5x" },
+   "classify_chat_intent": { "inv": 16, "err": "3×400 сканер", "last_success": "2026-08-08T12:50" },
+   "refill_premium_credits": { "inv": 7, "note": "cron жив 7/7 суток" },
+   "send_promotions_batch": { "inv": 7, "note": "cron жив 7/7 суток" },
+   "chat_completion": { "inv": 4, "verdict": "мёртв для органики, 5-е окно — все 4 в час бурста владельца" },
+   "on_rc_event_created": { "inv": 4 },
+   "link_google_account": { "inv": 2 },
+   "generate_checklist": { "inv": 1, "err": "1×429", "verdict": "ноль УСПЕШНЫХ вызовов за 7 суток" },
+   "transcribe_audio": { "inv": 1 },
+   "analyze_and_fill_checklist": { "inv": 0, "verdict": "реальный ноль ПЯТОЕ окно" },
+   "get_credits_info": { "inv": 0 },
+   "get_usage_stats": { "inv": 0 },
+   "restore_credits_after_purchase": { "inv": 0 }
   },
-  "not_functions": "reserve_credits / refund_credits / increment_usage — НЕ отдельные CF (404 на describe), это внутренние Python-функции в main.py (313/740/751)",
-  "new_signatures": "НЕТ. Оба non-2xx — те же записи, что в baseline: HTTP400 GET-на-POST @classify-chat-intent ×3 (abuse/bot, 08-08) и HTTP429 @generate-checklist ×1 (by-design, 08-06, латентность 9.99с). Латентность НЕ повторяется — за 5 суток пересечения окон единственный случай",
-  "DEPLOY_c12224ae": {
-   "status": "ЗАДЕПЛОЕН — HIGH прошлого прогона ЗАКРЫТ",
-   "revision": "chat-agent-00024-xuk",
-   "updateTime": "2026-08-10T06:13:02Z",
-   "proof": "артефакт function-source.zip скачан по generation, греп нашёл move_item + _build_screen_context_block + context_screen; prompts_private.py 286 строк",
-   "usage": "НОЛЬ вызовов новых инструментов за окно"
+  "new_signatures": "НЕТ. Оба non-2xx — те же записи baseline (429 @generate-checklist 08-06T22:32:55Z, 400×3 @classify-chat-intent 08-08T23:0x). С 08-08T23:03 — 4.2 суток вообще без non-2xx",
+  "N1_AI_PATHS_STOPPED": {
+   "severity": "HIGH", "conf": "95%",
+   "detail": "chat-agent 3.9 суток без реального запроса · classify 4.2 суток без успешного · generate-checklist 0 успешных за 7д · analyze-and-fill 0 пятое окно · chat-completion мёртв. Бек здоров ровно потому, что его почти не зовут"
+  },
+  "N2_GENERATE_ONLY_REQUEST_WAS_429": {
+   "severity": "MEDIUM", "conf": "75%",
+   "detail": "единственный за неделю запрос к генерации — отказ по лимиту. Технически by-design, содержательно — иллюстрация к lifetime-квоте (100 кредитов / 20 = 5 генераций навсегда)"
+  },
+  "N3_ORGANIC_REGISTRATIONS_DOWN": {
+   "severity": "MEDIUM", "conf": "65%",
+   "detail": "census register-user за вычетом ботов и сети владельца: 08-06:12 · 08-07:6 · 08-08:13 || 08-09:2 · 08-10:2 · 08-11:5 · 08-12:2 ⇒ 10.3/сут → 2.75/сут (−73%)",
+   "caveat": "семантика register_user не подтверждена; 10/сут не бьётся с 0–2 установками/сут из Play GCS; веб-трафик НЕ падал"
+  },
+  "BLINDSPOT_STDERR": {
+   "severity": "LOW-MEDIUM (было MEDIUM-HIGH)",
+   "last_line": "2026-07-31T05:51:40Z",
+   "silent_days": 13,
+   "hypothesis_a": "настоящий ноль, conf 92% (было 75%)",
+   "hypothesis_b": "пайплайн сломан деплоем 07-31, conf 8% (было 25%)",
+   "decisive_evidence": "ревизия chat-agent-00022-vun СОЗДАНА деплоем 07-31 в 05:14:37Z и выдала 3 stderr-строки в 05:51:40Z — через 37 минут после собственного деплоя. Деплой логирование не ломал",
+   "residual_risk": "живая ревизия chat-agent-00024-xuk не выдала ни одной прикладной строки НИКОГДА, но и не обслужила ни одного реального запроса ⇒ её error-логирование остаётся неверифицированным по benign-причине"
+  },
+  "DEPLOY_c12224ae_USAGE": {
+   "status": "ревизия chat-agent-00024-xuk за 3 суток обслужила РОВНО 1 запрос, и тот CORS-preflight 204",
+   "verdict": "ноль вызовов move_item / context_screen — дефект СПРОСА, не деплоя",
+   "method_note": "грепом по логам это в принципе не измеряется (см. notes)"
   },
   "SPLIT_MAIN_PY": {
-   "severity": "MEDIUM",
-   "snapshots": 3,
+   "severity": "MEDIUM", "snapshots": 3, "changed": false,
    "detail": "29.07 — register_user, link_google_account, restore_credits_after_purchase · 31.07 — 11 функций · 10.08 — только chat_agent",
    "consequence": "миграцию с gemini-2.5 катить на все 15 функций"
   },
-  "BLINDSPOT_STDERR": {
-   "severity": "MEDIUM-HIGH",
-   "last_line": "2026-07-31T05:51:40Z",
-   "silent_days": 11,
-   "hypothesis_a": "настоящий ноль, conf 75% (было 70%)",
-   "hypothesis_b": "пайплайн сломан деплоем 07-31, conf 25% (было 30%)",
-   "new_evidence": "модульный logger в main.py, 23 точки logger.exception/.error/.warning во всех хендлерах, без собственного handler (lastResort → stderr). Код БАЙТ-В-БАЙТ одинаков в снапшоте 29.07 и 10.08 ⇒ инфраструктура логирования не менялась и не объясняет начало тишины 31.07. Оба non-2xx обрабатываются ДО пользовательского try/except",
-   "why_not_higher": "естественный эксперимент (деплой 10.08) неинформативен — после него единственный запрос был CORS-preflight, до прикладного кода не доходит"
-  },
   "workers": {
    "deployments": {
-    "checklists": "67eb3d35 @08-10T06:35:23Z + 1fa21620 @07:09:02Z (БЫЛО 1508e484 @08-08)",
-    "gisti-landing": "2c1d0c3c @08-10T04:24:30Z (БЫЛО ece9efdd @07-22)",
+    "checklists": "🆕 03da8167 @08-11T05:47:24Z + 26054895 @08-11T07:02:23Z (текущий 100%)",
+    "gisti-landing": "2c1d0c3c @08-10T04:24:30Z без изменений",
     "gisti-mcp": "0d786b82 @07-28 без изменений"
    },
-   "traffic_24h": {
-    "gisti-mcp": "658 (549 success + 109 clientDisconnected)",
-    "gisti-landing": 315,
-    "checklists": 45,
-    "errors": 0
+   "traffic_24h": { "gisti-landing": 1250, "gisti-mcp": 338, "checklists": 123, "errors": 0 },
+   "traffic_7d": {
+    "gisti-landing": "118·110·748·207·301·366·769·510",
+    "gisti-mcp": "1153·1213·1137·1184·653·597·335·61",
+    "checklists": "112·43·191·66·62·40·123·10"
    },
-   "traffic_conf": "40% на дельты — одна точка day-over-day + известная ловушка семплирования по длине окна",
-   "waitUntil_cancelled": "109/24ч ≈ 4.5/час — воспроизводится в прежнем темпе, вердикт our-bug/framework LOW conf 50% не пересматриваю",
-   "SECURITY_PROBE_CHANGED": {
-    "severity": "LOW",
-    "conf": "95%",
-    "finding": "серия '6 прогонов байт-в-байт' СЛОМАНА: /.git/config теперь отдаёт 301 → /.git/config/ → 404, 0 байт. Раньше сразу 404",
-    "cause": "canonical-redirect из dd34beb6 не различает реальные страницы и сканер-пути; /.env и /wp-admin/install.php не задеты (у них есть 'расширение' в последнем сегменте)",
-    "impact": "итог безопасен — 0 байт, в конце 404. Но это side-effect свежего фикса, не намеренное поведение"
-   }
+   "W1_clientDisconnected_STOPPED": {
+    "severity": "MEDIUM", "conf": "80% факт / 45% причина",
+    "series": "08-06:431 · 08-07:401 · 08-08:348 · 08-09:373 · 08-10:118 · 08-11:125 · 08-12:0 · 08-13:0",
+    "verdict": "НЕ починка: gisti-mcp не передеплоивался с 07-28, код не менялся, и общий трафик упал 1150→335 ⇒ перестал ходить поллящий клиент",
+    "action": "переформулировать прежний вердикт our-bug/framework LOW conf 50% в not-reproducible-now, механизм (analytics.ts без waitUntil → DO в idle) НЕ подтверждён"
+   },
+   "W2_FOREIGN_WORKER": {
+    "severity": "LOW", "conf": "90%",
+    "detail": "bangkok-photo-spots-landing — ЧЕТВЁРТЫЙ воркер в том же CF-аккаунте, 331·187·84·38·61·6 за 7 суток. Объясняет bangkok.gisti-ai.com в доменном ресурсе GSC"
+   },
+   "W3_SECURITY_PROBE": "держится без изменений: /.git/config → 301 → /.git/config/ → 404 (0 байт); /.env и /wp-admin/install.php — прямой 404. Утечки нет"
   },
   "abuse": {
-   "verdict": "НЕ обнаружен, всплеска нет (общий трафик −2.3%)",
-   "A2_AdsBot_register_user": "воспроизводится, 8 попаданий, conf 85%",
-   "A3_ktor_AWS_52.11.208.27": "воспроизводится точно, 10 запросов, conf 90%",
-   "A1_IPv6_Jio_push_token": "НЕ воспроизводится — тот же /64 дал 1 попадание вместо 65. Вместо него другие IPv6-префиксы: 2402:3a80:4140:47d4::/64 = 49 хитов, 2405:204:3120:5c46::/64 = 28, 2a00:1110:131:5692::/64 = 26. LOW conf 35%",
-   "caveat": "gcloud logging read --limit=500 режет популяцию (426 строк из 2058 реальных вызовов) ⇒ это сэмпл, не census"
+   "verdict": "НЕ обнаружен, роста нет",
+   "A2_AdsBot_register_user": "8 попаданий, conf 90%",
+   "A3_ktor_AWS_52.11.208.27": "10 запросов, conf 90%",
+   "A1_IPv6_prefixes": "СНЯТА до not-a-finding (conf 80%) — это был тот же /64 владельца",
+   "scanner_400s": "3×400 GET-на-POST @classify-chat-intent с трёх IP (205.169.39.151, 205.169.39.0, 104.197.69.115) с подменными Chrome-UA. Кредит не тратится"
   },
-  "gemini_eol": {
-   "date": "2026-10-16",
-   "days_left": 66,
-   "state": "контроль server-A/B по-прежнему на 2.5"
-  }
+  "gemini_eol": { "date": "2026-10-16", "days_left": 64, "state": "контроль server-A/B по-прежнему на 2.5" }
  },
  "ab": {
-  "_delta_vs_prev": "три слоя байт-в-байт, 8-й прогон подряд",
-  "client_rc": {
-   "version": "v20",
-   "updated": "2026-06-18T08:55:33Z",
-   "params": 20,
-   "conditions": 1
-  },
-  "server_rc": {
-   "version": "v3",
-   "updated": "2026-07-22T09:51:33Z",
-   "params": 8
-  },
-  "firestore": {
-   "updated": "2026-07-09",
-   "ai_action_cost": 20,
-   "initial_ai_credits": 100,
-   "premium_daily_credits_cap": 300
-  },
-  "PaywallsV1_expired": "остаётся EXPIRED с 2026-08-08T10:30:19Z, без изменений",
-  "running": {
-   "CurrentOfferTrial_#6": "57д",
-   "activation_bundle_v1_#7": "54д",
-   "OnboardingABC_#8": "48д"
-  },
-  "next_expiries": {
-   "#6": "~2026-09-13",
-   "#7": "~2026-09-16",
-   "#8": "~2026-09-22"
+  "_delta_vs_prev": "три слоя байт-в-байт, 9-й прогон подряд",
+  "client_rc": { "version": "v20", "updated": "2026-06-18T08:55:33Z", "params": 20, "conditions": 1 },
+  "server_rc": { "version": "v3", "updated": "2026-07-22T09:51:33Z", "params": 8 },
+  "firestore": { "updated": "2026-07-09T07:10:30Z", "ai_action_cost": 20, "initial_ai_credits": 100, "premium_daily_credits_cap": 300 },
+  "PaywallsV1_expired": "EXPIRED с 2026-08-08T10:30:19Z, без изменений",
+  "running": { "CurrentOfferTrial_#6": "59д", "activation_bundle_v1_#7": "56д", "OnboardingABC_#8": "50д" },
+  "next_expiries": { "#6": "~2026-09-13", "#7": "~2026-09-16", "#8": "~2026-09-22" },
+  "TEMPLATE_VS_INAPP_DEFAULT_DRIFT": {
+   "severity": "MEDIUM-HIGH", "conf": "HIGH — проверено главным лично",
+   "activation_bundle_v1": { "template": "false", "in_app_default": "true (RemoteConfigKeys.kt:144)" },
+   "consequence_1": "автоистечение #7 ~16.09 вернёт 100% на шаблонный false ⇒ activation-бандл МОЛЧА ВЫКЛЮЧИТСЯ у всех",
+   "consequence_2": "промах RC уводит юзера в ЛЕЧЕНИЕ, а не в контроль — так и задумано комментарием в коде, но системно смещает сплит в сторону true",
+   "onboarding": { "template": "default", "web_condition": "none" },
+   "paywall_variant": { "template": "features_v1" }
   },
   "arms_observed": {
    "OnboardingABC_#8": {
-    "raw_d30": {
-     "slides": 164,
-     "none": 84,
-     "ai_welcome": 75,
-     "total": 323
-    },
-    "shares": "49.5 / 25.4 / 22.7",
+    "raw_d30": { "slides": 126, "none": 77, "ai_welcome": 63, "total": 266 },
+    "shares_raw": "47.4 / 28.9 / 23.7",
+    "cleaned_d30": { "none": 72, "ai_welcome": 58, "slides": 39, "total": 169 },
     "verdict": "ИСПРАВЕН",
-    "anomaly_low_conf": "1 событие арма interactive за since-start (n=833) — вероятно stale RC-cache от эксперимента #4"
+    "low_conf_note": "бот-фильтр режет непропорционально много 'slides' — наблюдение, не вывод, conf LOW"
    },
    "activation_bundle_v1_#7": {
-    "since_start": {
-     "true": 83,
-     "false": 0
-    },
-    "days": 54,
-    "verdict": "контроля в данных нет за ВСЁ время; на n=83 'мало данных' объясняет плохо — смотреть в код, может ли arm принять false",
+    "since_start": { "true": 83, "false": 0 },
+    "days": 56,
+    "delta": "НИ ОДНОГО нового события ни одного арма за 2 суток — полный флатлайн с ~08-05",
+    "verdict_corrected": "гейт ПОЧИНЕН 2026-07-26 (setNewUserPending обоим армам, SplashViewModel.kt:415-417) — 'контроль структурно недостижим' верно только для истории ДО этой даты. false технически достижим, но контроль не подталкивается к AI-созданию (получает статический seed), плюс in-app дефолт true уводит RC-промахи в лечение, плюс создания встали вовсе",
     "still_true": "останавливать НЕЛЬЗЯ — при пустом контроле остановка молча выключит бандл у 100%"
    },
    "CurrentOfferTrial_#6": {
-    "exposure": "31.2%",
-    "balance": "50.2:49.8"
+    "exposure": "31.25% (baseline 31.2%, совпадает)",
+    "balance": "~59:41 устойчиво на 4 днях подряд (baseline 50.2:49.8)",
+    "verdict": "НОВОЕ: дрейф, не поломка — в начале июля перекос был противоположным (~40:60). severity LOW-MEDIUM, conf MEDIUM, следить"
    },
-   "server_ai_model_FIXED_METHOD": {
-    "by_uniques": {
-     "control": 35,
-     "variant_b": 34
-    },
-    "balance": "50.7:49.3",
-    "verdict": "ИСПРАВЕН — перекос 73:27 по _active-totals был населением × вовлечённостью, не рандомизацией",
-    "conf": "medium (n=69)"
+   "server_ai_model": {
+    "by_uniques_d30": { "control": 8, "variant_b": 15, "n": 23 },
+    "prev": "control 35 / variant_b 34, n≈69",
+    "verdict": "объём упал втрое — следствие обвала AI-путей. На n=23 баланс НЕ читается",
+    "caveat": "снято только по ai_analyze_completed; арм несут ещё 4 потока"
    },
-   "push_ab_arm_FIXED_METHOD": {
-    "by_recipients": {
-     "b": 50,
-     "control": 46,
-     "a": 34,
-     "n": 130
-    },
-    "shares": "38.5 / 35.4 / 26.2",
-    "chi2": "≈3.62 против крит. 5.99 ⇒ НЕ ЗНАЧИМО",
-    "by_sends": "b 169 (41.5%) / control 120 / a 118, n=407 — идентично baseline",
-    "verdict": "перекос по ОТПРАВКАМ воспроизводится 3-й раз, но это артефакт sticky-арма и разночастотных юзеров; рандомизатор исправен"
+   "push_ab_arm": {
+    "by_sends_d30": { "b": 185, "control": 134, "a": 129, "n": 448 },
+    "shares": "41.3 / 29.9 / 28.8",
+    "verdict": "известный артефакт sticky-арма воспроизводится точно (41.5% → 41.3%), НЕ новая проблема",
+    "gap": "разбивка по получателям (baseline n=130, χ²≈3.62) в этот прогон НЕ воспроизводилась"
    }
   },
-  "rc_value_empty": {
-   "week_0803": "11.1% (n=45) — точно совпадает с baseline",
-   "week_0810": "нет данных (2 из 7 дней, n=2)"
-  },
-  "no_test_exists_keys": [
-   "push_timing_arm",
-   "max_weekly_checklists_free",
-   "max_attachments_per_item_free"
-  ],
-  "dead_template_keys": [
-   "templates_json",
-   "update_feed_json",
-   "feature_paywall_enabled"
-  ],
-  "nav_v2_gate": "ГЕЙТА НЕТ — nav_v2_arm удалён 08-04, DEFAULT_VARIANT = V2, RC не опрашивается"
+  "rc_value_empty": { "week_0806_0813": "11.9% (True 5 / False 37, n=42)", "prev": "11.1% (n=45)", "verdict": "стабильно в пределах шума" },
+  "no_test_exists_keys": ["push_timing_arm", "max_weekly_checklists_free", "max_attachments_per_item_free"],
+  "dead_template_keys": ["templates_json", "update_feed_json", "feature_paywall_enabled"],
+  "nav_v2_gate": "ГЕЙТА НЕТ — ключ отсутствует в обоих шаблонах, RC не опрашивается, оболочка из сохранённой настройки. Только исторические комментарии в коде"
  },
  "events": {
-  "d30_raw_cleaned": {
-   "ai_chat_message_sent": {
-    "raw": 219,
-    "cleaned": 142,
-    "prev_raw": 250
+  "🔴 ACTIVE_DENOMINATOR_IS_FICTION": {
+   "severity": "CRITICAL", "conf": "95% — ПРОВЕРЕНО ГЛАВНЫМ ЛИЧНО",
+   "uniques_by_day_08_06_to_08_12": {
+    "_active": [97, 121, 104, 99, 81, 108, 80],
+    "session_start": [91, 93, 86, 96, 72, 79, 62],
+    "screen_view": [10, 4, 8, 21, 4, 6, 3]
    },
-   "ai_chat_response_received": {
-    "raw": 261,
-    "cleaned": 173,
-    "prev_raw": 298
-   },
-   "ai_chat_thumb_down": {
-    "raw": 11,
-    "cleaned": 5,
-    "prev_raw": 18
-   },
-   "ai_chat_thumb_up": {
-    "raw": 12,
-    "cleaned": 8,
-    "prev_raw": 18
-   },
-   "purchase_failed": {
-    "raw": 6,
-    "cleaned": 5,
-    "prev_raw": 12
-   },
-   "purchase_button_clicked": {
-    "raw": 41,
-    "cleaned": 33,
-    "prev_raw": 52
-   },
-   "paywall_shown": {
-    "raw": 190,
-    "cleaned": 60,
-    "prev_raw": 217
-   },
-   "csat_shown": {
-    "raw": 40,
-    "cleaned": 25,
-    "prev_raw": 42
-   },
-   "csat_dismissed": {
-    "raw": 30,
-    "cleaned": 20,
-    "prev_raw": 32
-   },
-   "session_start": {
-    "raw": 14706,
-    "cleaned": 12785,
-    "prev_raw": 14792
-   }
+   "ratio": "5–27×, медиана ~15×",
+   "mechanism": "_active идёт вплотную к session_start, а тот с 07-04 = счётчик стартов процесса (AlarmManager), не визитов. Analytics.kt:55, trackingSessionEvents = true",
+   "consequence": "ВСЕ продуктовые доли на этом знаменателе занижены примерно на порядок. «Проникновение чата 2.96%» = 7 отправителей / 210 фантомных активных; на вовлечённых ≈17%. Тренд падения реален, УРОВЕНЬ — артефакт",
+   "action": "знаменателем брать уники screen_view (или любого foreground-события). Память session-start-step-invalidates-activation-metric ОБНОВЛЕНА этим прогоном"
   },
-  "d30_uniform_decline_explained": "равномерное снижение raw по ВСЕМ строкам — механика скользящего окна: выпал высокообъёмный 07-12, добавился неполный 08-11. НЕ новый регрессионный сигнал, conf medium-high",
-  "d7_raw": {
-   "ai_chat_message_sent": 19,
-   "ai_chat_response_received": 28,
-   "thumb_down": 1,
-   "thumb_up": 1,
-   "purchase_failed": 0,
-   "purchase_button_clicked": 1,
-   "paywall_shown": 19,
-   "csat_shown": 3,
-   "csat_dismissed": 2,
-   "session_start": 2765
+  "d30_raw_cleaned": {
+   "ai_chat_message_sent": { "raw": 162, "cleaned": 99, "prev_raw": 219 },
+   "ai_chat_response_received": { "raw": 196, "cleaned": 123, "prev_raw": 261 },
+   "ai_chat_thumb_down": { "raw": 11, "cleaned": 5, "prev_raw": 11 },
+   "ai_chat_thumb_up": { "raw": 11, "cleaned": 7, "prev_raw": 12 },
+   "purchase_failed": { "raw": 3, "cleaned": 2, "prev_raw": 6 },
+   "purchase_button_clicked": { "raw": 29, "cleaned": 21, "prev_raw": 41 },
+   "paywall_shown": { "raw": 154, "cleaned": 43, "prev_raw": 190 },
+   "csat_shown": { "raw": 34, "cleaned": 21, "prev_raw": 40 },
+   "csat_dismissed": { "raw": 24, "cleaned": 14, "prev_raw": 30 },
+   "session_start": { "raw": 14464, "cleaned": 13019, "prev_raw": 14706 }
+  },
+  "d7_raw_cleaned": {
+   "ai_chat_message_sent": "17 (16)",
+   "ai_chat_response_received": "26 (25)",
+   "thumb_down": "1 (1)",
+   "thumb_up": "1 (1)",
+   "purchase_failed": "0 (0) — реальный ноль",
+   "purchase_button_clicked": "0 (0) — реальный ноль",
+   "paywall_shown": "17 (6) — бот-фильтр режет 65%",
+   "csat_shown": "2 (2)",
+   "csat_dismissed": "1 (1)",
+   "session_start": "2511 (2502)"
   },
   "AI_CHAT_PENETRATION": {
-   "weekly": [
-    {
-     "w": "06-15",
-     "active": 123,
-     "senders": 16,
-     "pct": "13.0%"
-    },
-    {
-     "w": "06-22",
-     "active": 168,
-     "senders": 48,
-     "pct": "28.6%"
-    },
-    {
-     "w": "06-29",
-     "active": 231,
-     "senders": 59,
-     "pct": "25.5%"
-    },
-    {
-     "w": "07-06",
-     "active": 328,
-     "senders": 73,
-     "pct": "22.3%"
-    },
-    {
-     "w": "07-13",
-     "active": 278,
-     "senders": 35,
-     "pct": "12.6%"
-    },
-    {
-     "w": "07-20",
-     "active": 276,
-     "senders": 27,
-     "pct": "9.8%"
-    },
-    {
-     "w": "07-27",
-     "active": 204,
-     "senders": 11,
-     "pct": "5.4%"
-    },
-    {
-     "w": "08-03",
-     "active": 203,
-     "senders": 6,
-     "pct": "2.96%",
-     "note": "ревизия вверх с 201/5 = 2.5% — поздний доезд, не новый сигнал"
-    }
+   "weekly_on_old_denominator": [
+    { "w": "07-20", "active": 277, "senders": 27, "pct": "9.7%" },
+    { "w": "07-27", "active": 206, "senders": 11, "pct": "5.3%" },
+    { "w": "08-03", "active": 210, "senders": 7, "pct": "3.33%", "note": "ревизия вверх с 6/203 = 2.96% — поздний доезд" },
+    { "w": "08-10", "active": 149, "senders": 0, "pct": "0.00%", "note": "НЕПОЛНАЯ (4/7 дней). Ноль отправителей за 08-10, 08-11, 08-12, 08-13 подряд", "conf": "75% что реальный ноль" }
    ],
-   "week_0810": "НЕТ ДАННЫХ — только 2 дня окна (active 70, senders 0). Не использовать как точку тренда"
+   "denominator_warning": "ряд посчитан на `_active` ⇒ УРОВЕНЬ занижен на порядок, см. ACTIVE_DENOMINATOR_IS_FICTION",
+   "precedent": "08-07 (пт) тоже дал 0 сообщений при 4 вовлечённых — форма не новая, длина новая"
   },
   "activation": {
-   "week_0803": "3.45% (было 3.48%)",
-   "verdict": "плато, новой ПОЛНОЙ недели нет"
+   "creators_over_active": [
+    { "w": "07-20", "pct": "4.3%", "n": "12/277" },
+    { "w": "07-27", "pct": "3.9%", "n": "8/206" },
+    { "w": "08-03", "pct": "3.81%", "n": "8/210", "note": "доехало вверх с 3.45%" },
+    { "w": "08-10", "pct": "0%", "n": "0/149", "note": "неполная неделя" }
+   ],
+   "verdict": "плато 4-ю неделю в коридоре 3.8–4.3%, conf 80%. Тот же знаменатель-фикция"
   },
   "vc79_series": {
-   "nav_shell_shown_by_day": {
-    "08-08": 8,
-    "08-09": 2,
-    "08-10": 21,
-    "08-11": 0,
-    "web_none": "14 на 08-09"
+   "WATCH_ITEM_RESOLVED": {
+    "prev_finding": "checklist_created = 0 и inbox_quick_added = 0 на 1.19.0 при 21 сессии, conf 35%",
+    "verdict": "🟢 СНЯТ — НЕ дефект v2-навигации. severity HIGH → LOW, conf 75%",
+    "evidence": [
+     "разбивка по версии: ноль у ВСЕХ версий сразу — 1.19.0=0, 1.18.7=0, 1.18.6=0, (none)/web=0, по всем трём событиям. Неделей раньше те же версии давали 7/4/2 и 15/3/2",
+     "прецедент 08-07, когда 1.19.0 ещё не был на 100%",
+     "база 2–6 вовлечённых/сут: ожидание 2–8 созданий за 3 дня, ноль в пределах Пуассона на нижней границе"
+    ],
+    "against_late_arrival": "значения за 08-11 за двое суток не изменились ни на единицу",
+    "caveat": "nav_shell_shown за 08-09 читался как 2, сейчас 16 (×8) — либо ошибка baseline (conf 70%), либо разовый доезд"
    },
-   "nav_tab_selected": "16 / 12 / 21 за три дня = 49",
-   "nav_create_fab_tapped": {
-    "fab": 7,
-    "inline_row": 3
-   },
-   "quick_add_opened": "5 / 3 / 0",
-   "screen_view_4d": {
-    "inbox": 39,
-    "main": 36,
-    "projects": 26,
-    "checklist_detail": 23,
-    "overview": 20,
-    "chat": 11
-   },
-   "main_plus_projects": 62,
-   "ai_chat_opened_double_emit": "НЕТ — август 35 против screen_view:chat 35, ratio 1.00 (было 31/31)",
-   "nav_variant_selected": "отсутствует в таксономии ⇒ 0 opt-out в Классический вид",
-   "csat_shown_1_19_0": 0,
-   "WATCH_ITEM": {
-    "finding": "checklist_created = 0 И inbox_quick_added = 0 на 1.19.0 за 08-10 и 08-11 при 21 сессии nav_shell_shown и 21 nav_tab_selected. Веб в том же окне: 4 и 18",
-    "conf": "35% — на 21 сессии неотличимо от шума",
-    "action": "перепроверить следующим прогоном с бóльшим числом дней"
-   }
+   "nav_shell_shown_by_day": { "08-08": 8, "08-09": 16, "08-10": 22, "08-11": 0, "08-12": 1, "08-13": 0 },
+   "nav_tab_selected": "16 / 12 / 21 / 0 / 0 / 0 — первые три не изменились ни на единицу",
+   "nav_create_fab_tapped": { "fab": 7, "inline_row": 3, "sum": 10, "verdict": "полная неподвижность, ни одного тапа с 08-10" },
+   "ai_chat_opened_double_emit": "НЕТ — 23 против screen_view:chat 23, ratio 1.00 ТРЕТИЙ прогон подряд",
+   "screen_view_extended": { "inbox": 40, "main": 43, "projects": 26, "checklist_detail": 23, "overview": 20, "chat": 11 },
+   "main_plus_projects": 69,
+   "csat_shown_1_19_0": 0
   },
   "purchases": {
    "d7": "0 — реальный ноль",
    "last_purchase_completed": "2026-07-23",
-   "days_without_purchase": 19,
+   "days_without_purchase": 21,
+   "purchases_since_07_01": ["07-02", "07-06", "07-12", "07-23"],
+   "last_button_click": "2026-08-04 (дал purchase_cancelled)",
+   "days_without_any_tap": 9,
+   "taps_in_last_17_days": 1,
    "last_purchase_failed": "2026-07-19",
-   "days_clean": 23,
-   "button_clicked": "ровно ОДИН тап 08-04 за 18 суток, дал purchase_cancelled",
-   "purchase_failed_d30_reasons": {
-    "NetworkError": 3,
-    "PurchaseNotAllowedError": 3,
-    "user_cancelled": 0,
-    "window": "все 6 между 07-16 и 07-19, с 07-20 реальный ноль"
-   },
-   "has_free_trial_on_button_clicked": {
-    "False": 41,
-    "True": 0
-   },
-   "has_free_trial_on_completed_failed": "код НА МЕСТЕ (PaywallViewModel.kt:463 и :514, покрыт тестами) — отсутствие в таксономии = отсутствие событий, `нет данных`",
-   "is_repeat_tap": {
-    "(none)": 40,
-    "False": 1,
-    "True": 0,
-    "note": "свойство ставится только когда покупка уже in-flight ⇒ 40/41 без значения. Минорная несогласованность таксономии"
-   }
-  },
-  "RC_NOT_AUTHORIZED_RESOLVED": {
-   "status": "ОТКРЫТЫЙ ВОПРОС ПРОШЛОГО ПРОГОНА ЗАКРЫТ",
-   "by_version_d30": {
-    "1.17.16": 18,
-    "1.17.13": 13,
-    "1.17.17": 4,
-    "1.17.15": 2,
-    "1.17.4": 1,
-    "1.17.5": 1,
-    "1.17.7": 1,
-    "total": 40
-   },
-   "on_1_18_and_1_19": 0,
-   "denominator": "126 событий onboarding_rc_resolved на 1.18.x/1.19.0 в том же окне",
-   "verdict": "фикс 1.18 ДЕРЖИТСЯ полностью, conf HIGH. 'Натяжение' снято",
-   "method_note": "rc_error = полный текст исключения, не enum ⇒ фильтр по литералу не работает, нужен contains",
-   "denominator_caveat": "1.17.x = 50.9% объёма onboarding_rc_resolved (не 4.8% как доля активных) — разные знаменатели, не путать"
+   "days_clean": 25,
+   "paywall_to_tap_d7": "0 тапов на 6 cleaned показов",
+   "purchase_failed_d30_reasons": { "NetworkError": 2, "PurchaseNotAllowedError": 1, "note": "падение 6→3 = сдвиг окна, НЕ улучшение" },
+   "has_free_trial": "проверять не на чем — 0 событий purchase_button_clicked за d7"
   }
  },
  "dead_instrumentation": {
-  "_result": "категория «не меряется» — по-прежнему ОДНА запись",
-  "create_screen_events": {
-   "exists": false,
-   "zero_kind": "НЕ МЕРЯЕТСЯ",
-   "code_grep": "absent"
-  },
-  "form_variant": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found AnalyticsEvents.kt:830",
-   "note": "PR #28 влит в транк 08-10, релиза с ним ещё не было — ожидание релиза, НЕ пропущенная инструментация"
-  },
-  "list_kind": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found AnalyticsEvents.kt:845"
-  },
-  "recurring_limit_hit": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :222"
-  },
-  "nav_variant_selected": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :661"
-  },
-  "attachment_added": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :601"
-  },
-  "gallery_deeplink_failed": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :189"
-  },
-  "inbox_task_moved": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :780"
-  },
-  "inbox_task_deleted": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :783"
-  },
-  "repeat_schedule_cancelled": {
-   "exists": false,
-   "zero_kind": "нет данных",
-   "code_grep": "found :221"
+  "_result": "категория «не меряется» — по-прежнему ОДНА запись. За 2 суток НИЧЕГО не появилось, номера строк совпали 1-в-1 ⇒ кода никто не трогал",
+  "create_screen_events": { "exists": false, "zero_kind": "НЕ МЕРЯЕТСЯ", "code_grep": "absent" },
+  "form_variant": { "exists": false, "zero_kind": "нет данных", "code_grep": "found AnalyticsEvents.kt:830", "note": "PR #28 в транке с 08-10, релиза не было" },
+  "list_kind": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :845" },
+  "recurring_limit_hit": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :222 + 3 эмиттера + тесты" },
+  "nav_variant_selected": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :661", "note": "ни одного opt-out в Классический вид за всё время, conf 80%" },
+  "attachment_added": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :601 + ChecklistDetailViewModel.kt:3370 + InboxViewModel.kt:1634" },
+  "gallery_deeplink_failed": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :189" },
+  "inbox_task_moved": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :780" },
+  "inbox_task_deleted": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :783" },
+  "repeat_schedule_cancelled": { "exists": false, "zero_kind": "нет данных", "code_grep": "found :221" },
+  "INBOX_TRIO_SHARPENED": {
+   "severity": "MEDIUM", "conf": "55%",
+   "detail": "attachment_added / inbox_task_moved / inbox_task_deleted — код на месте с 07-26, Inbox набрал 40 просмотров, событий ноль. Либо путь недостижим, либо база 2–6 человек не доходит",
+   "not_checked": "условие ветвления над эмитами НЕ читалось — честный пробел прогона"
   },
   "csat_chip_toggled": {
-   "exists": true,
-   "d90": 0,
-   "zero_kind": "реальный ноль",
-   "code_grep": "found :521",
-   "DIAGNOSIS_CHANGED": "при расширении окна за 90 дней найдено 25 исторических событий (до середины мая 2026) ⇒ чипы РАБОТАЛИ раньше и замолчали позже. Диагноз меняется с 'код никогда не срабатывал' на кандидата на git-blame. conf 60%"
+   "exists": true, "d90": 0, "zero_kind": "реальный ноль", "code_grep": "found AnalyticsEvents.kt:563",
+   "DIAGNOSIS_QUESTIONED": "🔴 гипотеза прошлого прогона «25 исторических событий до середины мая ⇒ чипы работали раньше» ПОД СОМНЕНИЕМ, conf 50%: она снята на interval:30, который тянет данные за границу start. Перед git-blame перемерить на interval:7 с явным start в апреле"
   },
-  "folder_deleted": {
-   "exists": true,
-   "d30": 3,
-   "note": "все 08-06, новых с прошлого прогона нет"
-  }
+  "folder_deleted": { "note": "в этот прогон НЕ перезапрашивался — цифра не выдумывается" }
  },
  "csat": {
-  "_METHOD_FIX": "baseline мерился в окне d90, НЕ lifetime — зафиксировать для следующих прогонов",
-  "d90_raw": {
-   "shown": 44,
-   "opened": 18,
-   "rating_selected": 37,
-   "chip_toggled": 0,
-   "submitted": 16,
-   "dismissed": 45,
-   "review_tapped": 8,
-   "review_completed": 8
-  },
-  "prev_d90": {
-   "shown": 44,
-   "opened": 11,
-   "rating_selected": 35,
-   "submitted": 16,
-   "dismissed": 38,
-   "review_tapped": 6,
-   "review_completed": 8
-  },
-  "correct_denominator": 62,
-  "rates": {
-   "закрыто": "72.6% (было 69.1%)",
-   "рейтинг": "59.7% (было 63.6%)",
-   "досабмичено": "25.8% (было 29.1%)"
-  },
-  "verdict": "воронка плоская; прирост opened/dismissed при неизменном shown = поздний доезд внутри окна, не суточный рост, conf medium",
-  "shown_1_19_0": 0,
-  "legacy_share": "1.17.x всё ещё половина экспозиции"
+  "_METHOD": "d90 = 05-15..08-13, interval:7 (НЕ interval:30 — тот расширяет окно)",
+  "d90_raw": { "shown": 44, "opened": 19, "rating_selected": 37, "chip_toggled": 0, "submitted": 16, "dismissed": 46, "review_tapped": 8, "review_completed": 8 },
+  "prev_d90": { "shown": 44, "opened": 18, "rating_selected": 37, "submitted": 16, "dismissed": 45, "review_tapped": 8, "review_completed": 8 },
+  "correct_denominator": 63,
+  "rates": { "закрыто": "73.0% (было 72.6)", "рейтинг": "58.7% (было 59.7)", "досабмичено": "25.4% (было 25.8)" },
+  "verdict": "воронка ЗАМОРОЖЕНА, все три в пределах ±1 п.п., conf 95%",
+  "exposure_by_week": { "07-13": 15, "07-20": 8, "07-27": 9, "08-03": 3, "08-10": 0, "verdict": "схлопнулась вчетверо за 2 недели — следствие обвала базы, не логики показа, conf 80%" },
+  "by_version": { "1.17.x": 23, "1.18.x": 21, "1.19.0": 0, "note": "1.17.x = 52.3% экспозиции, апдейт-хвост не рассасывается, conf 95%" },
+  "shown_1_19_0": { "n": 0, "conf": "65%", "note": "изолировать эффект v2 нельзя — на 08-10..08-13 показов ноль у ВСЕХ версий" }
  },
  "chat_feedback": {
-  "thumbs_d30_raw": {
-   "up": 12,
-   "down": 11,
-   "responses": 261,
-   "down_rate": "4.21%",
-   "up_down": "1.09:1"
-  },
-  "thumbs_d30_cleaned": {
-   "up": 8,
-   "down": 5,
-   "up_down": "1.6:1",
-   "conf": "низкая-средняя, n=13"
-  },
-  "texts_30d": {
-   "(нет текста)": 5,
+  "thumbs_d30_raw": { "up": 11, "down": 11, "responses": 196, "down_rate": "5.61%" },
+  "thumbs_d30_cleaned": { "up": 7, "down": 5, "responses": 123, "down_rate": "4.07%" },
+  "rate_growth_verdict": "рост доли — эффект сокращения ЗНАМЕНАТЕЛЯ, не ухудшение ответов. severity LOW, conf 60%",
+  "d7": "1 thumb_down + 1 thumb_up, оба 08-08 — выборки нет",
+  "texts_d90_verbatim": {
+   "(нет текста)": 15,
    "todo": 3,
-   "total_ai_chat_feedback": 8
+   "Баг": 1,
+   "Не добавил в папку": 1,
+   "Неправильно взял текст": 1,
+   "Должен искать внутри чеклиста папку и туда добавлять , папка не обязательно должна так же назывались ИИ должен понять про что речь": 1,
+   "Нужно научить": 1
   },
   "new_texts_since_prev": 0,
-  "new_texts_streak": "ТРЕТИЙ прогон подряд нулевого притока",
-  "routed_layer_d90": {
-   "unknown": 27,
-   "FullChat": 12,
-   "Classifier": 2,
-   "note": "ПОБАЙТОВО идентично baseline"
-  },
-  "layer_mix_current_builds": {
-   "FullChat": 12,
-   "Classifier": 2,
-   "Local": 0
-  },
-  "is_repeat_tap_on_thumbdown": {
-   "(none)": 10,
-   "False": 1,
-   "True": 0
-  },
-  "fixer_verdict": "РАНО — приток нулевой, routed_layer не изменился, чинить нечего"
+  "new_texts_streak": "ЧЕТВЁРТЫЙ прогон подряд нулевого притока, conf 90%",
+  "only_cluster": "«ПАПКА» — 3 из 4 содержательных жалоб об одном: чат не находит существующую папку внутри чек-листа и не кладёт туда элемент. Все три июнь/июль, свежее нет",
+  "routed_layer_d90": { "unknown": 27, "FullChat": 12, "Classifier": 2, "Local": 0, "note": "ПОБАЙТОВО идентично baseline, третий прогон" },
+  "routed_layer_on_thumb_up": { "unknown": 44, "FullChat": 8, "Classifier": 0 },
+  "fixer_verdict": "РАНО, conf 90% — обоснование УЖЕСТОЧИЛОСЬ: за 08-10..08-13 в чат не отправлено ни одного сообщения ⇒ красный тест писался бы против июньских данных, зелёный не подтвердился бы в проде. Кластер «папка» можно взять отдельной TDD-задачей, но не прогоном скилла"
  },
  "seo": {
   "performance_domain_28d": {
-   "clicks": 1,
-   "prev_clicks": 0,
-   "impressions": 146,
-   "prev": 140,
-   "ctr": "0.7%",
-   "position": 37.8,
-   "prev_position": 38.3,
-   "queries": 31,
-   "prev_queries": 30,
-   "data_range": "19.07–08.08"
+   "clicks": 1, "prev_clicks": 1,
+   "impressions": 161, "prev": 146,
+   "ctr": "0.6%", "position": 36.1, "prev_position": 37.8,
+   "queries": 32, "prev_queries": 31,
+   "data_range": "19.07–10.08"
   },
-  "MILESTONE": "🆕 ПЕРВЫЙ КЛИК ЗА ВСЮ ИСТОРИЮ — ряд '0 кликов при ненулевых показах' сломан. conf 95% на факте, 40% на значимости",
+  "position_trend": "38.3 → 37.8 → 36.1 — улучшается третий замер подряд при растущих показах",
+  "THE_ONE_CLICK": "пришёл на /checklists/fitness/gym-workout-checklist/ (1 клик / 5 показов) — то есть первый клик за историю дало КОНТЕНТНОЕ SEO, а не бренд",
+  "top_pages": {
+   "/checklists/fitness/gym-workout-checklist/": "1 клик / 5 показов",
+   "/": "0 / 63",
+   "/checklists/health/dental-visit-checklist/": "0 / 13",
+   "/mcp (без слэша)": "0 / 8",
+   "app.gisti-ai.com/": "0 / 8",
+   "/checklists/groceries/pantry-staples-checklist/": "0 / 8",
+   "/hi/checklists/travel/5-day-paris-packing-list/": "0 / 3"
+  },
   "top_queries": {
-   "brand": [
-    "gisti 10",
-    "giste 4",
-    "gistei 2"
-   ],
-   "generic": [
-    "patient dental checklist 8",
-    "pantry supplies checklist 6",
-    "cia packing list college 3",
-    "shopping list access 3",
-    "dentist checklist 3",
-    "fitness checklist 2",
-    "मासिक बजट 2"
-   ]
+   "brand": ["gisti 13", "giste 5", "gistei 2"],
+   "generic": ["patient dental checklist 8", "pantry supplies checklist 6", "cia packing list college 3", "shopping list access 3", "dentist checklist 3", "fitness checklist 2", "मासिक बजट 2"]
   },
-  "verdict": "позиция 37.8 = по-прежнему RANKING-GAP (авторитет домена, 0 беклинков), НЕ поломка индексации/robots/sitemap. НЕ перерешивать",
-  "FOREIGN_SUBDOMAIN": "bangkok.gisti-ai.com остаётся в domain-ресурсе — доменный срез не чистый",
-  "not_checked_this_run": "url-prefix и /hi/ ресурсы, индексация, sitemap — за сутки при лаге отчёта 3 дня движения быть не может; снят только domain-ресурс"
+  "indexing": {
+   "indexed": 215, "excluded": 21,
+   "reasons": { "redirect": 3, "blocked_robots": 2, "discovered_not_indexed": 12, "crawled_not_indexed": 1, "dup_no_canonical": 2, "dup_google_chose_other": 1 },
+   "verdict": "состав ровно ожидаемый. dup_google_chose_other = 1 при валидации «Начато» — ожидание пере-сканирования, НЕ регрессия",
+   "curl_check": "/mcp, /checklists, /privacy-policy → 301 (не 307) ⇒ воркер не откатился"
+  },
+  "verdict": "позиция 36.1 = по-прежнему RANKING-GAP (авторитет домена, 0 беклинков), НЕ поломка индексации/robots/sitemap. НЕ перерешивать",
+  "FOREIGN_SUBDOMAIN": "bangkok.gisti-ai.com — источник найден: bangkok-photo-spots-landing, четвёртый воркер в том же CF-аккаунте",
+  "not_checked_this_run": "url-prefix и /hi/ ресурсы, sitemap, точная доля hi (в топ-10 одна hi-страница с 3 показами из 161)"
  },
  "ads": {
   "_SOURCE": "Google Ads UI через Claude in Chrome, аккаунт churaevanton@gmail.com, ТОЛЬКО ЧТЕНИЕ",
-  "_SCOPE": "владелец попросил смотреть ТОЛЬКО Gisti_V3_todoist_style; Gisti_V2 остановлен и из скоупа исключён",
+  "_SCOPE": "владелец просил смотреть ТОЛЬКО Gisti_V3_todoist_style",
   "account": "Gisti_V3_todoist_style · 359-150-8046 · ocid 8464264537",
-  "campaign": {
-   "name": "Gisti_EN_Tier1_v2_2026-08",
-   "type": "Приложение",
-   "start": "2026-08-09",
-   "end": null,
-   "budget": "$2.00/день",
-   "bidding": "Максимум конверсий, целевая цена за конверсию НЕ задана",
-   "networks": "Google Поиск; Поисковые партнёры; YouTube; КМС",
-   "language": "Английский",
-   "locations": "Australia; Canada; (ещё 2) — Tier-1",
-   "devices": "Все",
-   "schedule": "Весь день",
-   "status": "Обучение стратегии назначения ставок"
-  },
-  "performance_09_10_08": {
-   "impressions": 99,
-   "clicks": 0,
-   "ctr": "0.00%",
-   "cost": "$0.01",
-   "conversions": 0,
-   "note": "период 09–10.08 = вся жизнь кампании; за 30д те же числа"
+  "campaign": { "name": "Gisti_EN_Tier1_v2_2026-08", "start": "2026-08-09", "budget": "$2.00/день", "status": "Обучение стратегии назначения ставок", "optimization_score": "92.2%" },
+  "🟢 BREAKTHROUGH": {
+   "period": "09–12.08 (вся жизнь кампании)",
+   "impressions": 499, "prev": 99,
+   "clicks": 5, "prev": 0,
+   "ctr": "1.00%",
+   "conversions": 2, "prev": 0,
+   "cost_per_conversion": "$0.77",
+   "cost": "$1.55", "prev": "$0.01",
+   "conversion_rate": "4.17%",
+   "conversion_rate_note": "посчитан НЕ от кликов (2/5 = 40%), а от взаимодействий (~48) — в app-кампаниях норма, YouTube и КМС дают взаимодействия без клика"
   },
   "billing": {
-   "available": "$9.26",
-   "last_payment": "$10.00 @2026-08-08, Visa 8660, предоплата",
-   "net_cost_august": "$0.74"
+   "available": "$7.14", "prev": "$9.26",
+   "net_cost_august": "$2.86", "prev": "$0.74",
+   "last_payment": "$10.00 @2026-08-08, Visa 8660",
+   "burn": "ровно $2.12 за 2 суток ⇒ $1.06/сутки при лимите $2.00 — БЮДЖЕТ НЕ ВЫБИРАЕТСЯ ПОЛНОСТЬЮ"
   },
-  "COST_DISCREPANCY": {
-   "finding": "кампания показывает $0.01, billing — $0.74 чистой стоимости за август",
-   "hypothesis": "отчёты по кампаниям не realtime, разница приходится на 11.08",
-   "conf": "70%",
-   "action": "если разрыв сохранится через сутки — вопрос к атрибуции расхода"
+  "COST_DISCREPANCY_RESOLVED": {
+   "prev_finding": "кампания $0.01 против биллинга $0.74, гипотеза «не realtime» conf 70%",
+   "now": "кампания $1.55 против биллинга $2.86 за август; разрыв $1.31 объясняется тем же лагом плюс расходом 13.08, ещё не доехавшим в отчёт",
+   "verdict": "гипотеза подтверждается — биллинг движется согласованно с отчётом, просто раньше него"
   },
-  "CONVERSION_GOAL": {
-   "status": "НАСТРОЕНА ВЕРНО — менять нечего, ничего не менял",
-   "action": "Установки приложения «Gisti - ИИ Чеклисты (Android)» (2026-08-09T13:59:24.480)",
-   "source": "Мобильное приложение (Google Play)",
-   "tracking_status": "Активно",
-   "optimization": "Основные (primary)",
-   "counting": "Одна",
-   "click_window": "30 дней",
-   "account_level_goal": "Да",
-   "category": "Скачивания (Цель по умолчанию на уровне аккаунта)",
-   "conversions": 0,
-   "note": "0 конверсий производно от 0 кликов, а не признак несвязанной цели"
+  "CONVERSION_GOAL": "не перепроверялась в этот прогон — на 08-11 подтверждено: «Установки приложения (Android)», источник Google Play, primary, окно клика 30 дней, отслеживание активно",
+  "DIAGNOSIS_UPDATED": {
+   "prev": "узкое место — бюджет и гео, кампания не наберёт конверсий для выхода из обучения, conf 85%",
+   "now": "диагноз ДЕРЖИТСЯ (кампания всё ещё в обучении), но СМЯГЧАЕТСЯ: выборка набралась быстрее ожидаемого — показы ×5 за двое суток, конверсии пошли. Фактический расход $1.06/сутки НИЖЕ лимита ⇒ потолок сейчас не только в деньгах, но и в доступном инвентаре под текущую ставку",
+   "owner_decision": "поднимать бюджет сейчас, пока стратегия учится, ИЛИ дать добрать выборку на текущем лимите"
   },
-  "account_blockers": "«Сейчас нет задач, ожидающих выполнения» — модерация пройдена, блокеров нет",
-  "DIAGNOSIS": {
-   "verdict": "узкое место — БЮДЖЕТ и ГЕО, не настройка",
-   "reasoning": "App-кампании выходят из learning примерно на 10 конверсиях/день; $2/день на US·UK·CA·AU этого объёма не дают в принципе ⇒ кампания будет сидеть в обучении неограниченно долго. 'Максимум конверсий' без целевой цены при таком бюджете дополнительно занижает ставку",
-   "conf": "85%",
-   "options": "поднять дневной бюджет ЛИБО сузить гео до одной страны для плотности"
-  }
+  "NOT_VERIFIED": "атрибуция «2 конверсии Ads ↔ фактические установки Play» — GCS-экспорт отстаёт на несколько суток, колонки utm_source в его CSV нет вовсе",
+  "UI_BLOCKER": "модальное окно про политрекламу ЕС закрыто Escape без выбора — ответ на него меняет настройки аккаунта, скилл только читает"
  },
  "verification_records": {
-  "_result_this_run": "0 refuted · 0 новых confirmed · статусы не менялись за сутки",
-  "pending_manual": [
-   "sync-reminder-fullscreen",
-   "android-trial-freephase-eligible-ondevice",
-   "gallery-deeplink-no-duplicate-checklists"
-  ],
+  "_result_this_run": "0 refuted · 0 новых confirmed · 5 записей обновлены (checked: 2026-08-13)",
+  "WRITE_BACK": "ВЫПОЛНЕН. Хук protected-branch-guard сначала заблокировал правку docs/active/*.md (файлы gitignored ⇒ в worktree их нет, а master защищён); владелец РАЗРЕШИЛ явно в чате, флаг .claude/.allow-protected-branch-edits создан на время правок и СНЯТ сразу после. Обновлены: mcp-canonical-301 и app-deeplinks-nofollow (pending → too-early), android-trial-flag-appears, play-referrer-attribution, r8-viewmode-sync-anomaly (checked → 2026-08-13). Frontmatter всех четырёх файлов перепроверен парсером YAML. seen.json пополнен 8 новыми записями (100 ключей).",
   "too_early": {
-   "android-trial-flag-appears": "блокер = отсутствие покупок (19 суток), не инструментация",
-   "play-referrer-attribution": "блокер = выборка (4 acquisitions), колонки utm_source в CSV нет вовсе",
-   "r8-viewmode-sync-anomaly": "критерий признан НЕФАЛЬСИФИЦИРУЕМЫМ на прошлом прогоне, baseline/success не правил",
-   "seo-canonical-307-fix": "earliest 2026-08-24 и 2026-09-07 — не наступил"
-  }
+   "android-trial-flag-appears": "блокер = отсутствие покупок (21 сутки), не инструментация",
+   "play-referrer-attribution": "блокер = выборка; колонки utm_source в CSV нет вовсе",
+   "r8-viewmode-sync-anomaly": "критерий признан НЕФАЛЬСИФИЦИРУЕМЫМ, baseline/success не правил",
+   "mcp-canonical-301": "earliest 2026-08-24 не наступил. Промежуточно: шаг 1 критерия ПРОЙДЕН (301, не 307); причина держится на 1 странице, валидация «Начато»",
+   "app-deeplinks-nofollow": "earliest 2026-09-07 не наступил"
+  },
+  "pending_manual": ["sync-reminder-fullscreen", "android-trial-freephase-eligible-ondevice"]
  },
  "owner_hands": [
-  "РЕКЛАМА: поднять дневной бюджет Gisti_EN_Tier1_v2_2026-08 либо сузить гео до одной страны — при $2/день на 4 Tier-1 кампания не наберёт конверсий для выхода из обучения",
-  "vc79 на 100% так и НЕ прогонялся руками ни на устройстве, ни на web :9090 — новые инструменты чата (move_item, context_screen) задеплоены, но ни разу не вызывались",
+  "РЕКЛАМА — РЕШЕНИЕ: кампания доказала работоспособность (2 конверсии по $0.77). Поднимать бюджет сейчас или дать добрать выборку на $2/день? Фактический расход $1.06/сутки, лимит не выбирается",
+  "🔴 16.09 — автоистечение activation_bundle_v1: шаблон несёт false, in-app дефолт true ⇒ бандл МОЛЧА ВЫКЛЮЧИТСЯ у 100%. Проверено замером. Календарь: #6 ~13.09 · #7 ~16.09 · #8 ~22.09",
+  "Знаменатель метрик: пока доли считаются на `_active`, они занижены на порядок. Перевести на уники screen_view",
+  "vc79 руками так и НЕ прогонялся — move_item и context_screen задеплоены 10.08 и за 3 суток не вызывались ни разу",
   "Пере-бампнуть worktree-ai-voice-call с versionCode 79 — телеметрия vc79 остаётся загрязнённой",
-  "Календарь автоистечений Firebase A/B: #6 ~13.09, #7 ~16.09, #8 ~22.09. Для #7 истечение молча выключит activation-бандл у 100%",
-  "activation_bundle_v1: 83 события treatment и 0 control за 54 дня — посмотреть в код, может ли переменная арма принять false",
-  "/.git/config на лендинге отдаёт 301 вместо 404 — побочный эффект dd34beb6, итог безопасен, но поведение стоит осознать",
-  "bangkok.gisti-ai.com в domain-ресурсе GSC — решить, разделять ли ресурсы",
-  "gemini-2.5 EOL 2026-10-16 (66 дней) — миграцию катить на ВСЕ 15 функций, деплой точечный",
-  "docs/todos/ — 93 файла при лимите 20",
-  "Firebase MCP не подключён в сессии Claude Code — краши пришлось снимать браузером"
+  "gemini-2.5 EOL 2026-10-16 (64 дня) — миграцию катить на ВСЕ 15 функций, деплой точечный",
+  "docs/todos/ — 93 файла при лимите 20"
  ],
  "deltas_this_run": {
   "fix_confirmed": [],
   "fix_refuted": [],
-  "resolved": [
-   "vc79 промоутнут до 100% — 0 FATAL / 0 ANR теперь РЕАЛЬНЫЙ ноль (crash-free users и sessions 100%)",
-   "серверная половина релиза ЗАДЕПЛОЕНА — chat-agent-00024-xuk, подтверждено артефактом",
-   "rc_error not_authorized разложен по версии — фикс 1.18 держится, ноль на 1.18.x/1.19.0",
-   "перекос push_ab_arm снят как артефакт единицы измерения (по получателям χ² не значим)",
-   "server ai_model по уникам 50.7:49.3 — рандомизатор исправен",
-   "ai_chat_opened двойного эмита нет второй прогон подряд (ratio 1.00)"
-  ],
   "new": [
-   "РЕКЛАМА: Gisti_V3 — 99 показов, 0 кликов, $0.01 за двое суток; цель настроена верно, узкое место бюджет $2/день на Tier-1",
-   "SEO: ПЕРВЫЙ органический клик (0 → 1), позиция 37.8, показы 146",
-   "LOW: /.git/config отдаёт 301 вместо 404 — side-effect canonical-фикса dd34beb6, серия 6 прогонов сломана",
-   "MEDIUM: диагноз csat_chip_toggled сменился — 25 событий старше 90 дней, чипы работали раньше",
-   "WATCH conf 35%: на 1.19.0 ноль checklist_created и inbox_quick_added за 08-10/08-11 при 21 сессии"
+   "CRITICAL: знаменатель `_active` завышен в 5–27× — реальная база 3–21 вовлечённых/сут (проверено лично)",
+   "HIGH: AI-пути остановились все сразу — chat-agent 3.9 суток, classify 4.2 суток, generate 0 успешных за 7д",
+   "🟢 РЕКЛАМА: 499 показов / 5 кликов / 2 конверсии по $0.77 (было 99/0/0)",
+   "MEDIUM: органические register_user 10.3/сут → 2.75/сут (−73%)",
+   "MEDIUM-HIGH: шаблон activation_bundle_v1=false против in-app true ⇒ риск автоистечения доказан",
+   "MEDIUM (метод): Amplitude interval:30 расширяет окно за start — портит любые d90/d30",
+   "MEDIUM: CurrentOfferTrial баланс уехал 50:50 → 59:41",
+   "LOW: bangkok-photo-spots-landing — 4-й воркер в CF-аккаунте, источник bangkok.gisti-ai.com",
+   "2 новых non-fatal на 1.19.0 по 1 событию (ChatAgentApiServiceImpl.kt:469 — механизм НЕ подтверждён; ConfigFetchHttpClient — network)"
   ],
   "shifted": [
-   "бек 2318 → 2264 (−2.3%), падение выположилось после −14.3%",
-   "non-fatal 435 (−37%), users 78 (−12.4%)",
-   "link_google_account 0 → 2",
-   "stderr blindspot: веса A 70→75%, B 30→25%",
-   "три новых деплоя воркеров 08-10 (checklists ×2, gisti-landing ×1)"
+   "BLINDSPOT_STDERR: гипотеза B 25% → 8%, решающее доказательство найдено",
+   "clientDisconnected на gisti-mcp 431/сут → 0, но это падение нагрузки, не починка",
+   "бек 2264 → 2085 (−7.9%)",
+   "non-fatal 435/78 → 407/68",
+   "SocketTimeout30s@Platform.kt:148 12/6 → 19/9 (+58%)",
+   "SEO позиция 37.8 → 36.1, показы 146 → 161",
+   "покупки: 19 → 21 суток без покупки, 9 суток без единого тапа",
+   "gisti-landing трафик 315 → 1250/24ч",
+   "два новых деплоя воркера checklists 08-11"
+  ],
+  "resolved": [
+   "WATCH-item «1.19.0 ломает создание чек-листов» СНЯТ — ноль у всех версий сразу, включая web",
+   "IPv6-префиксы на push_token переклассифицированы в not-a-finding (сеть владельца)"
   ],
   "unchanged": [
-   "три слоя RC байт-в-байт (8-й прогон)",
+   "три слоя RC байт-в-байт (9-й прогон)",
+   "rollout 1.19.0 100% completed, FATAL и ANR — реальные нули, crash-free 100%",
    "PaywallsV1 EXPIRED",
-   "routed_layer идентичен побайтово",
-   "новых текстов чат-фидбека 0 (3-й прогон)",
-   "новых крашей нет, новых сигнатур на беке нет",
-   "abuse не обнаружен",
-   "analyze_and_fill_checklist = 0 (4-е окно)",
-   "категория «не меряется» — одна запись"
+   "routed_layer идентичен побайтово (3-й прогон)",
+   "новых текстов чат-фидбека 0 (4-й прогон)",
+   "CSAT-воронка заморожена ±1 п.п.",
+   "новых сигнатур на беке нет, abuse не обнаружен",
+   "analyze_and_fill_checklist = 0 (5-е окно)",
+   "категория «не меряется» — одна запись",
+   "SPLIT_MAIN_PY 3 снапшота без изменений",
+   "/.git/config 301→404 держится"
   ]
  },
  "method_notes_for_next_run": [
-  "Firebase MCP может отсутствовать — путь через Firebase Console браузером рабочий: снять фильтры Event type и Issue state, читать блок Trends (Crashes / Non-fatals / ANRs) и crash-free проценты",
-  "CSAT мерить в d90 — baseline построен именно так",
-  "rc_error фильтровать по contains, не по литералу",
-  "Amplitude 'Last N Days' даёт N+1 бакетов, последний неполный",
-  "push_ab_arm и server ai_model мерить ПО УНИКАМ, метод зафиксирован",
-  "перепроверить WATCH: checklist_created на 1.19.0 при большем числе дней",
-  "docs/healthcheck/ ОТСЛЕЖИВАЕТСЯ git (не gitignored, вопреки общему правилу про docs/) ⇒ снапшот едет через worktree + PR, как прошлые прогоны. Писать его Write'ом по master нельзя — PreToolUse-хук protected-branch-guard заблокирует."
+  "Firebase MCP отсутствует ВТОРОЙ прогон — планировать браузерный путь сразу, не тратить время на попытку MCP",
+  "Amplitude мерить на interval:1 или :7. НИКОГДА interval:30 — он схлопывает в календарные месяцы И расширяет диапазон за start",
+  "Недели размечены по дате НАЧАЛА (Пн) — неделя 08-10 полна только с 08-17",
+  "Знаменатель продуктовых долей — уники screen_view, НЕ _active и НЕ session_start",
+  "CSAT мерить в d90 на interval:7",
+  "Вызовы tool'ов chat_agent грепом по логам не проверяются — только request_count по ревизии",
+  "Перепроверить: csat_chip_toggled «25 исторических» на interval:7 с явным start в апреле; ChatAgentApiServiceImpl.kt:469 если повторится; условие ветвления над inbox_task_moved/deleted",
+  "docs/active/*.md gitignored ⇒ в worktree их НЕТ, а хук protected-branch-guard блокирует правку в master. Рабочий путь (применён 08-13 с явного разрешения владельца): попросить разрешение → создать .claude/.allow-protected-branch-edits → внести правки → СНЯТЬ флаг сразу. Сам флаг не выставлять",
+  "docs/healthcheck/ ОТСЛЕЖИВАЕТСЯ git ⇒ снапшот едет через worktree + PR"
  ]
 }
