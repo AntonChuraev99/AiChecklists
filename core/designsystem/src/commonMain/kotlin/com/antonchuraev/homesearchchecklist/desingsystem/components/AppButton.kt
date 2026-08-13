@@ -18,10 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 
 @Composable
 fun AppButton(
@@ -30,7 +33,7 @@ fun AppButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
-    shape: Shape = MaterialTheme.shapes.small,
+    shape: Shape = AppShapeTokens.Button,
     loading: Boolean = false,
 ) {
     Button(
@@ -70,6 +73,32 @@ fun AppButton(
     }
 }
 
+/**
+ * The outlined, second-rank action.
+ *
+ * ## [accentColor] — why an outlined button needs to know what it is standing on
+ * By default this button belongs to no single palette: its outline is `colorScheme.primary` (blue)
+ * while M3 paints its label `onSurfaceVariant` (neutral grey). On the app's own page background
+ * that reads fine, because grey-on-cream is the page's own text colour and the blue outline is the
+ * app accent. Drop the very same button onto a **tonal container** and both halves become foreign
+ * at once — on the Inbox error state's `errorContainer` it rendered a `#1565C0` outline and a
+ * `#49454F` label on `#FFDAD6` pink, i.e. three unrelated palettes inside one 100dp control.
+ *
+ * [accentColor] is the fix, and it is opt-in rather than a new default on purpose: defaulting the
+ * label to `primary` would repaint it on all eight existing call sites, none of which this change
+ * has looked at. [Color.Unspecified] therefore means "leave today's rendering exactly as it is",
+ * and a caller sitting on a tonal surface passes that surface's paired `on*Container` role so the
+ * outline and the label both come from the block they are inside.
+ *
+ * ⛔ Not read from `LocalContentColor` automatically: [Surface] sets that to the container's
+ * content colour, which sounds like the right source until a button placed on the plain page
+ * background silently turns `onSurface` — i.e. every existing call site would change. The colour
+ * is passed because the decision belongs to the call site, which is the thing that knows it is
+ * inside a coloured block.
+ *
+ * @param accentColor outline AND label colour. [Color.Unspecified] keeps the default
+ *   primary-outline / neutral-label pairing.
+ */
 @Composable
 fun AppButtonSecondary(
     text: String,
@@ -77,14 +106,23 @@ fun AppButtonSecondary(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
-    shape: Shape = MaterialTheme.shapes.small,
+    shape: Shape = AppShapeTokens.Button,
+    accentColor: Color = Color.Unspecified,
 ) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.height(AppDimens.ButtonHeight),
         enabled = enabled,
         shape = shape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        colors = if (accentColor.isSpecified) {
+            ButtonDefaults.outlinedButtonColors(contentColor = accentColor)
+        } else {
+            ButtonDefaults.outlinedButtonColors()
+        },
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (accentColor.isSpecified) accentColor else MaterialTheme.colorScheme.primary,
+        ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
     ) {
         if (icon != null) {
@@ -128,7 +166,7 @@ fun AppButtonDestructive(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = MaterialTheme.shapes.small,
+    shape: Shape = AppShapeTokens.Button,
 ) {
     Button(
         onClick = onClick,

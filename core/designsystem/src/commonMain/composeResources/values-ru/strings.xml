@@ -1487,6 +1487,15 @@
     <string name="inbox_display_sort_manual">Вручную</string>
     <string name="inbox_display_sort_name">По названию</string>
     <string name="inbox_display_sort_priority">По важности</string>
+    <string name="inbox_display_group_by_date">Группировать по дате</string>
+
+    <!-- Заголовки секций списка задач -->
+    <string name="inbox_section_overdue">Просрочено</string>
+    <string name="inbox_section_today">Сегодня</string>
+    <string name="inbox_section_upcoming">Предстоит</string>
+    <string name="inbox_section_anytime">Без даты</string>
+
+    <string name="inbox_error_retry">Повторить</string>
 
     <!-- Таб «Проекты» -->
     <string name="projects_title">Проекты</string>
@@ -1563,4 +1572,47 @@
          значение приходит из Remote Config, и согласовать окончание заранее нельзя. -->
     <string name="create_limit_reached_title">Проектов на бесплатном тарифе: %1$d</string>
     <string name="create_limit_reached_description">Перейдите на Премиум для безлимитных проектов или удалите тот, который больше не нужен.</string>
+
+    <!-- ─── Приглашение к разбору ────────────────────────────────────────────────────────────
+         Намеренно без числа задач без срока: счётчик долга растёт быстрее, чем его разбирают, и
+         превращается в упрёк — это работает против самой фичи. -->
+    <string name="plan_nudge_title">Разберите день с Gisti</string>
+    <string name="plan_nudge_subtitle">По одной задаче за раз</string>
+
+    <!-- ─── Метки срока (DueLabelFormatter) ──────────────────────────────────────────────────
+         Порядок «день — месяц» задаётся здесь, а не в Kotlin: due_date переставляет аргументы
+         (%2$s %1$s), поэтому получается «14 сент.», а не «сент. 14». -->
+    <string name="due_today">Сегодня %1$s</string>
+    <string name="due_tomorrow">Завтра %1$s</string>
+    <string name="due_weekday">%1$s %2$s</string>
+    <!-- %1$s = месяц, %2$s = число; в русском они идут в обратном порядке. -->
+    <string name="due_date">%2$s %1$s</string>
+    <!-- Перед временем нужен предлог, перед датой — нет. Это и есть причина двух отдельных
+         ключей: «Просрочено в 09:00», но «Просрочено 14 сент.». -->
+    <string name="due_overdue_time">Просрочено в %1$s</string>
+    <string name="due_overdue_day">Просрочено %1$s</string>
+    <string name="due_someday">Когда-нибудь</string>
+    <string name="due_repeat_daily">Ежедневно %1$s</string>
+    <string name="due_repeat_weekly">%1$s %2$s</string>
+    <string name="due_repeat_weekly_named">Еженедельно %1$s %2$s</string>
+    <string name="due_repeat_weekly_any">Еженедельно %1$s</string>
+    <string name="due_repeat_monthly">Ежемесячно %1$s</string>
+    <string name="due_repeat_yearly">Ежегодно %1$s</string>
+    <string name="due_absolute_date_time">%1$s, %2$s</string>
+    <string name="due_missed">Пропущено (%1$s)</string>
+
+    <!-- Сокращённые названия месяцев — родительный падеж, как и полные: они стоят только после
+         числа («14 сент.»). -->
+    <string name="month_abbr_jan">янв.</string>
+    <string name="month_abbr_feb">февр.</string>
+    <string name="month_abbr_mar">марта</string>
+    <string name="month_abbr_apr">апр.</string>
+    <string name="month_abbr_may">мая</string>
+    <string name="month_abbr_jun">июня</string>
+    <string name="month_abbr_jul">июля</string>
+    <string name="month_abbr_aug">авг.</string>
+    <string name="month_abbr_sep">сент.</string>
+    <string name="month_abbr_oct">окт.</string>
+    <string name="month_abbr_nov">нояб.</string>
+    <string name="month_abbr_dec">дек.</string>
 </resources>

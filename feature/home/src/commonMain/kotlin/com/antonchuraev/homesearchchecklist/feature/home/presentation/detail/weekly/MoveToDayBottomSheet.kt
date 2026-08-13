@@ -26,12 +26,14 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.cancel
 import aichecklists.core.designsystem.generated.resources.selected
 import aichecklists.core.designsystem.generated.resources.weekly_move_to_day_title
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -59,8 +61,12 @@ internal fun MoveToDayBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = AppDimens.CardElevation,
+        // Level 4 "Modal" of the depth ladder: a modal sheet is separated by its scrim, not by
+        // depth, so it carries no elevation — and it steps ONE container away from the page rather
+        // than sharing the page's `surface`, which is what lets a card inside it (level 1) still
+        // read as raised above the sheet.
+        containerColor = AppSurface.modal(),
+        tonalElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier

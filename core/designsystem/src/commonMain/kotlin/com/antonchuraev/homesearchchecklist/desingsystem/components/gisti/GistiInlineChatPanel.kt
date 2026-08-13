@@ -89,6 +89,8 @@ import aichecklists.core.designsystem.generated.resources.chat_panel_collapse
 import aichecklists.core.designsystem.generated.resources.chat_panel_help_description
 import aichecklists.core.designsystem.generated.resources.chat_panel_open_full
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppElevation
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import org.jetbrains.compose.resources.stringResource
 
@@ -208,11 +210,21 @@ fun GistiInlineChatPanel(
                     // "страшные цвета" the user reported). In dark the shadow is invisible against a
                     // dark surface, so a hairline top border (outlineVariant) separates the dock from
                     // the content behind it.
-                    color = MaterialTheme.colorScheme.surface,
+                    // Depth kept, now named: this is level 3 "Floating" of the ladder, the one level
+                    // that still casts a shadow, and the 8dp it always used IS AppElevation.FloatingPanel.
+                    // Dark paints no shadow at all and is carried by the ring instead — 1dp, the
+                    // ladder's hairline weight, because a 0.5dp stroke lands on a sub-pixel and renders
+                    // at half strength (or not at all) depending on density.
+                    // The container role is the ladder's Floating level, NOT plain `surface`: the panel
+                    // and GistiChatDock are the same level and were drifting apart in tone (dock already
+                    // sat on surfaceContainerLowest). AppSurface.floating() keeps the "clean white, no
+                    // tonal overlay" intent above intact in light — surfaceContainerLowest IS #FFFFFF —
+                    // while dark gets the one step up the ladder prescribes instead of the page colour.
+                    color = AppSurface.floating(),
                     tonalElevation = 0.dp,
-                    shadowElevation = if (isDark) 0.dp else 8.dp,
+                    shadowElevation = AppElevation.shadowInLight(AppElevation.FloatingPanel),
                     border = if (isDark) {
-                        BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     } else {
                         null
                     },

@@ -27,7 +27,10 @@ object AppDimens {
     val IconSizeXxl = 64.dp
 
     // Card
-    val CardElevation = 2.dp
+    // NOTE: there is deliberately no CardElevation token. Depth is expressed by surface tone
+    // (see AppSurface), and the single layer that still casts a shadow owns its own depths in
+    // AppElevation. A generic "card elevation" would re-introduce the shadow that the flat-card
+    // decision removed.
     val CardPadding = 16.dp
 
     // Input fields

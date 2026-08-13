@@ -39,7 +39,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
@@ -87,6 +86,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.inboxNavBarI
 import com.antonchuraev.homesearchchecklist.desingsystem.components.overviewNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.components.projectsNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -636,47 +636,60 @@ private fun V2SplitNavigationBar(
     modifier: Modifier = Modifier,
 ) {
     val gapAfter = items.size / 2
-    NavigationBar(
-        modifier = modifier,
-        containerColor = NavigationBarDefaults.containerColor,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        tonalElevation = NavigationBarDefaults.Elevation,
-    ) {
-        items.forEachIndexed { index, item ->
-            if (index == gapAfter) {
-                Spacer(modifier = Modifier.width(V2ShellMetrics.AiButtonBarSpacer))
+    // Level 2 "Docked", identical to AppNavigationBar: the bar shares the card tone, carries no
+    // tonal elevation and is marked by a 1dp outlineVariant hairline on its seam with the content.
+    // The divider is a sibling ABOVE the bar — the bar owns the navigation-bar inset at its own
+    // bottom, so a divider inside it would land under the labels instead of on the seam.
+    //
+    // `modifier` stays on the Column, i.e. the host's onSizeChanged reports divider + bar. That is
+    // the number the shell wants: it consumes the measured height and positions the raised AI button
+    // off it, and the divider is part of what the bar covers.
+    Column(modifier = modifier) {
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = AppSurface.dockedSeam(),
+        )
+        NavigationBar(
+            containerColor = AppSurface.docked(),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 0.dp,
+        ) {
+            items.forEachIndexed { index, item ->
+                if (index == gapAfter) {
+                    Spacer(modifier = Modifier.width(V2ShellMetrics.AiButtonBarSpacer))
+                }
+                val isSelected = item.id == selectedItemId
+                // Items after the gap shift one slot down the traversal order to leave room for the
+                // button; see V2ShellMetrics.AiButtonTraversalIndex.
+                val traversal = (index + if (index >= gapAfter) 1 else 0).toFloat()
+                NavigationBarItem(
+                    selected = isSelected,
+                    onClick = { onItemSelected(item.id) },
+                    icon = {
+                        Icon(
+                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                            contentDescription = item.contentDescription ?: item.label,
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    alwaysShowLabel = true,
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.semantics { traversalIndex = traversal },
+                )
             }
-            val isSelected = item.id == selectedItemId
-            // Items after the gap shift one slot down the traversal order to leave room for the
-            // button; see V2ShellMetrics.AiButtonTraversalIndex.
-            val traversal = (index + if (index >= gapAfter) 1 else 0).toFloat()
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = { onItemSelected(item.id) },
-                icon = {
-                    Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.contentDescription ?: item.label,
-                    )
-                },
-                label = {
-                    Text(
-                        text = item.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                alwaysShowLabel = true,
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                modifier = Modifier.semantics { traversalIndex = traversal },
-            )
         }
     }
 }

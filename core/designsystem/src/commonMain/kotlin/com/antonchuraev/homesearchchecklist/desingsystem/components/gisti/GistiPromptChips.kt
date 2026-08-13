@@ -5,12 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Repeat
@@ -33,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiAwareText
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 
 /**
  * The distinct quick-action a home-screen prompt chip triggers.
@@ -199,7 +199,9 @@ private fun PromptChipItem(
     label: String,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(19.dp) // full pill for height=38
+    // Percentage-based rather than a hardcoded 19dp: identical at the 38dp resting height, and it
+    // stays a pill once ru/hi copy or a large font scale grows the chip past that.
+    val shape = AppShapeTokens.Pill
 
     // Surface(onClick=…) applies .clip(shape) BEFORE its own clickable, so the ripple is
     // clipped to the pill shape (a bare Modifier.clickable on the outer modifier would draw a
@@ -211,7 +213,11 @@ private fun PromptChipItem(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
-            .height(38.dp)
+            // heightIn, never height: a fixed 38dp clips Devanagari (matras sit above *and* below
+            // the baseline) and clips any label at fontScale >= 1.3. The chip is allowed to grow.
+            // minimumInteractiveComponentSize() stays — it is what keeps the touch target at 48dp
+            // while the visible pill rests at 38dp.
+            .heightIn(min = 38.dp)
             .minimumInteractiveComponentSize(),
     ) {
         // Center each glyph WITHIN its own line-box. Emoji (15sp) and label (13.5sp) have
@@ -455,7 +461,9 @@ private fun SelectablePromptChipItem(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(19.dp) // full pill for height=38
+    // Percentage-based rather than a hardcoded 19dp: identical at the 38dp resting height, and it
+    // stays a pill once ru/hi copy or a large font scale grows the chip past that.
+    val shape = AppShapeTokens.Pill
     // Outline aesthetic: an unselected chip is transparent with a hairline outline + a neutral
     // hollow icon; a selected chip fills solid `primary` (the blue active state the user asked for).
     val containerColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
@@ -476,7 +484,11 @@ private fun SelectablePromptChipItem(
         color = containerColor,
         border = border,
         modifier = Modifier
-            .height(38.dp)
+            // heightIn, never height: a fixed 38dp clips Devanagari (matras sit above *and* below
+            // the baseline) and clips any label at fontScale >= 1.3. The chip is allowed to grow.
+            // minimumInteractiveComponentSize() stays — it is what keeps the touch target at 48dp
+            // while the visible pill rests at 38dp.
+            .heightIn(min = 38.dp)
             .minimumInteractiveComponentSize(),
     ) {
         val centeredLineHeight = LineHeightStyle(

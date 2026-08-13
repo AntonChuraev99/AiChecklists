@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 
 /**
  * Shared tokens for the app's single card style: **Material 3 "filled + hairline"** — a flat tonal
@@ -33,21 +33,14 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 object AppCardDefaults {
 
     /**
-     * Resting container color. Sits one tonal step off the page background so the card stays distinct
-     * without the border doing all the work:
-     * - light → `surfaceContainerLowest` (just brighter than the warm cream surface)
-     * - dark → `surfaceContainerLow` (one step LIGHTER than the dark surface — the M3 tonal-lift
-     *   direction; `Lowest` would sit darker/recessed in dark mode, so it is NOT used in dark).
+     * Resting container color — level 1 ("Card") of the app's depth ladder.
+     *
+     * Delegates to [AppSurface.card] rather than repeating the roles, so a card and any other level-1
+     * surface cannot drift apart. Kept as an accessor here because card call sites reach for
+     * `AppCardDefaults` for their colors, border and elevation together.
      */
     @Composable
-    fun containerColor(): Color {
-        val isDark = LocalIsDarkTheme.current
-        return if (isDark) {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLowest
-        }
-    }
+    fun containerColor(): Color = AppSurface.card()
 
     /** Container color for the SELECTED state of a selectable card. Filled accent for clear emphasis. */
     @Composable

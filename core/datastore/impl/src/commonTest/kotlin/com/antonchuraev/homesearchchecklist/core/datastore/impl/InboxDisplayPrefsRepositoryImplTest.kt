@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.core.datastore.impl
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -78,6 +79,67 @@ class InboxDisplayPrefsRepositoryImplTest {
         assertEquals(InboxSort.NAME, options.sort)
         assertFalse(options.showCompleted)
         assertTrue(logger.errors.isEmpty(), "a readable store must not report a failure")
+    }
+
+    /**
+     * Date grouping defaults ON and round-trips through the store.
+     *
+     * The default is the load-bearing half: it decides what an existing user sees on the very first
+     * launch after this ships, and nobody will have the key written yet. Pinned against a store that
+     * holds a DIFFERENT value for it so the assertion cannot pass by reading the default twice.
+     */
+    @Test
+    fun observeDisplayOptions_groupByDate_defaultsOnAndReadsBackWhatWasStored() = runTest {
+        val logger = RecordingLogger()
+
+        assertTrue(
+            repository(flowOf(mutablePreferencesOf()), logger).observeDisplayOptions().first().groupByDate,
+            "an install with nothing stored must group by date",
+        )
+
+        val storedOff = mutablePreferencesOf().apply {
+            this[booleanPreferencesKey("inbox_display_group_by_date")] = false
+        }
+        val options = repository(flowOf(storedOff), logger).observeDisplayOptions().first()
+
+        assertFalse(options.groupByDate)
+        assertEquals(InboxLayout.CARDS, options.layout, "the other options are untouched by it")
+        assertTrue(options.showCompleted)
+    }
+
+    /**
+     * The nudge snooze carries the same never-throws contract as the options flow, and for the same
+     * reason: it is combined into `InboxViewModel.screenState`, whose combine has no `catch`. A
+     * corrupt preferences file must not cost the Inbox its whole tab over a dismissal timestamp.
+     */
+    @Test
+    fun observePlanNudgeDismissedAt_unreadableStore_emitsNeverAndLogsTheCause() = runTest {
+        val logger = RecordingLogger()
+        val corrupted = IllegalStateException("preferences file is not readable")
+
+        val dismissedAt = repository(flow<Preferences> { throw corrupted }, logger)
+            .observePlanNudgeDismissedAt()
+            .first()
+
+        assertEquals(0L, dismissedAt, "unreadable reads as never dismissed, so the nudge still shows")
+        val logged = assertNotNull(
+            logger.errors.singleOrNull(),
+            "the fallback must say WHY it fell back — a silent one is undiagnosable",
+        )
+        assertTrue(generateSequence(logged.second) { it.cause }.any { it === corrupted })
+    }
+
+    /** A stored timestamp comes back verbatim — the 24h window is the reader's arithmetic, not ours. */
+    @Test
+    fun observePlanNudgeDismissedAt_readsBackTheStoredTimestamp() = runTest {
+        val stored = mutablePreferencesOf().apply {
+            this[longPreferencesKey("inbox_plan_nudge_dismissed_at")] = 1_755_000_000_000L
+        }
+
+        assertEquals(
+            1_755_000_000_000L,
+            repository(flowOf(stored), RecordingLogger()).observePlanNudgeDismissedAt().first(),
+        )
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

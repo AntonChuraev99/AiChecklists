@@ -183,6 +183,12 @@ data class ChecklistFill(
  * [templateItemId]: stable link to the template [ChecklistItem.id]; null on legacy rows,
  * backfilled by text match on next write. Lets fill↔template reconciliation survive text
  * edits and (later) nested-structure reshuffles without orphaning checked/note/attachments.
+ *
+ * [alarmEnabled]: splits "this task has a date" from "an OS alarm is armed for it". A date is free
+ * and unlimited; the alarm is the metered half, so the two need separate fields for the due chip to
+ * be able to say which one a task actually has. Defaults to `true` — every [reminderAt] already in
+ * the field was written by a path that also armed an alarm, so a `false` default would decode all
+ * existing data as "alarm off" and silently stop notifying current users.
  */
 @ConsistentCopyVisibility
 @Serializable
@@ -207,6 +213,12 @@ data class ChecklistFillItem private constructor(
     // Lives in the JSON blob (no SQL column / Firestore field — fills sync via itemsJson).
     // Only meaningful while a reminder is set; cleared by withReminderCleared().
     val reminderFullScreen: Boolean = false,
+    // ── Is an OS alarm actually armed for this date? (end of constructor — safest for JSON schema) ──
+    // Same carrier as every field above it: the fill's itemsJson blob, so no SQL migration and no
+    // Firestore mapper entry (AndroidFirestoreSyncDataSource maps the fill ROW, not its items).
+    // Default TRUE, never false: legacy rows carry no such key, and reading them as "alarm off"
+    // would mute notifications for every existing user. Cleared back to true by withReminderCleared().
+    val alarmEnabled: Boolean = true,
 ) {
     constructor(
         text: String,
@@ -230,42 +242,42 @@ data class ChecklistFillItem private constructor(
     fun withChecked(checked: Boolean) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Update note while preserving id, weekday, priority, reminder fields, attachments, and template link */
     fun withNote(note: String?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Update weekday while preserving id, text, checked state, note, priority, reminder fields, attachments, and template link */
     fun withWeekday(weekday: Int?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Update text while preserving id, checked state, note, weekday, priority, reminder fields, attachments, and template link */
     fun withText(text: String) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Toggle priority between 0 (normal) and 1 (starred); preserves all other fields */
     fun withPriority(priority: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Set or clear the one-shot reminder timestamp; preserves all other fields */
     fun withReminderAt(reminderAt: Long?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Set the recurring repeat schedule; preserves all other fields */
@@ -276,14 +288,14 @@ data class ChecklistFillItem private constructor(
     ) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, rule, timeOfDayMinutes, nextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Advance the repeat schedule to the next trigger; preserves all other fields */
     fun withRepeatAdvanced(nextAt: Long?, newCount: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, nextAt, newCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Clear all reminder data (both one-shot and repeat) while preserving all other fields */
@@ -297,6 +309,9 @@ data class ChecklistFillItem private constructor(
         attachments = attachments,
         templateItemId = templateItemId,
         reminderFullScreen = false,
+        // Back to the default, not left at whatever it was: with no date there is no alarm to keep
+        // disarmed, and a sticky `false` would make the NEXT date the user sets arrive silently.
+        alarmEnabled = true,
     )
 
     /** Append [att] to the end of [attachments]; preserves all other fields */
@@ -306,6 +321,7 @@ data class ChecklistFillItem private constructor(
         attachments = attachments + att,
         templateItemId = templateItemId,
         reminderFullScreen = reminderFullScreen,
+        alarmEnabled = alarmEnabled,
     )
 
     /** Remove the attachment with [attachmentId]; preserves order and all other fields. No-op if id not found. */
@@ -315,6 +331,7 @@ data class ChecklistFillItem private constructor(
         attachments = attachments.filter { it.id != attachmentId },
         templateItemId = templateItemId,
         reminderFullScreen = reminderFullScreen,
+        alarmEnabled = alarmEnabled,
     )
 
     /** Replace [attachments] entirely; used by the repository after a platform store/delete op. */
@@ -324,20 +341,34 @@ data class ChecklistFillItem private constructor(
         attachments = attachments,
         templateItemId = templateItemId,
         reminderFullScreen = reminderFullScreen,
+        alarmEnabled = alarmEnabled,
     )
 
     /** Set or update the stable link to the template [ChecklistItem.id]; preserves all other fields */
     fun withTemplateItemId(templateItemId: String?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, reminderFullScreen,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Set the per-item full-screen-intent flag (alarm-style delivery); preserves all other fields */
     fun withReminderFullScreen(fullScreen: Boolean) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId, fullScreen,
+        attachments, templateItemId, fullScreen, alarmEnabled,
+    )
+
+    /**
+     * Arm or disarm the OS alarm without touching the date; preserves all other fields.
+     *
+     * The date stays exactly where it is — that is the whole point of the split. Turning the alarm
+     * off leaves a task that still shows its due chip and still sorts into "Today", it just does not
+     * buzz.
+     */
+    fun withAlarmEnabled(alarmEnabled: Boolean) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments, templateItemId, reminderFullScreen, alarmEnabled,
     )
 
     /** Returns true if this item has any active reminder (one-shot OR recurring) */

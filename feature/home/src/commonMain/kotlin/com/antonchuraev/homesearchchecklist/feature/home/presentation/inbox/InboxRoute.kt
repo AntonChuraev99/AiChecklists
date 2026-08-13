@@ -112,6 +112,10 @@ fun InboxRoute(
         }
     }
 
+    // TODO(ux-overhaul step 8): pass `onPlanDayClick = { navigator.navigateToDailyReview() }` once
+    //  DailyReviewScreen and its route exist. Left UNPASSED rather than wired to a no-op on purpose:
+    //  InboxScreen does not compose the plan-your-day nudge at all while the callback is null, so
+    //  today the affordance is simply absent instead of being a button that swallows its own tap.
     InboxScreen(
         state = state,
         contentBottomPadding = contentBottomPadding,

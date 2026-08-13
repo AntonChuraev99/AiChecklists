@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,12 +75,12 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -103,6 +102,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -362,14 +362,22 @@ private fun TemplateCard(
     template: ChecklistTemplate,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .width(180.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp,
-        tonalElevation = 1.dp
+    // Level 1 "Card" of the depth ladder: the app's single card style — flat tonal container plus a
+    // 1dp hairline, zero elevation in every interaction state (AppCardDefaults). Both elevations the
+    // old code carried had to go: the shadow re-introduced the side-"ears" artifact the flat-card
+    // decision removed, and `tonalElevation` was NOT a no-op here — the container was `surface`, the
+    // one role that material3 still mixes `surfaceTint` into, so the card sat a shade blue-grey.
+    //
+    // The click moved from `Modifier.clickable` onto `Card(onClick =)`: the caller's modifier is
+    // applied BEFORE the card's own `clip`, so the ripple used to paint a rectangle past the rounded
+    // corners.
+    Card(
+        onClick = onClick,
+        modifier = Modifier.width(180.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = AppCardDefaults.colors(),
+        elevation = AppCardDefaults.flatElevation(),
+        border = AppCardDefaults.border(),
     ) {
         Column(
             modifier = Modifier.padding(AppDimens.SpacingMd)

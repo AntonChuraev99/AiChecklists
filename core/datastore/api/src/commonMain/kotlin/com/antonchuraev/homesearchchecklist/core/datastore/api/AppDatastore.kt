@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,19 @@ class AppDatastore(
 
     fun observeInt(key: String, defaultValue: Int): Flow<Int> =
         dataStore.data.map { prefs -> prefs[intPreferencesKey(key)] ?: defaultValue }
+
+    // Epoch-millis timestamps do not fit in an Int (they passed 2^31 ms in 1970), so anything that
+    // stores "when did this happen" needs the 64-bit pair rather than saveInt.
+    suspend fun saveLong(key: String, value: Long) {
+        withContext(dispatcher) {
+            dataStore.edit { prefs ->
+                prefs[longPreferencesKey(key)] = value
+            }
+        }
+    }
+
+    fun observeLong(key: String, defaultValue: Long): Flow<Long> =
+        dataStore.data.map { prefs -> prefs[longPreferencesKey(key)] ?: defaultValue }
 
     suspend fun clear() {
         withContext(dispatcher) {

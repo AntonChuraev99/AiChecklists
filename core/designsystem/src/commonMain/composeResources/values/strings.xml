@@ -1677,6 +1677,20 @@
     <string name="inbox_display_sort_manual">Manual</string>
     <string name="inbox_display_sort_name">Name</string>
     <string name="inbox_display_sort_priority">Importance</string>
+    <string name="inbox_display_group_by_date">Group by date</string>
+
+    <!-- Section headings for the grouped task list. Drawn ONLY when two or more groups are
+         non-empty, and never with a count: the open-task total already sits in the toolbar
+         subtitle, and "Overdue 7" is a debt counter by another name. Not uppercased — Devanagari
+         has no letter case, so a transform would drop the emphasis on hi. -->
+    <string name="inbox_section_overdue">Overdue</string>
+    <string name="inbox_section_today">Today</string>
+    <string name="inbox_section_upcoming">Upcoming</string>
+    <string name="inbox_section_anytime">Anytime</string>
+
+    <!-- Load failure. The reason itself is one of the existing error strings, resolved by the
+         ViewModel; this is only the action. -->
+    <string name="inbox_error_retry">Try again</string>
 
     <!-- Projects tab (v2). One card per checklist: progress ring, name, mini-stat badges. -->
     <string name="projects_title">Projects</string>
@@ -1770,4 +1784,80 @@
          from GetUserLimitsUseCase — never a local constant. -->
     <string name="create_limit_reached_title">Free plan includes %1$d projects</string>
     <string name="create_limit_reached_description">Go Pro for unlimited projects, or delete one you no longer need.</string>
+
+    <!-- ─── Plan nudge ───────────────────────────────────────────────────────────────────────
+         Invitation to run the daily review. Deliberately carries NO count of undated tasks: a
+         debt counter grows faster than it is cleared and turns into a reproach the user learns
+         to ignore, which works against the point of the feature. -->
+    <string name="plan_nudge_title">Plan your day with Gisti</string>
+    <string name="plan_nudge_subtitle">One task at a time</string>
+
+    <!-- ─── Due chip accessibility ───────────────────────────────────────────────────────────
+         %1$s = the already-resolved, already-localized due label ("Tomorrow 09:00"), produced in
+         the feature layer. The trailing clear affordance is a separate semantics node, so it
+         needs its own label. -->
+    <string name="due_chip_a11y">Reminder: %1$s. Tap to change.</string>
+    <string name="due_chip_clear_a11y">Remove reminder</string>
+
+    <!-- ─── Task source accessibility ────────────────────────────────────────────────────────
+         The source indicator is a bare 14dp glyph, so the whole meaning has to live in its
+         contentDescription. A manually typed task draws nothing and therefore has no string. -->
+    <string name="source_a11y_ai">Created by Gisti</string>
+    <string name="source_a11y_email">From email</string>
+    <string name="source_a11y_webhook">From a webhook</string>
+    <string name="source_a11y_messenger">From a messenger</string>
+
+    <!-- ─── Due labels (DueLabelFormatter) ───────────────────────────────────────────────────
+         One key per shape of due label. Kotlin supplies the PARTS (a 24h time, an abbreviated
+         weekday, an abbreviated month, a day number) and the ORDER lives here, because day/month
+         order is locale data: "Sep 14" in English is "14 сент." in Russian.
+         ⛔ Never assemble these by concatenating in Kotlin — that hardcodes English word order,
+         which is the defect this whole set replaces. -->
+    <string name="due_today">Today %1$s</string>
+    <string name="due_tomorrow">Tomorrow %1$s</string>
+    <!-- 2–6 days out. %1$s = abbreviated weekday, %2$s = time. -->
+    <string name="due_weekday">%1$s %2$s</string>
+    <!-- A week or more out, and the date half of every label below. %1$s = abbreviated month,
+         %2$s = day number. -->
+    <string name="due_date">%1$s %2$s</string>
+    <!-- Missed earlier today — the clock time is what identifies it. -->
+    <string name="due_overdue_time">Overdue %1$s</string>
+    <!-- Missed on an earlier day. %1$s is an already-composed date ("Sep 14"). A separate key
+         from due_overdue_time on purpose: a language may need a different preposition before a
+         date than before a clock time, and one shared key would force them to be identical. -->
+    <string name="due_overdue_day">Overdue %1$s</string>
+    <!-- Parked without a concrete date. -->
+    <string name="due_someday">Someday</string>
+    <string name="due_repeat_daily">Daily %1$s</string>
+    <!-- Chip form. %1$s = joined weekdays ("Mon,Wed"), %2$s = time. The rule is NOT named here —
+         the repeat glyph on the chip already says the task comes back, and the chip is capped at
+         140dp. -->
+    <string name="due_repeat_weekly">%1$s %2$s</string>
+    <!-- Checklist-detail form: same parts, rule named, as that screen has always shown it. -->
+    <string name="due_repeat_weekly_named">Weekly %1$s %2$s</string>
+    <!-- Weekly with no explicit day selection — there is nothing to list. -->
+    <string name="due_repeat_weekly_any">Weekly %1$s</string>
+    <string name="due_repeat_monthly">Monthly %1$s</string>
+    <string name="due_repeat_yearly">Yearly %1$s</string>
+    <!-- Absolute one-shot on the checklist detail screen. %1$s = date ("May 5"), %2$s = time. -->
+    <string name="due_absolute_date_time">%1$s, %2$s</string>
+    <!-- Absolute one-shot that has passed. Date only — the exact minute is clutter once gone. -->
+    <string name="due_missed">Missed (%1$s)</string>
+
+    <!-- Abbreviated month names. Deliberately separate from the full month_* set above: those
+         are used in chat previews where there is room, while these have to fit a 140dp chip and
+         have to keep the checklist detail screen's long-standing "May 5" shape. RU forms are
+         genitive for the same reason the full names are — they only ever follow a day number. -->
+    <string name="month_abbr_jan">Jan</string>
+    <string name="month_abbr_feb">Feb</string>
+    <string name="month_abbr_mar">Mar</string>
+    <string name="month_abbr_apr">Apr</string>
+    <string name="month_abbr_may">May</string>
+    <string name="month_abbr_jun">Jun</string>
+    <string name="month_abbr_jul">Jul</string>
+    <string name="month_abbr_aug">Aug</string>
+    <string name="month_abbr_sep">Sep</string>
+    <string name="month_abbr_oct">Oct</string>
+    <string name="month_abbr_nov">Nov</string>
+    <string name="month_abbr_dec">Dec</string>
 </resources>

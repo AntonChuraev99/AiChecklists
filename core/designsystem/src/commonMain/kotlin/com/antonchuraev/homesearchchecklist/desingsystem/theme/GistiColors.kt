@@ -56,6 +56,22 @@ object GistiColors {
         @Composable @ReadOnlyComposable
         get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFF4A923)
 
+    /**
+     * Priority indicator when the shape carrying it is the ONLY channel — the 3dp bar along a task
+     * row's leading edge, where [star] would fail contrast.
+     *
+     * [star] is tuned as a *glyph* colour: a star icon reads at 16dp because its silhouette carries
+     * the meaning, and the surrounding text says the rest. A 3dp bar has no silhouette and no label —
+     * it is a non-text UI element that must clear WCAG 1.4.11 (3:1) on its own, and `#F4A923` gives
+     * only ~2:1 against the white card. Darkening the light value to `#C67C00` buys ~3.5:1 while
+     * staying the same hue, so the bar and the star still read as one signal.
+     *
+     * Dark keeps [star] unchanged: `#F5B544` on the `#1A1C20` card is already far past the bar.
+     */
+    val priorityIndicator: Color
+        @Composable @ReadOnlyComposable
+        get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFC67C00)
+
     // ── Calm completion green (100% banners, done progress) ──
     val success: Color
         @Composable @ReadOnlyComposable

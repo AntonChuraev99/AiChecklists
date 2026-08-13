@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppElevation
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -64,8 +65,8 @@ import dev.chrisbanes.haze.hazeEffect
  * Visual spec:
  *  - Height: 56dp, corner radius: 16dp (matches AskGistiBar)
  *  - Container: `surfaceContainerLowest`
- *  - Border: 1.5dp `outlineVariant`
- *  - Shadow: 2dp (light only)
+ *  - Border: 1dp `outlineVariant` (the ladder's single hairline weight)
+ *  - Shadow: [AppElevation.FloatingPill] = 2dp, light only (level 3 "Floating")
  *  - Left:  [SparkleTile] 28dp
  *  - Center: placeholder/context text, `onSurfaceVariant`
  *  - Trailing: ChevronUp 24dp in `primary` + Mic 40dp IconButton in `onSurfaceVariant`
@@ -85,7 +86,6 @@ fun GistiChatDock(
     contextLabel: String? = null,
     micContentDescription: String = "Voice input",
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(16.dp)
     val displayText = contextLabel ?: placeholder
 
@@ -95,8 +95,13 @@ fun GistiChatDock(
             .height(56.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = if (isDark) 0.dp else 2.dp,
+        // 1dp, not the 1.5dp this pill used to carry: every hairline in the ladder is 1dp, and a
+        // heavier stroke on the one floating element makes it read as a thicker-bordered card
+        // rather than as a surface above the page.
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        // Depth kept, now named: the 2dp this dock always used IS AppElevation.FloatingPill, and the
+        // "light only" rule now lives in AppElevation.shadowInLight instead of a local isDark check.
+        shadowElevation = AppElevation.shadowInLight(AppElevation.FloatingPill),
         tonalElevation = 0.dp,
     ) {
         Row(

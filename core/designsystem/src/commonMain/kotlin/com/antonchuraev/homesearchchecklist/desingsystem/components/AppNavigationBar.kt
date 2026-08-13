@@ -1,21 +1,24 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChecklistRtl
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 
 // ---------------------------------------------------------------------------
 // AppNavigationBarItem — data model for a single navigation tab.
@@ -46,9 +49,11 @@ data class AppNavBarItem(
 // AppNavigationBar — Material 3 NavigationBar wrapper.
 //
 // Design decisions:
-//   - containerColor = NavigationBarDefaults.containerColor (surfaceContainer in M3).
-//     MD3 spec: NavigationBar uses surfaceContainer, not surface. This ensures
-//     the correct tonal elevation separating it from the content area.
+//   - containerColor = AppSurface.docked() (level 2 of the app's depth ladder), with
+//     tonalElevation = 0 and a 1dp outlineVariant divider ABOVE the bar. M3 separates
+//     surfaces by tone by default, and this app spends that budget once: the bar shares
+//     the card tone and is marked by the hairline on its seam with the content, so the
+//     bottom chrome cannot drift from the cards it sits under.
 //   - Tonal indicator (secondary-container pill behind selected icon): provided
 //     by NavigationBarItemDefaults.colors() automatically — no override needed.
 //   - windowInsets handled by NavigationBar itself: internally it applies
@@ -79,7 +84,9 @@ data class AppNavBarItem(
  * @param items List of 2–5 [AppNavBarItem] descriptors.
  * @param selectedItemId The [AppNavBarItem.id] of the currently active tab.
  * @param onItemSelected Called when the user taps a tab. Receives the full item.
- * @param modifier Optional modifier applied to the [NavigationBar] container.
+ * @param modifier Optional modifier applied to the Column wrapping the seam divider AND the
+ *   [NavigationBar] — so a caller measuring this component sees the height of both, which is what
+ *   the bottom chrome actually occupies.
  */
 @Composable
 fun AppNavigationBar(
@@ -88,39 +95,48 @@ fun AppNavigationBar(
     onItemSelected: (AppNavBarItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    NavigationBar(
-        modifier = modifier,
-        containerColor = NavigationBarDefaults.containerColor,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        tonalElevation = NavigationBarDefaults.Elevation,
-    ) {
-        items.forEach { item ->
-            val isSelected = item.id == selectedItemId
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = { onItemSelected(item) },
-                icon = {
-                    Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.contentDescription ?: item.label,
-                    )
-                },
-                label = {
-                    Text(
-                        text = item.label,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                },
-                alwaysShowLabel = true,
-                colors = NavigationBarItemDefaults.colors(
-                    // Tonal pill: secondary-container (M3 default for nav bar indicator)
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
+    // Level 2 "Docked": the bar is anchored to the window edge, not raised above it, so what marks
+    // it is the 1dp hairline on the seam it shares with the content — never a tonal step and never
+    // a shadow. The divider is a sibling ABOVE the bar (the bar owns the navigation-bar inset at its
+    // own bottom, so a divider inside it would sit below the labels, not on the seam).
+    Column(modifier = modifier) {
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = AppSurface.dockedSeam(),
+        )
+        NavigationBar(
+            containerColor = AppSurface.docked(),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 0.dp,
+        ) {
+            items.forEach { item ->
+                val isSelected = item.id == selectedItemId
+                NavigationBarItem(
+                    selected = isSelected,
+                    onClick = { onItemSelected(item) },
+                    icon = {
+                        Icon(
+                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                            contentDescription = item.contentDescription ?: item.label,
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    },
+                    alwaysShowLabel = true,
+                    colors = NavigationBarItemDefaults.colors(
+                        // Tonal pill: secondary-container (M3 default for nav bar indicator)
+                        indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
+            }
         }
     }
 }

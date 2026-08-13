@@ -215,12 +215,16 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.util.asWholeUrl
 import com.antonchuraev.homesearchchecklist.desingsystem.util.displayDomain
 import com.antonchuraev.homesearchchecklist.desingsystem.util.extractUrls
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import com.antonchuraev.homesearchchecklist.desingsystem.util.rememberLinkifiedText
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.DueLabelStyle
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.dueLabelSpec
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.label
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.containsRepeat
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.resolveChipLabel
 import com.antonchuraev.homesearchchecklist.desingsystem.components.TokenChipPreview
@@ -3165,8 +3169,17 @@ private fun ItemMetaRow(
             AppItemMetaChip(
                 icon = Icons.Filled.Star,
                 label = stringResource(Res.string.item_chip_priority),
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                // GistiColors.star, not tertiaryContainer. Priority was drawn in three different
+                // colours across the product — teal here, blue on the Inbox row, and the gold token
+                // literally named for it used nowhere — so the same meaning read as three things.
+                // One meaning, one colour, and it is the one the token exists for.
+                //
+                // The gold arrives as a WASH rather than as the label colour: #F4A923 is a graphic
+                // accent (it is drawn solid on the row's 3dp priority bar and on a filled star
+                // glyph), and as text on a light surface it sits near 2:1 — unreadable. The label
+                // therefore keeps onSurface, and the container carries the identity.
+                containerColor = GistiColors.star.copy(alpha = PriorityChipContainerAlpha),
+                contentColor = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -3200,6 +3213,14 @@ private fun ItemMetaRow(
 }
 
 /**
+ * Opacity of the gold wash behind the priority chip's label.
+ *
+ * Low enough that the label keeps its normal `onSurface` contrast on the card, high enough that the
+ * chip reads as gold rather than as one more neutral tag next to the reminder and attachment chips.
+ */
+private const val PriorityChipContainerAlpha = 0.18f
+
+/**
  * Returns true if the item has a one-shot reminder that has already passed (missed).
  * Recurring reminders never count as missed — they always show the next future trigger.
  */
@@ -3213,56 +3234,29 @@ private fun isReminderMissed(item: ChecklistFillItem): Boolean {
  * Formats the label shown on the Remind TextButton inside ChecklistItemCard.
  *
  * States:
- * - No reminder   → "Remind"
- * - One-shot, future → "May 5, 18:00"  (formatted via formatReminderDateTime)
+ * - No reminder      → "Remind"
+ * - One-shot, future → "May 5, 18:00"
  * - One-shot, past   → "Missed (May 5)"
  * - Recurring        → compact rule text, e.g. "Daily 09:00" / "Weekly Mon 18:00"
+ *
+ * ## Why this delegates
+ * This function used to write those labels as Kotlin literals — "Daily", "Weekly", "Mon",
+ * "Missed (May 5)" — which is one language shipped to every locale. The words now come from
+ * [DueLabelStyle.Absolute] in the shared [dueLabelSpec] formatter, so this screen and the task
+ * row's due chip resolve the same fields through the same clock and the same string table.
+ *
+ * The rendered result is unchanged in English, deliberately: this screen is not being redesigned
+ * here, it is only being made translatable. The chip's shorter, relative vocabulary
+ * ("Today 18:00") lives behind [DueLabelStyle.Relative].
  */
 @Composable
 internal fun formatItemReminderLabel(item: ChecklistFillItem): String {
-    if (!item.hasActiveReminder) return stringResource(Res.string.detail_item_action_remind)
+    val spec = item.dueLabelSpec(
+        nowMillis = currentTimeMillis(),
+        style = DueLabelStyle.Absolute,
+    ) ?: return stringResource(Res.string.detail_item_action_remind)
 
-    val tz = TimeZone.currentSystemDefault()
-
-    // Recurring reminder — show rule + time from repeatTimeOfDayMinutes
-    val rule = item.repeatRule
-    if (rule != null) {
-        val minutes = item.repeatTimeOfDayMinutes ?: 0
-        val h = (minutes / 60).toString().padStart(2, '0')
-        val m = (minutes % 60).toString().padStart(2, '0')
-        val ruleText = when (rule.type) {
-            RepeatType.DAILY -> "Daily $h:$m"
-            RepeatType.WEEKLY -> {
-                val days = rule.weekDays
-                if (days.isNullOrEmpty()) "Weekly $h:$m"
-                else {
-                    val dayNames = days.sorted().joinToString(",") { iso ->
-                        when (iso) {
-                            1 -> "Mon"; 2 -> "Tue"; 3 -> "Wed"; 4 -> "Thu"
-                            5 -> "Fri"; 6 -> "Sat"; else -> "Sun"
-                        }
-                    }
-                    "Weekly $dayNames $h:$m"
-                }
-            }
-            RepeatType.MONTHLY -> "Monthly $h:$m"
-            RepeatType.YEARLY -> "Yearly $h:$m"
-        }
-        return ruleText
-    }
-
-    // One-shot reminder
-    val at = item.reminderAt ?: return stringResource(Res.string.detail_item_action_remind)
-    val localDt = Instant.fromEpochMilliseconds(at).toLocalDateTime(tz)
-    val formatted = formatReminderDateTime(localDt)
-
-    return if (isReminderMissed(item)) {
-        // Show date only for missed (no time clutter)
-        val month = localDt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-        "Missed ($month ${localDt.day})"
-    } else {
-        formatted
-    }
+    return spec.label()
 }
 
 @Composable

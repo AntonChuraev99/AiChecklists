@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +50,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree
@@ -82,40 +83,48 @@ fun AnalyzeResultPreviewScreen(
         scrollBehavior = scrollBehavior,
         bottomBar = {
             if (!state.isLoading && state.editableItems.isNotEmpty()) {
+                // Level 2 "Docked" of the depth ladder: a bar anchored to the window edge is not
+                // *raised* above the page, it is attached to it — so it carries no shadow and is
+                // separated by a 1dp hairline on the seam it shares with the content. See AppSurface.
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 8.dp,
-                    color = MaterialTheme.colorScheme.surface
+                    shadowElevation = 0.dp,
+                    color = AppSurface.docked()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(AppDimens.ScreenPaddingHorizontal)
-                            .padding(vertical = AppDimens.SpacingLg)
-                            .navigationBarsPadding()
-                    ) {
-                        // When folders are used the count reflects checkable leaves (folders aren't
-                        // items), matching the count shown above the list. On the flat path it's the
-                        // included (soft-capped) editable list.
-                        val createCount = if (state.useFolders) {
-                            state.structuredItems.count { it.type == ChecklistNodeType.ITEM }
-                        } else {
-                            state.editableItems.size
-                        }
-                        AppButton(
-                            text = if (state.isCreating)
-                                stringResource(Res.string.analyze_preview_creating)
-                            else if (state.fillDefault)
-                                stringResource(Res.string.fill_apply)
-                            else if (state.isFillMode)
-                                stringResource(Res.string.analyze_preview_create_fill_button, createCount)
-                            else
-                                stringResource(Res.string.analyze_preview_create_button, createCount),
-                            onClick = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnCreateChecklist) },
-                            icon = Icons.Filled.Add,
-                            enabled = !state.isCreating && state.editableItems.isNotEmpty() && (state.fillDefault || state.checklistName.isNotBlank()),
-                            modifier = Modifier.fillMaxWidth()
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant,
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(AppDimens.ScreenPaddingHorizontal)
+                                .padding(vertical = AppDimens.SpacingLg)
+                        ) {
+                            // When folders are used the count reflects checkable leaves (folders aren't
+                            // items), matching the count shown above the list. On the flat path it's the
+                            // included (soft-capped) editable list.
+                            val createCount = if (state.useFolders) {
+                                state.structuredItems.count { it.type == ChecklistNodeType.ITEM }
+                            } else {
+                                state.editableItems.size
+                            }
+                            AppButton(
+                                text = if (state.isCreating)
+                                    stringResource(Res.string.analyze_preview_creating)
+                                else if (state.fillDefault)
+                                    stringResource(Res.string.fill_apply)
+                                else if (state.isFillMode)
+                                    stringResource(Res.string.analyze_preview_create_fill_button, createCount)
+                                else
+                                    stringResource(Res.string.analyze_preview_create_button, createCount),
+                                onClick = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnCreateChecklist) },
+                                icon = Icons.Filled.Add,
+                                enabled = !state.isCreating && state.editableItems.isNotEmpty() && (state.fillDefault || state.checklistName.isNotBlank()),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
