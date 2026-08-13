@@ -19,6 +19,21 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveCont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
 /**
+ * Opacity of the scrim a host paints over its CONTENT while [QuickCaptureDock] is up.
+ *
+ * Lives next to the dock so the Inbox and the Calendar cannot drift into two different depths for
+ * the same interruption — they paint it in two different ways (an overlay Box vs. a draw layer on
+ * the pager, because those two screens dismiss the dock through different modifier chains), and the
+ * shared number is the only thing keeping the RESULT identical.
+ *
+ * Above M3's 32% default: this scrim sits under a dock that is itself a light surface, and at 32%
+ * the two read as one page — which is the defect it was introduced to fix. The host must apply it to
+ * the content only: the dock, the snackbar and the system-nav strip stay bright (rule `designsystem`
+ * — a dimmed nav strip breaks the continuous surface the strip and the dock form).
+ */
+const val CaptureDockScrimAlpha: Float = 0.45f
+
+/**
  * The v2 quick-capture affordance: a raised bottom dock with one input, raised by the shell's "+" FAB.
  *
  * Shared by the Inbox tab and the Calendar/Today tab. Deliberately ONE component rather than a copy
