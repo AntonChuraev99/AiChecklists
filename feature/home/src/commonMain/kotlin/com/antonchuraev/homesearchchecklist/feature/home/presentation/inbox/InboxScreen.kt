@@ -88,6 +88,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -120,6 +123,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefau
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -237,113 +241,162 @@ fun InboxScreen(
     // frame of a swipe.
     val currentPage = content?.pages?.getOrNull(content.selectedPage)
 
-    AppScaffold(
-        title = currentPage?.title ?: stringResource(Res.string.inbox_title),
-        // Open tasks only, matching Todoist: a count that includes finished ones answers a question
-        // nobody asked ("how much have I ever put here") instead of "how much is left".
-        subtitle = currentPage?.let { page ->
-            pluralStringResource(
-                Res.plurals.inbox_task_count,
-                page.tasks.count { !it.checked },
-                page.tasks.count { !it.checked },
-            )
-        },
-        startAlignedTitle = true,
-        actions = {
-            if (content != null) {
-                InboxToolbarActions(
-                    // The system Inbox has no rename/delete, so it gets no overflow at all rather
-                    // than an overflow of disabled rows.
-                    showListMenu = currentPage?.isInbox == false,
-                    listMenuOpen = content.listMenuOpen,
-                    onIntent = onIntent,
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        // The capture dock lives in the bottomBar SLOT, not inside the content.
-        //
-        // AppScaffold insets its content by statusBars only and wraps this slot in
-        // windowInsetsPadding(ime ∪ navigationBars) — so the slot is the one place that is
-        // automatically lifted above the keyboard. Hosting the dock inside the content instead forced
-        // a manual imePadding(), and because a bottom inset counts toward a composable's measured
-        // HEIGHT, the non-weighted row then claimed the keyboard's height out of the Column: the input
-        // slid off-screen while the pager and tab row were squeezed to nothing. That defect is the
-        // reason this stays a slot even though the dock is now conditional.
-        //
-        // Also hidden while there is no page to capture into: with no target checklist the Add button
-        // would be an enabled affordance that does nothing (the ViewModel can only log and drop the
-        // text). Defensive only — the ViewModel holds Loading until the system Inbox row exists.
-        bottomBar = {
-            val pages = content?.pages
-            if (createDockOpen && content != null && !pages.isNullOrEmpty()) {
-                QuickCaptureDock(
-                    text = content.draft.text,
-                    onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
-                    onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
-                    placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
-                    // The same chip row the checklist detail screen has always had. Until now this
-                    // dock was a bare text field, so a capture made on the home tab could carry no
-                    // reminder and no priority — the surface the user reaches FIRST was the weakest.
-                    //
-                    // Pick-time and Repeat stay off: both open sheets that only the detail screen
-                    // hosts, and a chip that swallows its tap is worse than an absent one.
-                    aboveInput = {
-                        TaskCreateChipsRow(
-                            draft = content.draft,
-                            onAction = { onIntent(InboxIntent.OnCreateChipAction(it)) },
-                            showPickTime = false,
-                            showRepeat = false,
-                        )
-                    },
-                )
-            }
-        },
-    ) {
-        if (content == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize()) {
-                InboxContent(
-                    content = content,
-                    pages = content.pages,
-                    layout = content.displayOptions.layout,
-                    // While the dock is up it occupies the bottomBar slot, so the Scaffold has already
-                    // shortened the content by its height — reserving the AI button's band on top of
-                    // that would strand the list above a gap the size of chrome that is not on screen.
-                    contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
-                    showAddTaskRow = showAddTaskRow,
-                    onIntent = onIntent,
-                    homeSignal = homeSignal,
-                    anchorChecklistId = anchorChecklistId,
-                    onAnchorChecklistChanged = onAnchorChecklistChanged,
-                )
+    // ── Capture-dock scrim: TWO tiled scrims, one flag ───────────────────────────────────────────
+    // Same anatomy as the item-create scrim on ChecklistDetailScreen, and for the same reason. The
+    // dock lives in the scaffold's `bottomBar`, so the CONTENT scrim (a child of the content slot)
+    // already stops exactly where the dock begins — the dock, the snackbar and the system-nav strip
+    // stay bright with nothing to measure and nothing to subtract.
+    //
+    // A single full-screen scrim with the dock's height cut out of the bottom was tried instead and
+    // is what this replaces: the slot's ime ∪ navigationBars padding is applied by the scaffold
+    // OUTSIDE the measured node, so once the keyboard was up the cut-out sat a keyboard's height
+    // BELOW the dock — dimming the input and leaving a bright band under it. The height of a dock
+    // that rides the keyboard is not a number this screen can hold correctly; the slot boundary is.
+    //
+    // [contentTopPx] is the content slot's y in the root = the height of the zone the scaffold owns
+    // above it (status bar + app bar). The TOP scrim uses exactly it, so the two tile edge-to-edge:
+    // no bright gap at the seam, no double-dark overlap.
+    var contentTopPx by remember { mutableStateOf(0f) }
+    val captureScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
 
-                // Tap-outside-to-dismiss for the capture dock. Deliberately NOT dimmed: the dock is a
-                // one-line input, not a modal task — darkening the whole list to type a word reads as
-                // a much heavier interruption than it is. The surface exists purely to catch the tap,
-                // which is also why it renders nothing.
-                //
-                // `detectTapGestures`, NOT `clickable`: the dock stays open across several adds, and
-                // `clickable` claims the initial press, so the list underneath stopped scrolling
-                // while capturing — the one moment the user is most likely to want to look down the
-                // list. A tap detector leaves the press unconsumed, so a drag falls through to the
-                // LazyColumn and only a real tap dismisses.
-                if (createDockOpen) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures(onTap = { onCreateDockDismiss() })
-                            },
+    // Root box so the TOP scrim can be a sibling ABOVE the scaffold — the app bar is the scaffold's
+    // own slot, and nothing inside the content can reach it.
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppScaffold(
+            title = currentPage?.title ?: stringResource(Res.string.inbox_title),
+            // Open tasks only, matching Todoist: a count that includes finished ones answers a question
+            // nobody asked ("how much have I ever put here") instead of "how much is left".
+            subtitle = currentPage?.let { page ->
+                pluralStringResource(
+                    Res.plurals.inbox_task_count,
+                    page.tasks.count { !it.checked },
+                    page.tasks.count { !it.checked },
+                )
+            },
+            startAlignedTitle = true,
+            actions = {
+                if (content != null) {
+                    InboxToolbarActions(
+                        // The system Inbox has no rename/delete, so it gets no overflow at all rather
+                        // than an overflow of disabled rows.
+                        showListMenu = currentPage?.isInbox == false,
+                        listMenuOpen = content.listMenuOpen,
+                        onIntent = onIntent,
                     )
                 }
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            // The capture dock lives in the bottomBar SLOT, not inside the content.
+            //
+            // AppScaffold insets its content by statusBars only and wraps this slot in
+            // windowInsetsPadding(ime ∪ navigationBars) — so the slot is the one place that is
+            // automatically lifted above the keyboard. Hosting the dock inside the content instead forced
+            // a manual imePadding(), and because a bottom inset counts toward a composable's measured
+            // HEIGHT, the non-weighted row then claimed the keyboard's height out of the Column: the input
+            // slid off-screen while the pager and tab row were squeezed to nothing. That defect is the
+            // reason this stays a slot even though the dock is now conditional.
+            //
+            // Also hidden while there is no page to capture into: with no target checklist the Add button
+            // would be an enabled affordance that does nothing (the ViewModel can only log and drop the
+            // text). Defensive only — the ViewModel holds Loading until the system Inbox row exists.
+            bottomBar = {
+                val pages = content?.pages
+                if (createDockOpen && content != null && !pages.isNullOrEmpty()) {
+                    QuickCaptureDock(
+                        text = content.draft.text,
+                        onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
+                        onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
+                        placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
+                        // The same chip row the checklist detail screen has always had. Until now
+                        // this dock was a bare text field, so a capture made on the home tab could
+                        // carry no reminder and no priority — the surface the user reaches FIRST
+                        // was the weakest.
+                        //
+                        // Pick-time and Repeat stay off: both open sheets that only the detail
+                        // screen hosts, and a chip that swallows its tap is worse than an absent
+                        // one.
+                        aboveInput = {
+                            TaskCreateChipsRow(
+                                draft = content.draft,
+                                onAction = { onIntent(InboxIntent.OnCreateChipAction(it)) },
+                                showPickTime = false,
+                                showRepeat = false,
+                            )
+                        },
+                    )
+                }
+            },
+        ) {
+            if (content == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // The seam between the two scrims: this box's y in the root IS the height of
+                        // the chrome above it (status bar + app bar), which the top scrim uses as its
+                        // own height. Measured rather than assumed because the bar carries a subtitle
+                        // and grows with fontScale.
+                        .onGloballyPositioned { contentTopPx = it.positionInRoot().y },
+                ) {
+                    InboxContent(
+                        content = content,
+                        pages = content.pages,
+                        layout = content.displayOptions.layout,
+                        // While the dock is up it occupies the bottomBar slot, so the Scaffold has already
+                        // shortened the content by its height — reserving the AI button's band on top of
+                        // that would strand the list above a gap the size of chrome that is not on screen.
+                        contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
+                        showAddTaskRow = showAddTaskRow,
+                        onIntent = onIntent,
+                        homeSignal = homeSignal,
+                        anchorChecklistId = anchorChecklistId,
+                        onAnchorChecklistChanged = onAnchorChecklistChanged,
+                    )
+
+                    // CONTENT scrim + tap-outside-to-dismiss, in one node. It ends where the content
+                    // slot ends, which is exactly where the dock's slot begins — so the dock stays
+                    // bright at any keyboard height, and the system-nav strip its slot pads for is
+                    // never dimmed (rule `designsystem`: the strip and the dock are one surface).
+                    //
+                    // `detectTapGestures`, NOT `clickable`: the dock stays open across several adds, and
+                    // `clickable` claims the initial press, so the list underneath stopped scrolling
+                    // while capturing — the one moment the user is most likely to want to look down the
+                    // list. A tap detector leaves the press unconsumed, so a drag falls through to the
+                    // LazyColumn and only a real tap dismisses.
+                    if (createDockOpen) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(captureScrimColor)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onTap = { onCreateDockDismiss() })
+                                },
+                        )
+                    }
+                }
             }
+        }
+
+        // TOP-BAR scrim — the other tile. Dims the status-bar zone and the app bar, which belong to
+        // the scaffold and are out of reach from inside its content slot. Height is exactly the
+        // content slot's offset, so it meets the content scrim edge-to-edge.
+        //
+        // No pointer-input modifier on purpose: a node with only a background takes no part in
+        // hit-testing, so the toolbar's actions stay pressable through the dim instead of being
+        // swallowed by it.
+        if (createDockOpen && contentTopPx > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(with(LocalDensity.current) { contentTopPx.toDp() })
+                    .background(captureScrimColor),
+            )
         }
     }
 
@@ -1027,6 +1080,12 @@ private fun InboxPageList(
                 item(key = "inline_add_task") {
                     AddTaskRow(
                         onClick = { onIntent(InboxIntent.OnAddTaskRowClick) },
+                        // On an EMPTY page this row is the only action on screen and it sits under a
+                        // full empty state, so it grows instead of staying the list-sized line it is
+                        // among tasks. Keyed on the page's own emptiness rather than on a flag from
+                        // the host: the host cannot see which page the pager settled on, and the
+                        // Inbox and a project page can differ on exactly this.
+                        prominent = page.tasks.isEmpty(),
                         modifier = rowInset.padding(top = AppDimens.SpacingSm),
                     )
                 }
