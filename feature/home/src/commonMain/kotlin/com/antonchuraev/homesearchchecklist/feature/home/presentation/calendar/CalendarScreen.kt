@@ -64,7 +64,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -94,6 +98,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWin
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
@@ -270,162 +275,215 @@ fun CalendarScreen(
     // screen. Both of those collapse to the same rule: whoever is last carries it.
     val bodyBottomPadding = if (captureVisible || captureRowVisible) 0.dp else contentBottomPadding
 
+    // ── Capture-dock scrim: TWO tiled scrims, one flag (same anatomy as the Inbox tab) ───────────
+    // The dock is the scaffold's `bottomBar`, so a scrim scoped to the CONTENT already stops exactly
+    // where the dock begins — at any keyboard height, with nothing to measure. [contentTopPx] is the
+    // content slot's y in the root, i.e. the height of the chrome above it, and the top scrim uses
+    // exactly that so the two tile without a seam.
+    var contentTopPx by remember { mutableStateOf(0f) }
+    val captureScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
+
     // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
     PlatformBackHandler(enabled = captureVisible) { onCaptureDockDismiss() }
 
-    AppScaffold(
-        title = stringResource(Res.string.calendar_title),
-        navigationIcon = if (drawerState != null) {
-            {
-                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                    Icon(
-                        imageVector = Icons.Filled.Menu,
-                        contentDescription = stringResource(Res.string.today_open_menu),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    // Root box so the scrim below can be a SIBLING of the whole scaffold: as a child of the content
+    // slot it dimmed the pager alone and left the toolbar and the tab row bright.
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppScaffold(
+            title = stringResource(Res.string.calendar_title),
+            navigationIcon = if (drawerState != null) {
+                {
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        Icon(
+                            imageVector = Icons.Filled.Menu,
+                            contentDescription = stringResource(Res.string.today_open_menu),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else null,
+            scrollBehavior = scrollBehavior,
+            snackbarHost = {
+                if (snackbarHostState != null) SnackbarHost(hostState = snackbarHostState)
+            },
+            // bottomBar, not inside the content: this slot is the only one AppScaffold lifts above the
+            // keyboard (it applies ime ∪ navigationBars). Hosting the dock in the content forced a manual
+            // imePadding() on the Inbox tab and slid the input off-screen — same trap, same fix.
+            bottomBar = {
+                if (captureVisible) {
+                    QuickCaptureDock(
+                        text = draft.text,
+                        onTextChange = onQuickAddTextChange,
+                        onAdd = onQuickAddSubmit,
+                        placeholder = stringResource(Res.string.today_quick_add_placeholder),
+                        // This tab draws the day's reminders, so its draft arrives with one chip
+                        // already selected ("Tonight", or "In 1 hour" once the evening has
+                        // started) — that chip is what keeps a task captured here visible on the
+                        // screen that captured it.
+                        //
+                        // Pick-time and Repeat stay off: their picker and repeat sheet live on the
+                        // detail screen, and a chip that swallows its tap is worse than an absent
+                        // one.
+                        aboveInput = {
+                            TaskCreateChipsRow(
+                                draft = draft,
+                                onAction = onCreateChipAction,
+                                showPickTime = false,
+                                showRepeat = false,
+                            )
+                        },
                     )
                 }
-            }
-        } else null,
-        scrollBehavior = scrollBehavior,
-        snackbarHost = {
-            if (snackbarHostState != null) SnackbarHost(hostState = snackbarHostState)
-        },
-        // bottomBar, not inside the content: this slot is the only one AppScaffold lifts above the
-        // keyboard (it applies ime ∪ navigationBars). Hosting the dock in the content forced a manual
-        // imePadding() on the Inbox tab and slid the input off-screen — same trap, same fix.
-        bottomBar = {
-            if (captureVisible) {
-                QuickCaptureDock(
-                    text = draft.text,
-                    onTextChange = onQuickAddTextChange,
-                    onAdd = onQuickAddSubmit,
-                    placeholder = stringResource(Res.string.today_quick_add_placeholder),
-                    // This tab draws the day's reminders, so its draft arrives with one chip already
-                    // selected ("Tonight", or "In 1 hour" once the evening has started) — that chip is
-                    // what keeps a task captured here visible on the screen that captured it.
-                    //
-                    // Pick-time and Repeat stay off: their picker and repeat sheet live on the detail
-                    // screen, and a chip that swallows its tap is worse than an absent one.
-                    aboveInput = {
-                        TaskCreateChipsRow(
-                            draft = draft,
-                            onAction = onCreateChipAction,
-                            showPickTime = false,
-                            showRepeat = false,
-                        )
-                    },
-                )
-            }
-        },
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            PrimaryTabRow(
-                selectedTabIndex = pagerState.currentPage,
-                containerColor = MaterialTheme.colorScheme.background,
-            ) {
-                Tab(
-                    selected = pagerState.currentPage == 0,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
-                    text = { Text(stringResource(Res.string.today_title)) },
-                )
-                Tab(
-                    selected = pagerState.currentPage == 1,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
-                    text = { Text(stringResource(Res.string.calendar_nav_label)) },
-                )
-            }
-            HorizontalPager(
-                state = pagerState,
-                // Tap-outside-to-dismiss for the capture dock. Without it BACK is the ONLY way out
-                // — and on wasmJs `PlatformBackHandler` is an empty actual, so web users were left
-                // with a raised keyboard, no FABs and no exit but a tab switch.
-                //
-                // It rides the PAGER'S OWN modifier chain rather than a full-bleed overlay Box, and
-                // both halves of that matter:
-                //  - Scoped to the pager, the tab row above stays live. An overlay sized to the
-                //    whole Column covered the tabs too, so while the dock was up the first tap on
-                //    Today/Calendar only dismissed and switching pages cost two taps.
-                //  - In the chain rather than over it, the pages keep scrolling while capturing.
-                //    An overlay cannot be "tapped through": hit-testing stops at the topmost
-                //    sibling that hits, and a sibling below is reached only if the one above opts
-                //    into `sharePointerInputWithSiblings()`, which `pointerInput` does not
-                //    (PointerInputModifierNode defaults it to false). Consumption is beside the
-                //    point — `detectTapGestures` consumes the down as well.
-                //    As an ANCESTOR it is dispatched after its children on the Main pass, so a
-                //    vertical scroll or a page swipe consumes the movement first and cancels the
-                //    tap, and a row's own `clickable` consumes the down, so tapping a reminder
-                //    opens it instead of being spent on dismissing the dock.
-                // weight(1f) rather than fillMaxSize(): the add-task row below is a sibling in this
-                // Column and a filling pager would push it off the bottom. With no row composed
-                // (control arm) a single weighted child occupies exactly the space fillMaxSize gave
-                // it, so that arm's layout is unchanged.
+            },
+        ) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+                    .fillMaxSize()
+                    // Seam for the top scrim: this column's y in the root is the height of the chrome
+                    // above it (status bar + app bar), which the top scrim below uses as its height.
+                    .onGloballyPositioned { contentTopPx = it.positionInRoot().y }
+                    // CONTENT scrim, as a draw layer rather than an overlay node — the tab row and
+                    // the pager beneath it must stay interactive, and an overlay is exactly what the
+                    // pager's dismiss comment below rules out (hit-testing stops at the topmost
+                    // sibling). Drawing over the column dims the tabs AND the pages, ends where the
+                    // content slot ends — so the dock in `bottomBar` stays bright at any keyboard
+                    // height — and changes neither layout nor hit-testing.
                     .then(
                         if (captureVisible) {
-                            Modifier.pointerInput(Unit) {
-                                detectTapGestures(onTap = { onCaptureDockDismiss() })
+                            Modifier.drawWithContent {
+                                drawContent()
+                                drawRect(captureScrimColor)
                             }
                         } else {
                             Modifier
                         }
                     ),
-            ) { page ->
-                when (page) {
-                    0 -> TodayBody(
-                        state = todayState,
-                        onReminderClick = onTodayReminderClick,
-                        onCreateChecklistClick = onTodayCreateChecklistClick,
-                        onRetry = onTodayRetry,
-                        contentBottomPadding = bodyBottomPadding,
-                        canCapture = captureEnabled,
+            ) {
+                PrimaryTabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    containerColor = MaterialTheme.colorScheme.background,
+                ) {
+                    Tab(
+                        selected = pagerState.currentPage == 0,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
+                        text = { Text(stringResource(Res.string.today_title)) },
                     )
-                    1 -> CalendarTabBody(
-                        state = calendarState,
-                        onIntent = onCalendarIntent,
-                        contentBottomPadding = bodyBottomPadding,
+                    Tab(
+                        selected = pagerState.currentPage == 1,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
+                        text = { Text(stringResource(Res.string.calendar_nav_label)) },
+                    )
+                }
+                HorizontalPager(
+                    state = pagerState,
+                    // Tap-outside-to-dismiss for the capture dock. Without it BACK is the ONLY way out
+                    // — and on wasmJs `PlatformBackHandler` is an empty actual, so web users were left
+                    // with a raised keyboard, no FABs and no exit but a tab switch.
+                    //
+                    // It rides the PAGER'S OWN modifier chain rather than a full-bleed overlay Box, and
+                    // both halves of that matter:
+                    //  - Scoped to the pager, the tab row above stays live. An overlay sized to the
+                    //    whole Column covered the tabs too, so while the dock was up the first tap on
+                    //    Today/Calendar only dismissed and switching pages cost two taps.
+                    //  - In the chain rather than over it, the pages keep scrolling while capturing.
+                    //    An overlay cannot be "tapped through": hit-testing stops at the topmost
+                    //    sibling that hits, and a sibling below is reached only if the one above opts
+                    //    into `sharePointerInputWithSiblings()`, which `pointerInput` does not
+                    //    (PointerInputModifierNode defaults it to false). Consumption is beside the
+                    //    point — `detectTapGestures` consumes the down as well.
+                    //    As an ANCESTOR it is dispatched after its children on the Main pass, so a
+                    //    vertical scroll or a page swipe consumes the movement first and cancels the
+                    //    tap, and a row's own `clickable` consumes the down, so tapping a reminder
+                    //    opens it instead of being spent on dismissing the dock.
+                    // weight(1f) rather than fillMaxSize(): the add-task row below is a sibling in this
+                    // Column and a filling pager would push it off the bottom. With no row composed
+                    // (control arm) a single weighted child occupies exactly the space fillMaxSize gave
+                    // it, so that arm's layout is unchanged.
+                    //
+                    // The DIMMING is not here: it is a root-level scrim drawn over the whole screen (see
+                    // the end of this composable). Dimming just the pager left the toolbar and the tab
+                    // row bright, which the owner called out on both tabs (2026-08-13).
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .then(
+                            if (captureVisible) {
+                                Modifier.pointerInput(Unit) {
+                                    detectTapGestures(onTap = { onCaptureDockDismiss() })
+                                }
+                            } else {
+                                Modifier
+                            }
+                        ),
+                ) { page ->
+                    when (page) {
+                        0 -> TodayBody(
+                            state = todayState,
+                            onReminderClick = onTodayReminderClick,
+                            onCreateChecklistClick = onTodayCreateChecklistClick,
+                            onRetry = onTodayRetry,
+                            contentBottomPadding = bodyBottomPadding,
+                            canCapture = captureEnabled,
+                        )
+                        1 -> CalendarTabBody(
+                            state = calendarState,
+                            onIntent = onCalendarIntent,
+                            contentBottomPadding = bodyBottomPadding,
+                        )
+                    }
+                }
+
+                // The add-task row, PINNED under the pager rather than appended to a list — the one place
+                // this tab differs from the Inbox, and deliberately.
+                //
+                // Both of this tab's pages show REMINDERS, not a checklist you append to, and a capture
+                // here always lands in the system Inbox (see TodayViewModel.captureTask) — never on the
+                // day under the finger. A row sitting at the end of the agenda would promise "add to this
+                // date", which is the one thing it does not do. Pinned, it reads as the tab's action.
+                //
+                // One insertion point also covers BOTH pages and every state the bodies can be in
+                // (loading, empty, error, agenda) — the "+" it replaces was visible across all of them,
+                // and reproducing that inside two independent list bodies and their five empty branches
+                // is where the affordance would go missing on one of them.
+                //
+                // Gating and gate ORDER live in [captureRowVisible] at the top of this composable — see
+                // there for why the arm flag is read before the window size.
+                if (captureRowVisible) {
+                    AddTaskRow(
+                        onClick = onAddTaskRowClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Same chain as the bodies above: fillMaxWidth pins minWidth == maxWidth, and
+                            // a widthIn(max) coerced into a fixed range is a no-op, so the relax step in
+                            // the middle is what lets the cap bind on a tablet.
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .adaptiveContentWidth()
+                            .padding(
+                                horizontal = AppDimens.ScreenPaddingHorizontal,
+                                vertical = AppDimens.SpacingXs,
+                            )
+                            // The host's reserve, applied to the row because the row is the bottommost
+                            // element of this tab (see [bodyBottomPadding] above). It sits OUTSIDE
+                            // AddTaskRow's own `clickable`, which the component applies after the caller's
+                            // modifier — so this is dead space, not an enlarged target overlapping the
+                            // shell's AI button. 0.dp in the control arm, which draws no row at all.
+                            .padding(bottom = contentBottomPadding),
                     )
                 }
             }
+        }
 
-            // The add-task row, PINNED under the pager rather than appended to a list — the one place
-            // this tab differs from the Inbox, and deliberately.
-            //
-            // Both of this tab's pages show REMINDERS, not a checklist you append to, and a capture
-            // here always lands in the system Inbox (see TodayViewModel.captureTask) — never on the
-            // day under the finger. A row sitting at the end of the agenda would promise "add to this
-            // date", which is the one thing it does not do. Pinned, it reads as the tab's action.
-            //
-            // One insertion point also covers BOTH pages and every state the bodies can be in
-            // (loading, empty, error, agenda) — the "+" it replaces was visible across all of them,
-            // and reproducing that inside two independent list bodies and their five empty branches
-            // is where the affordance would go missing on one of them.
-            //
-            // Gating and gate ORDER live in [captureRowVisible] at the top of this composable — see
-            // there for why the arm flag is read before the window size.
-            if (captureRowVisible) {
-                AddTaskRow(
-                    onClick = onAddTaskRowClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // Same chain as the bodies above: fillMaxWidth pins minWidth == maxWidth, and
-                        // a widthIn(max) coerced into a fixed range is a no-op, so the relax step in
-                        // the middle is what lets the cap bind on a tablet.
-                        .wrapContentWidth(Alignment.CenterHorizontally)
-                        .adaptiveContentWidth()
-                        .padding(
-                            horizontal = AppDimens.ScreenPaddingHorizontal,
-                            vertical = AppDimens.SpacingXs,
-                        )
-                        // The host's reserve, applied to the row because the row is the bottommost
-                        // element of this tab (see [bodyBottomPadding] above). It sits OUTSIDE
-                        // AddTaskRow's own `clickable`, which the component applies after the caller's
-                        // modifier — so this is dead space, not an enlarged target overlapping the
-                        // shell's AI button. 0.dp in the control arm, which draws no row at all.
-                        .padding(bottom = contentBottomPadding),
-                )
-            }
+        // TOP-BAR scrim — the other tile, dimming the status-bar zone and the app bar the scaffold
+        // owns and the content cannot reach. Height is exactly the content column's offset, so the
+        // two tiles meet without a bright seam or a double-dark band. No pointer-input modifier: a
+        // background-only node is invisible to hit-testing, so the toolbar stays pressable.
+        if (captureVisible && contentTopPx > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(with(LocalDensity.current) { contentTopPx.toDp() })
+                    .background(captureScrimColor),
+            )
         }
     }
 }
