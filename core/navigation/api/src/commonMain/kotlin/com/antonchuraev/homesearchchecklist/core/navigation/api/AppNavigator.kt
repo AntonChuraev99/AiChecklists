@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.core.navigation.api
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import kotlinx.coroutines.flow.SharedFlow
 
 interface AppNavigator {
@@ -90,6 +92,24 @@ interface AppNavigator {
         initialText: String? = null,
         autoAnalyze: Boolean = false,
     )
+
+    /**
+     * Opens Analyze with the material picker ALREADY resolved to [inputKind], stamping [entrySource]
+     * so `ai_analyze_started` can be attributed to the door the user came through.
+     *
+     * A separate method rather than two more parameters on [navigateToAnalyzeScreen] because the two
+     * calls answer different questions: that one opens the material PICKER, this one opens a material
+     * already chosen from a named door.
+     *
+     * ⚠️ ABSTRACT ON PURPOSE — do not give it a default body. It carried one briefly (delegating to
+     * [navigateToAnalyzeScreen], to spare ~27 hand-written test fakes a mechanical edit) and that
+     * body silently dropped BOTH arguments: an implementation that forgot to override it would send
+     * the user to a generic picker and emit `ai_analyze_started` with an empty source — which is the
+     * exact outage this pair of parameters was introduced to end, restored by the very convenience
+     * that was meant to be free. Making it abstract moves that failure from production to the
+     * compiler, and the cost is paid once, by the fakes.
+     */
+    fun navigateToAnalyzeWithInput(inputKind: AnalyzeInputKind, entrySource: AiEntrySource)
 
     fun navigateToAnalyzeResultPreview()
 

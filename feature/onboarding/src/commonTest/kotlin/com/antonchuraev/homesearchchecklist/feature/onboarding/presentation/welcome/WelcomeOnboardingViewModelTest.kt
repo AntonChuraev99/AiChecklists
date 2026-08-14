@@ -4,7 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
@@ -547,6 +549,11 @@ class WelcomeOnboardingViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {
             navigatedToAnalyzeScreen = true
             lastAnalyzeInitialText = initialText

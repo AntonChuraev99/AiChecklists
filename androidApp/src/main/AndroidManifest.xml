@@ -22,7 +22,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.Gisti">
         <activity
             android:exported="true"
             android:name="com.antonchuraev.homesearchchecklist.MainActivity"
@@ -154,14 +154,18 @@
 
         <!-- Alarm-style full-screen reminder shown over the lock screen for per-item reminders
              that opted into reminderFullScreen. Launched only via setFullScreenIntent from
-             ReminderReceiver; not exported, excluded from recents. -->
+             ReminderReceiver; not exported, excluded from recents.
+             Theme.Gisti (night-aware window background): this screen renders
+             AppTheme(darkTheme = isSystemInDarkTheme()), so it follows the system night setting
+             exactly like the values-night resource qualifier does — no runtime override needed.
+             Without it a dark alarm screen fired at night flashed a white window first. -->
         <activity
             android:name="com.antonchuraev.homesearchchecklist.notification.FullScreenReminderActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+            android:theme="@style/Theme.Gisti" />
 
         <!-- Boot Completed Receiver: reschedule reminders after device reboot -->
         <receiver
@@ -201,6 +205,10 @@
                 android:resource="@xml/checklist_widget_info" />
         </receiver>
 
+        <!-- Keeps the platform LIGHT theme on purpose — do NOT switch this to @style/Theme.Gisti.
+             This screen renders AppTheme { } with the default darkTheme = false, i.e. it is
+             always light regardless of the system night setting. A night-aware window background
+             would put a dark backdrop behind permanently light content. -->
         <activity
             android:name="com.antonchuraev.homesearchchecklist.widget.config.WidgetConfigActivity"
             android:exported="true"

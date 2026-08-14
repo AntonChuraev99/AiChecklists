@@ -9,6 +9,10 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.jetbrains.kotlin.serialization)
+    // Screenshot tests for the chrome this module OWNS (the v2 navigation shell). core:designsystem
+    // already carries the same stack, but it cannot photograph this shell: the dependency runs
+    // composeApp -> core:designsystem, never back.
+    alias(libs.plugins.roborazzi)
 }
 
 kotlin {
@@ -176,8 +180,21 @@ kotlin {
             implementation(libs.robolectric)
             implementation(libs.androidx.compose.ui.test.junit4)
             implementation(libs.androidx.compose.ui.test.manifest)
+            // Roborazzi: JVM screenshots of the v2 shell's own chrome. Same versions and the same
+            // record/verify task pair core:designsystem uses.
+            implementation(libs.roborazzi)
+            implementation(libs.roborazzi.compose)
+            implementation(libs.roborazzi.junit.rule)
         }
     }
+}
+
+roborazzi {
+    // Golden PNGs live under src/ so they are versioned next to the test that records them —
+    // mirrors core:designsystem.
+    // Task: ./gradlew :composeApp:recordRoborazziAndroidHostTest
+    //       ./gradlew :composeApp:verifyRoborazziAndroidHostTest
+    outputDir.set(file("src/androidHostTest/roborazzi"))
 }
 
 // Compose UI tooling for Android debug builds — androidRuntimeClasspath is the AGP9 replacement

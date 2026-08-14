@@ -2,7 +2,9 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -424,6 +426,11 @@ class CreateChecklistViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {

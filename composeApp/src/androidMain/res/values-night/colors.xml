@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      Night variant of the @style/Theme.Gisti window background. Only the alias is overridden —
+      the two concrete colors stay in values/colors.xml so MainActivity can pick either one
+      explicitly, independent of the system configuration.
+
+      NOTE: on API 24-28 there is no system-wide dark theme and the app never calls
+      AppCompatDelegate.setDefaultNightMode, so this qualifier effectively never matches there.
+      Dark-theme users on those API levels are covered by the runtime setter in MainActivity.
+    -->
+    <color name="gisti_window_background">@color/gisti_window_background_dark</color>
+
+</resources>

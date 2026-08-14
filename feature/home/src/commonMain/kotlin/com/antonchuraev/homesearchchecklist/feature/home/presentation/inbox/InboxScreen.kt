@@ -9,6 +9,7 @@ import aichecklists.core.designsystem.generated.resources.checklist_rename
 import aichecklists.core.designsystem.generated.resources.checklist_rename_title
 import aichecklists.core.designsystem.generated.resources.delete
 import aichecklists.core.designsystem.generated.resources.delete_checklist
+import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_display_options
 import aichecklists.core.designsystem.generated.resources.inbox_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
@@ -108,6 +109,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -136,7 +138,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
@@ -221,6 +226,18 @@ fun InboxScreen(
      * can actually honour it.
      */
     onPlanDayClick: (() -> Unit)? = null,
+    /**
+     * Analytics `source` for the AI-credits chip in this screen's top bar; **null draws no chip**.
+     *
+     * Same shape (and same reason) as [CalendarScreen]'s: the chip is an arm-specific affordance, and
+     * a screen cannot see the nav arm. Threading the source rather than a boolean means the host
+     * cannot mount the chip without also declaring which surface it reports as — the paywall's
+     * `source` is the only thing that separates the four v2 tabs in the funnel, and a chip that
+     * reports the wrong one is as invisible as a chip that is absent.
+     *
+     * Pass [CreditsChipSource.V2_INBOX]. Null keeps previews and screenshot tests Koin-free.
+     */
+    creditsSource: String? = null,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.INBOX) }
@@ -302,7 +319,19 @@ fun InboxScreen(
                 )
             },
             startAlignedTitle = true,
+            // The credits chip LEADS, and it is composed outside the `content != null` guard on
+            // purpose: the paywall entry point must survive Loading and Error too. This tab is the v2
+            // home, and "I can't find where to open the paywall from the home screen" is the report
+            // this chip exists to answer — an entry point that disappears while the list is loading
+            // is the same defect with a smaller window.
+            //
+            // Flat siblings, not a Row: `AppScaffold` forwards this slot into Material's
+            // `actions: RowScope.() -> Unit`, so everything emitted here is already laid out in one
+            // row, in emission order.
             actions = {
+                if (creditsSource != null) {
+                    CreditsToolbarAction(source = creditsSource)
+                }
                 if (content != null) {
                     InboxToolbarActions(
                         // The system Inbox has no rename/delete, so it gets no overflow at all rather
@@ -349,6 +378,24 @@ fun InboxScreen(
                                 onAction = { onIntent(InboxIntent.OnCreateChipAction(it)) },
                                 showPickTime = false,
                                 showRepeat = false,
+                            )
+                        },
+                        // The main entry into Analyze. Inside the dock rather than behind the "+"
+                        // or an overflow: content → checklist is HALF of all checklist creation
+                        // (20 of 40 unique creators), and the v2 shell shipped with no route to it
+                        // at all — the funnel "saw the v2 shell → started a analysis" read 31 → 0.
+                        // A door that has to be discovered is the state we are leaving, not
+                        // arriving at.
+                        belowInput = {
+                            SourceRow(
+                                onSelect = { kind ->
+                                    onIntent(
+                                        InboxIntent.OnAiSourceTapped(
+                                            kind = kind,
+                                            source = AiEntrySource.CAPTURE_DOCK_INBOX,
+                                        )
+                                    )
+                                },
                             )
                         },
                     )
@@ -1205,9 +1252,79 @@ private fun InboxPageList(
                     )
                 }
             }
+
+            // Second door into Analyze, shown only on the INBOX page and only while it is SPARSE.
+            //
+            // Inbox-only because this composable also renders every PROJECT page of the pager, and
+            // the row cannot honestly serve one from the other. Its two surfaces (`INBOX_EMPTY` /
+            // `INBOX_SPARSE`) are defined as an Inbox page, so firing them from a project would fuse
+            // "the Inbox was empty" with "some project was empty" into one unsplittable series — and
+            // the tap itself lands wrong: `navigateToAnalyzeWithInput` carries no `checklistId`, so a
+            // user who reached for it from inside a project gets their checklist created elsewhere.
+            // The add-task row directly above already draws this line (`SOURCE_INBOX` vs
+            // `SOURCE_PROJECT`), and this row must not contradict it.
+            //
+            // Nothing is lost on a project page: the capture dock hosts the SAME row for the whole
+            // tab (see this screen's `bottomBar`), one "+" tap away, and reports its own surface.
+            //
+            // Sparse-only because this is the moment it helps: an empty or nearly-empty list is a
+            // user with nothing to act on, and "hand me a photo instead" is a real answer to that.
+            // Once the list fills up the same row would be permanent furniture between the user and
+            // their tasks, and the dock's copy is always one tap away regardless.
+            //
+            // Placed AFTER the add-task row rather than between it and the tasks: that row's own
+            // contract is to be the LAST element of the list (its top gap is what stops it reading
+            // as one more task), and splitting it from the list it terminates would undo a decision
+            // the owner already reviewed on device. The AI block therefore sits below it as a
+            // clearly separate offer — still inside the first viewport, which is what the sparse
+            // gate guarantees.
+            if (page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
+                item(key = "ai_source_row") {
+                    // One Column, not two siblings: a LazyColumn item is a single slot, and two
+                    // children in it are stacked at the same origin rather than laid out in order.
+                    Column(modifier = Modifier.padding(top = AppDimens.SpacingLg)) {
+                    // The heading carries the promise; the pills carry the doors. Without it four
+                    // bare pills read as "attach something to a task", which is a different (and
+                    // already-served) offer — the words are what make this the listing's own
+                    // "any content -> checklist".
+                    Text(
+                        text = stringResource(Res.string.inbox_ai_entry_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = rowInset.padding(bottom = AppDimens.SpacingSm),
+                    )
+                    SourceRow(
+                        onSelect = { kind ->
+                            onIntent(
+                                InboxIntent.OnAiSourceTapped(
+                                    kind = kind,
+                                    // Two values, not one: "the list was empty" and "the list was
+                                    // nearly empty" are different user states, and collapsing them
+                                    // would hide which of the two actually converts.
+                                    source = if (page.tasks.isEmpty()) {
+                                        AiEntrySource.INBOX_EMPTY
+                                    } else {
+                                        AiEntrySource.INBOX_SPARSE
+                                    },
+                                )
+                            )
+                        },
+                        modifier = rowInset,
+                    )
+                    }
+                }
+            }
         }
     }
 }
+
+/**
+ * Up to this many tasks the page still counts as sparse and shows the AI source row.
+ *
+ * Two rather than zero: a list holding one or two captured lines is still a user who has not got
+ * going, and the empty state alone would hide the affordance the moment they typed anything.
+ */
+private const val SparseInboxTaskLimit = 2
 
 /**
  * Holds the section clock steady while the user is working.

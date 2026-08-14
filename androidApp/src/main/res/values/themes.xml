@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      Activity theme for the app window.
+
+      Parent is deliberately the SAME platform theme the manifest pointed at before
+      (@android:style/Theme.Material.Light.NoActionBar), so this changes exactly one thing —
+      the window background — and cannot drift any other platform default. There is no
+      values-night/themes.xml on purpose: the night variation is carried by the
+      @color/gisti_window_background alias (:composeApp androidMain values/ + values-night/),
+      which keeps the parent style byte-identical in both configurations.
+
+      Why this theme exists at all: the platform Light theme hardcodes a WHITE windowBackground,
+      and windowBackground paints (a) the cold-start starting window before the first Compose
+      frame and (b) every pixel Compose does not cover. Under enableEdgeToEdge the content draws
+      behind the system bars, so any uncovered sliver — most visibly the strip under the
+      navigation bar — showed white on top of the dark app theme.
+
+      Deliberately NOT set here: android:statusBarColor, android:navigationBarColor,
+      android:windowLightStatusBar, android:windowLightNavigationBar. targetSdk is 36 and those
+      window-color attributes are deprecated no-ops from API 35 on; bar icon appearance is owned
+      at runtime by enableEdgeToEdge() in MainActivity. Setting them here would be dead config
+      on modern devices and a second, competing source of truth on older ones.
+    -->
+    <style name="Theme.Gisti" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/gisti_window_background</item>
+    </style>
+
+</resources>

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -245,7 +246,10 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onTermsClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp),
+                    // heightIn, never height — see AppButton's KDoc. `labelSmall` in a 28dp box is
+                    // already tight at fontScale 1.0 and clipped by 1.3; these are the store-required
+                    // legal links, so they must stay readable at every scale.
+                    modifier = Modifier.heightIn(min = 28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_terms),
@@ -256,7 +260,10 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onPrivacyClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp),
+                    // heightIn, never height — see AppButton's KDoc. `labelSmall` in a 28dp box is
+                    // already tight at fontScale 1.0 and clipped by 1.3; these are the store-required
+                    // legal links, so they must stay readable at every scale.
+                    modifier = Modifier.heightIn(min = 28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_privacy),
@@ -267,7 +274,10 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onSupportClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp),
+                    // heightIn, never height — see AppButton's KDoc. `labelSmall` in a 28dp box is
+                    // already tight at fontScale 1.0 and clipped by 1.3; these are the store-required
+                    // legal links, so they must stay readable at every scale.
+                    modifier = Modifier.heightIn(min = 28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_support),

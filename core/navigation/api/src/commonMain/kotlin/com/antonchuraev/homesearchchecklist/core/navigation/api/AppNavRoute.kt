@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.api
 
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import kotlinx.serialization.Serializable
 
 /**
@@ -69,6 +71,17 @@ sealed interface AppNavRoute : NavKey {
         // typed topic IS the explicit intent to generate. Default false preserves the
         // ACTION_PROCESS_TEXT contract (prefill only, user taps Analyze).
         val autoAnalyze: Boolean = false,
+        // Pre-selects the material picker so the screen opens ON the chosen source instead of on
+        // the "pick a source" list. The v2 dock names the four materials itself (Photo / PDF /
+        // Link / Voice), so arriving at a second picker would ask the same question twice.
+        // null = show the picker (every pre-v2 caller). [initialText] still wins: a non-blank
+        // prefill implies RAW_TEXT and is resolved first, so the two can never disagree.
+        val initialInputKind: AnalyzeInputKind? = null,
+        // WHICH affordance opened this screen. Carried only so AnalyzeViewModel can stamp
+        // `source` onto `ai_analyze_started` — without it the started/completed events cannot be
+        // attributed to an entry point at all, which is how the v2 Analyze entry went missing for
+        // a full release without anyone being able to see it in Amplitude.
+        val entrySource: AiEntrySource? = null,
     ) : AppNavRoute
 
     @Serializable

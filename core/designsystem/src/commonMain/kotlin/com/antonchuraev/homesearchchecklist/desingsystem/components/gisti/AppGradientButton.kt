@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +25,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -40,7 +42,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
  * a custom [ButtonColors] that still produces wrong ripple colors.
  *
  * Visual spec (from gisti-extra.jsx FilledBtn with gradient=true):
- *  - Height: 56dp, corner radius: 18dp
+ *  - Height: 56dp MINIMUM (grows for a wrapped label), corner radius: 18dp
  *  - Background: [GistiColors.aiGradient] (disabled: `surfaceVariant`)
  *  - Text: white, 16.5sp, weight 700
  *  - Icon: white, 21dp (when provided)
@@ -81,7 +83,9 @@ fun AppGradientButton(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            // heightIn, never height — see AppButton's KDoc. A 16.5sp Bold label in a box pinned to
+            // 56dp is clipped at fontScale 1.3+ and in the longer locales; the button grows instead.
+            .heightIn(min = 56.dp)
             .clip(shape)
             .then(backgroundModifier)
             .then(
@@ -113,7 +117,9 @@ fun AppGradientButton(
                     fontWeight = FontWeight.Bold,
                 ),
                 color = contentColor,
-                maxLines = 1,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
             )
         }
     }

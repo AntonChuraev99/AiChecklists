@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -28,6 +30,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Today
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.PremiumEntryPoint
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.PremiumEntryPointImpl
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
@@ -128,6 +132,10 @@ private class FakeAppLogger : AppLogger {
 }
 
 private class FakeNavigator : AppNavigator {
+    /** Paywall `source` values this navigator was asked for — the credits funnel's only attribution. */
+    val paywallSources = mutableListOf<String>()
+    var subscriptionStatusOpened = 0
+
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
     override val backStack: NavBackStack<NavKey> = NavBackStack()
     override fun showWidgetInstruction() {}
@@ -143,14 +151,19 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToEditChecklist(checklistId: Long) {}
     override fun navigateToTemplatesScreen() {}
     override fun navigateToTemplatePreview(templateId: String) {}
+    override fun navigateToAnalyzeWithInput(
+        inputKind: AnalyzeInputKind,
+        entrySource: AiEntrySource,
+    ) = Unit
+
     override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
     override fun navigateToAnalyzeResultPreview() {}
     override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
     override fun navigateToFillsList(checklistId: Long) {}
-    override fun navigateToPaywall(source: String) {}
+    override fun navigateToPaywall(source: String) { paywallSources += source }
     override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
-    override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
+    override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) { subscriptionStatusOpened++ }
     override fun navigateToShareChecklist(checklistId: Long) {}
     override fun navigateToUpdateFeed() {}
     override fun navigateToSettings() {}
@@ -207,9 +220,14 @@ private open class FakeChecklistRepository(
     override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) {}
 }
 
-private class FakePaywallRepository : PaywallRepository {
-    override val subscriptionStatus: Flow<SubscriptionStatus> =
-        flowOf(SubscriptionStatus.FREE)
+private class FakePaywallRepository(isPremium: Boolean = false) : PaywallRepository {
+    override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(
+        if (isPremium) {
+            SubscriptionStatus(isActive = true, activeEntitlements = setOf("AiChecklists Pro"))
+        } else {
+            SubscriptionStatus.FREE
+        }
+    )
     override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> = Result.success(null)
     override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Cancelled
     override suspend fun restorePurchases(): RestoreResult = RestoreResult.NoActiveSubscription
@@ -301,13 +319,18 @@ private fun makeViewModel(
     googleAuthRepository: GoogleAuthRepository = FakeGoogleAuthRepository(),
     userDataRepository: FakeUserDataRepository = FakeUserDataRepository(),
     analyticsTracker: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+    navigator: FakeNavigator = FakeNavigator(),
+    isPremium: Boolean = false,
+    // Defaults to the PRODUCTION implementation over this test's navigator, so a test that does not
+    // care about the gate still exercises the real branch rather than a stub that always agrees.
+    premiumEntryPoint: PremiumEntryPoint = PremiumEntryPointImpl(navigator),
 ): MainScreenViewModel {
-    val fakePaywallRepo = FakePaywallRepository()
+    val fakePaywallRepo = FakePaywallRepository(isPremium = isPremium)
     val fakeUserDataRepo = userDataRepository
     val fakeRemoteConfig = FakeRemoteConfigProvider()
     return MainScreenViewModel(
         repository = checklistRepository,
-        appNavigator = FakeNavigator(),
+        appNavigator = navigator,
         getSubscriptionStatusUseCase = GetSubscriptionStatusUseCase(fakePaywallRepo),
         userDataRepository = fakeUserDataRepo,
         getUserLimitsUseCase = GetUserLimitsUseCase(
@@ -320,6 +343,7 @@ private fun makeViewModel(
         hintsRepository = hintsRepository,
         googleAuthRepository = googleAuthRepository,
         syncRepository = syncRepository,
+        premiumEntryPoint = premiumEntryPoint,
         logger = logger,
     )
 }
@@ -864,6 +888,115 @@ class MainScreenViewModelTest {
             logger.errors.any { it.first == "main_pending_sync_push_failed" && it.second === cause },
             "A push returning AppResult.Error must be logged, not discarded; got ${logger.errors}",
         )
+    }
+
+    // ── v1 credits chip / premium banner: ONE gate, and a substitutable one ────
+    //
+    // v1 is the A/B CONTROL arm, so what it does must not move. What changed is HOW it gets the
+    // gate: it used to build `PremiumEntryPointImpl(appNavigator)` inline, which made it the single
+    // route through this branch that a test could not substitute — in a `fun interface` whose whole
+    // stated reason to exist is that a test can hand it a one-line recorder.
+
+    @Test
+    fun creditsChip_routesThroughTheInjectedGate_withItsOwnSource() = runTest {
+        val calls = mutableListOf<Pair<Boolean, String>>()
+        val navigator = FakeNavigator()
+        val vm = makeViewModel(
+            hintsRepository = FakeHintsRepository(),
+            navigator = navigator,
+            premiumEntryPoint = PremiumEntryPoint { isPremium, source -> calls += isPremium to source },
+        )
+        vm.awaitSuccess()
+
+        vm.sendIntent(MainScreenIntent.OnCreditsClick)
+
+        assertEquals(
+            listOf(false to "main_credits_chip"),
+            calls,
+            "The v1 chip must go through the INJECTED gate, carrying its own attribution: a " +
+                "paywall opened under someone else's source is indistinguishable, in Amplitude, " +
+                "from an affordance that does not exist",
+        )
+        assertTrue(
+            navigator.paywallSources.isEmpty(),
+            "…and it must not reach the navigator behind the gate's back; got ${navigator.paywallSources}",
+        )
+    }
+
+    /**
+     * The premium banner is the SAME gate and the SAME source — one affordance in two shapes.
+     *
+     * Pinned because "add a second source for the banner" is the obvious-looking change that would
+     * silently split one series in two.
+     */
+    @Test
+    fun premiumBanner_usesTheSameGateAndSourceAsTheChip() = runTest {
+        val calls = mutableListOf<Pair<Boolean, String>>()
+        val vm = makeViewModel(
+            hintsRepository = FakeHintsRepository(),
+            premiumEntryPoint = PremiumEntryPoint { isPremium, source -> calls += isPremium to source },
+        )
+        vm.awaitSuccess()
+
+        vm.sendIntent(MainScreenIntent.OnPremiumBannerClick)
+
+        assertEquals(listOf(false to "main_credits_chip"), calls)
+    }
+
+    /**
+     * Anti-regression for the control arm: the premium INPUT stays `subscriptionStatus.isActive`.
+     *
+     * Deliberately NOT the `isPremiumUser` OR of RevenueCat and Firestore that v2 uses — v1's
+     * behaviour has to stay byte-for-byte what it was while the experiment runs. This test is what
+     * makes a later "unify it" edit visible instead of silent.
+     */
+    @Test
+    fun premiumUser_reachesTheGateAsPremium_soASubscriberIsNotSoldASubscription() = runTest {
+        val calls = mutableListOf<Pair<Boolean, String>>()
+        val navigator = FakeNavigator()
+        val vm = makeViewModel(
+            hintsRepository = FakeHintsRepository(),
+            navigator = navigator,
+            isPremium = true,
+            premiumEntryPoint = PremiumEntryPoint { isPremium, source -> calls += isPremium to source },
+        )
+        vm.awaitSuccess()
+
+        vm.sendIntent(MainScreenIntent.OnCreditsClick)
+
+        assertEquals(listOf(true to "main_credits_chip"), calls)
+    }
+
+    /**
+     * End-to-end through the PRODUCTION gate, not the recorder.
+     *
+     * The recorder proves the wiring; this proves the wiring still lands where it always did, which
+     * is the part a control arm cannot afford to lose.
+     */
+    @Test
+    fun withTheProductionGate_aFreeUserStillReachesThePaywallAndAPremiumUserDoesNot() = runTest {
+        val freeNavigator = FakeNavigator()
+        makeViewModel(hintsRepository = FakeHintsRepository(), navigator = freeNavigator)
+            .also { it.awaitSuccess() }
+            .sendIntent(MainScreenIntent.OnCreditsClick)
+
+        assertEquals(listOf("main_credits_chip"), freeNavigator.paywallSources)
+        assertEquals(0, freeNavigator.subscriptionStatusOpened)
+
+        val premiumNavigator = FakeNavigator()
+        makeViewModel(
+            hintsRepository = FakeHintsRepository(),
+            navigator = premiumNavigator,
+            isPremium = true,
+        )
+            .also { it.awaitSuccess() }
+            .sendIntent(MainScreenIntent.OnCreditsClick)
+
+        assertTrue(
+            premiumNavigator.paywallSources.isEmpty(),
+            "Selling a subscription to a subscriber is the worst outcome this branch can produce",
+        )
+        assertEquals(1, premiumNavigator.subscriptionStatusOpened)
     }
 }
 

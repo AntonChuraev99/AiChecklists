@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.desingsystem.theme
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -53,11 +54,30 @@ object AppShapeTokens {
     val Button: CornerBasedShape = RoundedCornerShape(14.dp)
 
     /**
-     * Top corners of anything that rises from the bottom edge — the capture dock, the inline chat
-     * panel, `ModalBottomSheet`.
-     *
-     * One token because these surfaces are seen in succession and previously disagreed (the dock was
-     * 20dp while the panel was 28dp), which read as two different bottom sheets.
+     * The radius behind [SheetTop], exposed as a [Dp] for the one thing a [CornerBasedShape] cannot
+     * serve: hand-drawn geometry that has to trace the same corner. `GistiGlassChatDock` strokes its
+     * top hairline with `drawWithContent`, so it needs the number, and a second `28.dp` literal there
+     * is exactly how a shape and its outline drift apart.
      */
-    val SheetTop: CornerBasedShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val BottomChromeCorner: Dp = 28.dp
+
+    /**
+     * Top corners of every surface at the window's bottom edge — the v2 navigation bar, the capture
+     * dock, the chat dock, the inline chat panel, `ModalBottomSheet`.
+     *
+     * One token because these surfaces are seen in succession AND stacked, and they previously
+     * disagreed three ways: the bar was 24dp, the capture dock 20dp, the chat dock 28dp. Colour alone
+     * does not fix that — with one tone and three radii the bottom of the screen still reads as three
+     * docks piled up, because the corner is where the eye finds the edge of an object. The navigation
+     * bar was the deliberate exception ("the plinth does not rise; it is the edge those surfaces rise
+     * from") and that exception is what the owner saw as three different languages, so it is gone: the
+     * dock's bottom edge IS the bar's top edge, and two surfaces that meet on a shared edge must agree
+     * on that edge's shape.
+     *
+     * Pairs with [AppSurface.bottomChrome][
+     * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface.bottomChrome] — one tone, one
+     * radius, one bottom chrome.
+     */
+    val SheetTop: CornerBasedShape =
+        RoundedCornerShape(topStart = BottomChromeCorner, topEnd = BottomChromeCorner)
 }

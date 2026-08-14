@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.templates
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntryDestination
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -63,6 +65,24 @@ class TemplatesViewModel(
             is TemplatesScreenIntent.OnSearchQueryChange -> onSearchQueryChange(intent.query)
             TemplatesScreenIntent.OnToggleSearch -> toggleSearch()
             TemplatesScreenIntent.OnCreateWeeklyClick -> handleCreateWeeklyClick()
+            is TemplatesScreenIntent.OnCreateWithAiClick -> analyticsTracker.event(
+                AnalyticsEvents.AiEntry.TAPPED,
+                buildMap {
+                    put(AnalyticsParams.DESTINATION, AiEntryDestination.AI_CREATE.wire)
+                    put(AnalyticsParams.SOURCE, intent.source.wire)
+                    // No INPUT_TYPE: this door leads to the chat's create flow, which has no
+                    // material to pre-select. Sending a placeholder would put a value in a column
+                    // that only means something for the analyze doors.
+                    //
+                    // The query dimensions ride along only where a query exists, and both are sent
+                    // together: `has_query` gives the countable denominator, `query_len` the shape.
+                    val query = intent.query?.takeIf { it.isNotBlank() }
+                    if (intent.source == AiEntrySource.TEMPLATES_EMPTY_SEARCH) {
+                        put(AnalyticsParams.HAS_QUERY, query != null)
+                        put(AnalyticsParams.QUERY_LEN, query?.length ?: 0)
+                    }
+                },
+            )
         }
     }
 

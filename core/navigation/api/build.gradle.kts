@@ -28,6 +28,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // `api`, not `implementation`: AnalyzeInputKind / AiEntrySource appear in the PUBLIC
+            // signature of AppNavRoute.Analyze and AppNavigator, so every consumer must see them
+            // without re-declaring the dependency (an `implementation` dep is not transitive).
+            // No cycle is possible — :core:common:api declares no project dependencies at all.
+            api(projects.core.common.api)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
             // Navigation 3 — NavKey is part of AppNavRoute's public API (sealed interface AppNavRoute : NavKey).

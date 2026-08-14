@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.domain.model
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import kotlinx.serialization.Serializable
 
 /**
@@ -82,4 +83,26 @@ enum class InputDataType {
     WEB_LINK,
     RAW_TEXT,
     VOICE
+}
+
+/**
+ * Resolves a navigation-level [AnalyzeInputKind] onto this screen's own picker state.
+ *
+ * Two enums rather than one because the direction of dependency forbids it: `AppNavRoute` and the
+ * design-system source row both need this vocabulary, and neither may depend on `feature:analyze`.
+ * [AnalyzeInputKind] therefore lives in `core:common:api` and this is the single seam between them.
+ *
+ * Exhaustive on purpose — no `else`. Adding a kind to [AnalyzeInputKind] must break THIS file
+ * loudly at compile time; a `null` fallback would instead open the source picker, i.e. the user
+ * taps a named material and is asked to name it again, silently.
+ *
+ * [InputDataType.TEXT_FILE] has no kind: nothing navigates straight to it (the four doors are
+ * Photo / PDF / Link / Voice), and it stays reachable through the on-screen picker as before.
+ */
+fun AnalyzeInputKind.toInputDataType(): InputDataType = when (this) {
+    AnalyzeInputKind.PHOTO -> InputDataType.PHOTO
+    AnalyzeInputKind.PDF -> InputDataType.PDF
+    AnalyzeInputKind.WEB_LINK -> InputDataType.WEB_LINK
+    AnalyzeInputKind.RAW_TEXT -> InputDataType.RAW_TEXT
+    AnalyzeInputKind.VOICE -> InputDataType.VOICE
 }

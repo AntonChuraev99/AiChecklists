@@ -23,6 +23,7 @@ import aichecklists.core.designsystem.generated.resources.inbox_task_move_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_moved_message
 import aichecklists.core.designsystem.generated.resources.main_error_description
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntryDestination
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -467,6 +468,21 @@ class InboxViewModel(
                 AnalyticsEvents.Nav.CREATE_FAB_TAPPED,
                 mapOf(AnalyticsParams.SOURCE to SOURCE_INLINE_ROW),
             )
+            // Report BEFORE navigating, and unconditionally. The tap is the fact being measured:
+            // if navigation later fails or the user backs straight out, "someone reached for
+            // Analyze" still has to be true in the data — that is the whole reason the funnel
+            // 31 → 0 was unreadable before this event existed.
+            is InboxIntent.OnAiSourceTapped -> {
+                analytics.event(
+                    AnalyticsEvents.AiEntry.TAPPED,
+                    mapOf(
+                        AnalyticsParams.DESTINATION to AiEntryDestination.ANALYZE.wire,
+                        AnalyticsParams.SOURCE to intent.source.wire,
+                        AnalyticsParams.INPUT_TYPE to intent.kind.wire,
+                    ),
+                )
+                navigator.navigateToAnalyzeWithInput(intent.kind, intent.source)
+            }
             is InboxIntent.OnTaskCheckedChanged -> setTaskChecked(intent.taskId, intent.checked)
             // A fresh ItemSheetState, not a copy: every sub-surface (note draft, reminder tab, custom
             // picker) belongs to the PREVIOUS task, and carrying one over would show the last task's

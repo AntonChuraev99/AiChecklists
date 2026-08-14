@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -42,7 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppElevation
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -92,7 +93,9 @@ fun GistiChatDock(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp),
+            // heightIn, never height — see AppButton's KDoc. The pill shows the checklist name as
+            // its context label, which is user-authored and unbounded.
+            .heightIn(min = 56.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         // 1dp, not the 1.5dp this pill used to carry: every hairline in the ladder is 1dp, and a
@@ -217,7 +220,7 @@ fun GistiGlassChatDock(
     chipsContent: (@Composable () -> Unit)? = null,
     pillContent: @Composable () -> Unit,
 ) {
-    val dockShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val dockShape = AppShapeTokens.SheetTop
     // Variant B "Crisp hairline": the dock reads as a distinct foreground panel via a 1dp hairline
     // (outlineVariant) tracing its top edge + rounded corners — NOT via a tinted surface. The earlier
     // "FIX D" used a flat grey (surfaceContainerLow) on the near-white page, but the ~2% lightness gap
@@ -242,7 +245,7 @@ fun GistiGlassChatDock(
                 drawContent()
                 if (!legacyDock) {
                     val stroke = 1.dp.toPx()
-                    val r = 28.dp.toPx()
+                    val r = AppShapeTokens.BottomChromeCorner.toPx()
                     val inset = stroke / 2f
                     val hairline = Path().apply {
                         moveTo(inset, size.height)
@@ -275,12 +278,17 @@ fun GistiGlassChatDock(
 }
 
 /**
- * Background colour of [GistiGlassChatDock] ("Crisp hairline" variant). Exposed so any system
- * navigation-bar strip painted behind the dock (e.g. MainScreen / ChecklistDetailScreen) stays in
- * sync with the dock surface — the strip and the dock MUST read as one continuous surface, so the
- * colour lives in exactly ONE place. Light = pure white (surfaceContainerLowest); dark keeps
- * surfaceContainerLow (a touch lighter than the page). Separation from the page comes from the
- * dock's 1dp [outlineVariant][androidx.compose.material3.ColorScheme.outlineVariant] hairline.
+ * Background colour of [GistiGlassChatDock], and of any system navigation-bar strip painted behind
+ * it (MainScreen / ChecklistDetailScreen) — the strip and the dock MUST read as one continuous
+ * surface.
+ *
+ * ## This is now a forwarder, not a decision
+ * It used to own its own light/dark pair (white / `surfaceContainerLow`). That made the chat dock a
+ * SECOND source of truth for "what colour is the bottom of the screen", beside the navigation bar's
+ * own — and the two disagreed, which is what put three differently-coloured docks in one frame. The
+ * colour now lives in [AppSurface.bottomChrome] and every bottom surface reads it from there, so the
+ * bar and the chat cannot drift apart again. Kept as a named function because ~6 call sites reference
+ * it and the name says what it is for at those sites.
  */
 @Composable
 @ReadOnlyComposable
@@ -288,10 +296,8 @@ fun gistiDockColor(): Color =
     if (DockDesignDebug.useLegacyDock) {
         // Legacy (pre-"Crisp hairline") flat-grey dock — same surfaceContainerLow in light & dark.
         MaterialTheme.colorScheme.surfaceContainerLow
-    } else if (LocalIsDarkTheme.current) {
-        MaterialTheme.colorScheme.surfaceContainerLow
     } else {
-        MaterialTheme.colorScheme.surfaceContainerLowest
+        AppSurface.bottomChrome()
     }
 
 /**

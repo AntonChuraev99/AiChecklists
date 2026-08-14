@@ -41,7 +41,13 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.common.api)
+            // `api`, not `implementation`, for the same reason as `haze` below: this module's
+            // PUBLIC signatures carry core:common:api types — `SourceRow(onSelect: (AnalyzeInputKind) -> Unit)`
+            // is the live one. Under `implementation` the type is leaked without being exported, and
+            // it only compiles while every host happens to declare core:common:api itself; the first
+            // host that does not fails with "Cannot access class …AnalyzeInputKind", exactly as the
+            // v2 shell did over HazeState.
+            api(projects.core.common.api)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.Firebase
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.repository.AnalyzeRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeEntryArgs
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeViewModel
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewViewModel
 import org.koin.core.module.dsl.viewModel
@@ -29,13 +30,26 @@ val analyzeFeatureModule = module {
     // attachment flows (CreateChecklistFromAttachment).
     single<AiAnalyzer> { FirebaseAiAnalyzerAdapter(analyzeRepository = get()) }
 
-    // ViewModel with optional checklistId, fillDefault, initialText and autoAnalyze parameters
-    viewModel { (checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) ->
+    // ViewModel with optional checklistId, fillDefault, initialText, autoAnalyze parameters, plus
+    // the v2 entry-point pair (which material the door chose, and which door it was).
+    //
+    // Koin's destructured `parametersOf` is POSITIONAL and untyped at the call site — the two new
+    // values go LAST so every existing 4-arg call keeps its meaning. Adding them anywhere else
+    // would silently shift `initialText` into `autoAnalyze` at runtime, with no compiler warning.
+    viewModel { (
+        checklistId: Long?,
+        fillDefault: Boolean,
+        initialText: String?,
+        autoAnalyze: Boolean,
+        entryArgs: AnalyzeEntryArgs,
+    ) ->
         AnalyzeViewModel(
             checklistId = checklistId,
             fillDefault = fillDefault,
             initialText = initialText,
             autoAnalyze = autoAnalyze,
+            initialInputKind = entryArgs.inputKind,
+            entrySource = entryArgs.source,
             analyzeRepository = get(),
             checklistRepository = get(),
             appNavigator = get(),

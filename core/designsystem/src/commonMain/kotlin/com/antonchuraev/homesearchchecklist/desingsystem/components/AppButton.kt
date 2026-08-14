@@ -3,10 +3,9 @@ package com.antonchuraev.homesearchchecklist.desingsystem.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,10 +21,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 
+/**
+ * The primary, filled action.
+ *
+ * ## Why the label is never scaled down, and the button grows instead
+ * This button used to pin itself to `Modifier.height(ButtonHeight)` and hand its label
+ * `maxLines = 1` plus `TextAutoSize.StepBased(labelLarge.fontSize / 2, …)`. Those three constraints
+ * cannot all hold at once, so the text lost: `Modifier.height` fixes min AND max, so the box could
+ * not grow; `maxLines = 1` forbade a second line; and the only remaining degree of freedom was the
+ * font, with a floor at **half** the type ramp — about 7sp on a 14sp `labelLarge`. Long labels
+ * therefore shipped at an unreadable size on every sticky CTA in the app, which all route through
+ * here (share, template preview, analyze preview, paywall). RU and HI at `fontScale 1.5` hit it
+ * hardest because their labels are longest exactly where the user asked for bigger text.
+ *
+ * The fix is the one the repo already documents for chips — see `GistiPromptChips` ("heightIn, never
+ * height … the chip is allowed to grow") and `SourceRow` ("MinTouchTarget as a MINIMUM, never a fixed
+ * height"). [AppDimens.ButtonHeight] becomes a floor, the label keeps the full `labelLarge` ramp, and
+ * a label too long for one line WRAPS to a second, centred.
+ *
+ * Two lines is the cap, not one: two lines fit a CTA, three mean the string is wrong. Ellipsis is the
+ * overflow of last resort and is only reachable past two lines at extreme scale — a truncated CTA is
+ * better than one that pushes the sheet off screen, but it should not be reachable on ordinary text.
+ */
 @Composable
 fun AppButton(
     text: String,
@@ -40,7 +63,7 @@ fun AppButton(
         // While loading the button keeps its primary color (not greyed) so the spinner
         // reads as "processing", but taps are swallowed.
         onClick = { if (!loading) onClick() },
-        modifier = modifier.height(AppDimens.ButtonHeight),
+        modifier = modifier.heightIn(min = AppDimens.ButtonHeight),
         enabled = enabled,
         shape = shape,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
@@ -63,11 +86,9 @@ fun AppButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                autoSize = TextAutoSize.StepBased(
-                    MaterialTheme.typography.labelLarge.fontSize / 2,
-                    MaterialTheme.typography.labelLarge.fontSize
-                )
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -111,7 +132,10 @@ fun AppButtonSecondary(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.height(AppDimens.ButtonHeight),
+        // heightIn, never height — see [AppButton]'s KDoc. This one carries the app's longest CTA
+        // strings (TemplatesScreen swaps "Create weekly" for "Unlock more with Premium" in the same
+        // slot), so a fixed box clipped or shrank the label on the widest-label surface there is.
+        modifier = modifier.heightIn(min = AppDimens.ButtonHeight),
         enabled = enabled,
         shape = shape,
         colors = if (accentColor.isSpecified) {
@@ -135,7 +159,10 @@ fun AppButtonSecondary(
         }
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -170,7 +197,8 @@ fun AppButtonDestructive(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.height(AppDimens.ButtonHeight),
+        // heightIn, never height — see [AppButton]'s KDoc.
+        modifier = modifier.heightIn(min = AppDimens.ButtonHeight),
         enabled = enabled,
         shape = shape,
         colors = ButtonDefaults.buttonColors(
@@ -181,7 +209,10 @@ fun AppButtonDestructive(
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
 }

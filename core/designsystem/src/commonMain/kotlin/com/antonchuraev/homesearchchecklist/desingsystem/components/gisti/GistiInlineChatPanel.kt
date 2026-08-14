@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.OpenInFull
@@ -90,6 +89,7 @@ import aichecklists.core.designsystem.generated.resources.chat_panel_help_descri
 import aichecklists.core.designsystem.generated.resources.chat_panel_open_full
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppElevation
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import org.jetbrains.compose.resources.stringResource
@@ -203,7 +203,7 @@ fun GistiInlineChatPanel(
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    shape = AppShapeTokens.SheetTop,
                     // Clean white panel: plain `surface` with NO tonal overlay. Depth comes from
                     // the drop shadow alone (light), matching AskGistiBar / AppCard. A tonalElevation
                     // would mix +primary into the surface and make the dock look grey-tinted (the

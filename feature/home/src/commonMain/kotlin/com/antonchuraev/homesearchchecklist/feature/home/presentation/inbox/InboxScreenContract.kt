@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
@@ -265,6 +267,24 @@ sealed interface InboxIntent : Intent {
      * of parallel vocabulary that drifts the moment a seventh chip is added.
      */
     data class OnCreateChipAction(val action: GistiItemCreateAction) : InboxIntent
+
+    /**
+     * One of the AI source pills (Photo / PDF / Web Link / Voice) was tapped.
+     *
+     * Routed through the ViewModel rather than through a host callback because BOTH halves of the
+     * response belong together and neither belongs to the shell: the emit of `ai_entry_tapped` and
+     * the navigation into Analyze with that material pre-selected. Splitting them across layers is
+     * how the v2 shell ended up with a credits chip that navigated but reported nothing, and an
+     * Analyze entry that reported nothing because it did not exist at all.
+     *
+     * @param source WHICH of this screen's two doors was tapped — the capture dock, the empty
+     *   state, or the sparse-inbox row. Passed in by the composable rather than inferred here:
+     *   the ViewModel cannot see which of its own surfaces the user was looking at.
+     */
+    data class OnAiSourceTapped(
+        val kind: AnalyzeInputKind,
+        val source: AiEntrySource,
+    ) : InboxIntent
 
     data class OnTaskCheckedChanged(val taskId: String, val checked: Boolean) : InboxIntent
 

@@ -65,8 +65,11 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeEntryArgs
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -78,9 +81,24 @@ fun AnalyzeScreen(
     fillDefault: Boolean = false,
     initialText: String? = null,
     autoAnalyze: Boolean = false,
+    /** Material chosen at the door, so this screen opens ON it instead of on its source picker. */
+    initialInputKind: AnalyzeInputKind? = null,
+    /** Which affordance opened this screen — stamped onto the `ai_analyze_*` events. */
+    entrySource: AiEntrySource? = null,
     viewModel: AnalyzeViewModel = koinViewModel(
-        key = "analyze_${checklistId}_${fillDefault}_${initialText?.hashCode()}_$autoAnalyze"
-    ) { parametersOf(checklistId, fillDefault, initialText, autoAnalyze) }
+        // Both new arguments are part of the KEY. Without them, opening Photo and then Voice from
+        // the dock would resolve the SAME cached ViewModel and the second tap would land on the
+        // photo picker — the very "tapped Voice, got the wrong screen" dead end this work removes.
+        key = "analyze_${checklistId}_${fillDefault}_${initialText?.hashCode()}_${autoAnalyze}_${initialInputKind}_$entrySource"
+    ) {
+        parametersOf(
+            checklistId,
+            fillDefault,
+            initialText,
+            autoAnalyze,
+            AnalyzeEntryArgs(inputKind = initialInputKind, source = entrySource),
+        )
+    }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.ANALYZE) }

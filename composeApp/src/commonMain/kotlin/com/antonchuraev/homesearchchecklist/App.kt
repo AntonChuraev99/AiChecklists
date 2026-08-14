@@ -258,6 +258,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.Che
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.FillsListScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.picker.AddToChecklistPickerScreen
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallRoute
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
@@ -1941,7 +1942,27 @@ fun App() {
                             detailPlaceholder = { EmptyDetailPlaceholder() }
                         )
                     ) {
-                        TemplatesScreen()
+                        TemplatesScreen(
+                            // Reuses the EXISTING "✨ Create with AI" flow (the CREATE_WITH_AI
+                            // prompt chip) rather than inventing a second one: same chat dock, same
+                            // prefill seed, same Layer-1 CreateChecklist preview on send. A parallel
+                            // path would be a second thing to keep in step with the first.
+                            //
+                            // The search query, when there is one, is appended to that seed so the
+                            // user lands on "Create a checklist for <what they just typed>" with
+                            // the words they already chose — and still taps Send themselves, which
+                            // is what protects the AI-credit budget.
+                            onCreateWithAi = { query ->
+                                onQuickAction(GistiQuickAction.CREATE_WITH_AI)
+                                if (!query.isNullOrBlank()) {
+                                    chatViewModel.sendIntent(
+                                        ChatScreenIntent.OnPrefillInput(
+                                            quickCreateWithAiPrefill + query
+                                        )
+                                    )
+                                }
+                            },
+                        )
                     }
 
                     entry<AppNavRoute.CreateChecklistRoute.TemplatePreview>(
@@ -1977,6 +1998,11 @@ fun App() {
                             fillDefault = route.fillDefault,
                             initialText = route.initialText,
                             autoAnalyze = route.autoAnalyze,
+                            // Forwarded, not defaulted: dropping either here is exactly how the v2
+                            // source row would land every door on the generic picker and report
+                            // every analysis as source-less.
+                            initialInputKind = route.initialInputKind,
+                            entrySource = route.entrySource,
                         )
                     }
 
@@ -2183,6 +2209,16 @@ fun App() {
                             // Calendar and the standalone Today route have no capture affordance and
                             // get the neutral wording.
                             captureEnabled = navVariant == NavVariant.V2,
+                            // AI-credits chip = the paywall entry point, v2 ONLY. This entry is the
+                            // one v2 tab the CONTROL arm also reaches (the v1 drawer pushes
+                            // AppNavRoute.Calendar), so an unconditional chip here would plant a new
+                            // paywall door inside the control arm and confound the A/B. Same arm gate,
+                            // same reason, as captureEnabled directly above.
+                            creditsSource = if (navVariant == NavVariant.V2) {
+                                CreditsChipSource.V2_CALENDAR
+                            } else {
+                                null
+                            },
                         )
                     }
 
@@ -2221,6 +2257,10 @@ fun App() {
                             // pane. backStack is a SnapshotStateList, so this re-evaluates on push/pop.
                             swallowRootBack = navigator.backStack.lastOrNull() is AppNavRoute.Inbox,
                             homeSignal = v2InboxHomeSignal,
+                            // The paywall entry point on the v2 HOME tab. Passed explicitly even
+                            // though InboxRoute defaults to it, so all four tabs read alike here and
+                            // the set of surfaces is visible in one place.
+                            creditsSource = CreditsChipSource.V2_INBOX,
                         )
                     }
 
@@ -2229,7 +2269,10 @@ fun App() {
                             detailPlaceholder = { EmptyDetailPlaceholder() }
                         )
                     ) {
-                        ProjectsRoute(contentBottomPadding = v2FabBandPadding)
+                        ProjectsRoute(
+                            contentBottomPadding = v2FabBandPadding,
+                            creditsSource = CreditsChipSource.V2_PROJECTS,
+                        )
                     }
 
                     entry<AppNavRoute.Overview> {
@@ -2263,6 +2306,7 @@ fun App() {
                             googleDisplayName = userData.googleDisplayName,
                             onSignInClick = handleSignIn,
                             onSignOutClick = handleSignOut,
+                            creditsSource = CreditsChipSource.V2_OVERVIEW,
                         )
                     }
 

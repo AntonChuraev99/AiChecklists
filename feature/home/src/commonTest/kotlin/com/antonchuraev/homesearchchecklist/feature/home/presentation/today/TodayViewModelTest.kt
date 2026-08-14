@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -66,6 +68,9 @@ private class FakeNavigator : AppNavigator {
     val navigatedChecklistIds = mutableListOf<Long>()
     var navigatedToTemplates = false
 
+    /** (material, door) pairs handed to Analyze — the other half of an `ai_entry_tapped`. */
+    val analyzeEntries = mutableListOf<Pair<AnalyzeInputKind, AiEntrySource>>()
+
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
     override val backStack: NavBackStack<NavKey> = NavBackStack()
     override fun showWidgetInstruction() {}
@@ -81,6 +86,13 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToEditChecklist(checklistId: Long) {}
     override fun navigateToTemplatesScreen() { navigatedToTemplates = true }
     override fun navigateToTemplatePreview(templateId: String) {}
+    override fun navigateToAnalyzeWithInput(
+        inputKind: AnalyzeInputKind,
+        entrySource: AiEntrySource,
+    ) {
+        analyzeEntries += inputKind to entrySource
+    }
+
     override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
     override fun navigateToAnalyzeResultPreview() {}
     override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {
@@ -623,6 +635,67 @@ class TodayViewModelTest {
         job.cancel()
     }
 
+    // ── 15b. ai_entry_tapped from the Calendar tab's capture dock ──────────────
+    //
+    // The event shipped with no test at all — which is the hole it exists to close. A typo in a
+    // `wire` value, a dropped `input_type` or a `source` copy-pasted from the Inbox door would all
+    // leave this affordance looking healthy while its funnel joined against nothing. The assertion
+    // pins the WHOLE map: an EXTRA dimension is as much a defect as a missing one, because
+    // Amplitude registers a property name on first ingest and cannot un-register it.
+
+    @Test
+    fun `aiSourceTap_emitsTheFullParamMap_forTheCalendarDock`() = runTest {
+        val analytics = RecordingAnalytics()
+        val navigator = FakeNavigator()
+        val repo = FakeRepository()
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger)
+
+        vm.sendIntent(TodayIntent.OnAiSourceTapped(AnalyzeInputKind.PHOTO))
+
+        assertEquals(
+            listOf(
+                "ai_entry_tapped" to mapOf<String, Any>(
+                    "destination" to "analyze",
+                    "source" to "capture_dock_calendar",
+                    "input_type" to "photo",
+                ),
+            ),
+            analytics.events,
+            "This tab has ONE door (the capture dock) and it must say so: a source borrowed from " +
+                "the Inbox dock fuses two surfaces that convert differently",
+        )
+    }
+
+    /**
+     * Reporting comes FIRST, and it is unconditional.
+     *
+     * The tap is the fact being measured: if navigation later fails or the user backs straight out,
+     * "someone reached for Analyze" still has to be true in the data. Both halves are asserted here
+     * because splitting them across layers is how the v2 credits chip ended up navigating while
+     * reporting nothing.
+     */
+    @Test
+    fun `aiSourceTap_reportsAndThenNavigatesWithTheSameMaterialAndDoor`() = runTest {
+        val analytics = RecordingAnalytics()
+        val navigator = FakeNavigator()
+        val repo = FakeRepository()
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger)
+
+        vm.sendIntent(TodayIntent.OnAiSourceTapped(AnalyzeInputKind.VOICE))
+
+        assertEquals(
+            listOf(AnalyzeInputKind.VOICE to AiEntrySource.CAPTURE_DOCK_CALENDAR),
+            navigator.analyzeEntries,
+            "Analyze must open on the material the user named, carrying the door that opened it",
+        )
+        assertEquals(
+            "voice",
+            analytics.events.single().second["input_type"],
+            "…and the SAME material must be on the wire, or ai_entry_tapped -> ai_analyze_started " +
+                "cannot be joined on input_type",
+        )
+    }
+
     // ── 16. Capture feedback must survive a collector that subscribes late ──
 
     /**
@@ -716,5 +789,16 @@ class TodayViewModelTest {
         override fun setUserProperties(properties: Map<String, Any>) = Unit
         override fun screenView(name: String) = Unit
         override fun event(name: String, params: Map<String, Any>) = Unit
+    }
+
+    /** Keeps name AND params so an assertion can pin the whole map, not one key of it. */
+    private class RecordingAnalytics : AnalyticsTracker {
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
+        override fun setUserId(userId: String) = Unit
+        override fun setUserProperties(properties: Map<String, Any>) = Unit
+        override fun screenView(name: String) = Unit
+        override fun event(name: String, params: Map<String, Any>) {
+            events += name to params
+        }
     }
 }

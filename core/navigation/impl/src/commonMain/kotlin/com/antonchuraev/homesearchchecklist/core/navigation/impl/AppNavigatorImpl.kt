@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.core.navigation.impl
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -123,6 +125,9 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) =
         push(AppNavRoute.Analyze(checklistId, fillDefault, initialText, autoAnalyze))
+
+    override fun navigateToAnalyzeWithInput(inputKind: AnalyzeInputKind, entrySource: AiEntrySource) =
+        push(AppNavRoute.Analyze(initialInputKind = inputKind, entrySource = entrySource))
 
     override fun navigateToAnalyzeResultPreview() = push(AppNavRoute.AnalyzeResultPreview)
 

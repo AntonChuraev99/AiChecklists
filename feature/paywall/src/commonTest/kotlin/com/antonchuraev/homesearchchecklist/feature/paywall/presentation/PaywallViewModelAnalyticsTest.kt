@@ -3,11 +3,13 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm
 import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -558,6 +560,11 @@ class PaywallViewModelAnalyticsTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(
             checklistId: Long?,
             fillDefault: Boolean,

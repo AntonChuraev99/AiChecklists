@@ -190,7 +190,6 @@
     <string name="templates_use_template">Использовать шаблон</string>
     <string name="templates_section_title">Выберите шаблон</string>
     <string name="templates_tap_to_use">Нажмите, чтобы использовать</string>
-    <string name="templates_create_manually">Создать вручную</string>
     <string name="templates_create_with_ai">Создать с ИИ</string>
 
     <!-- Экран предпросмотра шаблона -->
@@ -235,6 +234,7 @@
     <string name="analyze_source_pdf">PDF</string>
     <string name="analyze_source_text_file">Текстовый файл</string>
     <string name="analyze_source_link">Ссылка</string>
+    <string name="analyze_source_link_short">Ссылка</string>
     <string name="analyze_source_text">Вставить текст</string>
     <string name="analyze_source_voice">Голос</string>
     <string name="analyze_url_label">URL</string>
@@ -1446,6 +1446,7 @@
     <string name="inbox_empty_title">Во входящих пусто</string>
     <string name="inbox_empty_description">Всё, что вы записываете, сначала попадает сюда. Добавьте задачу сейчас, а разложить по проектам можно позже.</string>
     <string name="inbox_project_empty_description">В этом проекте пока нет задач.</string>
+    <string name="inbox_ai_entry_title">Превратите контент в чек-лист</string>
     <string name="inbox_open_project_action">Открыть проект</string>
     <string name="inbox_task_sheet_move">Перенести в проект</string>
     <string name="inbox_task_sheet_delete">Удалить задачу</string>

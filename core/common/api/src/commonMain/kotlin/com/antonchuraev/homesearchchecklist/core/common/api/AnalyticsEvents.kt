@@ -380,6 +380,24 @@ object AnalyticsEvents {
         const val FAILED = "ai_analyze_failed"
     }
 
+    // ─── AI entry affordances (the DOORS into Analyze / AI-create) ───────────
+    /**
+     * Fired the moment a user taps a door into an AI flow, BEFORE any navigation or credit check.
+     *
+     * Deliberately upstream of [Analyze.STARTED]: the v2 shell shipped with no reachable route to
+     * Analyze at all, and because nothing was emitted at the door the gap read as "nobody wanted
+     * it" instead of "there is no button". A tap event whose funnel to `ai_analyze_started` reads
+     * 100 → 0 is a broken destination; no tap event at all is undiagnosable.
+     *
+     * Params: [AnalyticsParams.DESTINATION] (AiEntryDestination.wire) · [AnalyticsParams.SOURCE]
+     * (AiEntrySource.wire) · [AnalyticsParams.INPUT_TYPE] (AnalyzeInputKind.wire — only when
+     * destination is `analyze`) · [AnalyticsParams.HAS_QUERY] / [AnalyticsParams.QUERY_LEN] (only
+     * from the Templates empty-search door, which carries the user's typed words into the prompt).
+     */
+    object AiEntry {
+        const val TAPPED = "ai_entry_tapped"
+    }
+
     // ─── AI Chat (flagship interaction layer) ────────────────────────────────
     object Chat {
         const val OPENED = "ai_chat_opened"
@@ -823,6 +841,20 @@ object AnalyticsParams {
     const val ERROR = "error"
     const val FORMAT = "format"
     const val INPUT_TYPE = "input_type"
+
+    // ── ai_entry_tapped dimensions ────────────────────────────────────────────────────────────
+    // WHICH AI flow the tapped door leads to: AiEntryDestination.wire = analyze | ai_create.
+    // NOTE the paywall already sends a `destination` of its own ("google_play") on a different
+    // event. Event properties are scoped per event in Amplitude, so the two vocabularies do not
+    // collide — and reusing the key beats inventing a near-synonym that splits "where does this
+    // go" across two columns.
+    const val DESTINATION = "destination"
+
+    // Whether the Templates empty-search door carried the user's typed words into the AI prompt,
+    // and how many characters. Only that one door sets them: a high-intent tap (the user described
+    // what they wanted and we had nothing to show) is the case worth telling apart from a cold tap.
+    const val HAS_QUERY = "has_query"
+    const val QUERY_LEN = "query_len"
 
     // AI analyze failure taxonomy on ai_analyze_failed — coarse machine reason so failures group in
     // Amplitude WITHOUT regex over the free-text [ERROR]. Values (wire): credit_gate | daily_limit |

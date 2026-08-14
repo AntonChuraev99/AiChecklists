@@ -15,6 +15,8 @@ import aichecklists.core.designsystem.generated.resources.overview_title
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -71,11 +73,30 @@ fun OverviewScreen(
     googleDisplayName: String?,
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit,
+    /**
+     * Analytics `source` for the AI-credits chip in the top bar; **null draws no chip**.
+     *
+     * Same nullable-source shape as the three `:feature:home` tabs, for consistency rather than
+     * necessity — this screen is v2-only, so its host always passes
+     * [CreditsChipSource.V2_OVERVIEW]. Null exists for previews and for the Compose test, which
+     * would otherwise need a Koin graph to render the screen at all.
+     */
+    creditsSource: String? = null,
 ) {
     val analytics: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analytics.screenView(AnalyticsScreens.OVERVIEW) }
 
-    AppScaffold(title = stringResource(Res.string.overview_title)) {
+    AppScaffold(
+        title = stringResource(Res.string.overview_title),
+        // This tab had no actions slot at all. Overview is where a user who went looking for
+        // "where do I subscribe" arrives — it hosts the account row and settings — so it is the tab
+        // where an absent paywall entry point costs the most.
+        actions = {
+            if (creditsSource != null) {
+                CreditsToolbarAction(source = creditsSource)
+            }
+        },
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AppNavigationDrawerContent(
                 // Handed to the content as TRAILING SCROLL ROOM, not as padding on this Box: the

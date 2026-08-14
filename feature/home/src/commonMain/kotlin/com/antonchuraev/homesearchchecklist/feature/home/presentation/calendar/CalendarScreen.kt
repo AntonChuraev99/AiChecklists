@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -69,6 +69,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -101,11 +102,15 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -215,7 +220,27 @@ fun CalendarScreen(
     onAddTaskRowClick: () -> Unit = {},
     onQuickAddTextChange: (String) -> Unit = {},
     onQuickAddSubmit: () -> Unit = {},
+    /**
+     * One of the capture dock's AI source pills was tapped (Photo / PDF / Web Link / Voice).
+     *
+     * Defaulted to a no-op like its dock siblings above so the standalone Today route — which has
+     * no dock — stays unchanged. The v2 Calendar tab wires it in `CalendarRoute`.
+     */
+    onAiSourceTapped: (AnalyzeInputKind) -> Unit = {},
     snackbarHostState: SnackbarHostState? = null,
+    /**
+     * Analytics `source` for the AI-credits chip in the top bar; **null draws no chip**.
+     *
+     * The arm gate matters MORE here than on the other three v2 tabs, and it is the whole reason this
+     * is a nullable source rather than an unconditional chip: `AppNavRoute.Calendar` is also what the
+     * v1 DRAWER pushes, so this is the one shared screen of the four. An unconditional chip would
+     * plant a brand-new paywall entry point inside the A/B CONTROL arm and confound the experiment
+     * the v2 shell is being judged by. Same reason [captureEnabled] is threaded rather than derived:
+     * the screen cannot see which arm mounted it.
+     *
+     * v2 hosts pass [CreditsChipSource.V2_CALENDAR]; the control arm passes nothing.
+     */
+    creditsSource: String? = null,
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
@@ -302,6 +327,14 @@ fun CalendarScreen(
                     }
                 }
             } else null,
+            // This tab had NO actions slot at all before — the v2 shell left it without any paywall
+            // entry point, like its three siblings. Flat emission, not a Row: `AppScaffold` forwards
+            // the slot into Material's `actions: RowScope.() -> Unit`.
+            actions = {
+                if (creditsSource != null) {
+                    CreditsToolbarAction(source = creditsSource)
+                }
+            },
             scrollBehavior = scrollBehavior,
             snackbarHost = {
                 if (snackbarHostState != null) SnackbarHost(hostState = snackbarHostState)
@@ -332,6 +365,10 @@ fun CalendarScreen(
                                 showRepeat = false,
                             )
                         },
+                        // Same four doors as the Inbox tab, from the same shared component — the
+                        // two tabs must not drift into two different answers to "what can I hand
+                        // the AI". Only the reported source differs.
+                        belowInput = { SourceRow(onSelect = onAiSourceTapped) },
                     )
                 }
             },
@@ -975,27 +1012,34 @@ private fun WeekGridContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-        ) {
-            for (dayOffset in 0..6) {
-                val cellDate = monday.plus(dayOffset, DateTimeUnit.DAY)
-                val cellEpochDay = cellDate.toEpochDays().toLong()
-                val isToday = cellDate == today
-                val isPast = cellDate < today
-                val hasReminder = cellEpochDay in datesWithReminders
-                val isCurrentScroll = cellEpochDay == currentVisibleEpochDay
+        // BoxWithConstraints, not a bare Row: a cell has to know its own WIDTH to use it as its
+        // minimum HEIGHT, and a `weight(1f)` child cannot read the width it was given. See
+        // [WeekGridCell] for why the square became a floor instead of an aspect ratio.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val cellSide = weekCellSide(maxWidth)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+            ) {
+                for (dayOffset in 0..6) {
+                    val cellDate = monday.plus(dayOffset, DateTimeUnit.DAY)
+                    val cellEpochDay = cellDate.toEpochDays().toLong()
+                    val isToday = cellDate == today
+                    val isPast = cellDate < today
+                    val hasReminder = cellEpochDay in datesWithReminders
+                    val isCurrentScroll = cellEpochDay == currentVisibleEpochDay
 
-                WeekGridCell(
-                    date = cellDate,
-                    isToday = isToday,
-                    isPast = isPast,
-                    hasReminder = hasReminder,
-                    isCurrentScroll = isCurrentScroll,
-                    onClick = { onCellClick(cellEpochDay) },
-                    modifier = Modifier.weight(1f),
-                )
+                    WeekGridCell(
+                        date = cellDate,
+                        isToday = isToday,
+                        isPast = isPast,
+                        hasReminder = hasReminder,
+                        isCurrentScroll = isCurrentScroll,
+                        minSide = cellSide,
+                        onClick = { onCellClick(cellEpochDay) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -1009,8 +1053,9 @@ private fun WeekGridContent(
                 currentVisibleEpochDay
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(3.dp)) {
-            val totalSpacing = AppDimens.SpacingXs * 6
-            val cellW = (this.maxWidth - totalSpacing) / 7
+            // Same helper as the cells above, deliberately: the indicator slides to a cell's centre,
+            // so if the two ever computed the width differently the bar would drift off its day.
+            val cellW = weekCellSide(this.maxWidth)
             val indicatorW = cellW * 0.6f
             val centerOffset = (cellW - indicatorW) / 2
             val targetX = if (currentIdx != null) {
@@ -1044,6 +1089,15 @@ private fun WeekGridContent(
     )
 }
 
+/**
+ * Side of ONE day tile in a week grid [totalWidth] wide: seven equal cells with six [AppDimens.SpacingXs]
+ * gaps between them.
+ *
+ * Shared by the cells (which use it as their minimum height) and by the scroll indicator (which uses
+ * it to place itself under a cell's centre) so the two cannot drift apart.
+ */
+private fun weekCellSide(totalWidth: Dp): Dp = (totalWidth - AppDimens.SpacingXs * 6) / 7
+
 /** Compute the epoch-day of the Monday of the week containing [anchorEpochDay]. */
 private fun weekMondayEpochDay(anchorEpochDay: Long): Long {
     val date = LocalDate.fromEpochDays(anchorEpochDay.toInt())
@@ -1051,6 +1105,11 @@ private fun weekMondayEpochDay(anchorEpochDay: Long): Long {
     return date.minus(mondayOffset, DateTimeUnit.DAY).toEpochDays().toLong()
 }
 
+/**
+ * One day tile of the week grid.
+ *
+ * @param minSide the tile's width, applied as its MINIMUM height — see the `heightIn` call below.
+ */
 @Composable
 private fun WeekGridCell(
     date: LocalDate,
@@ -1058,6 +1117,7 @@ private fun WeekGridCell(
     isPast: Boolean,
     hasReminder: Boolean,
     isCurrentScroll: Boolean,
+    minSide: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1082,7 +1142,25 @@ private fun WeekGridCell(
 
     Column(
         modifier = modifier
-            .aspectRatio(1f)
+            .testTag(WeekGridCellTestTag)
+            // A MINIMUM square, not `aspectRatio(1f)`.
+            //
+            // `aspectRatio` pins height == width exactly, and width here is a fraction of the SCREEN
+            // (a dp), while everything inside is measured in sp and grows with the system font scale.
+            // The two never had to agree, and `clip()` above silently cut whatever did not fit: the
+            // reminder dot rendered as a dash welded to the tile's bottom edge at fontScale 1.0 on a
+            // 411dp phone, vanished entirely at 360dp, and at fontScale 1.3 the DAY NUMBER itself was
+            // sliced through the middle. Recut typography (`Type.kt`, `lineHeightStyle = Trim.None`
+            // on every role) is what pushed an already-tight budget over the edge, but the fixed
+            // height is the defect — the same "height() pins min AND max" trap `AppDensity` spells
+            // out for the task rows: heights are minimums, never fixed values.
+            //
+            // With `heightIn(min = …)` the tile is exactly square whenever the content fits — the
+            // common case, pixel-identical to the intended design — and grows instead of clipping
+            // when it does not. All seven cells hold the same anatomy (one letter, one number, the
+            // marker slot), so they measure the same height and the row stays even without any
+            // intrinsic-measurement machinery.
+            .heightIn(min = minSide)
             .clip(RoundedCornerShape(AppDimens.SpacingSm))
             .background(bgColor)
             .then(if (isInteractive) Modifier.clickable(onClick = onClick) else Modifier)
@@ -1119,6 +1197,15 @@ private fun WeekGridCell(
         }
     }
 }
+
+/**
+ * Test tag on every day tile of the week grid.
+ *
+ * The tile's box is what the geometry regression asserts against — that its content (weekday letter,
+ * day number, reminder marker) fits INSIDE it — and there is no other way to reach those bounds:
+ * the cell carries no merged semantics, and its vertical origin cannot be derived from the texts.
+ */
+internal const val WeekGridCellTestTag = "calendar_week_day_cell"
 
 /** Formats a LocalDate to "Mon D" short form, e.g. "May 12". KMP-safe, no locale. */
 private fun formatShortDate(date: LocalDate): String {

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      Window-background colors for the Android Activity themes.
+
+      These MIRROR the `background` token of the shared design system
+      (core/designsystem .../theme/Color.kt — WarmSurface #FBFAF8 / CoolDark6 #121317).
+      The duplication is unavoidable: android:windowBackground is resolved by the platform from
+      XML before any Compose code runs, so the Kotlin token is not reachable at that point.
+      Keep the two in sync — a drift here shows up as a mismatched sliver, not as a build error.
+
+      They live in :composeApp (not :androidApp) so that MainActivity can reference them through
+      R as well; :androidApp depends on :composeApp, so its themes.xml sees them via resource
+      merging, giving both the theme and the runtime setter one single source of truth.
+    -->
+    <color name="gisti_window_background_light">#FBFAF8</color>
+    <color name="gisti_window_background_dark">#121317</color>
+
+    <!--
+      Config-qualified alias used by @style/Theme.Gisti. A resource qualifier can only see the
+      SYSTEM night setting, which is NOT the same thing as the app's theme: AppThemeMode defaults
+      to Light and is stored in DataStore, so a user can run the light app on a dark phone or the
+      dark app on a light phone. MainActivity therefore re-asserts the window background at
+      runtime from the theme it actually renders; this alias only has to be right for the
+      cold-start frame that is drawn before the app can know its own preference.
+    -->
+    <color name="gisti_window_background">@color/gisti_window_background_light</color>
+
+</resources>

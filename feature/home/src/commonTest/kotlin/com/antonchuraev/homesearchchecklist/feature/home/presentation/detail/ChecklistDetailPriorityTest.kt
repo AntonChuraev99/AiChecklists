@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -291,6 +293,11 @@ class ChecklistDetailPriorityTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}

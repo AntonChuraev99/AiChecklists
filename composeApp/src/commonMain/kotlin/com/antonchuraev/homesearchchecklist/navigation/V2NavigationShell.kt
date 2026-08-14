@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -57,6 +58,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -86,6 +93,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.inboxNavBarI
 import com.antonchuraev.homesearchchecklist.desingsystem.components.overviewNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.components.projectsNavBarItem
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -513,9 +522,56 @@ private fun V2ShellCompactBar(
                     items = items,
                     selectedItemId = selectedTab,
                     onItemSelected = onNavigate,
+                    // The bar rounds its own top ONLY when it is the topmost bottom-chrome surface.
+                    // With the capture dock up, the dock's rounded top is the slab's top and the
+                    // bar's corners are not merely redundant, they cut a notch: the dock's bottom
+                    // edge is square and full-bleed, the bar's corner curves away from it, and the
+                    // ~10px triangle between them shows the PAGE. That notch is older than this
+                    // change — it measured 7px against the 24dp corner — but it was invisible while
+                    // the dock was #FFFFFF and the page #FBFAF8 (ΔL* 1.7). One shared grey makes it
+                    // a bright nick in the seam the owner asked to be smooth (ΔL* 10.5), so the
+                    // geometry has to go rather than the colour.
+                    //
+                    // Gated on the SAME flag that mounts the dock and moves the shadow band, so the
+                    // corner cannot lag the dock by a frame in either direction.
+                    roundedTop = !captureOpen,
                     modifier = Modifier.onSizeChanged { barHeightPx = it.height },
                 )
             }
+        }
+
+        // The plinth's shadow: an OVERLAY anchored to the bar's top edge, not a band inside the bar.
+        //
+        // Both halves of that matter. It has to be outside the measured node — the shell reads the
+        // bar's height to place the raised button and to consume the bottom inset exactly once, and
+        // 16dp of band inside it would lift the button off the bar's edge and put the first-frame
+        // jump back (see this function's KDoc). And it has to be drawn OVER the content rather than
+        // reserving space above it, because that is what a shadow is: the list scrolls under it and
+        // is shaded by it, instead of stopping 16dp short of a bar it is already stopping short of.
+        //
+        // No pointer input, so the strip stays transparent to touch and the list keeps every gesture
+        // that starts there — the same rule the AI button's positioning box follows.
+        //
+        // ⛔ NOT while the capture dock is up. Being drawn after the content column is what lets this
+        // shade a scrolling list, and it is also what makes it shade a RAISED surface that happens to
+        // occupy the same band: with the dock open it painted a 7% ramp across the bottom of the AI
+        // pill row (measured 241 → 233 on the pill fill), which reads as the dock sliding UNDER the
+        // bar — the opposite of what a raised dock is. There is nothing to separate in that state
+        // either: the dock is full-bleed to the bar's top edge and brings its own top hairline, so the
+        // band it would shade contains no content at all.
+        //
+        // Gated on the same flag the host uses to mount the dock (`v2CreateDockOpen` drives both), so
+        // the shadow leaves and returns on the dock's own frames and cannot lag it. The CHAT dock
+        // needs no such gate — it arrives via `overlayContent`, which is drawn after this.
+        if (barVisible && !captureOpen) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = barHeight)
+                    .height(AppSurface.bottomChromeShadowHeight())
+                    .background(AppSurface.bottomChromeShadow()),
+            )
         }
 
         // Composed for as long as the bar is — no dock unmounts it. Both docks are MOTION states
@@ -565,14 +621,20 @@ private fun V2ShellCompactBar(
                 FloatingActionButton(
                     onClick = onOpenChat,
                     shape = CircleShape,
-                    // The loudest role in the palette, at every window size (the rail and the drawer
-                    // use it too): this is the flagship action of the whole product, and the raised
-                    // centre circle only reads as "primary" rather than "fifth tab" if its colour
-                    // says so as well as its position. The CIRCLE, on the other hand, is Compact-only
-                    // on purpose — it exists to break the bar's silhouette, and there is no
-                    // silhouette to break in a rail header, where M3's default FAB shape is the norm.
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    // The loudest role available ON THE BOTTOM CHROME — the same pair the active
+                    // tab's pill takes, which is why it is the chrome token and not `primary` spelled
+                    // out here. With the ink plinth the token had to branch (`primary` #1565C0
+                    // measured 2.6:1 on #322F35, a blue smudge); on the grey chrome it resolves to
+                    // the ordinary `primary` in BOTH themes — 4.19:1 light, 9.75:1 dark. The
+                    // indirection stays because the next re-tune of the chrome must not have to find
+                    // this call site again.
+                    //
+                    // The rail and the drawer keep reading `primary` directly: they are not on the
+                    // bottom chrome, and one action reading "loudest available here" at every width
+                    // is the rule, not one literal role. The CIRCLE shape stays Compact-only on
+                    // purpose — it exists to break the bar's silhouette, and a rail header has none.
+                    containerColor = AppSurface.bottomChromeAccent(),
+                    contentColor = AppSurface.onBottomChromeAccent(),
                     modifier = Modifier
                         .size(V2ShellMetrics.AiButtonSize)
                         // Read in the DRAW phase (lambda form), so neither the 180ms hand-off nor the
@@ -608,10 +670,12 @@ private fun V2ShellCompactBar(
  *
  * ## Why this is not `AppNavigationBar`
  * It is the same component, item-for-item — same `AppNavBarItem` descriptors from designsystem, same
- * colour roles, same `alwaysShowLabel`, same M3 container — with ONE structural difference the shared
- * wrapper cannot express: a `Spacer` in the middle of its `RowScope` content. `NavigationBarItem`
- * applies `weight(1f)` to itself, so the four items split whatever the spacer leaves; there is no
- * modifier a caller can pass to `AppNavigationBar` that produces a centre gap. Keeping the shared
+ * `alwaysShowLabel`, same M3 container — with two differences the shared wrapper cannot express. The
+ * structural one: a `Spacer` in the middle of its `RowScope` content. `NavigationBarItem` applies
+ * `weight(1f)` to itself, so the four items split whatever the spacer leaves; there is no modifier a
+ * caller can pass to `AppNavigationBar` that produces a centre gap. The visual one: this bar is the
+ * app's bottom EDGE and paints the shared bottom chrome (`AppSurface.bottomChrome`), while `AppNavigationBar`
+ * stays on the level-2 `docked` tone that reads correctly in the v1 layout. Keeping the shared
  * component untouched also keeps it byte-identical for every other caller, which is the same reason
  * the v2 shell duplicates `guardedNavigate` instead of extracting it.
  *
@@ -633,66 +697,130 @@ private fun V2SplitNavigationBar(
     items: List<AppNavBarItem>,
     selectedItemId: String,
     onItemSelected: (String) -> Unit,
+    roundedTop: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val gapAfter = items.size / 2
-    // Level 2 "Docked", identical to AppNavigationBar: the bar shares the card tone, carries no
-    // tonal elevation and is marked by a 1dp outlineVariant hairline on its seam with the content.
-    // The divider is a sibling ABOVE the bar — the bar owns the navigation-bar inset at its own
-    // bottom, so a divider inside it would land under the labels instead of on the seam.
-    //
-    // `modifier` stays on the Column, i.e. the host's onSizeChanged reports divider + bar. That is
-    // the number the shell wants: it consumes the measured height and positions the raised AI button
-    // off it, and the divider is part of what the bar covers.
-    Column(modifier = modifier) {
-        HorizontalDivider(
-            thickness = 1.dp,
-            color = AppSurface.dockedSeam(),
-        )
-        NavigationBar(
-            containerColor = AppSurface.docked(),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            tonalElevation = 0.dp,
-        ) {
-            items.forEachIndexed { index, item ->
-                if (index == gapAfter) {
-                    Spacer(modifier = Modifier.width(V2ShellMetrics.AiButtonBarSpacer))
-                }
-                val isSelected = item.id == selectedItemId
-                // Items after the gap shift one slot down the traversal order to leave room for the
-                // button; see V2ShellMetrics.AiButtonTraversalIndex.
-                val traversal = (index + if (index >= gapAfter) 1 else 0).toFloat()
-                NavigationBarItem(
-                    selected = isSelected,
-                    onClick = { onItemSelected(item.id) },
-                    icon = {
-                        Icon(
-                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = item.contentDescription ?: item.label,
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = item.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    alwaysShowLabel = true,
-                    colors = NavigationBarItemDefaults.colors(
-                        indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                        selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                    modifier = Modifier.semantics { traversalIndex = traversal },
-                )
+    // Level 2′ "bottomChrome", NOT the `docked` tone AppNavigationBar uses — see
+    // AppSurface.bottomChrome for the measurements that separate the two, and for why the capture
+    // dock and the chat dock now read the very same accessor. `modifier` (the host's onSizeChanged) is on the
+    // NavigationBar itself and on nothing else: the number the shell wants is the height of the
+    // OPAQUE slab, because that is what it positions the raised AI button off and what it consumes
+    // from the bottom inset. The shadow band above the bar is drawn by the shell as an overlay for
+    // exactly that reason — 16dp of it inside this node would push the button off the bar's edge.
+    val idle = AppSurface.onBottomChrome()
+    // The ACTIVE label is the same role at full strength — it sits on the chrome, not on the pill,
+    // so it must not take the pill's content colour, and it must not stay dimmed either.
+    val activeLabel = idle.copy(alpha = 1f)
+    val accent = AppSurface.bottomChromeAccent()
+    val onAccent = AppSurface.onBottomChromeAccent()
+
+    NavigationBar(
+        containerColor = AppSurface.bottomChrome(),
+        contentColor = idle,
+        tonalElevation = 0.dp,
+        // Clipped, not shaped by a Surface: `NavigationBar` gives no shape parameter, and the top
+        // corners are the whole reason the bar reads as a slab the page slides behind rather
+        // than as a full-bleed footer. Only the TOP two — the bottom edge is the window's.
+        //
+        // The radius is the SHARED bottom-chrome token, not a local constant: the capture dock lands
+        // on this bar's top edge, so the two have to agree on the shape of the edge they share.
+        // [roundedTop] is false while the dock owns that edge — see the call site.
+        modifier = if (roundedTop) modifier.clip(AppShapeTokens.SheetTop) else modifier,
+    ) {
+        items.forEachIndexed { index, item ->
+            if (index == gapAfter) {
+                Spacer(modifier = Modifier.width(V2ShellMetrics.AiButtonBarSpacer))
             }
+            val isSelected = item.id == selectedItemId
+            // Items after the gap shift one slot down the traversal order to leave room for the
+            // button; see V2ShellMetrics.AiButtonTraversalIndex.
+            val traversal = (index + if (index >= gapAfter) 1 else 0).toFloat()
+
+            // 0 = no pill, 1 = full pill. The bar's only movement, and the reason it is hand-rolled
+            // rather than left to M3's `indicatorColor`: M3 cross-fades its indicator on a fixed
+            // 100ms tween, which at this size reads as a colour appearing rather than as a shape
+            // arriving. `spatialDefault` is the app's token for "something moved into place", and a
+            // spring is also what makes the tab change feel answered rather than switched.
+            val pill by animateFloatAsState(
+                targetValue = if (isSelected) 1f else 0f,
+                animationSpec = AppMotion.spatialDefault,
+                label = "v2NavPill",
+            )
+            // Colour is an EFFECT, so it rides the critically damped token: an icon colour that
+            // overshoots is a flicker. Both the selected and unselected slots receive the SAME
+            // animated value on purpose — `NavigationBarItem` picks between its two colour slots by
+            // the `selected` flag, so handing it two different colours makes the transition snap on
+            // the frame the flag flips, whatever spec is attached to it.
+            val iconColor by animateColorAsState(
+                targetValue = if (isSelected) onAccent else idle,
+                animationSpec = AppMotion.effectsDefaultAs(),
+                label = "v2NavIcon",
+            )
+            val labelColor by animateColorAsState(
+                targetValue = if (isSelected) activeLabel else idle,
+                animationSpec = AppMotion.effectsDefaultAs(),
+                label = "v2NavLabel",
+            )
+
+            NavigationBarItem(
+                selected = isSelected,
+                onClick = { onItemSelected(item.id) },
+                icon = {
+                    Icon(
+                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                        contentDescription = item.contentDescription ?: item.label,
+                        // Painted BEHIND the icon and deliberately outside its bounds: Compose does
+                        // not clip a node's drawing to its layout size, so the pill costs nothing in
+                        // measurement — and measurement is exactly what must not move here (the bar's
+                        // height is read by the shell to place the raised AI button). Same geometry
+                        // M3's own indicator uses, so at rest the bar is pixel-identical to a stock
+                        // one; only the motion differs. Both reads happen in the DRAW phase, so the
+                        // spring animates without recomposing the bar.
+                        modifier = Modifier.drawBehind {
+                            val progress = pill
+                            if (progress <= 0f) return@drawBehind
+                            val height = PlinthPillHeight.toPx()
+                            val width = PlinthPillWidth.toPx() * progress
+                            drawRoundRect(
+                                color = accent,
+                                topLeft = Offset(
+                                    x = (size.width - width) / 2f,
+                                    y = (size.height - height) / 2f,
+                                ),
+                                size = Size(width, height),
+                                cornerRadius = CornerRadius(height / 2f),
+                            )
+                        },
+                    )
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    // Transparent: the pill above is the indicator now. M3 still lays its own out,
+                    // which is what keeps the icon in the same place as in a stock bar.
+                    indicatorColor = Color.Transparent,
+                    selectedIconColor = iconColor,
+                    unselectedIconColor = iconColor,
+                    selectedTextColor = labelColor,
+                    unselectedTextColor = labelColor,
+                ),
+                modifier = Modifier.semantics { traversalIndex = traversal },
+            )
         }
     }
 }
+
+/** The active destination's pill — M3's own indicator size, so the resting bar is unchanged. */
+private val PlinthPillWidth: Dp = 56.dp
+private val PlinthPillHeight: Dp = 32.dp
 
 /**
  * Medium: NavigationRail carrying the same four destinations, chat FAB in the rail header.

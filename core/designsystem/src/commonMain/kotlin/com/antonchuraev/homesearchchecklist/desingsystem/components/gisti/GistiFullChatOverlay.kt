@@ -56,6 +56,7 @@ import kotlin.math.roundToInt
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_panel_collapse
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import org.jetbrains.compose.resources.stringResource
 
 /** The two positions of the FULL-screen chat overlay. */
@@ -228,7 +229,10 @@ fun GistiFullChatOverlay(
                             off.isNaN() -> 0f
                             else -> ((range - off) / range).coerceIn(0f, 1f)
                         }
-                        val corner = 28.dp.toPx() * (1f - f)
+                        // Starts at the shared bottom-chrome corner and lerps to 0 as the overlay
+                        // takes the whole window — so the docked state matches the bar and the
+                        // capture dock exactly, and only the full-screen state is square.
+                        val corner = AppShapeTokens.BottomChromeCorner.toPx() * (1f - f)
                         shape = RoundedCornerShape(topStart = corner, topEnd = corner, bottomEnd = 0f, bottomStart = 0f)
                         clip = true
                         // Fade in over the first ~16% so the content-swap from the dock is not visible.

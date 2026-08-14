@@ -3,8 +3,10 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -114,11 +116,15 @@ class AnalyzeViewModelTest {
         fillDefault: Boolean = false,
         initialText: String? = null,
         autoAnalyze: Boolean = false,
+        initialInputKind: AnalyzeInputKind? = null,
+        entrySource: AiEntrySource? = null,
     ): AnalyzeViewModel = AnalyzeViewModel(
         checklistId = checklistId,
         fillDefault = fillDefault,
         initialText = initialText,
         autoAnalyze = autoAnalyze,
+        initialInputKind = initialInputKind,
+        entrySource = entrySource,
         analyzeRepository = fakeAnalyzeRepository,
         checklistRepository = fakeChecklistRepository,
         appNavigator = fakeNavigator,
@@ -128,6 +134,78 @@ class AnalyzeViewModelTest {
         activationCoordinator = fakeActivationCoordinator,
         remoteConfigProvider = fakeRemoteConfigProvider,
     )
+
+    // ── v2 entry points: a door must arrive ON its material, and must be attributable ────────────
+    //
+    // Both properties exist because the v2 shell shipped with NO route to Analyze at all while
+    // Analyze accounts for half of all checklist creators, and the outage was invisible in
+    // Amplitude precisely because `ai_analyze_started` carried no `source`.
+
+    @Test
+    fun initialInputKind_preSelectsThatMaterial_soTheUserDoesNotPickTwice() = runTest {
+        // The dock's "Photo" pill already IS the answer to "what are you handing the AI".
+        // Landing on the source picker would ask the same question a second time.
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+
+        assertEquals(InputDataType.PHOTO, vm.screenState.value.selectedInputType)
+    }
+
+    @Test
+    fun everyInputKind_mapsToASelectedType_noSilentNulls() = runTest {
+        // Totality guard. A kind that maps to null would open the picker anyway — the exact
+        // "tapped Voice, got a menu" dead end this row exists to remove, and it would be silent.
+        AnalyzeInputKind.entries.forEach { kind ->
+            val vm = createViewModel(initialInputKind = kind)
+            advanceUntilIdle()
+            assertNotNull(
+                vm.screenState.value.selectedInputType,
+                "AnalyzeInputKind.$kind must pre-select an InputDataType",
+            )
+        }
+    }
+
+    @Test
+    fun initialText_stillWinsOverInputKind_soThePrefillIsNeverStranded() = runTest {
+        // ACTION_PROCESS_TEXT contract: a non-blank prefill implies RAW_TEXT. If a kind could
+        // override it the screen would open on the Photo picker holding text nobody can see.
+        val vm = createViewModel(initialText = "buy milk", initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+
+        assertEquals(InputDataType.RAW_TEXT, vm.screenState.value.selectedInputType)
+        assertEquals("buy milk", vm.screenState.value.inputText)
+    }
+
+    @Test
+    fun analyzeStarted_carriesEntrySource_soADeadDoorIsVisibleInAmplitude() = runTest {
+        val vm = createViewModel(entrySource = AiEntrySource.CAPTURE_DOCK_INBOX)
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("plan a trip")
+        advanceUntilIdle()
+
+        val started = assertNotNull(
+            fakeAnalyticsTracker.events.firstOrNull { it.first == AnalyticsEvents.Analyze.STARTED },
+            "ai_analyze_started must be recorded",
+        )
+        assertEquals("capture_dock_inbox", started.second["source"])
+        assertEquals("raw_text", started.second["input_type"])
+    }
+
+    @Test
+    fun analyzeStarted_withNoEntrySource_sendsCountableSentinelNotMissingProperty() = runTest {
+        // A missing property has no denominator: "how many analyses came from a door we shipped"
+        // cannot be asked if the doorless ones simply omit the dimension. Same rule the chat's
+        // `surface ?: "none"` follows.
+        val vm = createViewModel(entrySource = null)
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("plan a trip")
+        advanceUntilIdle()
+
+        val started = assertNotNull(
+            fakeAnalyticsTracker.events.firstOrNull { it.first == AnalyticsEvents.Analyze.STARTED },
+        )
+        assertEquals("none", started.second["source"])
+    }
 
     /** Drives a manual (non-hero) analysis: select RAW_TEXT, type a prompt, then tap Analyze. */
     private fun AnalyzeViewModel.startManualRawTextAnalysis(text: String) {
@@ -299,6 +377,11 @@ class AnalyzeViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {
             navigatedToAnalyzeScreen = true
         }

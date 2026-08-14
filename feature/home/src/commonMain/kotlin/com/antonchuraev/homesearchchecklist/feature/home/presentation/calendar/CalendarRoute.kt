@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayIntent
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodaySideEffect
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayViewModel
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -70,6 +71,17 @@ fun CalendarRoute(
      * [TodayIntent.OnAddTaskRowClick], and the ViewModel emits it with `source = "inline_row"`.
      */
     onAddTaskRowClick: () -> Unit,
+    /**
+     * Analytics `source` for the top bar's AI-credits chip — see [CalendarScreen]; **null draws no
+     * chip**.
+     *
+     * Default null, UNLIKE `InboxRoute` / `ProjectsRoute`, and that asymmetry is the point: this
+     * route is also what the v1 drawer pushes, so it is the one v2 tab whose screen is shared with
+     * the A/B CONTROL arm. Defaulting it on would add a paywall entry point to control and confound
+     * the experiment. The v2 host opts in with [CreditsChipSource.V2_CALENDAR]; the control arm
+     * passes nothing, exactly as it does for [captureEnabled].
+     */
+    creditsSource: String? = null,
     todayViewModel: TodayViewModel = koinViewModel(),
     calendarViewModel: CalendarViewModel = koinViewModel(),
 ) {
@@ -117,6 +129,10 @@ fun CalendarRoute(
         onQuickAddTextChange = { todayViewModel.sendIntent(TodayIntent.OnQuickAddTextChanged(it)) },
         onQuickAddSubmit = { todayViewModel.sendIntent(TodayIntent.OnQuickAddSubmit) },
         onCreateChipAction = { todayViewModel.sendIntent(TodayIntent.OnCreateChipAction(it)) },
+        // Straight to the ViewModel: it owns BOTH halves of the response (the `ai_entry_tapped`
+        // emit and the navigation into Analyze). Unlike the add-task row above, the host has
+        // nothing to do here — no dock flag changes, so there is no callback to fork.
+        onAiSourceTapped = { todayViewModel.sendIntent(TodayIntent.OnAiSourceTapped(it)) },
         snackbarHostState = snackbarHostState,
         onTodayReminderClick = { checklistId, fillId ->
             todayViewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))
@@ -126,6 +142,7 @@ fun CalendarRoute(
             onCreateChecklistClick()
         },
         onTodayRetry = { todayViewModel.sendIntent(TodayIntent.OnRefresh) },
+        creditsSource = creditsSource,
         onCalendarIntent = { intent ->
             if (intent is CalendarIntent.OnCreateChecklistClick) {
                 onCreateChecklistClick()

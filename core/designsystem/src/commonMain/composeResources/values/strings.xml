@@ -293,7 +293,6 @@
     <string name="templates_use_template">Use Template</string>
     <string name="templates_section_title">Choose a template</string>
     <string name="templates_tap_to_use">Tap to use</string>
-    <string name="templates_create_manually">Create Manually</string>
     <string name="templates_create_with_ai">Create with AI</string>
 
     <!-- Template Preview Screen -->
@@ -338,6 +337,12 @@
     <string name="analyze_source_pdf">PDF</string>
     <string name="analyze_source_text_file">Text File</string>
     <string name="analyze_source_link">Web Link</string>
+    <!-- Short form of analyze_source_link, used ONLY by the four-abreast SourceRow. "Web Link"
+         is measurably too wide to fit four pills on a 360dp window, which silently drops the row
+         to a 2x2 grid; the row's measure-phase fit check picks 4-up again the moment this shorter
+         label is in place. Kept as a separate key rather than shortening analyze_source_link,
+         which titles the full-width picker card where the longer wording still reads better. -->
+    <string name="analyze_source_link_short">Link</string>
     <string name="analyze_source_text">Paste Text</string>
     <string name="analyze_source_voice">Voice</string>
     <string name="analyze_url_label">URL</string>
@@ -1627,6 +1632,10 @@
     <string name="inbox_empty_title">Your inbox is empty</string>
     <string name="inbox_empty_description">Anything you capture lands here first. Add a task now and sort it into a project later.</string>
     <string name="inbox_project_empty_description">No tasks in this project yet.</string>
+    <!-- Heading over the SourceRow shown in an empty or nearly empty Inbox. Wording is deliberately
+         the Play listing's own promise (screenshot 2, "Any content -> checklist") so the first
+         screen states what the user installed the app for. -->
+    <string name="inbox_ai_entry_title">Turn content into a checklist</string>
     <string name="inbox_open_project_action">Open project</string>
     <!-- The "Move to project" row added to the shared ItemDetailsSheet when it is hosted by the
          Inbox. Distinct from folder_move ("Move to…"), which re-parents inside ONE checklist. -->
