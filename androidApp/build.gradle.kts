@@ -170,6 +170,14 @@ dependencies {
     // koin-android pulls in koin-core transitively
     implementation(libs.koin.android)
 
+    // JVM unit tests (Robolectric). `testImplementation` is a test-only configuration — none of
+    // these artifacts reach debugRuntimeClasspath / releaseRuntimeClasspath.
+    // Robolectric is needed here (and not in :composeApp) because the invariant under test lives in
+    // the APK's MERGED manifest, which only the application module produces.
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlin.testJunit)
+    testImplementation(libs.robolectric)
+
     // Android UI Tests
     androidTestImplementation(libs.androidx.testExt.junit)
     androidTestImplementation(libs.androidx.espresso.core)
