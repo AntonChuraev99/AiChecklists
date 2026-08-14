@@ -3,9 +3,12 @@ package com.antonchuraev.homesearchchecklist.widget
 import android.app.Activity
 import android.os.Bundle
 import androidx.glance.appwidget.updateAll
+import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.widget.data.WidgetRepository
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,14 +51,37 @@ class ToggleItemActivity : Activity() {
             val analyticsTracker = koin?.getOrNull<AnalyticsTracker>()
             if (repository != null) {
                 val appContext = applicationContext
-                scope.launch {
+                val logger = koin?.getOrNull<AppLogger>()
+
+                // [scope] is process-level and has no CoroutineExceptionHandler, so anything that
+                // escapes the block below reaches Thread.uncaughtExceptionHandler and kills the
+                // process — with this activity already finished, there is not even a screen to
+                // blame. This is the last-resort net for the toggle itself (a failing DB write);
+                // the widget refresh has its own guard inside.
+                val failureHandler = CoroutineExceptionHandler { _, throwable ->
+                    logger?.error(TAG, "toggle failed: ${throwable.message}", throwable)
+                    postWidgetToast(appContext, R.string.widget_toggle_failed)
+                }
+
+                scope.launch(failureHandler) {
                     toggleMutex.withLock {
                         repository.toggleItem(checklistId, fillId, itemIndex)
                         analyticsTracker?.event(
                             AnalyticsEvents.Item.WIDGET_TOGGLED,
                             mapOf("checklist_id" to checklistId.toString())
                         )
-                        ChecklistWidget().updateAll(appContext)
+                        // The toggle is already persisted at this point: a failed refresh leaves a
+                        // stale checkbox on the home screen, so staying silent would invite the
+                        // user to tap again and toggle the item straight back.
+                        runWidgetUpdateGuarded(
+                            tag = TAG,
+                            logger = logger,
+                            onDegraded = {
+                                postWidgetToast(appContext, R.string.widget_toggle_saved_refresh_failed)
+                            },
+                        ) {
+                            ChecklistWidget().updateAll(appContext)
+                        }
                     }
                 }
             }
@@ -65,6 +91,8 @@ class ToggleItemActivity : Activity() {
     }
 
     companion object {
+        private const val TAG = "Widget"
+
         const val EXTRA_CHECKLIST_ID = "checklist_id"
         const val EXTRA_FILL_ID = "fill_id"
         const val EXTRA_ITEM_INDEX = "item_index"

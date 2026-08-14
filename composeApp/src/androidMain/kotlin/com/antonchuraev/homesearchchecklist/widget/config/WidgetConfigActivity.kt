@@ -40,14 +40,18 @@ import androidx.lifecycle.lifecycleScope
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.widget.ChecklistWidget
 import com.antonchuraev.homesearchchecklist.widget.data.WidgetRepository
 import com.antonchuraev.homesearchchecklist.widget.data.WidgetStateManager
+import com.antonchuraev.homesearchchecklist.widget.postWidgetToast
+import com.antonchuraev.homesearchchecklist.widget.runWidgetUpdateGuarded
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 
@@ -65,6 +69,10 @@ class WidgetConfigActivity : ComponentActivity() {
 
     private val stateManager: WidgetStateManager by lazy {
         GlobalContext.get().get()
+    }
+
+    private val logger: AppLogger? by lazy {
+        GlobalContext.getOrNull()?.getOrNull()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -213,17 +221,34 @@ class WidgetConfigActivity : ComponentActivity() {
                 }
             }
 
-            // Update widget
-            val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity)
-                .getGlanceIdBy(appWidgetId)
-            ChecklistWidget().update(this@WidgetConfigActivity, glanceId)
+            // Update widget. Guarded because this is the first Glance update of the session, i.e.
+            // the first WorkManager.getInstance() call — see runWidgetUpdateGuarded. Unguarded, a
+            // NoSuchMethodError here would kill the process BEFORE setResult/finish below, leaving
+            // the placement half-done with nothing logged.
+            runWidgetUpdateGuarded(
+                tag = TAG,
+                logger = logger,
+                onDegraded = {
+                    postWidgetToast(applicationContext, R.string.widget_config_saved_refresh_failed)
+                },
+            ) {
+                val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity)
+                    .getGlanceIdBy(appWidgetId)
+                ChecklistWidget().update(this@WidgetConfigActivity, glanceId)
+            }
 
-            // Return result
+            // Return result. RESULT_OK even after a degraded refresh: the selection is already
+            // persisted, and RESULT_CANCELED would make the host DELETE the widget the user just
+            // placed — losing their choice on top of the failed render.
             val resultValue = Intent().apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
             setResult(Activity.RESULT_OK, resultValue)
             finish()
         }
+    }
+
+    private companion object {
+        const val TAG = "Widget"
     }
 }

@@ -15,6 +15,11 @@
     <string name="widget_checked">Отмечено</string>
     <string name="widget_unchecked">Не отмечено</string>
 
+    <!-- Widget failure feedback (toasts) -->
+    <string name="widget_toggle_failed">Не удалось обновить чек-лист</string>
+    <string name="widget_toggle_saved_refresh_failed">Пункт сохранён, но виджет не обновился</string>
+    <string name="widget_config_saved_refresh_failed">Виджет сохранён, но не обновился</string>
+
     <!-- Уведомления напоминаний -->
     <string name="reminder_all_completed">Все элементы выполнены!</string>
     <string name="reminder_notification_channel">Напоминания о чек-листах</string>
