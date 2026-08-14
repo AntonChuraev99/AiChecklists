@@ -15,6 +15,11 @@
     <string name="widget_checked">पूरा हुआ</string>
     <string name="widget_unchecked">बाकी</string>
 
+    <!-- Widget failure feedback (toasts) -->
+    <string name="widget_toggle_failed">चेकलिस्ट अपडेट नहीं हो सकी</string>
+    <string name="widget_toggle_saved_refresh_failed">आइटम सेव हो गया, लेकिन विजेट रीफ़्रेश नहीं हुआ</string>
+    <string name="widget_config_saved_refresh_failed">विजेट सेव हो गया, लेकिन रीफ़्रेश नहीं हुआ</string>
+
     <!-- Reminder Notifications -->
     <string name="reminder_all_completed">सभी आइटम पूरे हुए!</string>
     <string name="reminder_notification_channel">चेकलिस्ट रिमाइंडर</string>

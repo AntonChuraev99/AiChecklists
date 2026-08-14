@@ -46,14 +46,13 @@ open class GistiAndroidApplication : GistiApplication(), Configuration.Provider 
      * bytecode). So the home-screen widget IS the path that builds WorkManager now — lazily,
      * on first widget update, instead of on every process start.
      *
-     * Scope of the fix, stated plainly: on the broken ROM the app now LAUNCHES, but the widget
-     * still will not. The same NoSuchMethodError moves to whatever first builds WorkManager.
-     * Glance's own broadcast path catches it (`GlanceAppWidgetReceiver` wraps in
-     * `catch Throwable -> logException`), but two app call sites do not —
-     * `widget/ToggleItemActivity.kt` (`updateAll` after a tap) and
-     * `widget/config/WidgetConfigActivity.kt` (`update` when adding the widget) — so on that ROM
-     * those two paths still take the process down. Deliberately left alone: guarding them is a
-     * separate change, and this one stays a single fix to the startup path.
+     * Scope of the fix, stated plainly: on the broken ROM the app LAUNCHES, but the widget still
+     * will not draw. The same NoSuchMethodError moves to whatever first builds WorkManager — it is
+     * degraded now, not fatal. Every path that gets there is covered: Glance's own broadcast path
+     * catches `Throwable` inside `GlanceAppWidgetReceiver`, and the two app call sites
+     * (`widget/ToggleItemActivity.kt` on a tap, `widget/config/WidgetConfigActivity.kt` when the
+     * widget is added) go through `runWidgetUpdateGuarded`, which logs the throwable and tells the
+     * user instead of letting it reach `Thread.uncaughtExceptionHandler`.
      */
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().build()
