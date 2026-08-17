@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import aichecklists.core.designsystem.generated.resources.analyze_source_pdf
 import aichecklists.core.designsystem.generated.resources.analyze_source_photo
 import aichecklists.core.designsystem.generated.resources.analyze_source_voice
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -174,10 +176,20 @@ private fun SourcePill(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        // Plane-relative, and outlined as well as filled. This row's two hosts sit on DIFFERENT
+        // surfaces — the quick-capture dock paints `AppSurface.bottomChrome()`, the Inbox empty state
+        // is the bare page — and a fixed `surfaceContainer` is only ever right on one of them: it
+        // measured ΔL* ≈ 2 off the dark chrome, so the four pills dissolved into the dock in the one
+        // place they matter most (this row is the v2 shell's ONLY route into Analyze).
+        //
+        // The outline is new with the fill. `surfaceContainer` carried the row alone because it was a
+        // step DOWN from the light page; `raised()` is a step UP, and on the near-white page that step
+        // is +1.7 — invisible on its own. Every tappable edge in this system takes the same firm
+        // `controlOutline`, which is also what makes these four read as peers of the chat's chips
+        // rather than as a fifth kind of button. See AppChatColors.
+        color = AppChatColors.raised(),
+        border = BorderStroke(AppDimens.DividerThickness, AppChatColors.controlOutline()),
         shape = RoundedCornerShape(percent = 50),
-        // Filled, not outlined: this row is an ACTION strip, and an outline reads as a decorative
-        // frame around the input above it rather than as four things you can press.
         modifier = modifier
             // MIN height, not a fixed one — see the layout contract in [SourceRow]'s KDoc.
             .heightIn(min = AppDimens.MinTouchTarget)

@@ -47,6 +47,7 @@ import aichecklists.core.designsystem.generated.resources.chat_panel_greeting
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -242,8 +243,11 @@ private fun SuggestionCard(
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        // Plane-relative + firm outline: the empty state renders on the page in the full chat and
+        // inside the chrome in the compact dock, and these cards are tappable suggestions rather
+        // than content. See AppChatColors.
+        color = AppChatColors.raised(),
+        border = BorderStroke(1.dp, AppChatColors.controlOutline()),
         modifier = Modifier
             .fillMaxWidth()
             .minimumInteractiveComponentSize(),

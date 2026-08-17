@@ -726,7 +726,50 @@ private fun V2SplitNavigationBar(
         // The radius is the SHARED bottom-chrome token, not a local constant: the capture dock lands
         // on this bar's top edge, so the two have to agree on the shape of the edge they share.
         // [roundedTop] is false while the dock owns that edge — see the call site.
-        modifier = if (roundedTop) modifier.clip(AppShapeTokens.SheetTop) else modifier,
+        //
+        // ## The backdrop is not optional, and it must sit BEFORE the clip
+        // Every other `SheetTop` surface in the app is a shaped `Surface` drawn over content, so its
+        // clipped shoulders reveal the page behind it. This bar has nothing behind it: it is the last
+        // child of the shell's Column and the content box above ends at its top edge, so the clip cut
+        // a hole straight through the composition. Measured on the recorded goldens at x=2, two rows
+        // below the bar's top edge, the shoulders read `#FAFAFA` in BOTH themes — Robolectric's window
+        // backdrop, i.e. a colour this app never chose. On a device it is `android:windowBackground`
+        // (cream `#FBFAF8`, a bright nick beside the `#DEDCD6` chrome — what the owner reported as
+        // "по краям нижнего бара проглядывается белый цвет, видимо задник"); on wasmJs there is no
+        // `windowBackground` to fall back to at all.
+        //
+        // `background(…).clip(…)` and never the reverse: in a modifier chain the LEFT element wraps
+        // the right, so the backdrop is drawn across the node's full rectangle and the clip then
+        // applies only to what follows it — the bar's own `Surface`. Swap the two and the backdrop is
+        // clipped as well, which paints the hole a second time.
+        //
+        // Painted here rather than as an underlay `Box` in [V2ShellCompactBar] on purpose: a sibling
+        // would have to be sized from `barHeight`, and that state lags the real bar by one frame
+        // whenever a label wraps (fontScale ≥ 1.3), flashing the hole on exactly the frame the bar
+        // grows. As a modifier it shares the bar's bounds by construction, at every font scale, and it
+        // adds no layout node — `onSizeChanged` still measures the same box, so the raised AI button's
+        // offset and the consumed bottom inset are untouched.
+        //
+        // Paired with [roundedTop] rather than applied unconditionally, and the reason is that there
+        // is nothing to reveal in the square state — not that it costs less. Both branches would draw
+        // the same full-bar rectangle; what differs is whether any of it survives the clip. With the
+        // capture dock up the bar covers its own bounds completely, so a backdrop there fills a hole
+        // that does not exist, and `V2BarShoulderFillTest` pins that state precisely so a future
+        // change cannot round these corners under the dock and re-open the hole.
+        //
+        // Drawn across the WHOLE node rather than only in the two 28dp corner sectors it can actually
+        // show through. A `drawBehind` narrowed to those sectors would have to re-derive the arc from
+        // `SheetTop`'s radius, i.e. keep a second copy of the shape — the same "the probe has to know
+        // the radius" fragility the shoulder test refuses for its own scan. The cost of not doing that
+        // is one opaque rect per frame, immediately overpainted by the bar's own Surface; the cost of
+        // doing it is a radius that can drift out from under the clip silently.
+        modifier = if (roundedTop) {
+            modifier
+                .background(AppSurface.bottomChromeShoulder())
+                .clip(AppShapeTokens.SheetTop)
+        } else {
+            modifier
+        },
     ) {
         items.forEachIndexed { index, item ->
             if (index == gapAfter) {

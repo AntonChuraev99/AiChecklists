@@ -6,6 +6,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -234,6 +235,53 @@ object AppSurface {
     }
 
     /**
+     * A control or a bubble raised ON the [bottomChrome] — the chat dock's chips, its input pill, its
+     * answer bubble, the capture dock's AI source pills.
+     *
+     * ⚠️ **NOT the capture dock's text field**, which this line used to claim. That field is
+     * `AddItemInputField` → `AppTextField` → an `OutlinedTextField` with a transparent container:
+     * measured on `SourceRowScreenshotTest.dock_withSources_360dp_dark`, its interior reads `#1A1C20`,
+     * i.e. the chrome itself at ΔL\* 0.0, separated by its `outline` ring alone (ΔL\* +49.8 dark /
+     * −38.2 light). That is not the "hole punched in the dock" this accessor exists to prevent — a
+     * hole is DARKER than the slab — so the field is left as it is rather than filled. What it does
+     * leave open is a consistency question, not a legibility one: the chat's input pill on the same
+     * chrome IS filled with this level, so the app's two bottom-chrome inputs are drawn two ways.
+     * Deciding that is a design call with four other `AddItemInputField` call sites on the page plane
+     * behind it (analyze preview, template preview, create-checklist), not a doc edit.
+     *
+     * ## Why this cannot be [card] or [floating]
+     * Those two answer "how far above the PAGE is this", and the page is not what these sit on. A
+     * component inside the bottom chrome has [bottomChrome] behind it, so the step that has to be
+     * visible is the one off THAT surface, and it is a different arithmetic in each theme:
+     *
+     * | | Chrome | This | ΔL\* | ratio |
+     * |---|---|---|---|---|
+     * | Light | `surfaceDim` `#DEDCD6` (L\* 87.8) | `surfaceContainerLowest` `#FFFFFF` (L\* 100) | **+12.2** | 1.31 : 1 |
+     * | Dark | `surfaceContainerLow` `#1A1C20` (L\* 10.2) | `surfaceContainerHigh` `#26282E` (L\* 16.1) | **+5.9** | 1.16 : 1 |
+     *
+     * Dark had to move: [card] resolves to the chrome's OWN tone there (both `surfaceContainerLow`),
+     * i.e. ΔL\* 0.0, and `surfaceContainerLowest` — what the chat shipped — is `#0D0E11`, ΔL\* −6.2
+     * BELOW the chrome. A surface darker than the slab it rests on reads as a hole punched in the
+     * dock, not as a control lying on it, and it breaks [AppSurface]'s own rule that the dark ladder
+     * only runs up.
+     *
+     * ## Why it is its own accessor and not an alias of [floating]
+     * The two bodies are identical TODAY, and that is a coincidence of the current palette, not a
+     * shared decision. [floating] answers "above arbitrary scrolling content, colour underneath
+     * unknown" and is paired with a shadow; this one answers "on a known, measured slab" and is
+     * paired with a 1dp `outline`. Re-tuning the bottom chrome (which is one variant — see
+     * [bottomChrome]) must move this level and leave the FAB, the snackbar and `DropdownMenu` where
+     * they are. Aliasing them would silently drag those along.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun bottomChromeRaised(): Color = if (LocalIsDarkTheme.current) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    }
+
+    /**
      * Icon and label of an INACTIVE destination on the [bottomChrome].
      *
      * ## The trap this used to encode, now removed
@@ -336,6 +384,77 @@ object AppSurface {
     @Composable
     @ReadOnlyComposable
     fun bottomChromeShadowHeight(): Dp = BottomChromeShadowHeight
+
+    /**
+     * What is visible THROUGH the two corners [AppShapeTokens.SheetTop][
+     * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens.SheetTop] clips off the
+     * top of the v2 navigation bar.
+     *
+     * ## Why this token has to exist at all
+     * Every other surface that takes `SheetTop` — the capture dock, the chat dock, the inline panel,
+     * `FillOptionsSheet` — is a shaped `Surface` drawn OVER content, so its clipped shoulders reveal
+     * the page that genuinely lies behind it. The navigation bar is the one exception: it is the last
+     * child of the shell's `Column`, the content box above it ends exactly at its top edge, and
+     * nothing in the composition is behind it. Its clipped shoulders were therefore a hole straight
+     * through the app — two 28dp quarter-discs showing whatever the platform happens to paint under
+     * the Compose surface.
+     *
+     * Measured on the recorded frames, at `x = 2`, two rows below the bar's top edge:
+     *
+     * | Frame | Shoulder | Chrome beside it | Page above it |
+     * |---|---|---|---|
+     * | `compactBar_412dp_light` | `#FAFAFA` | `#DEDCD6` | `#FBFAF8` |
+     * | `compactBar_412dp_dark` | **`#FAFAFA`** | `#1A1C20` | `#121317` |
+     *
+     * `#FAFAFA` is not a colour this design system owns — it is Robolectric's default window backdrop.
+     * That the SAME value appears in both themes is the whole point: the shoulder does not resolve
+     * against the design system at all, it resolves against whatever host the composition happens to
+     * be sitting on. Three hosts, three answers:
+     *  - **Android, steady state** — `android:windowBackground`, so cream `#FBFAF8` beside the
+     *    `#DEDCD6` chrome (the bright nick reported from a Pixel 9) and `#121317` in dark.
+     *  - **Android, cold start / theme mismatch** — the `values-night` qualifier follows the SYSTEM
+     *    night setting while the app's theme comes from DataStore, so a dark-theme app launched on a
+     *    light-mode phone paints CREAM shoulders until `MainActivity`'s runtime setter lands.
+     *  - **wasmJs** — no `windowBackground` exists behind the Skiko canvas at all.
+     *
+     * A hole whose colour is decided outside the composition cannot be reasoned about, cannot be
+     * screenshot-tested honestly, and cannot be made consistent across the two platforms this file
+     * serves. So it is painted here instead.
+     *
+     * ## The value: the page, at the exact tone [bottomChromeShadow] ends on
+     * The shoulder is where the plinth's own shadow pools, so it takes that gradient's TERMINAL
+     * colour — the same alpha, composited over [ground]. That is what makes the seam disappear rather
+     * than merely dim: the 16dp band above the bar ramps down to precisely this value at the bar's top
+     * edge, so the band and the shoulder meet with no step, and re-tuning the ramp moves both.
+     *
+     * The two themes land on opposite sides of the chrome, and that is the ladder's documented
+     * asymmetry rather than an inconsistency — in light the page is LIGHTER than the bottom chrome, in
+     * dark it is darker:
+     *
+     * | | Shoulder | Chrome | Reads as |
+     * |---|---|---|---|
+     * | Light | `#E8E7E6` (L\* 91.3) | `#DEDCD6` (L\* 87.8) | shaded page behind a dim slab |
+     * | Dark | `#0C0C0F` (L\* 3.4) | `#1A1C20` (L\* 10.2) | a trough under a raised slab |
+     *
+     * Either way the run down the screen's edge is MONOTONIC — page → ramp → shoulder → chrome — with
+     * no value brighter than the page. Before the fix the shoulder was the brightest pixel in the
+     * whole region, above even the unshaded page, which is what made it read as backdrop showing
+     * through rather than as depth.
+     *
+     * ⛔ Not for the docks. They have real content behind them; painting this under one would replace
+     * the list they are supposed to be floating over with a flat grey.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun bottomChromeShoulder(): Color = Color.Black
+        .copy(
+            alpha = if (LocalIsDarkTheme.current) {
+                BOTTOM_CHROME_SHADOW_ALPHA_DARK
+            } else {
+                BOTTOM_CHROME_SHADOW_ALPHA_LIGHT
+            },
+        )
+        .compositeOver(ground())
 
     /**
      * How dark the light-theme ramp gets at the chrome's edge.

@@ -23,14 +23,16 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiAwareText
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 
@@ -126,7 +128,8 @@ data class GistiPromptChip<T>(
  *
  * Visual spec (from gisti-extra.jsx PromptChips) — identical for both sets:
  *  - Chip height: 38dp, full-pill (radius = height/2 = 19dp)
- *  - Background: `surfaceContainerLowest` (white card), border: 1dp `outlineVariant`
+ *  - Background: `AppChatColors.raised()`, border: 1dp `AppChatColors.controlOutline()` —
+ *    both resolve against the plane the row is drawn on (page vs bottom chrome), never a fixed role
  *  - Content: emoji (15sp) + label (labelLarge ~13.5sp, weight 600, `onSurface`)
  *  - Gap between chips: 8dp (`AppDimens.SpacingSm`)
  *  - Row scrolls horizontally when chips overflow
@@ -139,8 +142,8 @@ data class GistiPromptChip<T>(
  * content padding stacks on top of the parent padding and the edge-bleed is lost).
  *
  * Token mapping:
- * - Container: `colorScheme.surfaceContainerLowest`
- * - Border: `colorScheme.outlineVariant`
+ * - Container: [AppChatColors.raised]
+ * - Border: [AppChatColors.controlOutline]
  * - Label: `colorScheme.onSurface`, `labelLarge`
  *
  * @param chips        List of [GistiPromptChip] items to display.
@@ -210,8 +213,11 @@ private fun PromptChipItem(
     Surface(
         onClick = onClick,
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        // Plane-relative, not an absolute role: this row renders BOTH on the page (ChatEmptyState)
+        // and inside the bottom chrome (the dock), and `surfaceContainerLowest` is a step UP from
+        // the page but a step DOWN from the dark chrome. See AppChatColors.
+        color = AppChatColors.raised(),
+        border = BorderStroke(1.dp, AppChatColors.controlOutline()),
         modifier = Modifier
             // heightIn, never height: a fixed 38dp clips Devanagari (matras sit above *and* below
             // the baseline) and clips any label at fontScale >= 1.3. The chip is allowed to grow.
@@ -426,7 +432,8 @@ data class GistiSelectableChip<T>(
  * presets + property toggles stay on ONE line and scroll sideways (they no longer wrap) inside the
  * always-visible expanded dock frame (the dock's peek chip slot fades out on expand, so item-create
  * chips live in the answer frame instead). Selected chips fill solid `primary`/`onPrimary` (the blue
- * active state); unselected chips are transparent with a hairline `outlineVariant` outline + hollow icon.
+ * active state); unselected chips fill [AppChatColors.raised] with a 1dp [AppChatColors.controlOutline]
+ * and a hollow icon — they are NOT transparent, see [SelectablePromptChipItem].
  *
  * Edge padding is the LazyRow [contentPadding] (the caller passes no outer horizontal padding),
  * matching the [GistiPromptChips] convention.
@@ -464,9 +471,17 @@ private fun SelectablePromptChipItem(
     // Percentage-based rather than a hardcoded 19dp: identical at the 38dp resting height, and it
     // stays a pill once ru/hi copy or a large font scale grows the chip past that.
     val shape = AppShapeTokens.Pill
-    // Outline aesthetic: an unselected chip is transparent with a hairline outline + a neutral
-    // hollow icon; a selected chip fills solid `primary` (the blue active state the user asked for).
-    val containerColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+    // Aliased because inside `semantics { }` the name `selected` resolves to the semantics property
+    // being assigned, not to this parameter.
+    val isSelected = selected
+    // An unselected chip is FILLED, not transparent. It used to be `Color.Transparent` + a hairline
+    // `outlineVariant`, which left that one line as the only thing separating the control from its
+    // background — fine on the old white dock (1.32 : 1), invisible on today's `surfaceDim` chrome
+    // (1.04 : 1) while the LABEL stayed at 6.82 : 1. That is the reported defect exactly: readable
+    // words with no button under them. Now the fill carries the separation and the outline is the
+    // second channel; both resolve against the plane the chip is drawn on (see AppChatColors).
+    // A selected chip still fills solid `primary` — the blue active state is unchanged.
+    val containerColor = if (selected) MaterialTheme.colorScheme.primary else AppChatColors.raised()
     val contentColor = if (selected) {
         MaterialTheme.colorScheme.onPrimary
     } else {
@@ -475,7 +490,7 @@ private fun SelectablePromptChipItem(
     val border = if (selected) {
         null
     } else {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        BorderStroke(1.dp, AppChatColors.controlOutline())
     }
 
     Surface(
@@ -484,6 +499,12 @@ private fun SelectablePromptChipItem(
         color = containerColor,
         border = border,
         modifier = Modifier
+            // Surface(onClick) announces Role.Button but never "selected" — so a screen-reader user
+            // heard the four reminder presets as four identical buttons with no way to tell which
+            // one is active. The blue fill is a sighted-only cue until this is set.
+            // `this.` is required: the enclosing function's `selected` parameter shadows the
+            // SemanticsPropertyReceiver property of the same name.
+            .semantics { this.selected = isSelected }
             // heightIn, never height: a fixed 38dp clips Devanagari (matras sit above *and* below
             // the baseline) and clips any label at fontScale >= 1.3. The chip is allowed to grow.
             // minimumInteractiveComponentSize() stays — it is what keeps the touch target at 48dp

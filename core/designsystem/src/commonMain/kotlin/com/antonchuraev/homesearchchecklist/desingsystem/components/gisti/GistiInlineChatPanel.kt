@@ -858,7 +858,13 @@ private fun DockGrabberHandle(
                     .width(36.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                    // Identical to the full-screen overlay's grabber, deliberately: they are the two
+                    // ends of ONE gesture (drag this dock up to full, drag that one down to here), so
+                    // a difference in weight reads as two unrelated handles. `onSurfaceVariant` at 40%
+                    // measured 1.90 : 1 on the bottom chrome — a drag affordance you cannot see is not
+                    // an affordance; `outline` is the role for exactly this (3.33 : 1 light /
+                    // 5.47 : 1 dark) and needs no alpha to stay quiet.
+                    .background(MaterialTheme.colorScheme.outline),
             )
         }
     }

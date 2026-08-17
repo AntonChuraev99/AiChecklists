@@ -56,6 +56,7 @@ import aichecklists.core.designsystem.generated.resources.chat_choice_remember
 import aichecklists.core.designsystem.generated.resources.chat_choice_save
 import aichecklists.core.designsystem.generated.resources.chat_object_more
 import aichecklists.core.designsystem.generated.resources.chat_preview_new_list_label
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
@@ -77,7 +78,7 @@ import org.jetbrains.compose.resources.stringResource
  * Structure (NOT an AppCard — this is a styled dialogue turn, not a form):
  * ```
  * AiSenderLabel          (reused from ChatMessageBubble)
- * ┌──────────────────┐   prompt bubble: surfaceContainerLowest + 1dp outlineVariant
+ * ┌──────────────────┐   prompt bubble: AppChatColors.raised() + 1dp contentOutline()
  * │  prompt          │   shape 20-20-20-4 (tail bottom-left), ChatMarkdownText
  * │  object rows     │   D2: the typed object of the action (item / list / time / …)
  * └──────────────────┘
@@ -145,8 +146,14 @@ fun AiChoiceResponse(
                         bottomEnd = 20.dp,
                         bottomStart = 4.dp,
                     ),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    // The SAME pair as ChatMessageBubble's received side, and it has to be: this
+                    // bubble and an assistant answer are the same thing said two ways, and they are
+                    // routinely one above the other in one frame. Plane-relative — a fixed
+                    // `surfaceContainerLowest` is `#0D0E11`, ΔL* −6.2 BELOW the dark bottom chrome,
+                    // i.e. a hole punched in the dock rather than a bubble lying on it. Content, not
+                    // a target → the SOFT hairline. See AppChatColors.
+                    color = AppChatColors.raised(),
+                    border = BorderStroke(1.dp, AppChatColors.contentOutline()),
                 ) {
                     Column(
                         modifier = Modifier

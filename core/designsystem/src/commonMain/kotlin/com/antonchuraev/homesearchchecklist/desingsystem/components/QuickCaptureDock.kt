@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -16,6 +16,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiD
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
 
 /**
  * Opacity of the scrim a host paints over its CONTENT while [QuickCaptureDock] is up.
@@ -133,46 +136,57 @@ fun QuickCaptureDock(
         shape = AppShapeTokens.SheetTop,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Hairline on the TOP edge only — the dock flows into the system-nav strip below it, and
-            // a full border would draw a stray divider across that seam (same rule as
-            // GistiGlassChatDock). A divider as the first child traces exactly that edge.
-            HorizontalDivider(
-                thickness = AppDimens.DividerThickness,
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-            // The reminder/priority chips sit above the input; the AI source row sits below it.
-            // See [belowInput]'s KDoc for why "below" is safe here and was not in the dock's
-            // previous, content-hosted incarnation.
-            if (aboveInput != null) {
-                Box(modifier = Modifier.padding(top = slotGap)) { aboveInput() }
-            }
-            AddItemInputField(
-                text = text,
-                onTextChange = onTextChange,
-                onAdd = onAdd,
-                placeholder = placeholder,
-                focusRequester = focusRequester,
-                modifier = Modifier
-                    .adaptiveContentWidth()
-                    .padding(
-                        horizontal = AppDimens.ScreenPaddingHorizontal,
-                        // 4dp tighter than the input's own SpacingMd when a second row follows —
-                        // the 4dp the source pills took to reach a 48dp touch target comes from
-                        // here rather than from the pill, which is what keeps the pills at full size.
-                        vertical = if (belowInput != null) AppDimens.SpacingSm else AppDimens.SpacingMd,
-                    ),
-            )
-            if (belowInput != null) {
-                Box(
+        // Both slots and the field are drawn on the bottom chrome, not on the page — the chips the
+        // host passes into `aboveInput` are the same ones the chat dock renders. See AppChatColors.
+        CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.BottomChrome) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Hairline on the TOP edge only — the dock flows into the system-nav strip below it, and
+                // a full border would draw a stray divider across that seam (same rule as
+                // GistiGlassChatDock). A divider as the first child traces exactly that edge.
+                //
+                // `dockedSeam()`, not `outlineVariant`: measured on the recorded 360dp frames, the line
+                // was `#E2E0DB` on a `#DEDCD6` dock — ΔL* +1.4 (1.04 : 1), i.e. the edge-tracing line
+                // was the same colour as the edge it traced, and the whole separation fell back on the
+                // dock's own −10.5 step off the page. `dockedSeam()` resolves to `outline` in light
+                // (3.33 : 1 on this surface) and keeps `outlineVariant` in dark, where the old value
+                // was already ΔL* +9.2 and needed no help.
+                HorizontalDivider(
+                    thickness = AppDimens.DividerThickness,
+                    color = AppSurface.dockedSeam(),
+                )
+                // The reminder/priority chips sit above the input; the AI source row sits below it.
+                // See [belowInput]'s KDoc for why "below" is safe here and was not in the dock's
+                // previous, content-hosted incarnation.
+                if (aboveInput != null) {
+                    Box(modifier = Modifier.padding(top = slotGap)) { aboveInput() }
+                }
+                AddItemInputField(
+                    text = text,
+                    onTextChange = onTextChange,
+                    onAdd = onAdd,
+                    placeholder = placeholder,
+                    focusRequester = focusRequester,
                     modifier = Modifier
                         .adaptiveContentWidth()
                         .padding(
-                            start = AppDimens.ScreenPaddingHorizontal,
-                            end = AppDimens.ScreenPaddingHorizontal,
-                            bottom = slotGap,
+                            horizontal = AppDimens.ScreenPaddingHorizontal,
+                            // 4dp tighter than the input's own SpacingMd when a second row follows —
+                            // the 4dp the source pills took to reach a 48dp touch target comes from
+                            // here rather than from the pill, which is what keeps the pills at full size.
+                            vertical = if (belowInput != null) AppDimens.SpacingSm else AppDimens.SpacingMd,
                         ),
-                ) { belowInput() }
+                )
+                if (belowInput != null) {
+                    Box(
+                        modifier = Modifier
+                            .adaptiveContentWidth()
+                            .padding(
+                                start = AppDimens.ScreenPaddingHorizontal,
+                                end = AppDimens.ScreenPaddingHorizontal,
+                                bottom = slotGap,
+                            ),
+                    ) { belowInput() }
+                }
             }
         }
     }

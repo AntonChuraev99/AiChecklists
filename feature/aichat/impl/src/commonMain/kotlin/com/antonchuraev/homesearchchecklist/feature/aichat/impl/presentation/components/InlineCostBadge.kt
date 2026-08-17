@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 
 /**
  * A small read-only pill shown below a user message bubble, indicating how many
@@ -40,7 +41,10 @@ fun InlineCostBadge(
         modifier = modifier
             .clip(shape)
             .background(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                // `quietFill`, NOT `raised`: this badge has no border, so its fill is the only thing
+                // drawing the pill. Recorded with `raised()` on the light page it measured ΔL* +2.0
+                // against `#FAFAFA` and the pill disappeared, leaving a floating sparkle and a digit.
+                color = AppChatColors.quietFill(),
                 shape = shape,
             )
             .padding(horizontal = 6.dp, vertical = 2.dp)

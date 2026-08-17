@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,10 +41,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppElevation
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -65,8 +69,8 @@ import dev.chrisbanes.haze.hazeEffect
  *
  * Visual spec:
  *  - Height: 56dp, corner radius: 16dp (matches AskGistiBar)
- *  - Container: `surfaceContainerLowest`
- *  - Border: 1dp `outlineVariant` (the ladder's single hairline weight)
+ *  - Container: `AppChatColors.raised()` — plane-relative (page vs bottom chrome)
+ *  - Border: 1dp `AppChatColors.controlOutline()` (the ladder's single hairline weight, firm role)
  *  - Shadow: [AppElevation.FloatingPill] = 2dp, light only (level 3 "Floating")
  *  - Left:  [SparkleTile] 28dp
  *  - Center: placeholder/context text, `onSurfaceVariant`
@@ -97,11 +101,15 @@ fun GistiChatDock(
             // its context label, which is user-authored and unbounded.
             .heightIn(min = 56.dp),
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        // Plane-relative: this bar is the collapsed dock, so it is normally drawn ON the bottom
+        // chrome, where a fixed `surfaceContainerLowest` sits BELOW the dark chrome instead of on
+        // top of it. On a page host it resolves to the card tone exactly as before. See AppChatColors.
+        color = AppChatColors.raised(),
         // 1dp, not the 1.5dp this pill used to carry: every hairline in the ladder is 1dp, and a
         // heavier stroke on the one floating element makes it read as a thicker-bordered card
-        // rather than as a surface above the page.
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        // rather than as a surface above the page. `outline` rather than `outlineVariant` because
+        // the whole bar is one tap target.
+        border = BorderStroke(1.dp, AppChatColors.controlOutline()),
         // Depth kept, now named: the 2dp this dock always used IS AppElevation.FloatingPill, and the
         // "light only" rule now lives in AppElevation.shadowInLight instead of a local isDark check.
         shadowElevation = AppElevation.shadowInLight(AppElevation.FloatingPill),
@@ -230,7 +238,11 @@ fun GistiGlassChatDock(
     // goes muddy-grey and renders identically on Android and Web/Skiko. ([hazeState] is retained for
     // call-site/source compatibility but is no longer sampled — the dock no longer blurs behind it.)
     val dockColor = gistiDockColor()
-    val hairlineColor = MaterialTheme.colorScheme.outlineVariant
+    // The SAME seam token QuickCaptureDock traces its top edge with — these two docks are seen in one
+    // frame and their top edges are the same edge of the same app. `outlineVariant` measured `#E2E0DB`
+    // on today's `#DEDCD6` chrome, ΔL* +1.4: an edge-tracing line the colour of the edge it traces.
+    // `dockedSeam()` lifts light to `outline` and leaves dark alone (already ΔL* +9.2).
+    val hairlineColor = AppSurface.dockedSeam()
     val legacyDock = DockDesignDebug.useLegacyDock
 
     Surface(
@@ -261,18 +273,22 @@ fun GistiGlassChatDock(
         shape = dockShape,
         color = dockColor,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = AppDimens.SpacingSm, bottom = bottomPadding),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            // Grabber TOPMOST (above the chips), then chips, then the pill/morph content.
-            grabberContent?.invoke()
-            // Contextual prompt chips — edge-to-edge (own contentPadding, NO outer horizontal
-            // padding here so the last chip bleeds past the screen edge as a scroll affordance).
-            chipsContent?.invoke()
-            pillContent()
+        // Everything inside this dock is drawn on the bottom chrome, not on the page. Declared once,
+        // here, at the surface that paints it — see AppChatColors.
+        CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.BottomChrome) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = AppDimens.SpacingSm, bottom = bottomPadding),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+            ) {
+                // Grabber TOPMOST (above the chips), then chips, then the pill/morph content.
+                grabberContent?.invoke()
+                // Contextual prompt chips — edge-to-edge (own contentPadding, NO outer horizontal
+                // padding here so the last chip bleeds past the screen edge as a scroll affordance).
+                chipsContent?.invoke()
+                pillContent()
+            }
         }
     }
 }

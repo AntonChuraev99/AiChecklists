@@ -33,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,8 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_panel_collapse
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
 import org.jetbrains.compose.resources.stringResource
 
 /** The two positions of the FULL-screen chat overlay. */
@@ -239,55 +242,64 @@ fun GistiFullChatOverlay(
                         alpha = (f * 6f).coerceIn(0f, 1f)
                     },
             ) {
-                Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                    // ── Top handle: grabber pill (drag DOWN collapses) + chevron-down button ──
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .anchoredDraggable(
-                                state = state.anchored,
-                                orientation = Orientation.Vertical,
-                                flingBehavior = fling,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                // The overlay paints the bottom chrome across the whole window, and App.kt hands it
+                // the SAME ChatBody the page-hosted ChatScreen renders — so the plane it is drawn on
+                // has to be declared here rather than assumed by the components. See AppChatColors.
+                CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.BottomChrome) {
+                    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+                        // ── Top handle: grabber pill (drag DOWN collapses) + chevron-down button ──
                         Box(
                             modifier = Modifier
-                                .width(36.dp)
-                                .height(4.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
-                        )
-                        IconButton(
-                            onClick = onCollapse,
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = AppDimens.SpacingXs)
-                                .semantics { contentDescription = collapseLabel },
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .anchoredDraggable(
+                                    state = state.anchored,
+                                    orientation = Orientation.Vertical,
+                                    flingBehavior = fling,
+                                ),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.ExpandMore,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(AppDimens.IconSizeMd),
+                            Box(
+                                modifier = Modifier
+                                    .width(36.dp)
+                                    .height(4.dp)
+                                    .clip(CircleShape)
+                                    // `onSurfaceVariant` at 40% measured 1.90 : 1 on the chrome — a
+                                    // drag affordance you cannot see is not an affordance. `outline`
+                                    // is the role for exactly this (3.33 : 1 light / 5.47 : 1 dark)
+                                    // and needs no alpha to stay quiet.
+                                    .background(MaterialTheme.colorScheme.outline),
                             )
+                            IconButton(
+                                onClick = onCollapse,
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = AppDimens.SpacingXs)
+                                    .semantics { contentDescription = collapseLabel },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ExpandMore,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(AppDimens.IconSizeMd),
+                                )
+                            }
                         }
-                    }
 
-                    // ── Full conversation history (fills remaining space, scrolls internally) ──
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        historyContent()
-                    }
+                        // ── Full conversation history (fills remaining space, scrolls internally) ──
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            historyContent()
+                        }
 
-                    // ── Recording overlay + pinned input (own the ime ∪ navbar inset once) ──
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
-                    ) {
-                        recordingOverlay?.invoke()
-                        inputContent()
+                        // ── Recording overlay + pinned input (own the ime ∪ navbar inset once) ──
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+                        ) {
+                            recordingOverlay?.invoke()
+                            inputContent()
+                        }
                     }
                 }
             }

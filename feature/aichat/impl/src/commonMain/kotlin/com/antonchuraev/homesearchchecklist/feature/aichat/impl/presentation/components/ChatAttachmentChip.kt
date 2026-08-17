@@ -28,6 +28,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_attachment_remove
 import coil3.compose.AsyncImage
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
@@ -55,8 +56,12 @@ fun ChatAttachmentChip(
     Box(modifier = modifier.size(56.dp)) {
         Surface(
             shape = chipShape,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            // Plane-relative, like every other control in the chat: the pending-attachment strip
+            // renders above the input on BOTH the page and the dock, and `surfaceContainerLow` is
+            // the dark chrome's OWN tone (ΔL* 0.0 — the tile vanished into the dock, leaving only
+            // the ✕ badge). The outline role is unchanged in meaning: this tile is tappable.
+            border = BorderStroke(1.dp, AppChatColors.controlOutline()),
+            color = AppChatColors.raised(),
             modifier = Modifier.fillMaxSize(),
         ) {
             when (attachmentSourceFor(attachment)) {
