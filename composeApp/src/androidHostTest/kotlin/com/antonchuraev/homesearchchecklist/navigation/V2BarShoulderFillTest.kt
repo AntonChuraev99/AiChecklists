@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.navigation
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,12 +14,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
@@ -78,6 +84,15 @@ import javax.imageio.ImageIO
  * shoulder was the brightest pixel in the whole region — brighter even than the page — which is what
  * made it read as backdrop rather than as depth.
  *
+ * ## The second subject: the CAPTURE DOCK's shoulders
+ * The same shape of defect, one surface up, and it reached a device for the same reason — a bright
+ * wedge that only shows up against the right background. While the quick-capture dock is open the bar
+ * is not on screen at all (see [V2ShellCompactBar]) and the dock is the bottom chrome; its own
+ * `SheetTop` corners then showed the UNDIMMED page against the 45%-dimmed page beside them. That half
+ * lives in [assertCaptureDockShoulderIsTheDimmedPage], and unlike the bar's it is not a hole through
+ * the composition — it is a hole through the host's scrim, so it is fixed by the host and not by a
+ * design-system token.
+ *
  * Run:
  *   ./gradlew :composeApp:testAndroidHostTest --tests "*V2BarShoulderFillTest*"
  */
@@ -117,6 +132,13 @@ class V2BarShoulderFillTest {
      */
     private var barTopPx: Int = 0
 
+    /**
+     * Top edge of the quick-capture dock in px, from LAYOUT (`positionInRoot`), for the frames where
+     * the dock — not the bar — is the bottom chrome. Zero means the fixture never mounted it, which
+     * [assertCaptureDockShoulderIsTheDimmedPage] fails on rather than probing row 6 of the window.
+     */
+    private var dockTopPx: Int = 0
+
     /** `Locale.setDefault` is JVM-global and Gradle reuses one JVM for the whole task. */
     private val defaultLocale: Locale = Locale.getDefault()
 
@@ -150,14 +172,24 @@ class V2BarShoulderFillTest {
     fun noWindowBackdropShowsThroughTheBar_412dp_light_shortList() =
         assertNoSentinelInTheBarFootprint(Phone412, dark = false, cardsUnderTheBar = false)
 
-    /**
-     * With the capture dock up the bar is square ([V2SplitNavigationBar]'s `roundedTop = false`), so
-     * there is no shoulder to fill — and no hole either. Pinned so a future change cannot "fix" the
-     * corners by rounding them in this state too and re-open the hole under the dock.
-     */
+    // ── The SAME question one surface up: the capture dock's own shoulders ───
+    //
+    // This used to be one cell here — "with the capture dock up the bar is square, so there is no
+    // shoulder to fill". The premise is gone: with the dock up there is no BAR (the owner's second
+    // device verdict, see V2ShellCompactBar), so that cell rendered a frame with neither a bar nor a
+    // dock in it and asserted a scan over a page. Green, and about nothing.
+    //
+    // What replaces it is the same defect one surface up, and this one is real: the dock is a
+    // `SheetTop` Surface, its two top corners are clipped away, and what shows through them is
+    // whatever the host painted there. See [assertCaptureDockShoulderIsTheDimmedPage].
+
     @Test
-    fun noWindowBackdropShowsThroughTheBar_412dp_light_captureOpen() =
-        assertNoSentinelInTheBarFootprint(Phone412, dark = false, cardsUnderTheBar = true, captureOpen = true)
+    fun theCaptureDockShoulderIsTheDimmedPage_light() =
+        assertCaptureDockShoulderIsTheDimmedPage(dark = false)
+
+    @Test
+    fun theCaptureDockShoulderIsTheDimmedPage_dark() =
+        assertCaptureDockShoulderIsTheDimmedPage(dark = true)
 
     // ── Large text: where the ruler used to lie ──────────────────────────────
     //
@@ -278,6 +310,69 @@ class V2BarShoulderFillTest {
 
     // ── shared assertions ────────────────────────────────────────────────────
 
+    /**
+     * The quick-capture dock's clipped shoulders must read as the DIMMED page — the same value as the
+     * page one row above them — and never as the raw page.
+     *
+     * ## The defect, measured
+     * The host dims the page while the dock is up, and that scrim lives inside `AppScaffold`'s CONTENT
+     * slot, which ends exactly at the dock's top edge (deliberately: it is what keeps the dock and the
+     * system-nav strip out of the dim at any keyboard height). Behind the dock is therefore the
+     * scaffold's own container — the page, undimmed. The two 28dp corners `SheetTop` clips away showed
+     * it: measured on the 412dp light frame recorded before the fix, `#FBFAF8` in the shoulder against
+     * `#8A8988` in the page beside it, ΔL\* +41 — the brightest thing in the bottom half of a screen
+     * whose whole point at that moment is the dock. Reported from a Pixel 9 as two light corners next
+     * to the dock.
+     *
+     * ## Why the expected colour is named twice, once positively and once negatively
+     * "The shoulder equals the page above it" alone would pass on a frame with no scrim at all, where
+     * both are the raw page — i.e. on a fixture that stopped reproducing the case. So the raw
+     * `ground()` is lifted out of composition and asserted AGAINST: it is the exact value the defect
+     * produced, so a regression cannot be green, and a fixture that forgot the scrim cannot be green
+     * either.
+     *
+     * ## Why `cardsUnderTheBar = false`
+     * So that the plane ending at the dock's top edge is the PAGE, which is what makes the equality
+     * exact. With a card there instead the two probes differ by the card↔page step seen through one
+     * alpha (measured: light `#8A8988` shoulder against `#8C8C8C`, dark `#0A0B0D` against `#0F1012`)
+     * — arithmetic, not a defect, and the same arithmetic [shoulderMeetsTheBandOverCards_light]
+     * already bounds for the bar. Bounding it a second time here would trade an exact assertion for a
+     * tolerance, and the tolerance is where a real regression hides.
+     */
+    private fun assertCaptureDockShoulderIsTheDimmedPage(dark: Boolean) {
+        val name = "captureShoulder_${if (dark) "dark" else "light"}"
+        val image = render(
+            Phone412,
+            dark = dark,
+            cardsUnderTheBar = false,
+            captureOpen = true,
+            name = name,
+        )
+
+        assertTrue(
+            "the fixture did not mount the capture dock — dockTopPx=$dockTopPx (frame: $name)",
+            dockTopPx in 1 until image.height - ShoulderProbeDp,
+        )
+
+        // Both inside the 28dp corner sector at x = 2: at that inset the arc closes ~17px below the
+        // dock's top edge, so +6 is comfortably in the wedge and not on the dock's own surface.
+        val shoulder = rgb(image, SampleInset, dockTopPx + ShoulderProbeDp)
+        val dimmedPageAbove = rgb(image, SampleInset, dockTopPx - ShoulderProbeDp)
+
+        assertTrue(
+            "the shoulder reads ${hex(shoulder)}, which is the RAW page — the host's scrim is not " +
+                "being painted behind the dock, so its clipped corners are the brightest thing " +
+                "beside a dimmed page (frame: $name)",
+            shoulder != groundUnderTest,
+        )
+        assertEquals(
+            "the shoulder reads ${hex(shoulder)} against ${hex(dimmedPageAbove)} one probe above it " +
+                "— the corner must continue the dimmed page, not step off it (frame: $name)",
+            hex(dimmedPageAbove),
+            hex(shoulder),
+        )
+    }
+
     private fun assertBandSeamOverCards(dark: Boolean) {
         val name = "bandOverCards_${if (dark) "dark" else "light"}"
         val image = render(Phone412, dark = dark, cardsUnderTheBar = true, name = name)
@@ -360,7 +455,6 @@ class V2BarShoulderFillTest {
         qualifiers: String,
         dark: Boolean,
         cardsUnderTheBar: Boolean,
-        captureOpen: Boolean = false,
         fontScale: Float = 1f,
         locale: Locale = Locale.ENGLISH,
     ) {
@@ -368,11 +462,10 @@ class V2BarShoulderFillTest {
             append(qualifiers.substringAfter('w').substringBefore("dp"))
             append(if (dark) "_dark" else "_light")
             if (!cardsUnderTheBar) append("_shortList")
-            if (captureOpen) append("_captureOpen")
             if (locale != Locale.ENGLISH) append("_${locale.language}")
             if (fontScale != 1f) append("_fs${(fontScale * 10).toInt()}")
         }
-        val image = render(qualifiers, dark, cardsUnderTheBar, captureOpen, "hole_$name", fontScale, locale)
+        val image = render(qualifiers, dark, cardsUnderTheBar, false, "hole_$name", fontScale, locale)
         val barTop = barTopEdge(image)
         assertRulerIsOnTheBarsOwnSurface(image, barTop, name)
         val sentinel = Sentinel.toArgb() and 0xFFFFFF
@@ -498,7 +591,7 @@ class V2BarShoulderFillTest {
                             barVisible = true,
                             captureOpen = captureOpen,
                             overlayContent = null,
-                            content = { PageUnderTest(cardsUnderTheBar) },
+                            content = { PageUnderTest(cardsUnderTheBar, captureOpen) },
                         )
                     }
                 }
@@ -517,36 +610,75 @@ class V2BarShoulderFillTest {
      * A `LazyColumn` rather than a plain `Column`: it CLIPS to its bounds, so the last card is cut off
      * exactly at the bar's top edge the way a real scrolled list is. A `Column` would overflow and
      * draw its rows straight over the bar, which would hide the very region under test.
+     *
+     * ## The capture branch mirrors `AppScaffold`, and the structure is the whole test
+     * `Column { Box(weight(1f)) { list + scrim }; dock }` is exactly how the two real hosts mount it:
+     * the dock in the `bottomBar` slot, the scrim INSIDE the content slot. Flatten that — paint the
+     * scrim over the whole box and drop the dock on top — and the strip behind the dock gets dimmed
+     * too, the shoulders come out matching by accident, and the fixture reports a clean frame over the
+     * defect it exists for. That is not hypothetical: it is what this fixture's first draft did.
      */
     @Composable
-    private fun PageUnderTest(cardsUnderTheBar: Boolean) {
+    private fun PageUnderTest(cardsUnderTheBar: Boolean, captureOpen: Boolean = false) {
         val rows = if (cardsUnderTheBar) 40 else 2
         // Recorded here, where the rows are actually painted, so the value an assertion compares
         // against and the value the fixture draws with cannot come apart.
         cardUnderTest = AppSurface.card().toArgb() and 0xFFFFFF
         chromeUnderTest = AppSurface.bottomChrome().toArgb() and 0xFFFFFF
         groundUnderTest = AppSurface.ground().toArgb() and 0xFFFFFF
-        Box(
+        // = the scaffold's container: what both slots are drawn on, and therefore what a hole in
+        // either of them reveals.
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(AppSurface.ground())
-                // THE RULER. This box fills the shell's content slot, and the shell lays content and
-                // bar out as `Column { Box(weight(1f)) { content() }; bar }` — so this box's bottom
-                // edge IS the bar's top edge, by construction, at any font scale or locale. See
-                // [barTopEdge] for what the constant it replaces got wrong.
-                .onSizeChanged { barTopPx = it.height },
+                .background(AppSurface.ground()),
         ) {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items((0 until rows).toList()) {
-                    // Flush, unspaced card rows: whatever row lands against the bar, the plane ending
-                    // at the bar's top edge is card-coloured. No gap can put the page there by luck.
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    // THE RULER. This box fills the shell's content slot, and the shell lays content
+                    // and bar out as `Column { Box(weight(1f)) { content() }; bar }` — so this box's
+                    // bottom edge IS the bar's top edge, by construction, at any font scale or
+                    // locale. See [barTopEdge] for what the constant it replaces got wrong.
+                    .onSizeChanged { barTopPx = it.height },
+            ) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items((0 until rows).toList()) {
+                        // Flush, unspaced card rows: whatever row lands against the bar, the plane
+                        // ending at the bar's top edge is card-coloured. No gap can put the page
+                        // there by luck.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(RowHeight)
+                                .background(AppSurface.card()),
+                        )
+                    }
+                }
+                if (captureOpen) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(RowHeight)
-                            .background(AppSurface.card()),
+                            .matchParentSize()
+                            .background(captureDockScrimColor()),
                     )
                 }
+            }
+            if (captureOpen) {
+                QuickCaptureDock(
+                    text = "",
+                    onTextChange = {},
+                    onAdd = {},
+                    placeholder = "Add a task…",
+                    // Both of the modifier's jobs matter. The `background` is the fix under test —
+                    // the scrim continuing behind the dock. The `onGloballyPositioned` is the ruler:
+                    // the dock's own top edge, taken from layout rather than from a colour, because a
+                    // probe asserting something ABOUT the shoulder's colour must not locate it BY a
+                    // colour.
+                    modifier = Modifier
+                        .background(captureDockScrimColor())
+                        .onGloballyPositioned { dockTopPx = it.positionInRoot().y.toInt() },
+                    belowInput = { SourceRow(onSelect = {}) },
+                )
             }
         }
     }
@@ -610,6 +742,15 @@ class V2BarShoulderFillTest {
 
         /** `AppSurface.bottomChromeShadowHeight()`. */
         const val ShadowBandDp = 16
+
+        /**
+         * How far above / below the dock's top edge the shoulder probe samples.
+         *
+         * At [SampleInset] (x = 2) the 28dp corner arc closes ~17px below the top edge, so 6px down
+         * is inside the clipped wedge with room to spare — and 6px up is clear of the dock's own 1dp
+         * top hairline and its anti-aliasing.
+         */
+        const val ShoulderProbeDp = 6
 
         /**
          * The bar's `defaultMinSize` — `NavigationBarHeight` in material3, mirrored as

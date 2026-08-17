@@ -231,6 +231,63 @@ class InboxAddTaskRowTest {
         composeTestRule.onNodeWithText(placeholder).assertIsDisplayed()
     }
 
+    // ── A4. The flag may not outlive the dock ────────────────────────────────
+
+    /**
+     * Catches: a screen with no capture dock AND no bottom navigation.
+     *
+     * The dock needs a page to capture into, so it is withheld on Loading and on Error. That used to
+     * be a cosmetic detail — the bottom bar was still there underneath, so the user simply saw the
+     * bar again. Since the v2 shell started surrendering the whole bottom navigation while
+     * `createDockOpen` is true, the same mismatch strands the user: no dock, no tabs, no AI button.
+     * On Android BACK still rescues them; on wasmJs `PlatformBackHandler` is a no-op, so there is no
+     * way out at all.
+     *
+     * The state IS reachable after a successful load — this screen's state comes from a Flow that can
+     * emit an Error on a later refresh — which is why this is a guard and not an impossible branch.
+     *
+     * Asserted on the callback rather than on a pixel: the fix must hand the flag back to the HOST
+     * (the owner of both the dock and the shell's chrome), not hide the mismatch locally.
+     */
+    @Test
+    fun inboxScreen_whenTheDockCannotRender_reportsTheDockClosed() {
+        var dismissCount = 0
+        composeTestRule.setContent {
+            InboxUnderTest(
+                state = InboxScreenState.Error(message = "Could not load", canRetry = true),
+                createDockOpen = true,
+                onCreateDockDismiss = { dismissCount++ },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        assertTrue(
+            dismissCount > 0,
+            "With no page to capture into the dock is not composed, so the host must be told to " +
+                "drop the flag — otherwise the shell keeps its navigation hidden for a dock that is " +
+                "not on screen",
+        )
+    }
+
+    /** The mirror image: with a page to capture into, nothing may close the dock behind the user. */
+    @Test
+    fun inboxScreen_whenTheDockCanRender_doesNotReportItClosed() {
+        var dismissCount = 0
+        composeTestRule.setContent {
+            InboxUnderTest(
+                state = inboxContent(tasks = listOf(inboxTask(id = "t1", text = "First task"))),
+                createDockOpen = true,
+                onCreateDockDismiss = { dismissCount++ },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        assertTrue(
+            dismissCount == 0,
+            "The dock is on screen, so nothing may report it closed (saw $dismissCount dismissals)",
+        )
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────────
 
     @Composable

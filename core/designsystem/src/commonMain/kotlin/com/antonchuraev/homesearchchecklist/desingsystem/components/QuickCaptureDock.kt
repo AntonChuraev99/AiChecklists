@@ -5,13 +5,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -29,11 +32,43 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceT
  * shared number is the only thing keeping the RESULT identical.
  *
  * Above M3's 32% default: this scrim sits under a dock that is itself a light surface, and at 32%
- * the two read as one page — which is the defect it was introduced to fix. The host must apply it to
- * the content only: the dock, the snackbar and the system-nav strip stay bright (rule `designsystem`
- * — a dimmed nav strip breaks the continuous surface the strip and the dock form).
+ * the two read as one page — which is the defect it was introduced to fix.
+ *
+ * The host applies it to the CONTENT and to the strip BEHIND the dock, never over the dock: the dock,
+ * the snackbar and the system-nav strip stay bright (rule `designsystem` — a dimmed nav strip breaks
+ * the continuous surface the strip and the dock form). See [captureDockScrimColor] for why the second
+ * of those is mandatory rather than a refinement.
  */
 const val CaptureDockScrimAlpha: Float = 0.45f
+
+/**
+ * The scrim colour itself, resolved — [CaptureDockScrimAlpha] on the theme's `scrim` role.
+ *
+ * Exists so the two hosts, and the shell's screenshot fixture, cannot spell the same dim three ways.
+ * Each host paints it in TWO places and both are mandatory:
+ *
+ *  1. **over the content**, where it is the dim itself (an overlay `Box` on the Inbox, a
+ *     `drawWithContent` layer on the Calendar — those two screens dismiss the dock through different
+ *     modifier chains, so the mechanism differs and only the colour is shared);
+ *  2. **behind the dock**, as [QuickCaptureDock]'s own `modifier`.
+ *
+ * The second one is not a nicety. The dock is a `SheetTop` `Surface`, so its two top corners are
+ * clipped away and whatever lies behind them shows through — and what lies behind them is the
+ * scaffold's container, i.e. the page, at full brightness, because the content scrim stops at the
+ * dock's top edge (that boundary is deliberate: it is what keeps the dock, the snackbar and the
+ * system-nav strip out of the dim at any keyboard height). Undimmed page against a 45%-dimmed page
+ * is ΔL\* ≈ 33 in light: the "two light corners beside the dock" reported from a Pixel 9. Painting
+ * the same scrim behind the dock makes the shoulders the dimmed page they are supposed to be, and it
+ * costs nothing anywhere else — the dock's own surface is opaque and drawn over it.
+ *
+ * ⚠️ A host that mounts [QuickCaptureDock] WITHOUT dimming its page must not pass this: there the
+ * shoulders should reveal the undimmed page, and a dim behind them would be the same defect
+ * inverted. That is why this is the host's call and not something the dock does to itself.
+ */
+@Composable
+@ReadOnlyComposable
+fun captureDockScrimColor(): Color =
+    MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
 
 /**
  * The v2 quick-capture affordance: a raised bottom dock with one input, raised by the shell's "+" FAB.
@@ -51,6 +86,10 @@ const val CaptureDockScrimAlpha: Float = 0.45f
  *   off-screen — the exact defect this dock shipped with once.
  * - It adds NO inset of its own, and reserves no FAB band: the host hides its FABs while the dock is
  *   up, so reserving space for a stack that is not on screen would float the input above the edge.
+ * - Pass [captureDockScrimColor] as this component's `modifier` background whenever the host dims its
+ *   page. The dock's `SheetTop` corners are clipped away, and the strip behind them is OUTSIDE the
+ *   content scrim, so without it those two corners show the page at full brightness beside a dimmed
+ *   one — measured ΔL\* +41 in light, reported from a device as two bright nicks.
  * - Compose it only while it is open. The keyboard is raised via a `LaunchedEffect(Unit)`, which is
  *   correct exactly once per appearance; keeping it mounted-but-hidden fires it at the wrong time.
  *

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
@@ -59,8 +60,12 @@ import java.util.Locale
  *     page (going darker measures −2.0, i.e. less separation, not more).
  *
  * What each shot has to show:
- *  - the bar, the capture dock and the chat dock are ONE surface — same tone, same 28dp top corner —
- *    so the bottom of the screen reads as one object instead of three stacked docks;
+ *  - the bar and the chat dock are ONE surface — same tone, same 28dp top corner — so the bottom of
+ *    the screen reads as one object instead of stacked docks;
+ *  - **with quick-capture up there is no bar at all.** The dock is the bottom chrome in that state
+ *    (owner's verdict from a Pixel 9: "при создании чеклиста в открытом состоянии не должна быть
+ *    видна нижняя навигация"), it reaches the window's bottom edge, and its own clipped shoulders
+ *    read as the dimmed page rather than as two bright nicks;
  *  - the bar is a different plane from the page it sits under, carried by tone PLUS
  *    [AppSurface.bottomChromeShadow], because neither theme's tone step is large enough alone;
  *  - the ACTIVE tab is obvious at a glance (the old `secondaryContainer` pill on white was 1.31:1);
@@ -107,7 +112,6 @@ class V2ShellBottomBarScreenshotTest {
         selectedTab: String = V2Destination.Inbox,
         barVisible: Boolean = true,
         captureOpen: Boolean = false,
-        realDock: Boolean = false,
     ) {
         // BOTH, and neither alone is enough. `setQualifiers` moves the Android resource
         // configuration, which is what Robolectric measures against; Compose Resources
@@ -133,7 +137,7 @@ class V2ShellBottomBarScreenshotTest {
                         barVisible = barVisible,
                         captureOpen = captureOpen,
                         overlayContent = null,
-                        content = { InboxStub(captureOpen = captureOpen, realDock = realDock) },
+                        content = { InboxStub(captureOpen = captureOpen) },
                     )
                 }
             }
@@ -200,34 +204,48 @@ class V2ShellBottomBarScreenshotTest {
     // ── The two states the chrome changes shape in ───────────────────────────
 
     /**
-     * Quick-capture is up: the AI button sinks flush into the plinth, and the dock's own surface
-     * meets the plinth's top edge. That seam is the one the redesign has to keep honest — the dock
-     * is a light card in light theme and the plinth is ink.
+     * Quick-capture is up — the state the owner reported twice from a Pixel 9.
+     *
+     * Rendered with the REAL [QuickCaptureDock] and the page dimmed by the host's scrim, because
+     * both defects reported against this state are invisible without those two things:
+     *  - the bottom navigation showing under the dock is only a defect once you can see that the dock
+     *    is the surface the user is working in;
+     *  - the dock's `SheetTop` shoulders only read as "two bright corners" against a DIMMED page.
+     *    Undimmed, they are the page beside the page — ΔL\* 0.
+     *
+     * The stub dock these cells used to render could show neither: it had no rounded corners at all,
+     * so it had no shoulders, and the fixture painted no scrim.
      */
     @Test
-    fun compactBar_412dp_light_captureOpen() = shoot("w412dp-h891dp", captureOpen = true)
+    fun compactBar_412dp_light_captureOpen() =
+        shoot("w412dp-h891dp", captureOpen = true)
 
     @Test
     fun compactBar_412dp_dark_captureOpen() =
         shoot("w412dp-h891dp", dark = true, captureOpen = true)
 
-    /**
-     * The same seam with the REAL [QuickCaptureDock] and its [SourceRow], not the stub.
-     *
-     * This shot exists because the stub cannot answer the question it was being used for. The
-     * chrome's shadow is an overlay `Box` anchored to the bar's top edge and drawn AFTER the content
-     * column, so it shades the bottom [AppSurface.bottomChromeShadowHeight] of whatever the shell hosts
-     * — and what the shell hosts, while capture is up, is a raised dock whose last row is the AI
-     * pills. Whether that reads as a smudge along the pills or is invisible is a question about
-     * pixels, and the stub's flat `Text` placeholder cannot show it.
-     */
+    /** The narrower phone: the dock's rows tighten, its shoulders do not move. */
     @Test
-    fun compactBar_412dp_light_captureOpen_realDock() =
-        shoot("w412dp-h891dp", captureOpen = true, realDock = true)
+    fun compactBar_360dp_light_captureOpen() =
+        shoot("w360dp-h640dp", captureOpen = true)
 
     @Test
-    fun compactBar_412dp_dark_captureOpen_realDock() =
-        shoot("w412dp-h891dp", dark = true, captureOpen = true, realDock = true)
+    fun compactBar_360dp_dark_captureOpen() =
+        shoot("w360dp-h640dp", dark = true, captureOpen = true)
+
+    /**
+     * RU at fontScale 1.3 with capture up: the dock is at its tallest (wrapped chip labels, a bigger
+     * input) on a window that has not grown, which is where a dock that reserves the wrong bottom
+     * strip runs out of screen.
+     */
+    @Test
+    fun compactBar_412dp_light_captureOpen_ru_fontScale13() =
+        shoot(
+            "ru-rRU-w412dp-h891dp",
+            captureOpen = true,
+            fontScale = 1.3f,
+            locale = Locale("ru", "RU"),
+        )
 
     /** A pushed detail route: no plinth, no button, and the content owns the whole window. */
     @Test
@@ -236,74 +254,94 @@ class V2ShellBottomBarScreenshotTest {
     // ── Fake screen under the chrome ─────────────────────────────────────────
 
     /**
-     * Stand-in for the Inbox list. Rows are the real design-system tones ([AppSurface.card] on
+     * Stand-in for the Inbox screen. Rows are the real design-system tones ([AppSurface.card] on
      * [AppSurface.ground]) rather than feature code — the point of the shot is the step between the
      * PAGE and the bar, so the page has to be the real page colour, and `feature:home` is not on
      * this module's test classpath.
+     *
+     * ## The dock is mounted the way `AppScaffold` mounts it, and that is load-bearing
+     * `Column { Box(weight(1f)) { page + scrim }; dock }` is not decoration — it is the ONE
+     * structural fact that decides what the dock's clipped shoulders reveal. In production the dock
+     * lives in `AppScaffold`'s `bottomBar` slot and the capture scrim lives inside the CONTENT slot,
+     * so the scrim stops exactly at the dock's top edge and the strip behind the dock is undimmed
+     * page. A fixture that instead paints the scrim across the whole box and drops the dock on top
+     * dims that strip too — and then the shoulders come out the same colour as the page beside them,
+     * i.e. the fixture reports a clean frame over the exact defect it was built to show. This one
+     * was written that way first; the frame it recorded was ΔL\* 0 where the device shows a bright
+     * nick.
      */
     @Composable
-    private fun InboxStub(captureOpen: Boolean, realDock: Boolean = false) {
-        Box(
+    private fun InboxStub(captureOpen: Boolean) {
+        // = the scaffold's own container: what is behind BOTH slots, and therefore what any hole in
+        // either of them shows.
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(AppSurface.ground()),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-            ) {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-                Text(
-                    text = "Inbox",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "5 tasks · 2 due today",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
-                listOf(
-                    "Book the venue for Saturday",
-                    "Pick up dry cleaning",
-                    "Draft Q3 planning notes",
-                    "Reply to Marta about the invoice",
-                    "Water the plants",
-                    "Renew gym membership",
-                    "Call the landlord back",
-                    "Prepare the sprint demo",
-                ).forEach { TaskRowStub(it) }
-            }
-            if (captureOpen) {
-                if (realDock) {
-                    // Bottom-aligned inside the content box, which is exactly where the production
-                    // dock lands: it sits in `AppScaffold`'s bottomBar slot, and that scaffold fills
-                    // this same box, so the dock's bottom edge IS the plinth's top edge either way.
-                    Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                        QuickCaptureDock(
-                            text = "",
-                            onTextChange = {},
-                            onAdd = {},
-                            placeholder = "Add a task…",
-                            aboveInput = {
-                                Text(
-                                    text = "Today   Tomorrow   Important",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(
-                                        horizontal = AppDimens.ScreenPaddingHorizontal,
-                                    ),
-                                )
-                            },
-                            belowInput = { SourceRow(onSelect = {}) },
-                        )
-                    }
-                } else {
-                    CaptureDockStub(modifier = Modifier.align(Alignment.BottomCenter))
+            // = AppScaffold's content slot. The scrim is a child of THIS, never of the parent.
+            Box(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                ) {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+                    Text(
+                        text = "Inbox",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "5 tasks · 2 due today",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+                    listOf(
+                        "Book the venue for Saturday",
+                        "Pick up dry cleaning",
+                        "Draft Q3 planning notes",
+                        "Reply to Marta about the invoice",
+                        "Water the plants",
+                        "Renew gym membership",
+                        "Call the landlord back",
+                        "Prepare the sprint demo",
+                    ).forEach { TaskRowStub(it) }
                 }
+                if (captureOpen) {
+                    // The CONTENT scrim, exactly as `InboxScreen` and `CalendarScreen` paint it:
+                    // scoped to this slot, so it ends where the dock begins.
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(captureDockScrimColor()),
+                    )
+                }
+            }
+            // = AppScaffold's bottomBar slot.
+            if (captureOpen) {
+                QuickCaptureDock(
+                    text = "",
+                    onTextChange = {},
+                    onAdd = {},
+                    placeholder = "Add a task…",
+                    // The scrim's third tile, exactly as both hosts pass it: behind the dock, so its
+                    // clipped `SheetTop` shoulders read as the DIMMED page instead of the raw one.
+                    modifier = Modifier.background(captureDockScrimColor()),
+                    aboveInput = {
+                        Text(
+                            text = "Today   Tomorrow   Important",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                horizontal = AppDimens.ScreenPaddingHorizontal,
+                            ),
+                        )
+                    },
+                    belowInput = { SourceRow(onSelect = {}) },
+                )
             }
         }
     }
@@ -339,35 +377,4 @@ class V2ShellBottomBarScreenshotTest {
         }
     }
 
-    /**
-     * Stand-in for `QuickCaptureDock` — the REAL bottom-chrome colour, so the seam between the dock
-     * and the bar is honest. The component itself lives in core:designsystem; copying its tone is
-     * enough for a seam shot and keeps this test off it.
-     *
-     * It used to copy [AppSurface.docked] here, which was the bug this stub was supposed to expose:
-     * the real dock never read `docked()`, it read `gistiDockColor()`, so the stub was showing a seam
-     * the app did not have while hiding the one it did. Both now resolve to
-     * [AppSurface.bottomChrome].
-     */
-    @Composable
-    private fun CaptureDockStub(modifier: Modifier = Modifier) {
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .background(AppSurface.bottomChrome())
-                .padding(AppDimens.SpacingMd),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            Text(
-                text = "Today   Tomorrow   Important",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Add a task…",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
 }

@@ -3,13 +3,15 @@ package com.antonchuraev.homesearchchecklist.navigation
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
@@ -51,6 +53,13 @@ import javax.imageio.ImageIO
  * A PIXEL assertion rather than a golden on purpose: the effect is a ~3% tonal ramp, invisible in a
  * PNG at review size. A golden would happily record the smudge and then call it the reference.
  *
+ * ## Still needed after the bar started hiding under the dock
+ * The shell now takes the whole bottom chrome off screen while capture is up, so the shadow is gated
+ * off in that state twice over. This test is what makes the gate falsifiable: without it the overlay
+ * would be positioned by `padding(bottom = barHeight)` against a `barHeight` left over from the last
+ * frame that HAD a bar — i.e. a 16dp band ~80dp up from the bottom, straight across the middle of the
+ * dock, in a state no golden of a bar would ever show.
+ *
  * Run:
  *   ./gradlew :composeApp:testAndroidHostTest --tests "*V2PlinthShadowOverDockTest*"
  */
@@ -63,23 +72,53 @@ class V2PlinthShadowOverDockTest {
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     /**
-     * The dock's own surface two rows above the bar must be the same tone as the dock 32dp higher.
-     * Any difference there is paint that does not belong to the dock.
+     * Top edge of the dock in px, taken from LAYOUT by the fixture.
+     *
+     * Replaces `image.height - BottomBarHeight`, which described a bar that is not on screen in this
+     * state at all — see [theDockSurfaceIsNotShadedByThePlinth_light].
+     */
+    private var dockTopPx: Int = 0
+
+    /**
+     * No band of any kind may be painted across the dock's own surface.
+     *
+     * ## Why this is now a run and not two samples
+     * It used to take one sample two rows above the bar's top edge and one 32dp higher and require
+     * them equal. That ruler was `image.height - BottomBarHeight`, i.e. "80dp up from the bottom is
+     * the bar" — and with the dock up there is no bar down there any more (the shell hides the whole
+     * bottom chrome in that state). Both samples landed inside the dock, so the test compared the dock
+     * with itself: green whatever the shadow did, since the band it is hunting for would sit at a
+     * third row neither probe looks at. That is the shape this project files under "unfalsifiable when
+     * failure is silent".
+     *
+     * A run down one column of the dock's own margin needs no ruler at all: the dock is opaque and
+     * flat there by construction, so ANY variation in that column is paint that does not belong to
+     * it — at whatever height a future regression decides to put it. The one thing to skip is the
+     * top corner: at [SampleX] the `SheetTop` arc leaves the first ~20 rows outside the surface (they
+     * are the host's scrim, checked by `V2BarShoulderFillTest`), so the run starts below it.
      */
     @Test
     fun theDockSurfaceIsNotShadedByThePlinth_light() {
         val image = render(dark = false, captureOpen = true, name = "dockOverBar_light")
-        val barTop = barTopEdgeInLight(image)
 
-        val atTheEdge = luminance(image, SampleX, barTop - 2)
-        val wellAbove = luminance(image, SampleX, barTop - 2 - ShadowBandDp * 2)
-
-        assertEquals(
-            "the dock's surface reads $atTheEdge two rows above the bar but $wellAbove further up " +
-                "— the plinth shadow is being painted over the dock",
-            wellAbove,
-            atTheEdge,
+        assertTrue(
+            "the fixture did not mount the dock — dockTopPx=$dockTopPx",
+            dockTopPx in 1 until image.height - CornerSkipDp,
         )
+
+        val first = dockTopPx + CornerSkipDp
+        val reference = luminance(image, SampleX, first)
+        for (y in first until image.height) {
+            val here = luminance(image, SampleX, y)
+            assertEquals(
+                "the dock's own margin reads $here at row ${y - dockTopPx} below its top edge but " +
+                    "$reference at row ${first - dockTopPx} — something is being painted across the " +
+                    "dock (the plinth shadow is drawn after the content column and shades whatever " +
+                    "occupies the band it is anchored to)",
+                reference,
+                here,
+            )
+        }
     }
 
     /**
@@ -87,9 +126,10 @@ class V2PlinthShadowOverDockTest {
      * with no dock up the band above the bar MUST still be shaded, or the plinth loses the separator
      * it exists for.
      *
-     * Light only — the discriminator is "page vs ink", a ~200-point step in light; in dark the token
-     * is an opaque 1dp hairline rather than a gradient, and that frame is checked by eye
-     * (`compactBar_412dp_dark_captureOpen_realDock.png`).
+     * Light only — the discriminator is "page vs shaded page", and in light the ramp is a 7.5% black
+     * gradient over cream, which reads clearly in a luminance sample. The dark ramp is 35% black over
+     * a near-black page, i.e. a few points of luminance, so it is judged on the recorded frame
+     * (`compactBar_412dp_dark.png`) rather than pinned here at a tolerance nobody could justify.
      */
     @Test
     fun withNoDockUp_thePageIsStillShadedAboveTheBar() {
@@ -179,36 +219,40 @@ class V2PlinthShadowOverDockTest {
         return (r * 0.299f + g * 0.587f + b * 0.114f).toInt()
     }
 
+    /**
+     * `Column { Box(weight(1f)) { page }; dock }` — the shape `AppScaffold` gives the two slots. The
+     * dock therefore ends where the shell's content slot ends, which is where the production dock
+     * lands too, and [dockTopPx] is taken from its layout rather than guessed from a constant.
+     */
     @Composable
     private fun PageUnderTest(captureOpen: Boolean) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(AppSurface.ground()),
         ) {
+            Box(modifier = Modifier.weight(1f))
             if (captureOpen) {
-                // Bottom-aligned inside the content box, which is where the production dock lands:
-                // it sits in `AppScaffold`'s bottomBar slot and that scaffold fills this same box, so
-                // the dock's bottom edge IS the plinth's top edge either way.
-                Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                    QuickCaptureDock(
-                        text = "",
-                        onTextChange = {},
-                        onAdd = {},
-                        placeholder = "Add a task…",
-                        aboveInput = {
-                            Text(
-                                text = "Today   Tomorrow   Important",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(
-                                    horizontal = AppDimens.ScreenPaddingHorizontal,
-                                ),
-                            )
-                        },
-                        belowInput = { SourceRow(onSelect = {}) },
-                    )
-                }
+                QuickCaptureDock(
+                    text = "",
+                    onTextChange = {},
+                    onAdd = {},
+                    placeholder = "Add a task…",
+                    modifier = Modifier.onGloballyPositioned {
+                        dockTopPx = it.positionInRoot().y.toInt()
+                    },
+                    aboveInput = {
+                        Text(
+                            text = "Today   Tomorrow   Important",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                horizontal = AppDimens.ScreenPaddingHorizontal,
+                            ),
+                        )
+                    },
+                    belowInput = { SourceRow(onSelect = {}) },
+                )
             }
         }
     }
@@ -222,6 +266,16 @@ class V2PlinthShadowOverDockTest {
 
         /** The dock's left margin — its own surface, clear of the pills. */
         const val SampleX = 6
+
+        /**
+         * Rows to skip below the dock's top edge before the run starts.
+         *
+         * At [SampleX] the 28dp `SheetTop` arc closes ~17px down, so anything above that is the
+         * host's scrim showing through the clipped shoulder — a different surface with its own test
+         * (`V2BarShoulderFillTest.theCaptureDockShoulderIsTheDimmedPage_*`). 24 clears the arc and the
+         * 1dp top hairline together.
+         */
+        const val CornerSkipDp = 24
 
         /** `AppSurface.bottomChromeShadowHeight()`. */
         const val ShadowBandDp = 16

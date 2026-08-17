@@ -99,12 +99,12 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWin
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
-import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
@@ -306,7 +306,7 @@ fun CalendarScreen(
     // content slot's y in the root, i.e. the height of the chrome above it, and the top scrim uses
     // exactly that so the two tile without a seam.
     var contentTopPx by remember { mutableStateOf(0f) }
-    val captureScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
+    val captureScrimColor = captureDockScrimColor()
 
     // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
     PlatformBackHandler(enabled = captureVisible) { onCaptureDockDismiss() }
@@ -349,6 +349,13 @@ fun CalendarScreen(
                         onTextChange = onQuickAddTextChange,
                         onAdd = onQuickAddSubmit,
                         placeholder = stringResource(Res.string.today_quick_add_placeholder),
+                        // Behind the dock, not over it: the only pixels this reaches are the two
+                        // corners `SheetTop` clips away, which otherwise show the raw page against
+                        // the dimmed page beside them (measured ΔL* +41 in light). The content scrim
+                        // above cannot cover them — it stops at the content slot's edge on purpose.
+                        // Identical to the Inbox tab's, deliberately: the two docks are one surface
+                        // and must sit in the same depth of dim.
+                        modifier = Modifier.background(captureScrimColor),
                         // This tab draws the day's reminders, so its draft arrives with one chip
                         // already selected ("Tonight", or "In 1 hour" once the evening has
                         // started) — that chip is what keeps a task captured here visible on the

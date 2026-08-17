@@ -136,9 +136,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSkeletonL
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
-import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
@@ -262,6 +262,26 @@ fun InboxScreen(
 
     val content = state as? InboxScreenState.Content
 
+    // Can the dock actually be drawn right now? Not the same question as [createDockOpen], because
+    // the dock also needs a page to capture INTO — see the `bottomBar` slot, which is the one place
+    // that used to ask this.
+    val captureDockRenders = createDockOpen && !content?.pages.isNullOrEmpty()
+
+    // ── The flag must never outlive the dock it stands for ───────────────────────────────────────
+    // The v2 shell takes the WHOLE bottom navigation off screen while `createDockOpen` is true (the
+    // dock is the bottom chrome in that state — see V2ShellCompactBar). That makes a mismatch between
+    // the flag and the dock a dead end rather than a cosmetic slip: a later emission of this screen's
+    // state can drop back to Loading (`pages == null` on a re-collect) or to Error (a failed refresh
+    // AFTER a successful load), the dock stops rendering with it, and the user is left on a screen
+    // with no dock and no navigation. BACK still saves them on Android; on wasmJs `PlatformBackHandler`
+    // is a no-op, so there would be no way out at all.
+    //
+    // Reported to the HOST rather than patched locally: the host owns the flag, and it is the same
+    // channel the dismiss gestures use, so the shell's chrome comes back through exactly one path.
+    LaunchedEffect(createDockOpen, captureDockRenders) {
+        if (createDockOpen && !captureDockRenders) onCreateDockDismiss()
+    }
+
     // Whether the trailing add-task row is composed at all. Two independent reasons to withhold it,
     // and both are decided here rather than inside the list, which knows neither:
     //
@@ -302,7 +322,7 @@ fun InboxScreen(
     // above it (status bar + app bar). The TOP scrim uses exactly it, so the two tile edge-to-edge:
     // no bright gap at the seam, no double-dark overlap.
     var contentTopPx by remember { mutableStateOf(0f) }
-    val captureScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
+    val captureScrimColor = captureDockScrimColor()
 
     // Root box so the TOP scrim can be a sibling ABOVE the scaffold — the app bar is the scaffold's
     // own slot, and nothing inside the content can reach it.
@@ -355,15 +375,29 @@ fun InboxScreen(
             //
             // Also hidden while there is no page to capture into: with no target checklist the Add button
             // would be an enabled affordance that does nothing (the ViewModel can only log and drop the
-            // text). Defensive only — the ViewModel holds Loading until the system Inbox row exists.
+            // text). No longer merely defensive — the shell hides the whole bottom navigation while the
+            // dock is up, so this condition and the flag must agree; see `captureDockRenders` above,
+            // which is where the disagreement is now resolved rather than just tolerated.
+            //
+            // `content != null` is redundant with `captureDockRenders` (it cannot be non-empty on a
+            // null Content) and kept only because the body below smart-casts off it.
             bottomBar = {
-                val pages = content?.pages
-                if (createDockOpen && content != null && !pages.isNullOrEmpty()) {
+                if (captureDockRenders && content != null) {
                     QuickCaptureDock(
                         text = content.draft.text,
                         onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
                         onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
                         placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
+                        // The THIRD tile of the scrim, and the one that is easy to forget because
+                        // nothing about it is dim: it is painted BEHIND an opaque dock, so the only
+                        // pixels it ever reaches are the two the dock's `SheetTop` clips away. Those
+                        // corners showed the raw page (`#FBFAF8`) against the 45%-dimmed page beside
+                        // them (`#8A8988`) — ΔL* +41, the brightest thing in the lower half of the
+                        // screen, reported from a Pixel 9 as two light corners next to the dock. The
+                        // content scrim cannot reach them: it stops at the content slot's edge, which
+                        // is deliberately the dock's top edge. Same colour, same alpha, so the
+                        // shoulder and the page above it composite to the same value.
+                        modifier = Modifier.background(captureScrimColor),
                         // The same chip row the checklist detail screen has always had. Until now
                         // this dock was a bare text field, so a capture made on the home tab could
                         // carry no reminder and no priority — the surface the user reaches FIRST
