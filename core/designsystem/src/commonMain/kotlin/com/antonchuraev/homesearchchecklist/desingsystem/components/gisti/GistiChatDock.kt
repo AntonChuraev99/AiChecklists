@@ -229,27 +229,44 @@ fun GistiGlassChatDock(
     pillContent: @Composable () -> Unit,
 ) {
     val dockShape = AppShapeTokens.SheetTop
-    // Variant B "Crisp hairline": the dock reads as a distinct foreground panel via a 1dp hairline
-    // (outlineVariant) tracing its top edge + rounded corners — NOT via a tinted surface. The earlier
-    // "FIX D" used a flat grey (surfaceContainerLow) on the near-white page, but the ~2% lightness gap
-    // (dock #F6F5F2 vs page #FBFAF8) plus no border made the dock blend into the background. Now the
-    // light surface is pure white (surfaceContainerLowest) + hairline; dark keeps surfaceContainerLow
-    // (a touch lighter than the page) + hairline. Separation comes from the crisp line, so it never
-    // goes muddy-grey and renders identically on Android and Web/Skiko. ([hazeState] is retained for
-    // call-site/source compatibility but is no longer sampled — the dock no longer blurs behind it.)
+    // The dock reads as a distinct foreground panel via TWO channels: the bottom-chrome tone it
+    // shares with the v2 bar and the capture dock, plus a 1dp hairline tracing its top edge and the
+    // two top corners. Neither is a tinted-surface-only or a line-only design — the "FIX D" flat grey
+    // (surfaceContainerLow, #F6F5F2 against a #FBFAF8 page, ~2% lightness) had no line and vanished,
+    // and the white-surface-plus-line variant that replaced it put the whole separation on a line you
+    // could barely see. Today's tone is `AppSurface.bottomChrome()` — `surfaceDim` #DEDCD6 in light
+    // (ΔL* −10.5 off the page), `surfaceContainerLow` #1A1C20 in dark (ΔL* +4.3) — and the line is
+    // the firm bottom-chrome seam. Both are the shared tokens, so the dock cannot drift away from the
+    // other two bottom surfaces it is seen stacked with. Identical arithmetic on Android and Skiko.
+    // ([hazeState] is retained for call-site/source compatibility but is no longer sampled — the dock
+    // no longer blurs behind it.)
     val dockColor = gistiDockColor()
     // The SAME seam token QuickCaptureDock traces its top edge with — these two docks are seen in one
     // frame and their top edges are the same edge of the same app. `outlineVariant` measured `#E2E0DB`
     // on today's `#DEDCD6` chrome, ΔL* +1.4: an edge-tracing line the colour of the edge it traces.
-    // `dockedSeam()` lifts light to `outline` and leaves dark alone (already ΔL* +9.2).
-    val hairlineColor = AppSurface.dockedSeam()
+    // `bottomChromeSeam()` lifts light to `outline` and leaves dark alone (already ΔL* +9.2). It is
+    // the 2′ group's own token, NOT `dockedSeam()` — see AppSurface.bottomChromeSeam for why the two
+    // must not be wired together even while their bodies agree.
+    val hairlineColor = AppSurface.bottomChromeSeam()
     val legacyDock = DockDesignDebug.useLegacyDock
 
     Surface(
-        // Hairline traces the TOP edge + the two top corners ONLY — never the bottom. The dock sits
-        // navbar-padded directly above the (same-colour) system-nav strip, so a full border would
-        // draw a stray 1dp divider BETWEEN the dock and that strip. Stroking only the top keeps the
-        // page↔dock separation while the dock flows seamlessly into the nav strip below it.
+        // Hairline traces the TOP edge and the two top corner arcs — and STOPS at the point where
+        // each arc becomes vertical. It is an edge, not an outline, and the difference is visible
+        // the moment the dock is narrower than the window.
+        //
+        // ## Why it may not run down the sides
+        // Two separate reasons, and the second is the one that was missed. Downward it must not reach
+        // the bottom, because the dock sits navbar-padded directly above the (same-colour) system-nav
+        // strip and a closed border would draw a stray 1dp divider BETWEEN the dock and that strip.
+        // And sideways it must not descend at all: `V2ChatDockOverlay` mounts this dock
+        // `.adaptiveContentWidth().fillMaxWidth()`, a 720dp cap, so on a tablet-class window the dock
+        // is INSET and both side edges are interior. Strokes down them turn the dock into a boxed
+        // panel held together by a frame — the "is this a web page?" reading the owner rejected on
+        // the v2 bar. On a phone the dock fills the window and those same strokes land on the screen
+        // edge, which is why this survived: every frame in the suite was a phone until
+        // `mainGlassDock_840dp_light/dark` were added to record the geometry that shows it.
+        //
         // Suppressed in the legacy debug variant (the old dock had no border at all).
         modifier = modifier
             .fillMaxWidth()
@@ -260,12 +277,12 @@ fun GistiGlassChatDock(
                     val r = AppShapeTokens.BottomChromeCorner.toPx()
                     val inset = stroke / 2f
                     val hairline = Path().apply {
-                        moveTo(inset, size.height)
-                        lineTo(inset, r)
+                        // Both endpoints are the corner arcs' tangent points (y == inset + r), where
+                        // the shape stops curving and would start running straight down.
+                        moveTo(inset, inset + r)
                         arcTo(Rect(inset, inset, inset + 2 * r, inset + 2 * r), 180f, 90f, false)
-                        lineTo(size.width - r, inset)
+                        lineTo(size.width - inset - r, inset)
                         arcTo(Rect(size.width - inset - 2 * r, inset, size.width - inset, inset + 2 * r), 270f, 90f, false)
-                        lineTo(size.width - inset, size.height)
                     }
                     drawPath(hairline, color = hairlineColor, style = Stroke(width = stroke))
                 }

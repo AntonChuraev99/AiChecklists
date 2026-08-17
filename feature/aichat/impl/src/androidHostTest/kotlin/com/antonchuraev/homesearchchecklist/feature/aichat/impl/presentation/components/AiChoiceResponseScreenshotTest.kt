@@ -100,6 +100,11 @@ class AiChoiceResponseScreenshotTest {
         composeTestRule.onRoot().captureRoboImage()
     }
 
+    // The EXECUTING state — one chip spinning, every other chip in the block disabled — is not
+    // covered here on purpose: `AiChatVariantsScreenshotTest.variant_chip_executing_spinner_light`
+    // and `_dark` already frame it, escape chip included. A second pair of goldens over the same
+    // state costs a re-record on every unrelated palette change and adds no case.
+
     @Test
     fun whichList_6options_light() {
         composeTestRule.setContent { WhichListPreview(darkTheme = false, names = SIX) }

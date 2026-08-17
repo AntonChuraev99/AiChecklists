@@ -1527,8 +1527,9 @@ fun App() {
                         // A pending choice block (prompt + chips + escape) is taller than a one-line
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
                         // D2 adds typed object rows inside the bubble (item + list + time), so a
-                        // question that carries them needs more room again. Safe: GistiInlineChatPanel
-                        // clamps this against the real dock space, so a keyboard-up dock just scrolls.
+                        // question that carries them needs more room again. Safe: the dock clamps
+                        // this against the real available space (GistiExpandableDockContent's
+                        // `effectiveAnswerMax`), so a keyboard-up dock just scrolls.
                         answerMaxHeight = when {
                             chatUiState.pendingChoice?.hasObjectRows == true -> 440.dp
                             chatUiState.pendingChoice != null -> 360.dp
@@ -2526,7 +2527,9 @@ fun App() {
             // ChecklistDetailScreen's GistiGlassChatDock) via the `chatDockContent` slot built
             // above — NOT as an app-level slide-on-top overlay. This is Approach A (in-place morph):
             // one surface that expands in place, preserving the Haze backdrop blur. The old
-            // GistiInlineChatPanel(AnimatedVisibility) overlay was removed here.
+            // AnimatedVisibility slide-on-top panel was removed here, and the composable behind it
+            // (`GistiInlineChatPanel`) was deleted from the design system on 2026-08-17 once this
+            // comment was its last reference — see the note at the top of GistiInlineChatPanel.kt.
             } // Box
 
             // Chat attachment source sheet — shown when user taps the clip icon inside the chat sheet

@@ -76,10 +76,12 @@ val LocalChatSurfaceTone = staticCompositionLocalOf { ChatSurfaceTone.Page }
  * reason, and was removed — the plane values it returned are still spelled out in the tables below,
  * which is where they are actually needed.
  *
- * ⛔ Not a substitute for [AppSurface.docked] / [AppSurface.dockedSeam]. Those belong to bars that
- * share the PAGE's plane (the share sheet's CTA, template preview, analyze preview) and are approved
- * as they are. [controlOutline] happens to resolve to the same role as `dockedSeam()` in light
- * today; they are separate decisions and must not be wired to each other.
+ * ⛔ Not a substitute for [AppSurface.docked] / [AppSurface.dockedSeam], nor for
+ * [AppSurface.bottomChromeSeam]. Those are EDGES — the line where a bar meets the content above it —
+ * while [controlOutline] is the ring around a thing you press. Three accessors resolve to `outline`
+ * in light today and that is a coincidence of the palette, not one decision with three names: the
+ * seams answer "where does this surface end", this one answers "what is tappable". Wiring any two of
+ * them together means a chip's ring moves when a dock's edge is re-tuned.
  */
 object AppChatColors {
 

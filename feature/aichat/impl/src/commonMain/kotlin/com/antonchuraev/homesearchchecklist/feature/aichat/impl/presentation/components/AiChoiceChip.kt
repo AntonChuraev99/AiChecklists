@@ -96,6 +96,22 @@ internal fun AiChoiceChip(
     //  - a tonal split of the fills would be designing for a role nothing renders: no production code
     //    path emits `ChoiceRole.Add` today — the only non-test reference to it is the icon mapping in
     //    AiChoiceResponse. Give it a fill of its own when something starts producing it, with a spec.
+    //
+    // ## What merging COST, named rather than left to be re-discovered
+    // `Add` used to be `surfaceContainer` — on the light PAGE a step DOWN, ΔL* −3.9. `raised()` is a
+    // step UP, and up from a near-white page is ΔL* +1.7, i.e. nothing. So on that ONE cell of the
+    // matrix (light × page) the chip is now carried by its ring alone; the other three (light chrome
+    // +12.2, dark page +4.3, dark chrome +5.9) all gained or held. Checked on
+    // `ChatSurfacePlanesScreenshotTest.planes_360_light` at 3x: both neutral chips read unambiguously
+    // as pressable there — a 3.33 : 1 `outline` capsule is a boundary you see, which is the whole
+    // difference from the 1.04 : 1 hairline that caused the original "buttons blend into the
+    // background" report. It is also exactly how `SourcePill` renders on the same near-white page,
+    // and that treatment is shipped and approved.
+    //
+    // `quietFill()` would restore the −3.9 and is NOT the answer: its own KDoc scopes it to elements
+    // "that carry no outline at all", because it exists to be a fill that works as the ONLY channel.
+    // Both roles here have a ring. Revisit if the page stops being near-white, or when a production
+    // path starts emitting `Add` and it needs to be told apart from `Escape` by more than its label.
     val container: Color = when (role) {
         ChoiceRole.Primary -> cs.primary
         ChoiceRole.Default -> cs.primaryContainer
@@ -109,20 +125,29 @@ internal fun AiChoiceChip(
         ChoiceRole.Escape -> cs.onSurfaceVariant
         ChoiceRole.Add -> cs.onSurface
     }
-    // Both neutral roles are tap targets, so both take the firm control outline. Escape used to take
-    // the soft `outlineVariant` — the weaker of the two channels on the chip that had no other.
-    val border: BorderStroke? = when (role) {
-        ChoiceRole.Escape, ChoiceRole.Add -> BorderStroke(1.dp, AppChatColors.controlOutline())
-        else -> null
-    }
-
-    // Dim the whole chip (fill, text, icon) uniformly when disabled. We can't disable Surface's
-    // onClick AND keep custom colors with one flag, so we drop alpha on the colors and gate onClick.
-    // The old `if (container == Color.Transparent)` guard is gone with the transparent role it
-    // guarded: every role now has a fill, so every role dims the same way.
+    // Dim the whole chip — fill, text, icon AND ring — uniformly when disabled. We can't disable
+    // Surface's onClick AND keep custom colors with one flag, so we drop alpha on the colors and gate
+    // onClick. The old `if (container == Color.Transparent)` guard is gone with the transparent role
+    // it guarded: every role now has a fill, so every role dims the same way.
     val dimAlpha = if (enabled) 1f else 0.38f
     val effectiveContainer = container.copy(alpha = dimAlpha)
     val effectiveContent = content.copy(alpha = dimAlpha)
+
+    // Both neutral roles are tap targets, so both take the firm control outline. Escape used to take
+    // the soft `outlineVariant` — the weaker of the two channels on the chip that had no other.
+    //
+    // The ring takes `dimAlpha` like everything else, and it has to. Left at full strength it was the
+    // ONE part of a disabled chip that did not fade: a blurred fill and a ghost label inside a
+    // full-contrast `outline` ring reads as an ACTIVE control whose text happens to be faint, which is
+    // the opposite of what "the whole choice block is non-interactive while one chip executes" has to
+    // communicate. The defect predates the plane work and was invisible while `Escape` was
+    // transparent with a soft hairline; moving both neutral roles onto the firm ring is what made it
+    // show.
+    val border: BorderStroke? = when (role) {
+        ChoiceRole.Escape, ChoiceRole.Add ->
+            BorderStroke(1.dp, AppChatColors.controlOutline().copy(alpha = dimAlpha))
+        else -> null
+    }
 
     Surface(
         onClick = onClick,

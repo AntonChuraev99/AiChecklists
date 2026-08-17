@@ -3,8 +3,10 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.co
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -13,7 +15,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -23,6 +27,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiChatDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiFullChatOverlay
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChip
@@ -30,6 +35,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiP
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipRow
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiItemCreatePromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.rememberDockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
@@ -43,6 +49,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.PendingChoice
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -75,10 +82,12 @@ import java.util.Locale
  * suite that only ever records the first — so the two planes are stacked in ONE image here, and a
  * diff shows immediately if a role stops resolving against the surface under it.
  *
- * The dock halves use the REAL hosts ([GistiGlassChatDock], [QuickCaptureDock]) rather than a Box
- * painted with the chrome colour, so the `LocalChatSurfaceTone` provider is exercised where it
- * actually lives. Swapping them for a hand-painted background would make this test pass while the
- * production hosts forgot to provide the plane.
+ * The chrome halves use the REAL hosts rather than a Box painted with the chrome colour, so the
+ * `LocalChatSurfaceTone` provider is exercised where it actually lives. Swapping them for a
+ * hand-painted background would make this test pass while the production hosts forgot to provide the
+ * plane. All THREE providers are covered: [GistiGlassChatDock] and [QuickCaptureDock] stack into
+ * [ProbeBody]; [GistiFullChatOverlay] is `fillMaxSize()` and would cover them, so it has its own
+ * pair of frames below.
  *
  * ⚠️ These are wide-coverage frames: a colour, a metric or a string change anywhere in the chat
  * moves them. That is the intent — but re-record only after LOOKING at the result, because
@@ -128,9 +137,126 @@ class ChatSurfacePlanesScreenshotTest {
         locale = Locale("hi", "IN"),
     )
 
+    // ── The THIRD provider ───────────────────────────────────────────────────
+    //
+    // Three hosts declare `LocalChatSurfaceTone = BottomChrome`: `GistiGlassChatDock`,
+    // `QuickCaptureDock` and `GistiFullChatOverlay`. The frames above exercise the first two — the
+    // overlay was named in this file's KDoc and covered by nothing, here or anywhere else. Deleting
+    // its `CompositionLocalProvider` broke no test, and the full-screen chat would have fallen back
+    // to `Page` in silence: in dark that puts a `#1A1C20` bubble on a `#1A1C20` chrome, ΔL\* 0.0, the
+    // exact hole this whole mechanism exists to prevent.
+    //
+    // Its own test rather than a third section of [ProbeBody]: the overlay is `fillMaxSize()` and
+    // bottom-anchored, so stacked in that Column it would simply cover the other two planes.
+
+    @Test fun fullOverlay_360_light() = shootFullOverlay("w360dp-h880dp")
+
+    @Test fun fullOverlay_360_dark() = shootFullOverlay("w360dp-h880dp", dark = true)
+
     // =========================================================================
     // Harness
     // =========================================================================
+
+    private fun shootFullOverlay(qualifiers: String, dark: Boolean = false, copy: Copy = english) {
+        Locale.setDefault(Locale.ENGLISH)
+        RuntimeEnvironment.setQualifiers(qualifiers)
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.setContent {
+            AppTheme(darkTheme = dark) { FullOverlayProbe(copy) }
+        }
+        // The overlay opens by animating a spring across the WHOLE window height, so [PIN_MS] — a
+        // pin for the typing dots — would photograph it mid-grow, at a height that changes with the
+        // qualifier. One large advance of the test clock is simulated time, not wall time: it costs
+        // nothing, settles the spring on any window, and stays byte-deterministic.
+        composeTestRule.mainClock.advanceTimeBy(OVERLAY_SETTLE_MS)
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    /**
+     * The full-screen chat overlay, opened, carrying the same cast as the two dock planes.
+     *
+     * `dockStartHeightPx = 0` — the overlay grows from the very bottom of the window. The value only
+     * decides where the growth STARTS; at the settled `Full` anchor the surface covers the window
+     * either way, and 0 keeps the fixture from depending on a dock height measured elsewhere.
+     */
+    @Composable
+    private fun FullOverlayProbe(copy: Copy) {
+        val state = rememberDockFullExpandState()
+        val attachments = remember { probeAttachments }
+        LaunchedEffect(state) {
+            // `open()` is a documented no-op until the overlay has measured the window and published
+            // its anchors (it is NaN-guarded), so this waits for the offset to become a number rather
+            // than firing once on the first composition and quietly doing nothing.
+            snapshotFlow { state.anchored.offset }.first { !it.isNaN() }
+            state.open()
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(AppSurface.ground()),
+        ) {
+            GistiFullChatOverlay(
+                state = state,
+                dockStartHeightPx = 0,
+                onCollapse = {},
+                historyContent = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = AppDimens.ScreenPaddingHorizontal,
+                                vertical = AppDimens.SpacingSm,
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                    ) {
+                        PlaneLabel("BOTTOM-CHROME plane — GistiFullChatOverlay")
+                        ChatDayDivider()
+                        ChatMessageBubble(
+                            message = ChatMessage(id = "a4", role = ChatRole.Assistant, content = copy.aiCode, timestamp = 0L),
+                            showSenderLabel = true,
+                        )
+                        ChatMessageBubble(
+                            message = ChatMessage(
+                                id = "u3",
+                                role = ChatRole.User,
+                                content = copy.user,
+                                timestamp = 0L,
+                                costCredits = 1,
+                            ),
+                        )
+                        AiChoiceResponse(
+                            pending = planePending(copy),
+                            onSelect = {},
+                            onEditChange = {},
+                            onEditConfirm = {},
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                            AiChoiceChip(label = copy.escape, role = ChoiceRole.Escape, onClick = {})
+                            AiChoiceChip(
+                                label = copy.add,
+                                role = ChoiceRole.Add,
+                                onClick = {},
+                                leadingIcon = Icons.Outlined.Add,
+                            )
+                        }
+                        ChatAttachmentChipStrip(attachments = attachments, onRemove = {})
+                    }
+                },
+                inputContent = {
+                    ChatInputRow(
+                        text = copy.draft,
+                        onTextChange = {},
+                        onSend = {},
+                        onAttachFileClick = {},
+                        onVoiceRecordingStarted = {},
+                        onVoiceRecordingStopped = {},
+                        onVoiceRecordingCancelled = {},
+                        canSend = true,
+                    )
+                },
+            )
+        }
+    }
 
     private fun shoot(
         qualifiers: String,
@@ -286,6 +412,17 @@ class ChatSurfacePlanesScreenshotTest {
                     message = ChatMessage(id = "u1", role = ChatRole.User, content = copy.user, timestamp = 0L, costCredits = 1),
                 )
                 ChatTypingIndicator()
+                // The choice block belongs on BOTH halves. It was recorded only on the chrome, which
+                // is the same asymmetry that let its question bubble keep a fixed
+                // `surfaceContainerLowest` for a whole iteration — a defect is only visible on the
+                // plane it was photographed on, and a second spelling of "the AI said this" can drift
+                // from `ChatMessageBubble` in either direction.
+                AiChoiceResponse(
+                    pending = planePending(copy),
+                    onSelect = {},
+                    onEditChange = {},
+                    onEditConfirm = {},
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
                     // Add takes its leading "+" here because production does: the icon comes from
                     // `ChoiceRole.leadingIcon()` at the AiChoiceResponse call site, not from inside
@@ -379,7 +516,7 @@ class ChatSurfacePlanesScreenshotTest {
                                 ),
                             )
                             AiChoiceResponse(
-                                pending = chromePlanePending(copy),
+                                pending = planePending(copy),
                                 onSelect = {},
                                 onEditChange = {},
                                 onEditConfirm = {},
@@ -445,7 +582,7 @@ class ChatSurfacePlanesScreenshotTest {
     }
 
     /**
-     * The pending-choice block as a dock renders it: a question bubble plus its chips.
+     * The pending-choice block: a question bubble plus its chips. Rendered on every plane.
      *
      * That bubble is a SECOND spelling of "the AI said this" — a different composable from
      * [ChatMessageBubble] doing the same job — which is exactly how it kept a fixed
@@ -456,7 +593,7 @@ class ChatSurfacePlanesScreenshotTest {
      * Every action is [ChoiceAction.Dismiss]: nothing here is executed, the block is rendered and
      * photographed.
      */
-    private fun chromePlanePending(copy: Copy): PendingChoice = PendingChoice(
+    private fun planePending(copy: Copy): PendingChoice = PendingChoice(
         choice = ChatChoice(
             prompt = copy.choicePrompt,
             options = copy.choiceOptions.mapIndexed { index, label ->
@@ -489,6 +626,13 @@ class ChatSurfacePlanesScreenshotTest {
     private companion object {
         /** Past the enter animations, so only the ongoing typing dots are pinned at a fixed phase. */
         const val PIN_MS = 700L
+
+        /**
+         * Enough simulated time for the full overlay's open spring to settle on any window height.
+         * Deliberately far past it: the frame has to show the SETTLED overlay, and a value tuned to
+         * the millisecond would photograph a partly-grown surface the next time the window changes.
+         */
+        const val OVERLAY_SETTLE_MS = 5_000L
 
         val probeAttachments = listOf(
             ChatAttachment("doc://recipe", "application/pdf", "Recipe.pdf", 20_480L),

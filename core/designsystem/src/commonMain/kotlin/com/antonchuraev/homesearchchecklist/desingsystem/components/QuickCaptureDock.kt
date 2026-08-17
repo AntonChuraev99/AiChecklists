@@ -144,15 +144,19 @@ fun QuickCaptureDock(
                 // a full border would draw a stray divider across that seam (same rule as
                 // GistiGlassChatDock). A divider as the first child traces exactly that edge.
                 //
-                // `dockedSeam()`, not `outlineVariant`: measured on the recorded 360dp frames, the line
-                // was `#E2E0DB` on a `#DEDCD6` dock — ΔL* +1.4 (1.04 : 1), i.e. the edge-tracing line
-                // was the same colour as the edge it traced, and the whole separation fell back on the
-                // dock's own −10.5 step off the page. `dockedSeam()` resolves to `outline` in light
-                // (3.33 : 1 on this surface) and keeps `outlineVariant` in dark, where the old value
-                // was already ΔL* +9.2 and needed no help.
+                // `bottomChromeSeam()`, not `outlineVariant`: measured on the recorded 360dp frames,
+                // the line was `#E2E0DB` on a `#DEDCD6` dock — ΔL* +1.4 (1.04 : 1), i.e. the
+                // edge-tracing line was the same colour as the edge it traced, and the whole
+                // separation fell back on the dock's own −10.5 step off the page. The seam resolves to
+                // `outline` in light (3.33 : 1 on this surface) and keeps `outlineVariant` in dark,
+                // where the old value was already ΔL* +9.2 and needed no help.
+                //
+                // The 2′ group's token, NOT `dockedSeam()`: the two bodies agree today, but re-tuning
+                // the bottom chrome must not repaint the share-sheet / preview CTAs, and re-tuning
+                // those must not repaint this edge. See AppSurface.bottomChromeSeam.
                 HorizontalDivider(
                     thickness = AppDimens.DividerThickness,
-                    color = AppSurface.dockedSeam(),
+                    color = AppSurface.bottomChromeSeam(),
                 )
                 // The reminder/priority chips sit above the input; the AI source row sits below it.
                 // See [belowInput]'s KDoc for why "below" is safe here and was not in the dock's

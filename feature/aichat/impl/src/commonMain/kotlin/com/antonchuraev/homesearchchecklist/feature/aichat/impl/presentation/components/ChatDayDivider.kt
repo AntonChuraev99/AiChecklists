@@ -20,8 +20,12 @@ import org.jetbrains.compose.resources.stringResource
  * Day divider pill — centered chip "Today" between message groups.
  *
  * Material 3 chat pattern from AI Chat M3 design:
- * - Pill shape (999dp radius) filled with `AppChatColors.raised()` — plane-relative, because the
- *   divider renders both on the page and inside the chat dock.
+ * - Pill shape (999dp radius) filled with `AppChatColors.quietFill()` — plane-relative, because the
+ *   divider renders both on the page and inside the chat dock. **`quietFill`, not `raised`**: this
+ *   pill carries no outline, so its fill is its only channel, and on the near-white light page
+ *   `raised()` is a ΔL\* +1.7 step, i.e. no pill at all. See the accessor's own KDoc and the inline
+ *   comment at the call site — both spell out the same choice, so "align the code with this doc"
+ *   would restore the defect rather than fix a drift.
  * - Padding 4dp vertical × 12dp horizontal.
  * - `labelSmall` typography in `onSurfaceVariant`.
  *

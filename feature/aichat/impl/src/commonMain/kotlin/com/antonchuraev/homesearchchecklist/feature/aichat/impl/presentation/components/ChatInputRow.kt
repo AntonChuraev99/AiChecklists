@@ -219,7 +219,9 @@ fun ChatInputRow(
     // NOTE: this component does NOT apply imePadding / navigationBars itself. The bottom inset
     // (keyboard + system-nav) is owned by the HOST so it can be applied exactly once:
     //  - full ChatScreen: root Column already has .imePadding() + Scaffold navbar via scaffoldPadding;
-    //  - inline dock (GistiInlineChatPanel): panel Column applies ime.union(navigationBars).
+    //  - expandable dock: the HOST (GistiGlassChatDock's call site) applies imePadding +
+    //    navigationBarsPadding, lifting the whole dock as one unit;
+    //  - full-screen overlay (GistiFullChatOverlay): its input Column applies ime.union(navigationBars).
     // Applying it here too would double the inset in the full chat (Scaffold already insets navbar).
     Column(
         modifier = modifier

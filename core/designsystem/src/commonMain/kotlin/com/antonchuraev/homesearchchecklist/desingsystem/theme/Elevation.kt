@@ -123,10 +123,13 @@ object AppSurface {
      * Colour of the 1dp line where a [docked] bar meets the content. **Not `outlineVariant`.**
      *
      * On a card the hairline is one of two separators — the card also sits a tonal step off the page,
-     * so `outlineVariant` only has to hint at the edge. On the bottom bar there is no second channel:
+     * so `outlineVariant` only has to hint at the edge. On a [docked] bar there is no second channel:
      * measured on the rendered screen, the bar (`#FFFFFF`) against the warm page (`#FBFAF8`) is a
      * 1.03:1 step, i.e. no step at all, and `outlineVariant` (`#E2E0DB`) against that page is 1.26:1.
      * The entire separation rides on a line you can barely see.
+     *
+     * ⛔ Not for the bottom chrome — that edge has its own token, [bottomChromeSeam], for the reason
+     * spelled out there.
      *
      * Dark does not have this problem — the same token resolves to `#2C2F36`, which is 3.17:1 against
      * `#121317` — so only light is lifted, to `outline`. Same role family, one step firmer, and the
@@ -232,6 +235,39 @@ object AppSurface {
         MaterialTheme.colorScheme.surfaceContainerLow
     } else {
         MaterialTheme.colorScheme.surfaceDim
+    }
+
+    /**
+     * Colour of the 1dp line tracing the TOP edge of a [bottomChrome] surface — the chat dock's
+     * stroked shoulders, the quick-capture dock's divider.
+     *
+     * Measured on the recorded 360dp frames, `outlineVariant` was `#E2E0DB` on the `#DEDCD6` chrome:
+     * ΔL\* +1.4 (1.04 : 1), an edge-tracing line the colour of the edge it traces, leaving the whole
+     * separation to the chrome's own −10.5 step off the page. Light is therefore lifted to `outline`
+     * (3.33 : 1 on this surface); dark keeps `outlineVariant`, which was already ΔL\* +9.2 there and
+     * needed no help.
+     *
+     * ## Why it is its own accessor and not [dockedSeam]
+     * The two bodies are identical TODAY and that is a coincidence of the current palette, exactly as
+     * [bottomChromeRaised] and [floating] are — same trap, same answer. [dockedSeam] belongs to a bar
+     * that shares the PAGE's plane and is separated by the seam alone: the share sheet's CTA, the
+     * template-preview CTA, the analyze-preview CTA, the v1 `AppNavigationBar`. Those four are
+     * approved as they are. Re-tuning the bottom chrome is an edit to THIS group (see [bottomChrome])
+     * and must leave them where they are; equally, re-tuning those four must not repaint the top edge
+     * of both docks. Wiring one accessor to the other would silently drag whichever set was not being
+     * worked on.
+     *
+     * ⚠️ Pair it with [bottomChrome], never with [docked] — a seam drawn in this role on a `docked`
+     * bar is a firm line on a surface that already has a tonal step, i.e. the "decorative frame" this
+     * system spends [AppChatColors][
+     * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors]'s whole KDoc avoiding.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun bottomChromeSeam(): Color = if (LocalIsDarkTheme.current) {
+        MaterialTheme.colorScheme.outlineVariant
+    } else {
+        MaterialTheme.colorScheme.outline
     }
 
     /**
@@ -423,9 +459,17 @@ object AppSurface {
      *
      * ## The value: the page, at the exact tone [bottomChromeShadow] ends on
      * The shoulder is where the plinth's own shadow pools, so it takes that gradient's TERMINAL
-     * colour — the same alpha, composited over [ground]. That is what makes the seam disappear rather
-     * than merely dim: the 16dp band above the bar ramps down to precisely this value at the bar's top
-     * edge, so the band and the shoulder meet with no step, and re-tuning the ramp moves both.
+     * colour — the same alpha, composited over [ground]. Re-tuning the ramp therefore moves both.
+     *
+     * **Over the bare page the two meet with no step at all**, and that is what
+     * `V2BarShoulderFillTest.shoulderContinuesTheShadowBand_*` pins. Over a CARD there is a small
+     * step, by arithmetic rather than by defect: the band darkens whatever is under it, so its last
+     * row is the card at the terminal alpha while the shoulder is that alpha over the page. The two
+     * ends therefore differ by exactly what those two planes differ by, shrunk by the ramp — measured
+     * light `#ECECEC` (lum 236) against `#E8E7E6` (232), dark 18 against 12. That is the shoulder
+     * being the PAGE in shadow, which is its whole definition, and
+     * `shoulderMeetsTheBandOverCards_*` bounds it by the card↔page difference so it cannot quietly
+     * grow into a visible arc.
      *
      * The two themes land on opposite sides of the chrome, and that is the ladder's documented
      * asymmetry rather than an inconsistency — in light the page is LIGHTER than the bottom chrome, in

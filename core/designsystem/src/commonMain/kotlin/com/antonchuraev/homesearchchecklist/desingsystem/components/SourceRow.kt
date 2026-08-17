@@ -187,6 +187,20 @@ private fun SourcePill(
         // is +1.7 — invisible on its own. Every tappable edge in this system takes the same firm
         // `controlOutline`, which is also what makes these four read as peers of the chat's chips
         // rather than as a fifth kind of button. See AppChatColors.
+        //
+        // ## The argument this replaced, and why it does not reproduce
+        // The pills used to be filled and NOT outlined, on the reasoning that "an outline reads as a
+        // decorative frame around the input above it rather than as four things you can press" — and
+        // the host that reasoning was written for is exactly this one: `QuickCaptureDock` puts an
+        // `AddItemInputField` (an `OutlinedTextField`, same `outline` role, same 1dp) directly above
+        // the row. Re-checked on `SourceRowScreenshotTest.dock_withSources_360dp_light/dark` at 3x,
+        // it does not happen, and the reason is the fill that arrived WITH the outline: the field is a
+        // wide EMPTY box carried by its ring alone, each pill is a small capsule whose `#FFFFFF` fill
+        // is +12.2 off the `#DEDCD6` chrome (+5.9 in dark) and is the dominant channel. Different
+        // shape, different scale, different fill — nothing in the frame closes into one enclosing
+        // frame. Softening these to `contentOutline` would drop the ring to 1.04 : 1 on the light
+        // chrome and leave the v2 shell's ONLY route into Analyze as four fill-only capsules, which
+        // is a weaker control bought against a reading the recorded frames do not show.
         color = AppChatColors.raised(),
         border = BorderStroke(AppDimens.DividerThickness, AppChatColors.controlOutline()),
         shape = RoundedCornerShape(percent = 50),
