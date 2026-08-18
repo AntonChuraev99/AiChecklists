@@ -112,6 +112,16 @@ docs/healthcheck/*
 !docs/roadmap/
 docs/roadmap/*
 !docs/roadmap/ux-overhaul-roadmap.md
+
+# Exception: named solution documents travel with the MR whose work produced them, so the next
+# session finds them in the repo rather than in one working copy. This is a PER-FILE allowlist and
+# not `!docs/solutions/`, deliberately: the directory holds ~190 documents, ~40 of which quote
+# revenue, purchase counts, conversion or pricing, and this repo is PUBLIC — re-including the
+# directory would publish all of it permanently. A document is added here only after being read and
+# written for publication; business figures stay in the ignored docs it points at by name.
+!docs/solutions/
+docs/solutions/*
+!docs/solutions/release-slice-from-a-long-lived-branch-2026-08-18.md
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 
