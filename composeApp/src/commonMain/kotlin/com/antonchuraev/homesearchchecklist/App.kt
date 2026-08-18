@@ -147,6 +147,7 @@ import aichecklists.core.designsystem.generated.resources.chat_history_load_erro
 import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
 import aichecklists.core.designsystem.generated.resources.chat_completion_error
 import aichecklists.core.designsystem.generated.resources.chat_error_offline
+import aichecklists.core.designsystem.generated.resources.chat_error_message_too_long
 import aichecklists.core.designsystem.generated.resources.chat_error_service
 import aichecklists.core.designsystem.generated.resources.chat_error_timeout
 import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
@@ -909,6 +910,9 @@ fun App() {
             val sm_errorOffline = stringResource(Res.string.chat_error_offline)
             val sm_errorService = stringResource(Res.string.chat_error_service)
             val sm_errorTimeout = stringResource(Res.string.chat_error_timeout)
+            // Server-side REFUSAL (HTTP 400), not an outage — the only one of this family that
+            // ships without a Retry chip. Same sync rule with ChatRoute.kt's map.
+            val sm_errorMessageTooLong = stringResource(Res.string.chat_error_message_too_long)
             val sm_historyLoadError = stringResource(Res.string.chat_history_load_error)
             val sm_feedbackSubmitted = stringResource(Res.string.chat_feedback_submitted)
             val sm_feedbackBlankHint = stringResource(Res.string.chat_feedback_blank_hint)
@@ -996,6 +1000,7 @@ fun App() {
                     "chat_error_offline" to sm_errorOffline,
                     "chat_error_service" to sm_errorService,
                     "chat_error_timeout" to sm_errorTimeout,
+                    "chat_error_message_too_long" to sm_errorMessageTooLong,
                     "chat_history_load_error" to sm_historyLoadError,
                     "chat_feedback_submitted" to sm_feedbackSubmitted,
                     "chat_feedback_blank_hint" to sm_feedbackBlankHint,

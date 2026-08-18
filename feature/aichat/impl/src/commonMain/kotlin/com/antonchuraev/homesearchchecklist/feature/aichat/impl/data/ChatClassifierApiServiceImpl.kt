@@ -105,6 +105,26 @@ internal class ChatClassifierApiServiceImpl(
                     creditsRemaining = dto.creditsRemaining,
                 )
             }
+            400 -> {
+                // Layer 2 refused the input — in practice always its 500-char ceiling, hit by a
+                // paste rather than a command. Still ServiceError, and deliberately so: the
+                // repository escalates that to Layer 3, which has no per-message cap and answers
+                // the paste fine. Turning this into a user-visible "too long" would DELETE a
+                // working path (the whole 500..12000-char band) to report a failure that did not
+                // happen. Nothing is charged either — the server validates before reserving.
+                //
+                // What was missing was only the diagnosis: "unexpected status=400" gave no reason,
+                // so the 2026-08-18 healthcheck had to infer these turns from HTTP requestSize in
+                // the Cloud Function logs. The client now says it outright — including that the
+                // turn silently re-prices from 1 credit to Layer 3's flat 3.
+                val reason = runCatching { response.body<ClassifyResponseDto>().error }.getOrNull()
+                logger.warning(
+                    TAG,
+                    "classify: input rejected by server (400) — ${reason ?: "no reason in body"}; " +
+                        "escalating to Layer 3, so this turn costs 3 credits instead of 1",
+                )
+                RemoteClassificationResult.ServiceError
+            }
             else -> {
                 logger.warning(TAG, "classify: unexpected status=${response.status.value}")
                 RemoteClassificationResult.ServiceError

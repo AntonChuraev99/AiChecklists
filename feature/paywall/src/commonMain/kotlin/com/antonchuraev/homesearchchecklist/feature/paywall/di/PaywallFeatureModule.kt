@@ -56,6 +56,7 @@ val paywallFeatureModule = module {
             savedStateHandle = get(),
             navigator = get(),
             getOfferingsUseCase = get(),
+            getPaywallConfigUseCase = get(),
             purchaseProductUseCase = get(),
             restorePurchasesUseCase = get(),
             analyticsTracker = get(),

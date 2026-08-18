@@ -1010,6 +1010,35 @@ object AnalyticsParams {
     const val HAS_FREE_TRIAL = "has_free_trial"
 
     /**
+     * The offer this paywall impression was CONFIGURED to show — the RevenueCat offering id
+     * resolved from Remote Config `paywall_config.currentOffer`, falling back to
+     * `PaywallRemoteConfig.DEFAULT_OFFER` (the A/B control) when RC is empty or unparsable.
+     * This is the arm of the `CurrentOfferTrialVSNoTrial` experiment (trial offering vs no-trial
+     * offering), carried on EVERY paywall impression.
+     *
+     * Present unconditionally, in BOTH arms: the value is known in `PaywallViewModel.init`, before
+     * RevenueCat is contacted at all, so it does not depend on the product catalog loading. The
+     * guard wraps the DATA (empty RC → control offer), never the EVENT.
+     *
+     * ⚠️ DELIBERATELY NOT the same name as the `current_offer` USER-property set after a
+     * successful catalog load. They mean different things and are populated on different
+     * conditions:
+     *  - `current_offer` (user-property) = the offering RevenueCat actually DELIVERED. Written only
+     *    inside `loadProducts().onSuccess`, so with most catalog loads failing in prod it was
+     *    absent for the large majority of `paywall_opened` events — which left the experiment
+     *    verdict resting on a small, self-selected sample.
+     *  - `configured_offer` (this event-property) = what we ASKED for. Always present.
+     * Reusing one name for both would repeat the `push_ab_arm` defect, where the same key lives as
+     * a user- and an event-property with different meanings and Amplitude silently segments an arm
+     * against itself. Keeping both lets a dashboard cross "configured" against "delivered" and see
+     * the delivery gap instead of hiding it.
+     *
+     * Absent on `SURFACE_WEB_INSTALL` impressions on purpose: the browser has no RevenueCat, so no
+     * offer is configured there and such an impression can never convert.
+     */
+    const val CONFIGURED_OFFER = "configured_offer"
+
+    /**
      * WHICH paywall UI this event came from — see the `SURFACE_*` values on
      * [AnalyticsEvents.Paywall]. Distinct from [SOURCE], which says WHY the paywall was opened
      * (`checklist_limit`, `chat_insufficient_credits`, …).

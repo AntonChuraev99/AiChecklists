@@ -42,7 +42,13 @@ kotlinxDatetimeWasm = "0.8.0"
 # 2.1.x requires AGP 8.0+ (we run 9.2.0). Do NOT swap for desugar_jdk_libs_minimal:
 # minimal ships only java.util.function + concurrent-collection fixes, NOT java.time.
 desugarJdk = "2.1.5"
-amplitude = "1.22.4"
+# ⛔ HARD FLOOR 1.26.1 — do NOT downgrade below it, a downgrade makes the phantom-session fix a
+# SILENT no-op (no build error, no test failure, metrics just go wrong again). Two upstream fixes
+# are load-bearing: 1.25.2 registers activity lifecycle callbacks unconditionally (before it, with
+# only SESSIONS autocapture selected, the SDK never registered them and its foreground flag stayed
+# false forever), and 1.26.1 stops an out-of-session event from itself opening a session — which is
+# exactly what Analytics.eventOutOfSession relies on.
+amplitude = "1.30.1"
 # Play Install Referrer Library — 2.2 (2021) is the current stable API release, NOT deprecated.
 # Only source of the encoded install `referrer` (utm_* + gclid) Play attaches to ad/store installs.
 installreferrer = "2.2"

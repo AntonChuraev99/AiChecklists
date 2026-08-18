@@ -114,7 +114,11 @@ internal class PushDismissReceiver : BroadcastReceiver() {
             return
         }
         runCatching {
-            tracker.event(AnalyticsEvents.Push.DISMISSED, PushAnalytics.paramsFromIntent(intent))
+            // Out-of-session: a swipe-away delivers to this receiver, not to any Activity.
+            tracker.eventOutOfSession(
+                AnalyticsEvents.Push.DISMISSED,
+                PushAnalytics.paramsFromIntent(intent),
+            )
         }.onFailure { e ->
             logger?.error(TAG, "dismissed: failed to emit push_dismissed — ${e.message}", e)
         }

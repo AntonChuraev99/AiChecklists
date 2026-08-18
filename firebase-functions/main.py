@@ -378,6 +378,33 @@ def create_error_response(message: str, status_code: int = 400):
     ))
 
 
+def credit_error_response(action: str, message: str = "insufficient credits"):
+    """402 for a failed credit reservation, saying WHICH failure it was.
+
+    [message] exists because the wire text is NOT uniform across flows: the chat endpoints answer
+    "insufficient credits" while analyze/generate answer "Not enough credits. Need N. …". Both are
+    legacy strings old clients match on, so each caller passes its own and only the `reason` field
+    is added on top.
+
+    The status code and the `error` string are deliberately unchanged: most of the
+    installed base still runs 1.17.x/1.18.x, and those clients branch on 402 + that exact
+    text to raise the paywall. Changing either would break them. The new `reason` field is
+    additive — old clients ignore it, new ones can tell the two apart:
+
+        "insufficient_credits" -> the user exists and is out of credits  -> paywall
+        "no_user"              -> there is no user document              -> sign in
+
+    Until 2026-08-18 both cases returned the same body, so a caller who had never been
+    registered was shown the paywall, and the 402 counter could not be read as a
+    monetization signal. Server logs could not tell them apart either — hence the log line.
+    """
+    reason = "no_user" if action == "no_user" else "insufficient_credits"
+    logger.warning("credit reservation refused: reason=%s", reason)
+    return add_cors_headers(make_response(
+        jsonify({"success": False, "error": "insufficient credits", "reason": reason}), 402
+    ))
+
+
 def create_success_response(data: dict):
     """Create standardized success response with CORS headers so any
     @functions_framework.http endpoint becomes browser-callable."""
@@ -1342,10 +1369,12 @@ def analyze_and_fill_checklist(request: Request):
 
     # Reserve credits atomically (deduct before Gemini call)
     cost = get_credits_config()["action_cost"]
-    remaining = reserve_credits(user_id, request_id)
+    reserve_action, remaining = reserve_credits_with_action(user_id, cost, request_id)
     if remaining is None:
         suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
-        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
+        # Same split as the chat endpoints: the legacy text stays verbatim for old clients, the
+        # machine-readable `reason` says whether the wallet is empty or there is no user at all.
+        return credit_error_response(reserve_action, f"Not enough credits. Need {cost}. {suffix}")
 
     # Build prompt
     checklist_items = "\n".join([
@@ -1470,10 +1499,12 @@ def generate_checklist(request: Request):
 
     # Reserve credits atomically (deduct before Gemini call)
     cost = get_credits_config()["action_cost"]
-    remaining = reserve_credits(user_id, request_id)
+    reserve_action, remaining = reserve_credits_with_action(user_id, cost, request_id)
     if remaining is None:
         suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
-        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
+        # Same split as the chat endpoints: the legacy text stays verbatim for old clients, the
+        # machine-readable `reason` says whether the wallet is empty or there is no user at all.
+        return credit_error_response(reserve_action, f"Not enough credits. Need {cost}. {suffix}")
 
     # Build prompt
     if input_type == "image_base64":
@@ -2314,14 +2345,25 @@ CHAT_INTENT_MAX_INPUT_LEN = 500  # 99th percentile chat command length is well u
 
 
 
-def reserve_chat_credit(user_id: str) -> int | None:
+def reserve_chat_credit(user_id: str) -> tuple[str, int | None]:
     """
     Atomically check-and-deduct 1 credit for a Layer 2 classification call.
     Mirrors reserve_credits() but uses a small per-call cost (CHAT_INTENT_COST)
     instead of action_cost (30) so chat stays affordable for free users.
 
-    Returns the new remaining balance, or None if user document is missing or
-    has insufficient credits. Caller MUST treat None as 402 Payment Required.
+    Returns (action, value) — the same verdict vocabulary reserve_credits_with_action()
+    already uses, so both reservation paths read alike:
+        ("reserve", new_balance)   -> THIS call deducted the cost.
+        ("insufficient", None)     -> the user exists but cannot afford the call.
+        ("no_user", None)          -> there is no user document at all.
+
+    WHY a tuple and not a bare balance: the previous signature returned None for BOTH
+    failure modes, and every call site turned that into the same 402 "insufficient
+    credits". Two consequences, both observed in prod (healthcheck 2026-08-18): a caller
+    with no user document was shown the paywall instead of a sign-in prompt, and the 402
+    counter could not be read as a monetization signal because it conflated "out of
+    credits" with "not registered". Callers still answer 402 in both cases for wire
+    compatibility (see credit_error_response) — they now say WHICH one in the body.
     """
     user_ref = db.collection("users").document(user_id)
 
@@ -2329,16 +2371,16 @@ def reserve_chat_credit(user_id: str) -> int | None:
     def txn(transaction):
         snapshot = user_ref.get(transaction=transaction)
         if not snapshot.exists:
-            return None
+            return ("no_user", None)
         current = snapshot.get("ai_credits") or 0
         if current < CHAT_INTENT_COST:
-            return None
+            return ("insufficient", None)
         new_count = current - CHAT_INTENT_COST
         transaction.update(user_ref, {
             "ai_credits": new_count,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         })
-        return new_count
+        return ("reserve", new_count)
 
     return txn(db.transaction())
 
@@ -2449,9 +2491,9 @@ def classify_chat_intent(request: Request):
 
     # Server is authoritative for credit accounting — client cannot bypass.
     # Deduct BEFORE the AI call so concurrent requests can't oversell.
-    new_credits = reserve_chat_credit(user_id)
+    reserve_action, new_credits = reserve_chat_credit(user_id)
     if new_credits is None:
-        return create_error_response("insufficient credits", 402)
+        return credit_error_response(reserve_action)
 
     prompt = CLASSIFY_CHAT_INTENT_PROMPT.format(
         locale=locale,
@@ -2588,9 +2630,9 @@ def transcribe_audio(request: Request):
 
     # Server is authoritative for credit accounting — deduct BEFORE the AI call
     # so concurrent requests cannot oversell credits.
-    new_credits = reserve_chat_credit(user_id)
+    reserve_action, new_credits = reserve_chat_credit(user_id)
     if new_credits is None:
-        return create_error_response("insufficient credits", 402)
+        return credit_error_response(reserve_action)
 
     try:
         response = call_gemini(TRANSCRIBE_AUDIO_PROMPT, "audio_base64", audio_b64, audio_mime_type=gemini_mime)
@@ -2663,10 +2705,14 @@ CHAT_CONTEXT_ITEM_TEXT_MAX_CHARS = 200        # clamp a single item's text lengt
 
 
 
-def reserve_chat_completion_credits(user_id: str) -> int | None:
+def reserve_chat_completion_credits(user_id: str) -> tuple[str, int | None]:
     """
     Atomically deduct CHAT_COMPLETION_COST credits for one Layer 3 call.
-    Returns the new balance, or None if user is missing or under-credited.
+
+    Returns (action, value) with the same vocabulary as reserve_chat_credit() and
+    reserve_credits_with_action(): ("reserve", new_balance) | ("insufficient", None) |
+    ("no_user", None). See reserve_chat_credit() for why the two failure modes are kept
+    apart instead of both collapsing to None.
     """
     user_ref = db.collection("users").document(user_id)
 
@@ -2674,16 +2720,16 @@ def reserve_chat_completion_credits(user_id: str) -> int | None:
     def txn(transaction):
         snapshot = user_ref.get(transaction=transaction)
         if not snapshot.exists:
-            return None
+            return ("no_user", None)
         current = snapshot.get("ai_credits") or 0
         if current < CHAT_COMPLETION_COST:
-            return None
+            return ("insufficient", None)
         new_count = current - CHAT_COMPLETION_COST
         transaction.update(user_ref, {
             "ai_credits": new_count,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         })
-        return new_count
+        return ("reserve", new_count)
 
     return txn(db.transaction())
 
@@ -2907,9 +2953,9 @@ def chat_completion(request: Request):
     checklists_raw = data.get("checklists_summary") or []
     checklists_summary_text = _format_checklists_summary(checklists_raw)
 
-    new_credits = reserve_chat_completion_credits(user_id)
+    reserve_action, new_credits = reserve_chat_completion_credits(user_id)
     if new_credits is None:
-        return create_error_response("insufficient credits", 402)
+        return credit_error_response(reserve_action)
 
     history_text = "\n".join(
         f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
@@ -3673,10 +3719,12 @@ def chat_agent(request: Request):
         if request_id:
             action, new_credits = reserve_chat_agent_credits(user_id, request_id)
         else:
-            new_credits = reserve_chat_completion_credits(user_id)
-            action = "reserve" if new_credits is not None else "insufficient"
+            # Same verdict vocabulary on both branches — the legacy path used to flatten a
+            # missing user document into "insufficient", which is how a never-registered
+            # caller ended up being shown the paywall instead of a sign-in prompt.
+            action, new_credits = reserve_chat_completion_credits(user_id)
         if new_credits is None:
-            return create_error_response("insufficient credits", 402)
+            return credit_error_response(action)
         # Refund only what THIS invocation deducted: a replay deducted nothing, so refunding it
         # would return credits charged by the earlier call AND roll back its dedup doc.
         reserved_this_round = (action == "reserve")

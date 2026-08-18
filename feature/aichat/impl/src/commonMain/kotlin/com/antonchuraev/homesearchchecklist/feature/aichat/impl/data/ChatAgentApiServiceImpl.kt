@@ -239,6 +239,23 @@ internal class ChatAgentApiServiceImpl(
                     }
                 }
             }
+            400 -> {
+                // The server ANSWERED and refused this payload. Kept apart from the 5xx bucket
+                // below because the advice differs: a 5xx is transient ("try again in a moment"),
+                // a 400 is deterministic — the identical request is refused every time.
+                val reason = response.errorReasonOrNull()
+                // Synthetic throwable on purpose: CrashlyticsAppLogger calls recordException ONLY
+                // when the throwable is non-null, so `logger.error(tag, msg)` alone is a breadcrumb
+                // that ships only if some other crash happens later. Without it the falsifiability
+                // argument above ("a 400 for some other cause says so in Crashlytics") is unfounded.
+                val reasonText = reason ?: "no reason in body"
+                logger.error(
+                    TAG,
+                    "step: request rejected by server (400) — $reasonText",
+                    IllegalStateException("chat_agent 400: $reasonText"),
+                )
+                AgentStepResult.InvalidRequest(reason)
+            }
             else -> {
                 logger.warning(TAG, "step: unexpected status=${response.status.value}")
                 AgentStepResult.ServiceError
@@ -248,6 +265,18 @@ internal class ChatAgentApiServiceImpl(
         logger.error(TAG, "step: network/parse error — ${e.message}", e)
         AgentStepResult.NetworkError
     }
+
+    /**
+     * The server's own `error` string out of an error envelope, or null when the body is not one.
+     *
+     * Read defensively and never rethrown. This runs INSIDE the same `runCatching` as the request,
+     * so a body that is not the JSON envelope — an infrastructure 400 page, an empty body — would
+     * otherwise surface as a transport failure and demote a deterministic refusal to
+     * [AgentStepResult.NetworkError], i.e. tell the user to check a connection that worked.
+     */
+    private suspend fun HttpResponse.errorReasonOrNull(): String? = runCatching {
+        sharedJson.decodeFromString<ErrorEnvelopeDto>(bodyAsText()).error?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     // ─── Transcript mapping ───────────────────────────────────────────────────
 
@@ -396,6 +425,19 @@ internal class ChatAgentApiServiceImpl(
         @SerialName("model_variant") val modelVariant: String? = null,
         @SerialName("model_id") val modelId: String? = null,
         @SerialName("ai_flow") val aiFlow: String? = null,
+    )
+
+    /**
+     * The server's error envelope (`create_error_response`): `{"success": false, "error": "..."}`.
+     *
+     * Separate from [AgentResponseDto] because it is decoded on a NON-2xx body, where none of the
+     * success fields exist. Every field defaulted so a partial or foreign body decodes to nulls
+     * rather than throwing.
+     */
+    @Serializable
+    private data class ErrorEnvelopeDto(
+        val success: Boolean = false,
+        val error: String? = null,
     )
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

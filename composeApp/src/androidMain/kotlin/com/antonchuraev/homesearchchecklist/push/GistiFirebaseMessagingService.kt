@@ -103,7 +103,8 @@ internal class GistiFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
         runCatching {
-            tracker.event(AnalyticsEvents.Push.RECEIVED, payload.analyticsParams())
+            // Out-of-session: an incoming FCM message wakes the process with no Activity present.
+            tracker.eventOutOfSession(AnalyticsEvents.Push.RECEIVED, payload.analyticsParams())
         }.onFailure { e ->
             logger?.error(TAG, "received: failed to emit push_received — ${e.message}", e)
         }
