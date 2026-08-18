@@ -15,6 +15,13 @@
     <string name="widget_checked">Checked</string>
     <string name="widget_unchecked">Unchecked</string>
 
+    <!-- Widget failure feedback (toasts). The widget leaves no app UI behind and Glance cannot
+         render a snackbar, so a toast is the only surface available. Reached only when the device
+         cannot build WorkManager, which every Glance update goes through. -->
+    <string name="widget_toggle_failed">Could not update the checklist</string>
+    <string name="widget_toggle_saved_refresh_failed">Item saved, but the widget could not refresh</string>
+    <string name="widget_config_saved_refresh_failed">Widget saved, but it could not refresh</string>
+
     <!-- Reminder Notifications -->
     <string name="reminder_all_completed">All items completed!</string>
     <string name="reminder_notification_channel">Checklist Reminders</string>

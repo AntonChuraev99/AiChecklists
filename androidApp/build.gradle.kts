@@ -25,8 +25,8 @@ android {
         applicationId = "com.antonchuraev.aichecklists"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 80
-        versionName = "1.19.1"
+        versionCode = 81
+        versionName = "1.19.2"
 
         testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
 
@@ -169,6 +169,14 @@ dependencies {
     // Koin Android — for androidContext() / androidLogger() in startKoin
     // koin-android pulls in koin-core transitively
     implementation(libs.koin.android)
+
+    // JVM unit tests (Robolectric). `testImplementation` is a test-only configuration — none of
+    // these artifacts reach debugRuntimeClasspath / releaseRuntimeClasspath.
+    // Robolectric is needed here (and not in :composeApp) because the invariant under test lives in
+    // the APK's MERGED manifest, which only the application module produces.
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlin.testJunit)
+    testImplementation(libs.robolectric)
 
     // Android UI Tests
     androidTestImplementation(libs.androidx.testExt.junit)

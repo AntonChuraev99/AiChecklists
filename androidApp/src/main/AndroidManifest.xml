@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -108,6 +109,35 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity-alias>
+
+        <!--
+          Drop androidx.work.WorkManagerInitializer from the androidx.startup provider.
+
+          WorkManager's own manifest registers that initializer here, so WorkManager was built on
+          EVERY process start inside ContentProvider.onCreate() — before Application.onCreate(),
+          where a throw is fatal and uncatchable by the app. On 2026-08-13 a Pixel 8 Pro on 1.19.1
+          could not launch at all: its ROM reports API 34 but ships a framework.jar without
+          JobScheduler.forNamespace, so androidx.work's (correctly SDK_INT-guarded) call died with
+          NoSuchMethodError inside installProvider.
+
+          No app code enqueues work, so every start paid this for nothing. Glance does reach
+          WorkManager (SessionManagerImpl.startSession -> enqueueUniqueWork) when the home-screen
+          widget updates, so WorkManager still gets built — now lazily, on first widget update,
+          via Configuration.Provider on GistiAndroidApplication, with the same default
+          Configuration the initializer used.
+
+          The <provider> itself must stay: five other initializers (emoji2, ProcessLifecycle,
+          ProfileInstaller, RevenueCat, OkHttp) are declared under it.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
 
         <provider
             android:name="androidx.core.content.FileProvider"
