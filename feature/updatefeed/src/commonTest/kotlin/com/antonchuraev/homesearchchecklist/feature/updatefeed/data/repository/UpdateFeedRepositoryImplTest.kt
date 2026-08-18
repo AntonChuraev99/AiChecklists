@@ -29,7 +29,7 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // 33 posts across 13 main-versions (v1.6–v1.18)
+        // 39 posts across 15 main-versions (v1.6-v1.20)
         assertEquals(15, releases.size)
     }
 

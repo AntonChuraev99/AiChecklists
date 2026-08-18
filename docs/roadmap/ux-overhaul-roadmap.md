@@ -16,7 +16,7 @@ roadmap edited "later" is a roadmap nobody trusts.
 
 | Mark | Meaning |
 |---|---|
-| ✅ | Shipped and verified |
+| ✅ | Shipped and verified. The 1.20.0 block is prepared and verified but reaches users only once that version is published |
 | 🔨 | Next up — specified, nothing blocking it |
 | 🧊 | Planned, not specified yet |
 | ❓ | Waiting on an owner decision, not on work |
@@ -58,7 +58,7 @@ created in the console and therefore always resolved to the control arm.
   full-width row in the empty Inbox.
 - **Analyze redesigned.** Six materials as an equal-width `SourcePillGrid` that collapses to a
   single pill once chosen (`AnalyzeSourcePicker.kt`), replacing a stack of full-width cards that
-  pushed the editor below the fold on a 320dp window. Entering on Photo or PDF opens the system
+  pushed the editor off the first screen on a short window (the card stack alone ran ~332dp of a 640dp phone). Entering on Photo or PDF opens the system
   picker immediately (`EntryMaterialPicker.kt`) instead of asking the user to name the same thing
   twice.
 - **AI creation is findable on Templates.**
@@ -67,6 +67,10 @@ created in the console and therefore always resolved to the control arm.
   analytics `source` so the surfaces stay separately measurable.
 - **One bottom surface.** The bar, the capture dock and the chat dock stopped reading as three
   different docks (`ChatColors.kt`: `ChatSurfaceTone`, `LocalChatSurfaceTone`).
+- **"Add task" is the action of every empty state** (Inbox, Today, Calendar, checklist detail), via a
+  shared `action` slot on `EmptyState` — an empty screen now offers the thing to do on it.
+- **The bottom navigation lost its painted shadow ramp**, which used to tint the bottom 16dp of the
+  hosted screen, the open dock included (`Elevation.kt`).
 
 ---
 
@@ -128,16 +132,19 @@ feature table · a sheet for the credit dead-end.
 
 Two hard requirements, both of which have bitten before:
 
-- **Limits come from Remote Config, never from a local constant.** `PaywallScreen.kt` has shipped a
-  hardcoded comparison table that disagreed with the served config. A comment saying "mirrors X" is
-  not checked by the compiler — treat it as a smell, not documentation.
+- **Limits come from Remote Config, never from a local constant.** `PaywallScreen.kt` **is shipping**
+  a hardcoded comparison table that disagrees with the served config right now — it understates the
+  free tier on the purchase screen, and it is live, not hypothetical. Tracked separately from this
+  redesign as `docs/todos/2026-08-18-paywall-compare-table-hardcoded-limits.md`, because it is a
+  defect to fix rather than a surface to redraw. A comment saying "mirrors X" is not checked by the
+  compiler — treat it as a smell, not documentation.
 - **A regression test must pin two different config values.** A fake pinned to the value currently
   served passes against a hardcoded number just as happily as against a correct lookup. Reference
   fix: `ToolCallDispatcherImpl.freeChecklistCeilingReached()`.
 
-The failure is not only visual — most of the loss happens *after* the user taps to buy, which points
-at conductivity through the purchase flow, not at the screen's looks. Do not treat this as a
-repaint. Numbers: `docs/PRODUCT.md`.
+The screen's looks are not the only variable: the path from tapping to buy is instrumented and has
+its own losses, so treat this as a flow to fix rather than a surface to repaint. Where the losses sit
+and how big they are: `docs/PRODUCT.md`.
 
 ### R7 — Motion language
 Today the only motion in the codebase is `animateColorAsState`, `animateFloatAsState` and the chat
@@ -146,6 +153,12 @@ to decide what glides (sheet opening, sliding) and what is springy (tap, bounce)
 
 ⚠️ M3 `MotionScheme` is **not usable on CMP 1.11.0** — the symbols exist in the klib but are
 `internal`. On wasmJs springs convert to cubic-bezier plus a length.
+
+### R7b — The eight remaining shadows
+Shadows were dropped project-wide in favour of flat surfaces plus a hairline, but eight call sites
+still paint one: `HeroIllustration`, `ShareScreen`, `AnalyzeResult`, `Templates`, `TemplatePreview`,
+`InlineChatPanel`, `ChatDock`, `MoveToDayBottomSheet`. 1.20.0 removed only the bottom navigation's.
+Until the rest go, the elevation language is inconsistent screen to screen.
 
 ### R8 — Typography
 The scale is the default M3 one, 99 lines of `Type.kt`, with no character of its own.
