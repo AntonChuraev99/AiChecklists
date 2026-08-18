@@ -18,10 +18,12 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.ConversionEve
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getDeviceCountry
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getPlayStoreVersion
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallRemoteConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseAnalyticsContext
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetPaywallConfigUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
@@ -46,6 +48,11 @@ class PaywallViewModel(
     savedStateHandle: SavedStateHandle,
     private val navigator: AppNavigator,
     private val getOfferingsUseCase: GetOfferingsUseCase,
+    // Same resolver [GetOfferingsUseCase] uses to pick WHICH offering to request. Injected here so
+    // the impression event can report the configured offer (the CurrentOfferTrialVSNoTrial arm)
+    // without waiting for — or depending on — the RevenueCat catalog load. Pure + synchronous:
+    // it only parses the already-activated `paywall_config` RC string.
+    private val getPaywallConfigUseCase: GetPaywallConfigUseCase,
     private val purchaseProductUseCase: PurchaseProductUseCase,
     private val restorePurchasesUseCase: RestorePurchasesUseCase,
     private val analyticsTracker: AnalyticsTracker,
@@ -173,6 +180,18 @@ class PaywallViewModel(
                 "paywall_default_plan" to resolvedPlan.name.lowercase(),
             ),
         )
+        // WHICH offer this impression was configured to show — the CurrentOfferTrialVSNoTrial arm.
+        // Resolved here, in init, from the already-activated `paywall_config` RC value, i.e. BEFORE
+        // RevenueCat is contacted: an unconditional dimension on an unconditional event.
+        //
+        // It replaces nothing. The `current_offer` USER-property below (set in
+        // loadProducts().onSuccess) reports the offering RevenueCat actually DELIVERED and stays
+        // exactly where it is — with the catalog failing most of the time in prod it was written
+        // for a minority of impressions, which is precisely why the arm could not be read off it.
+        // Keeping both makes the configured-vs-delivered gap visible instead of invisible.
+        val configuredOffer =
+            getPaywallConfigUseCase().currentOffer ?: PaywallRemoteConfig.DEFAULT_OFFER
+
         // ONE map, TWO wire names. `paywall_opened` is the historical name the PaywallsV1 A/B
         // experiment and the existing dashboards read; `paywall_shown` is the funnel-entry name.
         // They used to be emitted from different layers with different coverage — `paywall_shown`
@@ -184,6 +203,7 @@ class PaywallViewModel(
             put(AnalyticsParams.SOURCE, source)
             put(AnalyticsParams.SURFACE, surface)
             put(AnalyticsParams.VARIANT, resolvedVariant.name)
+            put(AnalyticsParams.CONFIGURED_OFFER, configuredOffer)
             put("default_plan", resolvedPlan.name.lowercase())
             getDeviceCountry()?.let { put("country", it) }
             getPlayStoreVersion()?.let { put("play_store_version", it) }

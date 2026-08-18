@@ -59,6 +59,37 @@ class InstallReferrerCaptureTest {
         context().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit()
     }
 
+    /**
+     * Capture is dispatched from `Application.onCreate` and retries on every start until the Play
+     * IPC answers — so it runs in background-woken processes (FCM, alarm, widget job) that have no
+     * Activity. Both emissions must be stamped out-of-session; an in-session one makes the SDK open
+     * a session and stamp an empty `session_start` on a wake where no user was present.
+     *
+     * Delivery is asserted by the rest of this class (the event and its params still arrive) — this
+     * test pins only the channel.
+     */
+    @Test
+    fun capture_emitsBothTheEventAndThePropertiesOutOfSession() {
+        val analytics = RecordingAnalytics()
+        val service = ScriptedReferrerService(
+            Step(OK, "utm_source=google-play&utm_medium=cpc&utm_campaign=summer_sale"),
+        )
+
+        newCapture(analytics, service).capture()
+
+        assertEquals(
+            listOf(EVENT_INSTALL_ATTRIBUTED),
+            analytics.outOfSessionEvents,
+            "install_attributed must not open a session — capture runs on background process wakes",
+        )
+        assertEquals(
+            1,
+            analytics.outOfSessionPropertyWrites.size,
+            "The utm_* user-properties are an \$identify on the wire and mint a session just as " +
+                "readily as a named event — they must go out-of-session too",
+        )
+    }
+
     // ─── A. the event exists, once per install ───────────────────────────────
 
     /**
@@ -326,11 +357,23 @@ class InstallReferrerCaptureTest {
         private val propertyWrites = mutableListOf<Map<String, Any>>()
         private val onceWrites = mutableListOf<Map<String, Any>>()
 
+        /** Emissions stamped out-of-session. Anything missing here can mint a `session_start`. */
+        val outOfSessionEvents = mutableListOf<String>()
+        val outOfSessionPropertyWrites = mutableListOf<Map<String, Any>>()
+
         override fun setUserId(userId: String) {}
         override fun setUserProperties(properties: Map<String, Any>) { propertyWrites += properties }
         override fun setUserPropertiesOnce(properties: Map<String, Any>) { onceWrites += properties }
+        override fun setUserPropertiesOutOfSession(properties: Map<String, Any>) {
+            propertyWrites += properties
+            outOfSessionPropertyWrites += properties
+        }
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) { events += name to params }
+        override fun eventOutOfSession(name: String, params: Map<String, Any>) {
+            events += name to params
+            outOfSessionEvents += name
+        }
 
         fun attributionEvents(): List<Map<String, Any>> =
             events.filter { it.first == EVENT_INSTALL_ATTRIBUTED }.map { it.second }

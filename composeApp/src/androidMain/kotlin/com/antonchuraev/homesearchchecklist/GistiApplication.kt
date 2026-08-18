@@ -131,7 +131,13 @@ open class GistiApplication : Application() {
                         runCatching {
                             scheduler.scheduleComeback(first.id, first.name)
                             prefs.markComebackScheduled(first.id, armedAt)
-                            analytics?.event(
+                            // Out-of-session: this collector is started from onCreate and lives for
+                            // the whole process, including a process woken with no Activity. The
+                            // empty→non-empty transition is usually a user creating their first
+                            // checklist — but a background FCM wake that pulls the first checklist
+                            // down from Firestore reaches this same line with nobody looking at the
+                            // screen, and that emit would mint an empty session.
+                            analytics?.eventOutOfSession(
                                 AnalyticsEvents.Retention.COMEBACK_SCHEDULED,
                                 mapOf(
                                     AnalyticsParams.CHECKLIST_ID to first.id.toString(),
@@ -198,8 +204,10 @@ open class GistiApplication : Application() {
             }
 
             // Current state as user-properties — cheap, segmentable, no per-session event.
+            // Out-of-session: onCreate runs on every background process wake (FCM, alarm, widget
+            // job), so a plain write here stamps a phantom session_start on each one.
             runCatching {
-                tracker.setUserProperties(
+                tracker.setUserPropertiesOutOfSession(
                     mapOf(
                         AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
                         AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
@@ -221,7 +229,8 @@ open class GistiApplication : Application() {
                 .apply()
 
             runCatching {
-                tracker.event(
+                // Out-of-session — app-start telemetry, emitted with or without an Activity.
+                tracker.eventOutOfSession(
                     AnalyticsEvents.Push.PERMISSION_STATE,
                     mapOf(
                         AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,

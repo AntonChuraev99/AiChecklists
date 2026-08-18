@@ -13,10 +13,12 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallRemoteConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
@@ -127,21 +129,54 @@ class PaywallViewModelAnalyticsTest {
         experimentArm: AiModelArm? = null,
         purchaseDelayMs: Long = 0L,
     ): Pair<PaywallViewModel, RecordingAnalyticsTracker> {
-        val tracker = RecordingAnalyticsTracker()
-        val paywallRepo = FakePaywallRepository(
-            offering = PaywallOffering(id = "default", products = products),
+        val (vm, tracker, _) = createHarness(
+            products = products,
+            source = source,
             purchaseResult = purchaseResult,
+            experimentArm = experimentArm,
             purchaseDelayMs = purchaseDelayMs,
         )
+        return vm to tracker
+    }
+
+    /** Everything the offer-arm tests need to reach: the repo spy comes back too. */
+    private data class Harness(
+        val vm: PaywallViewModel,
+        val tracker: RecordingAnalyticsTracker,
+        val repository: FakePaywallRepository,
+    )
+
+    private fun createHarness(
+        products: List<PaywallProduct>,
+        source: String = "test_source",
+        purchaseResult: PurchaseResult = PurchaseResult.Cancelled,
+        experimentArm: AiModelArm? = null,
+        purchaseDelayMs: Long = 0L,
+        // Raw `paywall_config` RC value. "" = the shipped client default (RC absent / fetch failed).
+        paywallConfigJson: String = "",
+        // Id RevenueCat reports back on the DELIVERED offering — deliberately settable apart from
+        // the configured one, so a test can tell "what we asked for" from "what we got".
+        deliveredOfferingId: String = "default",
+        // Non-null = catalog load fails.
+        offeringsFailure: Throwable? = null,
+    ): Harness {
+        val tracker = RecordingAnalyticsTracker()
+        val paywallRepo = FakePaywallRepository(
+            offering = PaywallOffering(id = deliveredOfferingId, products = products),
+            purchaseResult = purchaseResult,
+            purchaseDelayMs = purchaseDelayMs,
+            offeringsFailure = offeringsFailure,
+        )
         val userRepo = FakeUserDataRepository()
-        val remoteConfig = FakeRemoteConfigProvider()
+        val remoteConfig = FakeRemoteConfigProvider(
+            strings = mapOf(RemoteConfigKeys.PAYWALL_CONFIG to paywallConfigJson),
+        )
+        val paywallConfigUseCase = GetPaywallConfigUseCase(remoteConfig)
         val vm = PaywallViewModel(
             savedStateHandle = SavedStateHandle(),
             navigator = FakeAppNavigator(),
-            getOfferingsUseCase = GetOfferingsUseCase(
-                paywallRepo,
-                GetPaywallConfigUseCase(remoteConfig),
-            ),
+            getOfferingsUseCase = GetOfferingsUseCase(paywallRepo, paywallConfigUseCase),
+            getPaywallConfigUseCase = paywallConfigUseCase,
             purchaseProductUseCase = PurchaseProductUseCase(paywallRepo, userRepo),
             restorePurchasesUseCase = RestorePurchasesUseCase(paywallRepo, userRepo),
             analyticsTracker = tracker,
@@ -149,7 +184,7 @@ class PaywallViewModelAnalyticsTest {
             sourceOverride = source,
             aiModelExperimentTracker = FakeAiModelExperimentTracker(experimentArm),
         )
-        return vm to tracker
+        return Harness(vm, tracker, paywallRepo)
     }
 
     // ── Funnel entry: paywall_shown must cover EVERY paywall host ─────────────
@@ -242,6 +277,105 @@ class PaywallViewModelAnalyticsTest {
                 )
             }
         }
+
+    // ── The A/B arm rides on the impression, not on a successful catalog load ─
+
+    /**
+     * Production symptom (healthcheck 2026-08-18): the `CurrentOfferTrialVSNoTrial` arm was only
+     * ever recorded as the `current_offer` USER-property, written inside
+     * `loadProducts().onSuccess`. With most catalog loads failing in prod the arm was absent for
+     * the large majority of `paywall_opened` events, so the verdict on an experiment that
+     * auto-expires 2026-09-13 rested on a small sample.
+     *
+     * The fix follows the house rule from the 2026-07-26 dead-instrumentation precedent: the guard
+     * wraps the DATA (empty RC → the control offer), never the EVENT. The arm is resolved from
+     * Remote Config in `init` and put on the impression map unconditionally.
+     *
+     * Deliberately NOT advanced past construction: the catalog tail (`handleEmptyProducts`) reads
+     * a localized string through Compose Resources, which is unresolvable in a plain JVM host test
+     * and would surface as an environment failure instead of an assertion — same reason as
+     * `purchaseIntent_recordsOneTapPerTap_...` below. Nothing needs advancing anyway, and that is
+     * exactly the point: the impression is emitted synchronously in `init`, before RevenueCat is
+     * contacted at all, which is what makes the arm independent of whether the catalog ever loads.
+     */
+    @Test
+    fun impression_carriesConfiguredOffer_beforeTheCatalogIsEvenRequested() {
+        val (_, tracker, repository) = createHarness(
+            products = listOf(monthlyTrialProduct),
+            paywallConfigJson = """{"currentOffer":"month1.99Year20Trial3d"}""",
+            offeringsFailure = IllegalStateException("billing unavailable"),
+        )
+
+        assertEquals(
+            emptyList(),
+            repository.requestedOfferingIds,
+            "guard rail for this test: the catalog must not have been asked yet, otherwise the " +
+                "assertions below would no longer prove independence from the load",
+        )
+        listOf(AnalyticsEvents.Paywall.SHOWN, "paywall_opened").forEach { name ->
+            assertEquals(
+                "month1.99Year20Trial3d",
+                tracker.events.first { it.first == name }.second[AnalyticsParams.CONFIGURED_OFFER],
+                "$name must carry the configured A/B arm even when the product catalog never " +
+                    "loads — most prod opens are exactly that case, and an arm missing there " +
+                    "silently reduces the experiment to its healthy-load minority",
+            )
+        }
+    }
+
+    /**
+     * The arm is what we ASKED Remote Config for, never what RevenueCat happened to hand back.
+     * Pinning the delivered offering id to a different string is what makes this test die if the
+     * value is ever re-sourced from `offering?.id`, which is the very read that made the arm
+     * conditional on a successful load in the first place.
+     */
+    @Test
+    fun impression_configuredOffer_isTheRcOffer_notTheDeliveredOfferingId() =
+        testScope.runTest {
+            val (_, tracker, _) = createHarness(
+                products = listOf(monthlyTrialProduct),
+                paywallConfigJson = """{"currentOffer":"month1.99Year20Trial3d"}""",
+                deliveredOfferingId = "rc_returned_something_else",
+            )
+            advanceUntilIdle() // catalog loads successfully — the 31% happy path
+
+            val opened = tracker.events.first { it.first == "paywall_opened" }.second
+            assertEquals(
+                "month1.99Year20Trial3d",
+                opened[AnalyticsParams.CONFIGURED_OFFER],
+                "configured_offer answers 'which arm was this user assigned', which is a Remote " +
+                    "Config fact; the delivered offering id is a separate, load-dependent fact",
+            )
+            assertEquals(
+                "rc_returned_something_else",
+                tracker.userProperties["current_offer"],
+                "the pre-existing current_offer user-property must keep reporting the DELIVERED " +
+                    "offering: the two together are what makes the configured-vs-delivered gap " +
+                    "visible, so the event-property is an addition, never a replacement",
+            )
+        }
+
+    /**
+     * RC empty (fetch failed, or the client default before the first activation) is not "no arm" —
+     * it is the CONTROL arm, because that is the offering the paywall actually requests. Reporting
+     * nothing here would move the whole RC-failure population out of the experiment instead of
+     * into its control group.
+     */
+    @Test
+    fun impression_whenRemoteConfigIsEmpty_reportsTheControlOffer_neverOmitsIt() {
+        val (_, tracker, _) = createHarness(
+            products = listOf(monthlyTrialProduct),
+            paywallConfigJson = "", // shipped client default
+        )
+
+        val opened = tracker.events.first { it.first == "paywall_opened" }.second
+        assertEquals(
+            PaywallRemoteConfig.DEFAULT_OFFER,
+            opened[AnalyticsParams.CONFIGURED_OFFER],
+            "an absent config resolves to the baseline offer both here and in " +
+                "GetOfferingsUseCase — the event must say the same thing the paywall did",
+        )
+    }
 
     // ── Duplicate taps are marked, never dropped ──────────────────────────────
 
@@ -490,8 +624,12 @@ class PaywallViewModelAnalyticsTest {
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {
         val events = mutableListOf<Pair<String, Map<String, Any>>>()
+        /** Flattened user-property writes — lets a test prove a property was (or was NOT) set. */
+        val userProperties = mutableMapOf<String, Any>()
         override fun setUserId(userId: String) {}
-        override fun setUserProperties(properties: Map<String, Any>) {}
+        override fun setUserProperties(properties: Map<String, Any>) {
+            userProperties.putAll(properties)
+        }
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) { events.add(name to params) }
     }
@@ -503,10 +641,16 @@ class PaywallViewModelAnalyticsTest {
         // completion before the NEXT buffered intent is dequeued, so the "two taps while one
         // purchase is running" window cannot be reproduced at all.
         private val purchaseDelayMs: Long = 0L,
+        // Non-null = the catalog load fails, the state most prod paywall opens end up in.
+        private val offeringsFailure: Throwable? = null,
     ) : PaywallRepository {
+        /** Which offering ids were actually requested — proves WHEN the catalog was contacted. */
+        val requestedOfferingIds = mutableListOf<String>()
         override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(SubscriptionStatus.FREE)
-        override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> =
-            Result.success(offering)
+        override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> {
+            requestedOfferingIds.add(offeringId)
+            return offeringsFailure?.let { Result.failure(it) } ?: Result.success(offering)
+        }
         override suspend fun purchase(packageId: String): PurchaseResult {
             if (purchaseDelayMs > 0) delay(purchaseDelayMs)
             return purchaseResult
@@ -535,10 +679,15 @@ class PaywallViewModelAnalyticsTest {
         override suspend fun getFirstLaunchAtMillis(): Long = 0L
     }
 
-    private class FakeRemoteConfigProvider : RemoteConfigProvider {
+    private class FakeRemoteConfigProvider(
+        // Only the keys a test pins; everything else falls back to the client default, which is
+        // what a real install sees before/without a successful fetch.
+        private val strings: Map<String, String> = emptyMap(),
+    ) : RemoteConfigProvider {
         override suspend fun fetchAndActivate(): Boolean = true
         override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-        override fun getString(key: String, defaultValue: String): String = defaultValue
+        override fun getString(key: String, defaultValue: String): String =
+            strings[key] ?: defaultValue
         override fun getLong(key: String, defaultValue: Long): Long = defaultValue
     }
 

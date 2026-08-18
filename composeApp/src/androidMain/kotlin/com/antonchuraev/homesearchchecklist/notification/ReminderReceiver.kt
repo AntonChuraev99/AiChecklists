@@ -116,7 +116,11 @@ class ReminderReceiver : BroadcastReceiver() {
                     val scheduler: ChecklistReminderScheduler = koin.get()
                     scheduler.scheduleRepeat(checklistId, nextOccurrence)
 
-                    analytics?.event(AnalyticsEvents.Reminder.RECURRING_FIRED, mapOf(
+                    // Out-of-session, like every emit in this receiver: an AlarmManager broadcast
+                    // wakes the process with no Activity, so a plain event() would mint an empty
+                    // session. Recurring reminders are the app's highest-frequency background wake,
+                    // which makes this the single largest phantom-session source.
+                    analytics?.eventOutOfSession(AnalyticsEvents.Reminder.RECURRING_FIRED, mapOf(
                         "checklist_id" to checklistId.toString(),
                         "occurrence_count" to newCount.toString(),
                         "next_at" to nextOccurrence.toString()
@@ -125,7 +129,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     // Auto-reset checkboxes if enabled
                     if (repeatRule.resetChecks) {
                         repository.resetDefaultFillChecks(checklistId)
-                        analytics?.event(AnalyticsEvents.Reminder.RECURRING_CHECKS_RESET, mapOf(
+                        analytics?.eventOutOfSession(AnalyticsEvents.Reminder.RECURRING_CHECKS_RESET, mapOf(
                             "checklist_id" to checklistId.toString(),
                             "items_count" to (defaultFill?.items?.size ?: 0).toString()
                         ))
@@ -133,7 +137,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 } else {
                     // End condition reached — stop repeating
                     repository.clearRepeatSchedule(checklistId)
-                    analytics?.event(AnalyticsEvents.Reminder.RECURRING_ENDED, mapOf(
+                    analytics?.eventOutOfSession(AnalyticsEvents.Reminder.RECURRING_ENDED, mapOf(
                         "checklist_id" to checklistId.toString(),
                         "end_reason" to repeatRule.endCondition::class.simpleName.orEmpty(),
                         "total_occurrences" to checklist.repeatOccurrenceCount.toString()

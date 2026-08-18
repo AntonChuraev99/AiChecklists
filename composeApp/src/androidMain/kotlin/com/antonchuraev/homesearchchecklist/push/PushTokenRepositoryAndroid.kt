@@ -87,7 +87,9 @@ internal class PushTokenRepositoryAndroid(
     private fun reportHoldoutUserProperty(holdout: Boolean) {
         if (holdoutReported) return
         runCatching {
-            analytics.setUserProperties(mapOf(AnalyticsParams.PUSH_HOLDOUT to holdout))
+            // Out-of-session: token registration runs from Application.onCreate on every process
+            // start, including background wakes with no Activity.
+            analytics.setUserPropertiesOutOfSession(mapOf(AnalyticsParams.PUSH_HOLDOUT to holdout))
             holdoutReported = true // only latch on success so a failed attempt retries next start
         }.onFailure { e ->
             logger.warning(TAG, "Failed to set push_holdout user-property: ${e.message}")
