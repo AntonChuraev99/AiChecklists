@@ -176,6 +176,37 @@ class AnalyzeViewModelTest {
         assertEquals("buy milk", vm.screenState.value.inputText)
     }
 
+    /**
+     * The seed and the screen's on-entry auto-open must be the SAME answer, from the same function.
+     *
+     * They are two readers of one decision — "what material did this visit open on" — and they used to
+     * be two implementations of it: the ViewModel spelled the precedence out in a `when`, while the
+     * screen froze the ViewModel's resolved value in a `remember`. That freeze died on a back-stack
+     * return and a photo picker opened with no tap. The fix is one function, and this test is what
+     * keeps it one: change either side alone and the two sets stop matching.
+     *
+     * Every door x prefilled/not, so a rule that drifts for one material is not averaged away.
+     */
+    @Test
+    fun theSeededMaterialIsExactlyWhatTheEntryPickerResolves() = runTest {
+        val doors: List<AnalyzeInputKind?> = listOf(null) + AnalyzeInputKind.entries
+        val prefills = listOf(null, "", "   ", "buy milk")
+
+        doors.forEach { door ->
+            prefills.forEach { prefill ->
+                val vm = createViewModel(initialText = prefill, initialInputKind = door)
+                advanceUntilIdle()
+
+                assertEquals(
+                    resolveEntryMaterial(initialText = prefill, initialInputKind = door),
+                    vm.screenState.value.selectedInputType,
+                    "door=$door prefill=${prefill?.let { "\"$it\"" }}: the ViewModel's seed and the " +
+                        "screen's entry picker must not be able to disagree about the material",
+                )
+            }
+        }
+    }
+
     @Test
     fun analyzeStarted_carriesEntrySource_soADeadDoorIsVisibleInAmplitude() = runTest {
         val vm = createViewModel(entrySource = AiEntrySource.CAPTURE_DOCK_INBOX)
@@ -297,6 +328,116 @@ class AnalyzeViewModelTest {
         assertFalse(fakeNavigator.navigatedToChecklistDetail)
         assertFalse(fakeNavigator.navigatedToAnalyzeResultPreview)
         assertNull(fakeActivationCoordinator.lastChecklistId)
+    }
+
+    // ── Changing the material discards the previous material's payload ──────────
+    //
+    // The picker rewrite made switching material a one-tap affair, which is what surfaced this: the
+    // payload used to survive the switch, so a photo picked for PHOTO stayed in `selectedFilePath`
+    // under the PDF flow and `buildInputData` would post that jpg to the server as a PDF document.
+
+    @Test
+    fun switchingMaterial_clearsTheFileThePreviousMaterialPicked() = runTest {
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnFileSelected("/tmp/receipt.jpg", "receipt.jpg"))
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.PDF))
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(InputDataType.PDF, state.selectedInputType)
+        assertNull(
+            state.selectedFilePath,
+            "a jpg picked for PHOTO must not survive into the PDF flow — buildInputData would " +
+                "wrap it as AnalyzeInputData.PdfDocument and post it as a PDF",
+        )
+        assertNull(state.selectedFileName, "the name must go with the path, not linger under it")
+    }
+
+    @Test
+    fun switchingMaterial_keepsTypedTextAndUrlAndRecording() = runTest {
+        // The mirror of the test above, and the reason that one is scoped to the FILE pair only.
+        //
+        // `selectedFilePath` / `selectedFileName` are shared by PHOTO, PDF and TEXT_FILE, so a stale
+        // value there really can be posted under the wrong material. Nothing else can: `inputText`,
+        // `inputUrl` and `recordedAudioPath` are each read by exactly ONE branch of
+        // `buildInputData`, so a leftover cannot be mistaken for another material's payload.
+        //
+        // Clearing them anyway would buy no correctness and cost real work: the compact picker made
+        // switching a cheap one-handed tap, so a mis-tap would silently delete a typed paragraph or a
+        // finished recording, with no undo and no snackbar. That is the project's anti-regression
+        // rule — a component that already held the user's input must keep holding it. This test is
+        // what fails if someone widens the wipe back out "for symmetry".
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.RAW_TEXT))
+        vm.sendIntent(AnalyzeScreenIntent.OnTextInputChanged("buy milk"))
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.WEB_LINK))
+        vm.sendIntent(AnalyzeScreenIntent.OnUrlInputChanged("https://example.com"))
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.VOICE))
+        vm.sendIntent(AnalyzeScreenIntent.OnRecordingComplete("/tmp/note.m4a", 42_000L))
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.PHOTO))
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(
+            "buy milk",
+            state.inputText,
+            "text typed for RAW_TEXT must survive a switch — only PHOTO/PDF/TEXT_FILE share a field, " +
+                "and buildInputData never reads inputText under PHOTO",
+        )
+        assertEquals(
+            "https://example.com",
+            state.inputUrl,
+            "a URL typed for WEB_LINK must survive — losing it to a mis-tap is a regression, not a fix",
+        )
+        assertEquals(
+            "/tmp/note.m4a",
+            state.recordedAudioPath,
+            "a finished recording must survive — it is the most expensive payload to reproduce",
+        )
+        assertEquals(
+            42_000L,
+            state.recordedAudioDuration,
+            "the duration is read beside the path, so the two have to survive together",
+        )
+    }
+
+    @Test
+    fun reSelectingTheSameMaterial_keepsTheFileAlreadyChosen() = runTest {
+        // The compact picker's "never mind" tap — closing the grid on the material you are already
+        // on — comes through this same intent. Treating it as a change would delete the file the
+        // user picked seconds earlier.
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnFileSelected("/tmp/receipt.jpg", "receipt.jpg"))
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.PHOTO))
+        advanceUntilIdle()
+
+        assertEquals("/tmp/receipt.jpg", vm.screenState.value.selectedFilePath)
+        assertEquals("receipt.jpg", vm.screenState.value.selectedFileName)
+    }
+
+    @Test
+    fun switchingMaterial_stillClearsTheErrorAndTheStaleResult() = runTest {
+        // The behaviour that already existed and must not be lost while adding the payload reset.
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnRecordingError("mic unavailable"))
+        advanceUntilIdle()
+        assertNotNull(vm.screenState.value.error, "precondition: an error is on screen")
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.WEB_LINK))
+        advanceUntilIdle()
+
+        assertNull(vm.screenState.value.error)
+        assertNull(vm.screenState.value.analyzeResult)
     }
 
     // ── Test doubles ────────────────────────────────────────────────────────────

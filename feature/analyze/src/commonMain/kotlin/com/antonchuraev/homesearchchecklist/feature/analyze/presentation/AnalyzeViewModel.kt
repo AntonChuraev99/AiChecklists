@@ -19,7 +19,6 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResultHolder
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
-import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.toInputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
@@ -40,7 +39,7 @@ class AnalyzeViewModel(
     private val autoAnalyze: Boolean = false,
     /**
      * Material chosen at the DOOR (the v2 capture dock's Photo / PDF / Link / Voice row), so the
-     * screen opens on that input instead of on its own source picker. See [toInputDataType].
+     * screen opens on that input instead of on its own source picker. See [resolveEntryMaterial].
      */
     private val initialInputKind: AnalyzeInputKind? = null,
     /** Which affordance opened this screen — stamped onto every `ai_analyze_*` event below. */
@@ -74,10 +73,11 @@ class AnalyzeViewModel(
                 // honouring a PHOTO kind here would open the photo picker over text the user can no
                 // longer see. Falling through to [initialInputKind] is what lets the v2 dock's four
                 // named pills land ON their input instead of on the source picker.
-                selectedInputType = when {
-                    prefill != null -> InputDataType.RAW_TEXT
-                    else -> initialInputKind?.toInputDataType()
-                },
+                //
+                // [resolveEntryMaterial] rather than the `when` this used to spell out here: the
+                // screen's on-entry auto-open needs the SAME answer, and the two must never disagree
+                // about whether this visit is "standing on a photo" or "standing on text".
+                selectedInputType = resolveEntryMaterial(initialText, initialInputKind),
                 inputText = prefill.orEmpty()
             )
         }
@@ -148,12 +148,36 @@ class AnalyzeViewModel(
             AnalyzeScreenIntent.OnBackClick -> appNavigator.onBack()
 
             is AnalyzeScreenIntent.OnInputTypeSelected -> {
-                _screenState.update {
-                    it.copy(
-                        selectedInputType = intent.type,
-                        error = null,
-                        analyzeResult = null
-                    )
+                _screenState.update { state ->
+                    // Changing the material clears the FILE fields and only those. Picking a photo and
+                    // then switching to PDF left "Selected receipt-2026-08-17.jpg" sitting under the
+                    // PDF flow, and `buildInputData` would send that jpg to the server as a PDF. The
+                    // defect predates the compact picker; the picker is what makes switching cheap
+                    // enough to hit it.
+                    //
+                    // ⚠️ `selectedFilePath` / `selectedFileName` are the ONLY cross-contaminating
+                    // fields, because PHOTO, PDF and TEXT_FILE all read that one pair — see
+                    // `buildInputData`. Every other payload field is read by exactly one material, so
+                    // it can never be mistaken for another's. Clearing them too would not fix
+                    // anything and would destroy work: one accidental tap on a pill — which this
+                    // picker deliberately made one-handed and cheap — would silently delete a typed
+                    // paragraph or a finished voice recording, with no undo and no snackbar. That is
+                    // a regression traded for nothing, so the wipe stays narrow. `OnClearInput` is
+                    // still the wide reset; it exists because the user ASKED to clear.
+                    if (state.selectedInputType == intent.type) {
+                        // Re-selecting the material you are already on is a no-op, NOT a reset. The
+                        // picker's "never mind, close the grid" tap lands here, and it must not throw
+                        // away the file the user already chose.
+                        state.copy(error = null, analyzeResult = null)
+                    } else {
+                        state.copy(
+                            selectedInputType = intent.type,
+                            error = null,
+                            analyzeResult = null,
+                            selectedFilePath = null,
+                            selectedFileName = null
+                        )
+                    }
                 }
             }
 

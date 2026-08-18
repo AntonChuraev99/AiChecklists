@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
+import aichecklists.core.designsystem.generated.resources.inbox_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
 import aichecklists.core.designsystem.generated.resources.inbox_project_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
@@ -13,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -32,11 +34,17 @@ import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The v2 Inbox must always offer a way to add a task, and that way is a row at the END of the list
- * — the Todoist anatomy the owner picked after seeing both variants rendered.
+ * The v2 Inbox must always offer a way to add a task, and EXACTLY ONE way at a time.
+ *
+ * The carrier depends on whether the page has anything on it, and that is the part these tests pin:
+ *  - **with tasks** — a row at the END of the list, the Todoist anatomy the owner picked after seeing
+ *    both variants rendered;
+ *  - **empty** — the placeholder's own `action` slot (owner request, 2026-08-17), with the trailing row
+ *    withheld. Both carriers use the same string, so two at once means two identically-named nodes.
  *
  * Tested through the real [InboxScreen] composable rather than through state, because every claim
  * here is about what is COMPOSED and where: "the row exists", "it is below the last task", "it is
@@ -126,23 +134,38 @@ class InboxAddTaskRowTest {
         )
     }
 
-    // ── A2. Present when the Inbox is EMPTY ──────────────────────────────────
+    // ── A2. On an EMPTY page the action is PART OF THE PLACEHOLDER ───────────
 
     /**
-     * Catches the defect this redesign exists to fix: with no tasks the screen renders an
-     * `EmptyState` INSTEAD of the list, so a row that lives inside the list is composed nowhere — and
-     * a brand-new user, whose Inbox is empty by definition, has no visible way to add anything.
+     * Two claims in one, and the pair is the whole contract of the 2026-08-17 change:
      *
-     * Whether the fix moves the EmptyState inside the LazyColumn or renders the row under it is the
-     * implementer's call; the invariant is that the row is on screen whenever the screen is.
+     *  1. **There is exactly ONE add-task control.** Previously the empty page carried a `prominent`
+     *     `AddTaskRow` *below* the placeholder; the action now lives in `EmptyState`'s own `action`
+     *     slot, and the trailing row is withheld. Leaving both composed would put two nodes with the
+     *     identical accessible name "Add task" on one screen — ambiguous to a screen reader and to
+     *     every UI test matching that label (which is why `strings.xml` splits that name off in the
+     *     first place).
+     *  2. **It is INSIDE the placeholder**, not merely somewhere on the page. Asserted as the gap
+     *     between the placeholder's description and the control, because that gap is the difference:
+     *     `EmptyState` puts `SpacingXl` (24dp) between the two, whereas the previous anatomy put the
+     *     row after a box whose height is 60% of the viewport — ~175dp on this 891dp frame. So the
+     *     old rendering fails this by an order of magnitude, and the assertion needs no exact
+     *     spacing to be re-tuned whenever the empty state's rhythm is.
+     *
+     * This test REPLACES `inboxScreen_withEmptyInbox_stillShowsTheAddTaskRow`, whose only claim was
+     * "an add-task control exists somewhere" — true both before and after, i.e. blind to the change.
+     * The invariant it protected (a brand-new user, whose Inbox is empty by definition, must have a
+     * visible way to add anything) is claim 1 here, strengthened from "at least one" to "exactly one".
      */
     @Test
-    fun inboxScreen_withEmptyInbox_stillShowsTheAddTaskRow() {
+    fun inboxScreen_withEmptyInbox_hostsTheAddTaskActionInsideThePlaceholder() {
         var addTaskLabel = ""
         var emptyTitle = ""
+        var emptyDescription = ""
         composeTestRule.setContent {
             addTaskLabel = stringResource(Res.string.inbox_add_task_row)
             emptyTitle = stringResource(Res.string.inbox_empty_title)
+            emptyDescription = stringResource(Res.string.inbox_empty_description)
             InboxUnderTest(state = inboxContent(tasks = emptyList()))
         }
         composeTestRule.waitForIdle()
@@ -150,12 +173,12 @@ class InboxAddTaskRowTest {
         // Precondition: the empty Inbox page really is what is on screen right now.
         composeTestRule.onNodeWithText(emptyTitle).assertIsDisplayed()
 
-        composeTestRule.onNodeWithText(addTaskLabel).assertIsDisplayed()
+        assertAddTaskActionSitsInsideThePlaceholder(addTaskLabel, emptyDescription)
     }
 
     /** Same guarantee on a PROJECT page — its empty state is a different branch of the same `when`. */
     @Test
-    fun inboxScreen_withEmptyProjectPage_stillShowsTheAddTaskRow() {
+    fun inboxScreen_withEmptyProjectPage_hostsTheAddTaskActionInsideThePlaceholder() {
         var addTaskLabel = ""
         var emptyDescription = ""
         composeTestRule.setContent {
@@ -171,10 +194,58 @@ class InboxAddTaskRowTest {
         }
         composeTestRule.waitForIdle()
 
-        // Precondition: the empty PROJECT page is on screen (its own `when` branch).
-        composeTestRule.onNodeWithText(emptyDescription).assertIsDisplayed()
+        assertAddTaskActionSitsInsideThePlaceholder(addTaskLabel, emptyDescription)
+    }
 
+    /**
+     * With TASKS on the page the placeholder is gone, so the trailing row is the only carrier — and
+     * still the only one. The mirror image of the assertion above: it is what fails if a future edit
+     * "helpfully" leaves the empty-state button composed once the list fills up.
+     */
+    @Test
+    fun inboxScreen_withTasks_hasExactlyOneAddTaskControl() {
+        var addTaskLabel = ""
+        composeTestRule.setContent {
+            addTaskLabel = stringResource(Res.string.inbox_add_task_row)
+            InboxUnderTest(state = inboxContent(tasks = listOf(inboxTask(id = "t1", text = "First task"))))
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText(addTaskLabel).fetchSemanticsNodes().size,
+            "one action, one control: with tasks on the page the trailing row is the carrier and the " +
+                "placeholder is not composed at all",
+        )
+    }
+
+    private fun assertAddTaskActionSitsInsideThePlaceholder(
+        addTaskLabel: String,
+        emptyDescription: String,
+    ) {
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText(addTaskLabel).fetchSemanticsNodes().size,
+            "exactly ONE control named \"$addTaskLabel\" may be on an empty page — the placeholder's " +
+                "action slot is the carrier there, and the trailing row must stand down",
+        )
         composeTestRule.onNodeWithText(addTaskLabel).assertIsDisplayed()
+
+        val descriptionBottom = composeTestRule.onNodeWithText(emptyDescription)
+            .fetchSemanticsNode().boundsInRoot.bottom
+        val actionTop = composeTestRule.onNodeWithText(addTaskLabel)
+            .fetchSemanticsNode().boundsInRoot.top
+        val gap = actionTop - descriptionBottom
+        val budget = with(composeTestRule.density) { PlaceholderActionGapBudget.toPx() }
+
+        assertTrue(
+            gap in 0f..budget,
+            "The add-task action must be the placeholder's own action slot, i.e. directly under its " +
+                "description (EmptyState puts SpacingXl between them). Measured gap=${gap}px, " +
+                "budget=${budget}px ($PlaceholderActionGapBudget). A gap far above the budget means " +
+                "the control is a separate row placed AFTER the height-capped empty-state box — the " +
+                "anatomy this change replaced.",
+        )
     }
 
     // ── A3. Tapping the row opens the capture dock ───────────────────────────
@@ -340,5 +411,17 @@ class InboxAddTaskRowTest {
         override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {}
+    }
+
+    private companion object {
+        /**
+         * How far below the placeholder's description the add-task action may start.
+         *
+         * `EmptyState` puts `SpacingXl` (24dp) there; the budget is twice that so the assertion does
+         * not have to be re-tuned every time that rhythm is, while staying an order of magnitude below
+         * what the previous anatomy produced (the row sat after a box sized to 60% of the viewport —
+         * ~175dp on this frame).
+         */
+        val PlaceholderActionGapBudget = 48.dp
     }
 }

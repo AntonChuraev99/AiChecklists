@@ -3,10 +3,8 @@ package com.antonchuraev.homesearchchecklist.desingsystem.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -67,7 +65,7 @@ object AppElevation {
  * | 0 [ground] | page background, `AppScaffold` container | — |
  * | 1 [card] | list row, card, section | 1dp `outlineVariant` all round |
  * | 2 [docked] | sticky CTA, v1 `AppNavigationBar`, sticky header | 1dp `outlineVariant` on the seam only |
- * | 2′ [bottomChrome] | the v2 bar, the capture dock, the chat dock — the app's bottom EDGE | tone off the page + a painted [bottomChromeShadow] |
+ * | 2′ [bottomChrome] | the v2 bar, the capture dock, the chat dock — the app's bottom EDGE | tone off the page + the 28dp `SheetTop` corners |
  * | 3 [floating] | FAB, chat dock/panel, snackbar, `DropdownMenu`, tooltip, drag ghost | light → shadow; dark → 1dp ring |
  * | 4 [modal] | `ModalBottomSheet`, `AlertDialog`, full-screen overlay | `scrim` @ 32%, no shadow |
  *
@@ -221,10 +219,17 @@ object AppSurface {
      * the other way round. This is the ladder's documented asymmetry (see this object's KDoc): in
      * light it runs both ways, in dark it only runs up.
      *
-     * **Neither theme is carried by tone alone**, and that is by design, not a gap: ±10.5 and +4.3 are
-     * both below the step a filled boundary needs on its own. The second channel is
-     * [bottomChromeShadow] plus the 28dp top corners — see [AppShapeTokens.SheetTop][
-     * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens.SheetTop].
+     * **The second channel is the SHAPE**, not a shadow: the 28dp top corners — see
+     * [AppShapeTokens.SheetTop][
+     * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens.SheetTop] — which is what
+     * makes the page read as sliding behind the chrome rather than stopping on top of it.
+     *
+     * There WAS a third: a painted 16dp gradient ramping the page into the bar's top edge, on the
+     * reasoning that ±10.5 and +4.3 are both below the step a filled boundary needs on its own. The
+     * owner removed it from the device ("убери тени от нижней навигации"), so tone plus shape is now
+     * the whole separator by decision, and a re-tune of this family may not quietly reintroduce a
+     * shadow to buy back contrast. If the edge ever needs a third channel again the answer is
+     * [bottomChromeSeam] — a hairline the owner can see and judge — not a ramp.
      *
      * ⚠️ Every accessor in this group is one **variant**. Re-tuning the chrome is an edit to these
      * BODIES only — no call site reads a colour role directly.
@@ -368,60 +373,6 @@ object AppSurface {
     fun onBottomChromeAccent(): Color = MaterialTheme.colorScheme.onPrimary
 
     /**
-     * The band that separates the [bottomChrome] from the content above it — a PAINTED gradient, not
-     * a `Modifier.shadow`.
-     *
-     * Two reasons it is drawn rather than cast. [AppElevation.shadowInLight] resolves to `0.dp` in
-     * dark by design, so a shadow would leave dark with no separator at all; and on Skiko a real
-     * shadow is a `RenderEffect` that is re-rasterised every frame (CMP-6618, Declined), which is a
-     * per-frame cost for chrome that never moves. A vertical gradient is identical arithmetic on
-     * both targets.
-     *
-     * **Both themes now ramp, and that is the change.** Dark used to be a flat 1dp `outlineVariant`
-     * hairline on the reasoning that there is nothing left to darken on a near-black page. Two things
-     * were wrong with it. A hairline is precisely the "`border-top: 1px solid` and nothing else"
-     * separator that was condemned in light, kept alive in the theme nobody screenshotted; and at
-     * `#2C2F36` on a `#1A1C20` chrome it is the BRIGHTEST thing at the bottom of a dark screen, i.e.
-     * it re-creates the pale edge in miniature. A ramp reads as depth instead of as a line, and depth
-     * is what "a smooth transition between the bar and the chat" actually asks for.
-     *
-     * Light fades transparent → 7.5% black; dark fades transparent → 35% black, both over
-     * [bottomChromeShadowHeight]. The alphas differ because the surfaces do: 7.5% over cream is a
-     * shadow you register without seeing, while the same 7.5% over `#121317` is arithmetically
-     * invisible (ΔL\* 0.4). 35% takes the dark page down to ≈`#0C0C0F`, a trough just under the
-     * chrome's own L\*.
-     *
-     * ⚠️ Draw it OUTSIDE the node the bar's height is measured from. The v2 shell measures the bar
-     * (`onSizeChanged`) to place the raised AI button and to consume the bottom inset exactly once;
-     * a 16dp band inside that node moves the button 16dp off the bar and re-opens the first-frame
-     * jump the measured seed exists to prevent.
-     */
-    @Composable
-    @ReadOnlyComposable
-    fun bottomChromeShadow(): Brush = Brush.verticalGradient(
-        listOf(
-            Color.Transparent,
-            Color.Black.copy(
-                alpha = if (LocalIsDarkTheme.current) {
-                    BOTTOM_CHROME_SHADOW_ALPHA_DARK
-                } else {
-                    BOTTOM_CHROME_SHADOW_ALPHA_LIGHT
-                },
-            ),
-        ),
-    )
-
-    /**
-     * Height [bottomChromeShadow] is drawn at. Lives with the brush so the two cannot drift.
-     *
-     * One value for both themes now that both ramp — the old 1dp dark branch existed only because
-     * dark painted a hairline instead of a gradient.
-     */
-    @Composable
-    @ReadOnlyComposable
-    fun bottomChromeShadowHeight(): Dp = BottomChromeShadowHeight
-
-    /**
      * What is visible THROUGH the two corners [AppShapeTokens.SheetTop][
      * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens.SheetTop] clips off the
      * top of the v2 navigation bar.
@@ -457,70 +408,53 @@ object AppSurface {
      * screenshot-tested honestly, and cannot be made consistent across the two platforms this file
      * serves. So it is painted here instead.
      *
-     * ## The value: the page, at the exact tone [bottomChromeShadow] ends on
-     * The shoulder is where the plinth's own shadow pools, so it takes that gradient's TERMINAL
-     * colour — the same alpha, composited over [ground]. Re-tuning the ramp therefore moves both.
+     * ## The value: the page, unmodified
+     * The shoulder shows what the plane ending at the bar's top edge would look like if it carried on
+     * behind the corner, and that plane is the page. So this is [ground] — the SAME accessor, no
+     * alpha over it.
      *
-     * **Over the bare page the two meet with no step at all**, and that is what
-     * `V2BarShoulderFillTest.shoulderContinuesTheShadowBand_*` pins. Over a CARD there is a small
-     * step, by arithmetic rather than by defect: the band darkens whatever is under it, so its last
-     * row is the card at the terminal alpha while the shoulder is that alpha over the page. The two
-     * ends therefore differ by exactly what those two planes differ by, shrunk by the ramp — measured
-     * light `#ECECEC` (lum 236) against `#E8E7E6` (232), dark 18 against 12. That is the shoulder
-     * being the PAGE in shadow, which is its whole definition, and
-     * `shoulderMeetsTheBandOverCards_*` bounds it by the card↔page difference so it cannot quietly
-     * grow into a visible arc.
+     * It was not always. While the chrome carried a painted 16dp shadow ramp, the shoulder took that
+     * gradient's terminal colour (black at the ramp's alpha, composited over [ground]) so the ramp
+     * could pool into the corner instead of stopping dead at it. With the ramp gone by the owner's
+     * decision (see [bottomChrome]) that terminal value has nothing leading up to it, and leaving it
+     * in place was measured on the 412dp frames as exactly the wedge it used to hide:
      *
-     * The two themes land on opposite sides of the chrome, and that is the ladder's documented
-     * asymmetry rather than an inconsistency — in light the page is LIGHTER than the bottom chrome, in
-     * dark it is darker:
+     * | | Page | Stale shoulder | Reads as |
+     * |---|---|---|---|
+     * | Light | `#FBFAF8` (lum 250) | `#E8E7E6` (lum 231) | a hard 19-step grey arc at the bar's edge |
+     * | Dark | `#121317` (lum 19) | `#0C0C0F` (lum 12) | a BLACK notch, darker than page and chrome both |
      *
+     * The dark row is why this is not a rounding detail: a shoulder darker than both neighbours is a
+     * hole again, just a dark one. Dropping the fill entirely is worse still and in the opposite
+     * direction — measured `#FAFAFA` in BOTH themes, the window backdrop, i.e. the original defect.
+     *
+     * ## What the run down the edge looks like now
      * | | Shoulder | Chrome | Reads as |
      * |---|---|---|---|
-     * | Light | `#E8E7E6` (L\* 91.3) | `#DEDCD6` (L\* 87.8) | shaded page behind a dim slab |
-     * | Dark | `#0C0C0F` (L\* 3.4) | `#1A1C20` (L\* 10.2) | a trough under a raised slab |
+     * | Light | `#FBFAF8` (L\* 98.3) | `#DEDCD6` (L\* 87.8) | the page continuing behind a dim slab |
+     * | Dark | `#121317` (L\* 5.9) | `#1A1C20` (L\* 10.2) | the page continuing behind a lifted slab |
      *
-     * Either way the run down the screen's edge is MONOTONIC — page → ramp → shoulder → chrome — with
-     * no value brighter than the page. Before the fix the shoulder was the brightest pixel in the
-     * whole region, above even the unshaded page, which is what made it read as backdrop showing
-     * through rather than as depth.
+     * page → shoulder → chrome, with the first two now EQUAL and nothing brighter than the page in
+     * either theme. That equality is the assertion (`V2BarShoulderFillTest.theShoulderIsThePage_*`) and
+     * it is stronger than the monotonic run it replaced: a ramp has a tolerance, an identity does not.
+     *
+     * ⚠️ Still a distinct accessor rather than `ground()` spelled out at the call site, and the reason
+     * survives the ramp that motivated it. The call site's question is "what is behind the bar's
+     * clipped corner", not "what colour is the page"; they agree today because the bar is the last
+     * child of a `Column` whose content box ends at its top edge. Put anything else there — a shell
+     * that lets content scroll under the chrome, a second bar — and this body changes while `ground()`
+     * does not. Inlining it also deletes the only place the hole is explained.
      *
      * ⛔ Not for the docks. They have real content behind them; painting this under one would replace
-     * the list they are supposed to be floating over with a flat grey.
+     * the list they are supposed to be floating over with a flat page.
      */
     @Composable
     @ReadOnlyComposable
-    fun bottomChromeShoulder(): Color = Color.Black
-        .copy(
-            alpha = if (LocalIsDarkTheme.current) {
-                BOTTOM_CHROME_SHADOW_ALPHA_DARK
-            } else {
-                BOTTOM_CHROME_SHADOW_ALPHA_LIGHT
-            },
-        )
-        .compositeOver(ground())
-
-    /**
-     * How dark the light-theme ramp gets at the chrome's edge.
-     *
-     * There is no "shadow as a brush" token in the app — [AppElevation] describes `shadowElevation`
-     * depths, which is a different mechanism — so this is named here rather than left as a number in
-     * a gradient literal. 7.5% is a shadow you register without seeing; 12% reads as a grey stripe
-     * drawn under the bar.
-     */
-    private const val BOTTOM_CHROME_SHADOW_ALPHA_LIGHT = 0.075f
-
-    /**
-     * The dark-theme ramp. Much heavier than the light one and it has to be: black at 7.5% over the
-     * `#121317` page moves it by ΔL\* 0.4, i.e. nothing. 35% lands ≈`#0C0C0F`.
-     */
-    private const val BOTTOM_CHROME_SHADOW_ALPHA_DARK = 0.35f
+    fun bottomChromeShoulder(): Color = ground()
 
     /** Idle destination content, light theme. */
     private const val BOTTOM_CHROME_IDLE_ALPHA_LIGHT = 0.82f
 
     /** Idle destination content, dark theme — one notch lower; dark contrast reads hotter. */
     private const val BOTTOM_CHROME_IDLE_ALPHA_DARK = 0.75f
-
-    private val BottomChromeShadowHeight: Dp = 16.dp
 }

@@ -83,9 +83,9 @@ class EndToEndFlowTest : BaseUiTest() {
         // Navigate to analyze via Create Checklist → Create with AI
         navigateToAnalyze()
 
-        // Verify analyze screen
+        // Verify analyze screen — nothing preselected, so its source heading is on screen.
         composeTestRule
-            .onNodeWithText("What would you like to analyze?")
+            .onNodeWithText(ANALYZE_SOURCE_HEADING)
             .assertIsDisplayed()
 
         // Go back twice (analyze → templates → main)

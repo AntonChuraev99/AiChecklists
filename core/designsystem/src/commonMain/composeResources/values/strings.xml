@@ -331,20 +331,30 @@
     <string name="analyze_button">Analyze</string>
     <string name="analyze_loading">Analyzing your content</string>
     <string name="analyze_loading_description">AI is extracting checklist items...</string>
-    <string name="analyze_select_source">What would you like to analyze?</string>
-    <string name="analyze_enter_data">Add your content</string>
+    <!-- The six materials the Analyze picker offers. All SHORT, and that is a LAYOUT requirement
+         rather than a copy preference: the pills are equal-width, so the widest label alone decides
+         how many fit abreast, and the measure-phase fit check drops the whole grid a rung when one
+         of them outgrows its column. Recorded with the long forms this block measured 158dp at
+         320dp/EN and 325dp at 320dp/RU x fontScale 1.5 — the compaction the screen exists for,
+         failing exactly where the screen is most cramped. "File" vs "Text" also carries the
+         distinction that matters at the point of choice: File is a file on the device, Text is what
+         you paste in by hand.
+         The long forms (analyze_select_source, analyze_enter_data, analyze_source_text_file,
+         analyze_source_link, analyze_source_text) were deleted with the redesign that stopped
+         reading them. -->
     <string name="analyze_source_photo">Photo</string>
     <string name="analyze_source_pdf">PDF</string>
-    <string name="analyze_source_text_file">Text File</string>
-    <string name="analyze_source_link">Web Link</string>
-    <!-- Short form of analyze_source_link, used ONLY by the four-abreast SourceRow. "Web Link"
-         is measurably too wide to fit four pills on a 360dp window, which silently drops the row
-         to a 2x2 grid; the row's measure-phase fit check picks 4-up again the moment this shorter
-         label is in place. Kept as a separate key rather than shortening analyze_source_link,
-         which titles the full-width picker card where the longer wording still reads better. -->
     <string name="analyze_source_link_short">Link</string>
-    <string name="analyze_source_text">Paste Text</string>
     <string name="analyze_source_voice">Voice</string>
+    <string name="analyze_source_text_file_short">File</string>
+    <string name="analyze_source_text_short">Text</string>
+    <!-- Accessible name of the collapsed source control, which shows only the active type. Its
+         visible label ("Photo") does not say that tapping changes the type, so the description has
+         to; %1$s is the current type's short label. -->
+    <string name="analyze_source_change">Change source: %1$s</string>
+    <!-- Names the action, and only while nothing is picked yet. It replaced a question that wrapped
+         to two lines on a 320dp window and repeated the top bar's own title. -->
+    <string name="analyze_select_source_short">Choose a source</string>
     <string name="analyze_url_label">URL</string>
     <string name="analyze_url_placeholder">https://example.com/article</string>
     <string name="analyze_text_placeholder">Paste meeting notes, articles, instructions — anything you want to turn into a checklist...</string>
@@ -1636,6 +1646,11 @@
          the Play listing's own promise (screenshot 2, "Any content -> checklist") so the first
          screen states what the user installed the app for. -->
     <string name="inbox_ai_entry_title">Turn content into a checklist</string>
+    <!-- Heading over the SAME SourceRow when it sits inside the capture dock, under the task field.
+         Deliberately not inbox_ai_entry_title: there the row is the screen's own promise, here it is
+         the alternative to the task the user is already typing, so the copy has to say "or". The
+         trailing colon carries the list that follows in all three languages. -->
+    <string name="capture_dock_ai_entry_title">Or create a checklist from:</string>
     <string name="inbox_open_project_action">Open project</string>
     <!-- The "Move to project" row added to the shared ItemDetailsSheet when it is hosted by the
          Inbox. Distinct from folder_move ("Move to…"), which re-parents inside ONE checklist. -->

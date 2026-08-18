@@ -2,9 +2,7 @@ package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,7 +19,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.analyze_source_link
 import aichecklists.core.designsystem.generated.resources.analyze_source_link_short
 import aichecklists.core.designsystem.generated.resources.analyze_source_pdf
 import aichecklists.core.designsystem.generated.resources.analyze_source_photo
@@ -214,6 +211,13 @@ class SourceRowScreenshotTest {
      * The presets are a plain Text rather than the real `TaskCreateChipsRow` because that component
      * lives in `feature:home` and this module cannot depend on it — what matters here is only that
      * SOMETHING occupies the `aboveInput` slot, so the collapse rule has something to collapse.
+     *
+     * `belowInput` carries the HEADED section, not a bare [SourceRow], because that is what both hosts
+     * pass since 2026-08-17 — the dock shipped with four unlabelled pills under the task field, which
+     * read as "attach one of these to this task" rather than as "or build me a checklist out of this".
+     * A fixture that keeps passing the bare row would go on recording a frame the app no longer draws,
+     * and the input-to-heading gap (which comes out of the input's own padding, not the section's) is
+     * only judgeable with the heading in the frame.
      */
     @Composable
     private fun DockStub() {
@@ -230,24 +234,27 @@ class SourceRowScreenshotTest {
                     modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                 )
             },
-            belowInput = { SourceRow(onSelect = {}) },
+            belowInput = {
+                SourceRowSection(
+                    // Literal, not `stringResource`: this stands in for the host's copy the way the
+                    // preset Text above stands in for the chip row. What the frame is judged on is the
+                    // type scale and the two gaps, and a literal keeps the fixture readable.
+                    title = "Or create a checklist from:",
+                    onSelect = {},
+                )
+            },
         )
     }
 
+    /** The Inbox's in-list door — the same shared section, on the bare page instead of the chrome. */
     @Composable
     private fun EmptyStateStub() {
-        Column(
+        SourceRowSection(
+            title = "Turn content into a checklist",
+            onSelect = {},
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(AppDimens.ScreenPaddingHorizontal),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            Text(
-                text = "Turn content into a checklist",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            SourceRow(onSelect = {})
-        }
+        )
     }
 }

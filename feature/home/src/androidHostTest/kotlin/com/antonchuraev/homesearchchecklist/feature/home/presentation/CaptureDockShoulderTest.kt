@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -85,6 +86,15 @@ class CaptureDockShoulderTest {
      */
     private var groundUnderTest: Int = 0
 
+    /**
+     * `gistiDockColor()` for the theme of the current frame, lifted OUT of composition.
+     *
+     * The value the dock's surface MUST read once nothing is painted over it — named, rather than
+     * derived from another pixel of the same frame, so the assertion cannot be satisfied by a frame
+     * where the dock is uniformly wrong.
+     */
+    private var dockColourUnderTest: Int = 0
+
     /** [InboxScreen] `koinInject()`s both of these directly; without a root the composition dies. */
     @Before
     fun startKoin() {
@@ -124,8 +134,69 @@ class CaptureDockShoulderTest {
     fun calendarCaptureDockShoulder_dark_isTheDimmedPage_notTheRawPage() =
         assertShoulderIsDimmed(Host.Calendar, dark = true)
 
-    private fun assertShoulderIsDimmed(host: Host, dark: Boolean) {
-        val image = render(host, dark)
+    // ── The same contract on a window too short to hold both bars ────────────────────────────────
+    // See [ShortWindow] for why this is the keyboard case, expressed without a keyboard.
+
+    @Test
+    @Config(qualifiers = ShortWindow)
+    fun inboxCaptureDock_shortWindow_light_dockIsBrightAndShoulderIsTheDimmedPage() =
+        assertDimStopsAtTheDock(Host.Inbox, dark = false)
+
+    @Test
+    @Config(qualifiers = ShortWindow)
+    fun inboxCaptureDock_shortWindow_dark_dockIsBrightAndShoulderIsTheDimmedPage() =
+        assertDimStopsAtTheDock(Host.Inbox, dark = true)
+
+    @Test
+    @Config(qualifiers = ShortWindow)
+    fun calendarCaptureDock_shortWindow_light_dockIsBrightAndShoulderIsTheDimmedPage() =
+        assertDimStopsAtTheDock(Host.Calendar, dark = false)
+
+    @Test
+    @Config(qualifiers = ShortWindow)
+    fun calendarCaptureDock_shortWindow_dark_dockIsBrightAndShoulderIsTheDimmedPage() =
+        assertDimStopsAtTheDock(Host.Calendar, dark = true)
+
+    /**
+     * On an over-constrained window, NOTHING but the behind-the-dock tile may paint at or below the
+     * dock's top edge — so the dock's own surface is the bottom chrome, and its shoulder is the page
+     * dimmed exactly once.
+     *
+     * Both halves are asserted together because the defect produced both at once and from one cause:
+     * a tile sized from the content slot's OFFSET ran 65px past the dock's top edge, laying a second
+     * scrim over the shoulder (the page dimmed twice) and a first one over the dock (the bottom
+     * chrome dimmed once). Asserting only the shoulder would let a future fix that merely stops
+     * painting the shoulder pass while the dock stayed dim, and vice versa.
+     */
+    private fun assertDimStopsAtTheDock(host: Host, dark: Boolean) {
+        val image = render(host, dark, case = "shortwindow")
+        val dockTop = dockTopEdge(image)
+
+        assertTrue(
+            "this frame no longer over-constrains the scaffold: the dock's top edge is at y=$dockTop, " +
+                "which is at or below the app bar's minimum height (${AppBarMinHeight}px), so the " +
+                "content slot still had room and the case is not being exercised. Shorten [ShortWindow] " +
+                "(the dock grew: it is ${image.height - dockTop}px tall here).",
+            dockTop in 1 until AppBarMinHeight,
+        )
+
+        val dockSurface = rgb(image, image.width / QuarterWidth, dockTop + IntoTheDock)
+        assertEquals(
+            "the dock's own surface ${IntoTheDock}px below its top edge reads ${hex(dockSurface)} " +
+                "instead of the bottom chrome ${hex(dockColourUnderTest)} — a scrim tile is painting " +
+                "OVER the dock. The dim's bottom edge must be the dock's top edge, and no proxy for it " +
+                "(host: $host, theme: ${themeName(dark)})",
+            hex(dockColourUnderTest),
+            hex(dockSurface),
+        )
+
+        assertShoulderIsDimmed(host, dark, image)
+    }
+
+    private fun assertShoulderIsDimmed(host: Host, dark: Boolean) =
+        assertShoulderIsDimmed(host, dark, render(host, dark))
+
+    private fun assertShoulderIsDimmed(host: Host, dark: Boolean, image: BufferedImage) {
         val wedgeBottom = shoulderWedgeBottom(image)
 
         val shoulder = rgb(image, SampleX, wedgeBottom - InsideWedge)
@@ -172,12 +243,32 @@ class CaptureDockShoulderTest {
         return y
     }
 
-    private fun render(host: Host, dark: Boolean): BufferedImage {
+    /**
+     * The dock's top edge, found by scanning DOWN the quarter-width column until the frame stops
+     * being the app bar behind its dim.
+     *
+     * That column is clear of every glyph either host puts in the bar — the Inbox's title is
+     * start-aligned and short, the Calendar's is centred, and neither test passes a `creditsSource`
+     * or a navigation icon — so the first change of colour going down is the dock's own top edge and
+     * cannot be a letter. Scanned downwards rather than walked up from the bottom like
+     * [shoulderWedgeBottom]: this probe needs the EDGE, and the bottom-up walk stops at the wedge,
+     * ~17px below it.
+     */
+    private fun dockTopEdge(image: BufferedImage): Int {
+        val x = image.width / QuarterWidth
+        val barUnderDim = rgb(image, x, 0)
+        var y = 0
+        while (y < image.height && rgb(image, x, y) == barUnderDim) y++
+        return y
+    }
+
+    private fun render(host: Host, dark: Boolean, case: String = "tall"): BufferedImage {
         composeTestRule.setContent {
             AppTheme(darkTheme = dark) {
                 // Recorded inside the theme that is actually rendering, so the expected value and the
                 // drawn one cannot come apart across a palette change.
                 groundUnderTest = AppSurface.ground().toArgb() and 0xFFFFFF
+                dockColourUnderTest = gistiDockColor().toArgb() and 0xFFFFFF
                 when (host) {
                     Host.Inbox -> InboxUnderTest()
                     // Empty on both pages: this probe is about the dock's corners, and an agenda long
@@ -197,7 +288,7 @@ class CaptureDockShoulderTest {
                 }
             }
         }
-        val file = File("$ProbeDir/captureShoulder_${host.name.lowercase()}_${themeName(dark)}.png")
+        val file = File("$ProbeDir/captureShoulder_${case}_${host.name.lowercase()}_${themeName(dark)}.png")
         file.parentFile?.mkdirs()
         composeTestRule.onRoot().captureRoboImage(
             filePath = file.path,
@@ -284,5 +375,42 @@ class CaptureDockShoulderTest {
          * edge and its 1dp hairline with room to spare and lands on the dimmed page.
          */
         const val AboveTheDock = 30
+
+        /**
+         * A window too short to hold the app bar AND the dock at once — the keyboard case, expressed
+         * without a keyboard.
+         *
+         * Robolectric never raises an IME: `WindowInsets.ime` is 0 in every frame this suite records,
+         * so no golden and no pixel probe taken at [the class-level size][CaptureDockShoulderTest] can
+         * reach the reported defect. It does not need to. The keyboard is not the cause — it is one
+         * way of reaching the cause, which is `topBar + bottomBar > windowHeight`. Material3's
+         * `Scaffold` then places the two bars OVERLAPPING (top bar at 0, bottom bar at
+         * `height - bottomBarHeight`) and collapses the content slot to zero height at the top bar's
+         * offset, i.e. BELOW the dock's top edge. A short window produces exactly that arithmetic,
+         * deterministically, on the JVM.
+         *
+         * 260dp holds the dock (213dp at this width) with ~47dp of app bar showing above it: enough
+         * for the shoulder probe to sample the page above the dock, and short enough that the app bar
+         * (88dp with a subtitle) runs well past the dock's top edge. The guard in
+         * [assertDimStopsAtTheDock] fails loudly if the dock ever grows or shrinks out of that band.
+         */
+        const val ShortWindow =
+            "w412dp-h260dp-normal-notlong-notround-any-160dpi-keyshidden-nonav"
+
+        /**
+         * `TopAppBarDefaults.TopAppBarExpandedHeight`. The bar is TALLER than this on both hosts (a
+         * subtitle on the Inbox, a status-bar inset wherever there is one), so a dock whose top edge
+         * is above this line is proof the two bars overlap — and a dock below it is proof they do not.
+         */
+        const val AppBarMinHeight = 64
+
+        /** Divides the frame width to reach a column clear of the app bar's text on both hosts. */
+        const val QuarterWidth = 4
+
+        /**
+         * Rows below the dock's top edge to sample its surface: past the 1dp hairline, inside the 8dp
+         * gap the dock keeps between that hairline and its first chip.
+         */
+        const val IntoTheDock = 4
     }
 }

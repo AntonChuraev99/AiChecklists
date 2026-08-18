@@ -181,7 +181,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDestructive
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
@@ -450,6 +449,52 @@ private fun NotFoundContent(
             shape = MaterialTheme.shapes.large
         )
     }
+}
+
+/**
+ * The v2 arm's empty level — "No tasks yet" — and, when the host offers one, the add-task action
+ * INSIDE it.
+ *
+ * ## Why the action lives here rather than only in the FAB
+ * On an empty level the FAB is a 56dp circle in the bottom-right corner while the whole middle of the
+ * screen is an illustration telling the user there is nothing here. The one thing to do next was the
+ * least prominent thing on screen, and it was labelled with the same string as the empty state's own
+ * instruction ("Add your first task below"). Folding it into the placeholder puts the action where
+ * the eye already is (owner request, 2026-08-17).
+ *
+ * ## The FAB must disappear while this button exists
+ * `detail_add_task_fab` is the FAB's content description AND this button's label. Two nodes with the
+ * same accessible name are indistinguishable to a screen reader and ambiguous to every UI test that
+ * matches on it — the exact reason that string was split off from `add_item` in the first place (see
+ * its comment in strings.xml). So `fabShown` gates on the same `isLevelEmpty` this composable is
+ * mounted under: exactly one of the two is ever on screen.
+ *
+ * The inline add ROW below the list stays composed either way, deliberately. It is a text FIELD, not
+ * a second button — it is what the empty state's description means by "below", and it is the only
+ * thing here that can actually take a task. This button is a shortcut TO it: same intent, same focus
+ * signal, same scroll, i.e. verbatim what the FAB does.
+ *
+ * @param onAddTaskClick null = no action slot, which reproduces the pre-2026-08-17 rendering exactly.
+ *   Extracted as a named composable (rather than staying inline in the header item) so the screenshot
+ *   report can compose the REAL production block instead of a hand-written twin of it — the full
+ *   screen needs a Koin-resolved ViewModel and cannot be mounted from a host test.
+ */
+@Composable
+internal fun ChecklistDetailEmptyState(
+    onAddTaskClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    // The design-system overload, not a hand-rolled `action = { AppButton(...) }`: the same block was
+    // written out three times (here, TodayBody, InboxPageList), each copy carrying its own paragraph
+    // re-arguing `fillMaxWidth`. One helper is where the CTA's width and spacing live now.
+    EmptyState(
+        icon = Icons.Outlined.ChecklistRtl,
+        title = stringResource(Res.string.detail_empty_title),
+        description = stringResource(Res.string.detail_empty_description),
+        actionLabel = stringResource(Res.string.detail_add_task_fab),
+        onAction = onAddTaskClick,
+        modifier = modifier,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -767,6 +812,37 @@ private fun ChecklistDetailContent(
         val headerCount = 1 + (if (state.additionalFillsCount > 0) 1 else 0)
         headerCount + activeNodeCount
     }
+
+    // ── "Open the inline add row" — ONE implementation, two carriers ──────────────────────────────
+    // The v2 FAB and the empty state's add-task button are the same action in two places (they are
+    // never on screen together — see `fabShown`). This used to live inline in the FAB's onClick, and
+    // copying those four steps into the empty state would have been the drift the repo's own
+    // "collapse it into one helper" rule is about: the re-tap guard, the bump-BEFORE-scroll ordering
+    // and the index arithmetic are each a fixed defect, and a second copy inherits none of them.
+    val openInlineAdd: () -> Unit = {
+        // Re-tap guard: if item-create is already open, do NOT re-open it (that would wipe
+        // in-progress text) — just re-focus and scroll.
+        if (!state.itemCreateMode) {
+            onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
+        }
+        // Bump BEFORE the scroll: the row focuses itself when it composes, and the scroll is what
+        // composes it.
+        //
+        // Targets the inline row's OWN index, not totalItemsCount - 1. The list is
+        // [header(s)][active rows][inline_add_item][completed_header][completed rows], so with
+        // separateCompleted on and a screenful of completed items the last index scrolls PAST the
+        // inline row — it leaves the composition, its LaunchedEffect never runs, and the tap becomes
+        // a silent no-op.
+        inlineAddFocusSignal++
+        dockScope.launch {
+            val total = listState.layoutInfo.totalItemsCount
+            if (total > 0) {
+                val target = inlineAddRowIndex().coerceIn(0, total - 1)
+                listState.animateScrollToItem(target)
+            }
+        }
+    }
+
     // Pinned (not exitUntilCollapsed): the toolbar action icons (share / add / reminder /
     // overflow-settings) must stay reachable while the list scrolls. exitUntilCollapsed on the
     // single-row CenterAlignedTopAppBar (Compact) treats the whole bar height as collapsible and
@@ -976,10 +1052,17 @@ private fun ChecklistDetailContent(
     // The IME check is a plain comparison rather than the derivedStateOf used further down for the
     // dock: derivedStateOf over two already-read Dp values never invalidates (it reads no state
     // inside), which would freeze the FAB visible over the keyboard.
+    // An EMPTY level is the fourth reason, added 2026-08-17: there the add-task action moves INTO the
+    // empty state (see [ChecklistDetailEmptyState]) and the FAB would be a second control carrying the
+    // same `detail_add_task_fab` name — indistinguishable to a screen reader, ambiguous to any UI test
+    // matching on it. It is a gate on the same `isLevelEmpty` the empty state is mounted under, so
+    // "exactly one of the two" holds by construction rather than by two agreeing conditions.
+    // Placed with the arm/mode/edit tests, before any inset is read, for the same reason they are.
     val fabShown: @Composable () -> Boolean = {
         if (!useInlineAddRow ||
             state.checklist.viewMode != ChecklistViewMode.Standard ||
-            isEditMode
+            isEditMode ||
+            isLevelEmpty
         ) {
             false
         } else {
@@ -1388,10 +1471,11 @@ private fun ChecklistDetailContent(
                                 CompletionBanner()
                             }
                             if (isLevelEmpty) {
-                                EmptyState(
-                                    icon = Icons.Outlined.ChecklistRtl,
-                                    title = stringResource(Res.string.detail_empty_title),
-                                    description = stringResource(Res.string.detail_empty_description),
+                                ChecklistDetailEmptyState(
+                                    // The SAME lambda the FAB runs — see [openInlineAdd]. The FAB is
+                                    // withheld on an empty level (`fabShown`), so this is the one
+                                    // copy of that action on screen, not a second door to it.
+                                    onAddTaskClick = openInlineAdd,
                                     modifier = Modifier.padding(top = AppDimens.SpacingXxl),
                                 )
                             }
@@ -1665,30 +1749,12 @@ private fun ChecklistDetailContent(
                       ),
               ) {
                   FloatingActionButton(
-                      onClick = {
-                          // Verbatim the toolbar "+"'s v2 branch — same intent, same focus signal,
-                          // same scroll target. Re-tap guard: if item-create is already open, do NOT
-                          // re-open it (that would wipe in-progress text), just re-focus and scroll.
-                          if (!state.itemCreateMode) {
-                              onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
-                          }
-                          // Bump BEFORE the scroll: the row focuses itself when it composes, and the
-                          // scroll is what composes it.
-                          //
-                          // Targets the inline row's OWN index, not totalItemsCount - 1. The list is
-                          // [header(s)][active rows][inline_add_item][completed_header][completed
-                          // rows], so with separateCompleted on and a screenful of completed items
-                          // the last index scrolls PAST the inline row — it leaves the composition,
-                          // its LaunchedEffect never runs, and the tap becomes a silent no-op.
-                          inlineAddFocusSignal++
-                          dockScope.launch {
-                              val total = listState.layoutInfo.totalItemsCount
-                              if (total > 0) {
-                                  val target = inlineAddRowIndex().coerceIn(0, total - 1)
-                                  listState.animateScrollToItem(target)
-                              }
-                          }
-                      },
+                      // [openInlineAdd] — the same lambda the empty state's add-task button runs, and
+                      // the only implementation of "open the inline add row" left on this screen. The
+                      // toolbar "+" no longer has a v2 branch to be verbatim with: it is gated on
+                      // `!useInlineAddRow`, i.e. it exists only in the control arm, where it expands
+                      // the chat dock instead.
+                      onClick = openInlineAdd,
                       containerColor = MaterialTheme.colorScheme.primary,
                       contentColor = MaterialTheme.colorScheme.onPrimary,
                   ) {

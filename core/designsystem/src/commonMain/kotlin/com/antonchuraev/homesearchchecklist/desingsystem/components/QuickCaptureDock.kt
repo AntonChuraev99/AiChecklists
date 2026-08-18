@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -22,6 +24,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
+import kotlin.math.roundToInt
 
 /**
  * Opacity of the scrim a host paints over its CONTENT while [QuickCaptureDock] is up.
@@ -64,11 +67,110 @@ const val CaptureDockScrimAlpha: Float = 0.45f
  * ⚠️ A host that mounts [QuickCaptureDock] WITHOUT dimming its page must not pass this: there the
  * shoulders should reveal the undimmed page, and a dim behind them would be the same defect
  * inverted. That is why this is the host's call and not something the dock does to itself.
+ *
+ * ⚠️ The two are exclusive by ZONE, and [captureScrimBottomPx] is what keeps them so: tile 1 owns
+ * every pixel ABOVE the dock's top edge, tile 2 owns every pixel at or below it. Where they overlap
+ * the alpha composites twice — 45% over 45% is 70% — and that is a visibly different colour, not a
+ * rounding difference.
  */
 @Composable
 @ReadOnlyComposable
 fun captureDockScrimColor(): Color =
     MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
+
+/**
+ * Sentinel for [captureScrimBottomPx]: the dock has not reported its position yet.
+ *
+ * "No ceiling" rather than "ceiling at 0", so the first frame of an opening dock dims its page
+ * normally instead of flashing undimmed for one layout pass.
+ */
+const val CaptureDockTopUnmeasured: Float = Float.POSITIVE_INFINITY
+
+/**
+ * How far down the window a host may paint the dim it lays OVER its page, in root pixels.
+ *
+ * [contentTopPx] is where the host's own content scrim begins (the scaffold's content slot), so it
+ * is the height of the chrome tile above it. [dockTopPx] is where [QuickCaptureDock]'s slot begins,
+ * measured FROM THE DOCK — [CaptureDockTopUnmeasured] until it has been.
+ *
+ * ## Why the dock's own position has to be measured, when the slot boundary looks like enough
+ * It normally is: `AppScaffold` pads its content by the bottom bar's height, so the content slot's
+ * bottom edge already IS the dock's top edge, and the chrome tile stops where the content slot
+ * starts. That holds while the scaffold has room for all three.
+ *
+ * It stops holding the moment `topBar + bottomBar > windowHeight`, which a tall dock reaches as soon
+ * as the keyboard is up: `Scaffold` places the top bar at 0 and the bottom bar at
+ * `height - bottomBarHeight` — OVERLAPPING, with the dock drawn last and therefore on top — and
+ * `Modifier.padding` collapses the content slot to zero height at the top bar's offset, which is now
+ * BELOW the dock's top edge. The chrome tile, sized from that offset, then runs past the dock: on a
+ * Pixel 9 with a Russian keyboard it reached 65px into it, dimming the dock's first 24dp and laying a
+ * SECOND scrim over the shoulders behind it (`#FBFAF8` → `#8A8988` → `#4C4B4B`). Reported as "a black
+ * bar covering the top of the sheet", 2026-08-17.
+ *
+ * So the two numbers answer two different questions — "where does the chrome end" and "where does the
+ * dock begin" — and only the second one is the boundary the dim must respect. They coincide right up
+ * until the layout is over-constrained, which is exactly when the defect appears.
+ *
+ * The host's CONTENT scrim needs no such cap: it is bounded by the content slot's own size, which is
+ * either inside `[contentTop, dockTop]` or zero-height, never past the dock.
+ */
+fun captureScrimBottomPx(contentTopPx: Float, dockTopPx: Float): Float =
+    minOf(contentTopPx, dockTopPx)
+
+/**
+ * The chrome tile of the capture scrim: the dim over the status-bar zone and the app bar, which belong
+ * to the scaffold and are out of reach from inside its content slot.
+ *
+ * Mount it as a sibling ABOVE the scaffold, inside the host's root `Box`. Both hosts had this as a
+ * hand-written `Box` with the same three modifiers and the same height arithmetic; one component is
+ * what keeps them one depth of dim, and it is where the deferred read below lives.
+ *
+ * ## Why the two positions arrive as lambdas
+ * [dockTopPx] changes on EVERY FRAME of the keyboard animation — the dock rides the ime inset, so its
+ * `positionInRoot().y` is a new number each pass — and [contentTopPx] moves with it. Read in the
+ * host's composable body, as `captureScrimBottomPx(contentTopPx, dockTopPx)` was, those two
+ * subscribed the whole screen: the scaffold, the toolbar, the pager and the list were invalidated once
+ * per frame for the entire keyboard animation, which is the documented
+ * `windowinsets-hoist-widens-recomposition-scope` trap in this repo's own memory.
+ *
+ * As lambdas the values are read inside [Modifier.layout], i.e. in the LAYOUT phase of this one node.
+ * Nothing recomposes; the tile re-measures. Same pixels, one node instead of a screen.
+ *
+ * ## The gate is inside the layout too
+ * "Nothing measured yet / nothing to dim" resolves to a zero-height tile rather than to `if (…)`
+ * around the call, because an `if` in the host's body is a composition read of the same frame-varying
+ * state and would put the whole cost straight back. A zero-height, background-only node draws nothing
+ * and, having no pointer input, takes no part in hit-testing either — which is the other reason this
+ * tile can sit over the toolbar at all: its actions stay pressable through the dim.
+ *
+ * @param visible the host's own dock flag. A plain Boolean, and the ONE thing here that is allowed to
+ *   be read in composition: it flips once per open and once per close, not once per frame.
+ */
+@Composable
+fun CaptureChromeScrim(
+    visible: Boolean,
+    color: Color,
+    contentTopPx: () -> Float,
+    dockTopPx: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    if (!visible) return
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val height = captureScrimBottomPx(contentTopPx(), dockTopPx())
+                    .coerceIn(0f, constraints.maxHeight.toFloat())
+                    .roundToInt()
+                val placeable = measurable.measure(
+                    constraints.copy(minHeight = height, maxHeight = height),
+                )
+                layout(placeable.width, height) { placeable.place(0, 0) }
+            }
+            .background(color),
+    )
+}
 
 /**
  * The v2 quick-capture affordance: a raised bottom dock with one input, raised by the shell's "+" FAB.
@@ -90,6 +192,11 @@ fun captureDockScrimColor(): Color =
  *   page. The dock's `SheetTop` corners are clipped away, and the strip behind them is OUTSIDE the
  *   content scrim, so without it those two corners show the page at full brightness beside a dimmed
  *   one — measured ΔL\* +41 in light, reported from a device as two bright nicks.
+ * - In the SAME chain, report this node's `positionInRoot().y` and cap every tile the host paints over
+ *   its page at that y — see [captureScrimBottomPx]. The dock's top edge is not derivable from the
+ *   scaffold's slots: once the keyboard makes `topBar + bottomBar` taller than the window, the two
+ *   bars overlap and the content slot collapses BELOW the dock, so a tile sized from it paints over
+ *   the dock and doubles up on the shoulder this same modifier is dimming.
  * - Compose it only while it is open. The keyboard is raised via a `LaunchedEffect(Unit)`, which is
  *   correct exactly once per appearance; keeping it mounted-but-hidden fires it at the wrong time.
  *

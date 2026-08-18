@@ -228,15 +228,14 @@
     <string name="analyze_button">Анализировать</string>
     <string name="analyze_loading">Анализируем контент</string>
     <string name="analyze_loading_description">ИИ извлекает элементы чек-листа...</string>
-    <string name="analyze_select_source">Что хотите проанализировать?</string>
-    <string name="analyze_enter_data">Добавьте контент</string>
     <string name="analyze_source_photo">Фото</string>
     <string name="analyze_source_pdf">PDF</string>
-    <string name="analyze_source_text_file">Текстовый файл</string>
-    <string name="analyze_source_link">Ссылка</string>
     <string name="analyze_source_link_short">Ссылка</string>
-    <string name="analyze_source_text">Вставить текст</string>
     <string name="analyze_source_voice">Голос</string>
+    <string name="analyze_source_text_file_short">Файл</string>
+    <string name="analyze_source_text_short">Текст</string>
+    <string name="analyze_source_change">Сменить источник: %1$s</string>
+    <string name="analyze_select_source_short">Выберите источник</string>
     <string name="analyze_url_label">URL</string>
     <string name="analyze_url_placeholder">https://example.com/article</string>
     <string name="analyze_text_placeholder">Вставьте заметки с совещания, статьи, инструкции — всё, что хотите превратить в чек-лист...</string>
@@ -1447,6 +1446,7 @@
     <string name="inbox_empty_description">Всё, что вы записываете, сначала попадает сюда. Добавьте задачу сейчас, а разложить по проектам можно позже.</string>
     <string name="inbox_project_empty_description">В этом проекте пока нет задач.</string>
     <string name="inbox_ai_entry_title">Превратите контент в чек-лист</string>
+    <string name="capture_dock_ai_entry_title">Или создайте чек-лист из:</string>
     <string name="inbox_open_project_action">Открыть проект</string>
     <string name="inbox_task_sheet_move">Перенести в проект</string>
     <string name="inbox_task_sheet_delete">Удалить задачу</string>

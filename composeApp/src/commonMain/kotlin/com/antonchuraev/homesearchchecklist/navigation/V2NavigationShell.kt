@@ -279,7 +279,7 @@ object V2ShellMetrics {
  *   dock (scale up + fade) instead of being cut mid-frame. It is drawn UNDER [overlayContent], so the
  *   dock's scrim takes every touch while this is true, and the button drops out of the a11y tree.
  * @param captureOpen whether the host's quick-capture dock is up. On Compact this REPLACES the bottom
- *   chrome: the bar, the raised AI button and the plinth shadow are all off, and the dock becomes the
+ *   chrome: the bar and the raised AI button are both off, and the dock becomes the
  *   app's bottom edge. That is an owner decision from a device run — "при создании чеклиста в открытом
  *   состоянии не должна быть видна нижняя навигация" — and it reverses the earlier arrangement in
  *   which the bar stayed lit under the dock. See [V2ShellCompactBar] for what the swap costs and for
@@ -420,7 +420,7 @@ fun V2NavigationShell(
  * a thumb rests. Above the bar only the circle itself answers, which is what any FAB does.
  *
  * ## While the quick-capture dock is up there is no bar, and no button
- * The whole bottom chrome — bar, raised circle, plinth shadow — is out of the tree while
+ * The whole bottom chrome — bar and raised circle — is out of the tree while
  * [captureOpen]. The dock IS the bottom chrome in that state; a navigation bar under it is a second
  * bottom surface competing with the one the user is typing into, which is what the owner rejected
  * from a Pixel 9.
@@ -491,10 +491,12 @@ private fun V2ShellCompactBar(
         label = "v2AiButtonHandoff",
     )
 
-    // The bottom chrome — bar, raised button, plinth shadow — as one gate. Composed as a val rather
-    // than repeated at four call sites: they used to disagree (the shadow was gated on the dock, the
-    // bar and the button were not), and "which parts of the chrome are on" is exactly the kind of
-    // question that must have one answer per frame.
+    // The bottom chrome — bar and raised button — as one gate. Composed as a val rather than repeated
+    // at the call sites below: they used to disagree (a third member of this group, the painted shadow
+    // band, was gated on the dock while the bar and the button were not), and "which parts of the
+    // chrome are on" is exactly the kind of question that must have one answer per frame. The band is
+    // gone — the owner removed the bar's shadow from the device — and the gate stays, because the two
+    // survivors still have to leave and arrive on the same frame.
     val chromeVisible = barVisible && !captureOpen
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -578,40 +580,6 @@ private fun V2ShellCompactBar(
                         .windowInsetsBottomHeight(WindowInsets.navigationBars),
                 )
             }
-        }
-
-        // The plinth's shadow: an OVERLAY anchored to the bar's top edge, not a band inside the bar.
-        //
-        // Both halves of that matter. It has to be outside the measured node — the shell reads the
-        // bar's height to place the raised button and to consume the bottom inset exactly once, and
-        // 16dp of band inside it would lift the button off the bar's edge and put the first-frame
-        // jump back (see this function's KDoc). And it has to be drawn OVER the content rather than
-        // reserving space above it, because that is what a shadow is: the list scrolls under it and
-        // is shaded by it, instead of stopping 16dp short of a bar it is already stopping short of.
-        //
-        // No pointer input, so the strip stays transparent to touch and the list keeps every gesture
-        // that starts there — the same rule the AI button's positioning box follows.
-        //
-        // ⛔ NOT while the capture dock is up — and now doubly so, because there is no bar left for it
-        // to be the shadow OF. Even before the bar started hiding, this band was wrong in that state:
-        // being drawn after the content column is what lets it shade a scrolling list, and it is also
-        // what made it shade a RAISED surface occupying the same band — with the dock open it painted
-        // a 7% ramp across the bottom of the AI pill row (measured 241 → 233 on the pill fill), which
-        // reads as the dock sliding UNDER the bar, the opposite of what a raised dock is. The 45%
-        // scrim the host paints over the page is the separator in that state, and it is an order of
-        // magnitude louder than this ramp.
-        //
-        // Shares [chromeVisible] with the bar and the button, so the three cannot disagree about
-        // whether the chrome is on.
-        if (chromeVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = barHeight)
-                    .height(AppSurface.bottomChromeShadowHeight())
-                    .background(AppSurface.bottomChromeShadow()),
-            )
         }
 
         // Composed for as long as the BAR is, and the two docks are treated differently on purpose.
@@ -748,8 +716,9 @@ private fun V2SplitNavigationBar(
     // dock and the chat dock now read the very same accessor. `modifier` (the host's onSizeChanged) is on the
     // NavigationBar itself and on nothing else: the number the shell wants is the height of the
     // OPAQUE slab, because that is what it positions the raised AI button off and what it consumes
-    // from the bottom inset. The shadow band above the bar is drawn by the shell as an overlay for
-    // exactly that reason — 16dp of it inside this node would push the button off the bar's edge.
+    // from the bottom inset. So nothing that is not the slab may be added to this node — the shadow
+    // band the chrome used to carry was an overlay in the shell for exactly that reason, and any future
+    // separator has to be one too rather than 16dp of padding inside here.
     val idle = AppSurface.onBottomChrome()
     // The ACTIVE label is the same role at full strength — it sits on the chrome, not on the pill,
     // so it must not take the pill's content colour, and it must not stay dimmed either.

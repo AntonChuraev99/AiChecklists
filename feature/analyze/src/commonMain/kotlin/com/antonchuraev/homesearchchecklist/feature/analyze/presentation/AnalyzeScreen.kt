@@ -18,12 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Stop
@@ -39,10 +34,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
@@ -104,6 +99,28 @@ fun AnalyzeScreen(
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.ANALYZE) }
 
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
+
+    // Opened ON a material → open that material's picker, don't ask for the material a second time.
+    // The capture dock's "Photo" pill already said what the source is; the "Choose Photo" button
+    // underneath is then a tap for a decision the user has already made.
+    //
+    // Resolved from THIS SCREEN'S ARGUMENTS by [resolveEntryMaterial] — the same function that seeds
+    // the ViewModel — so the prefill precedence still rules (shared text opens as RAW_TEXT even when
+    // the door said PHOTO) without the screen having to read the live selection.
+    //
+    // ⚠️ No `remember` and no state read on purpose. This used to be
+    // `remember(viewModel) { screenState.selectedInputType }`, and a plain `remember` dies where the
+    // ViewModel survives — a back-stack return or a configuration change. Entering by the Link door
+    // (nothing auto-opens, so no saveable latch is ever registered), switching to Photo on screen and
+    // coming back re-evaluated it as PHOTO and opened the system file picker with no tap. Arguments
+    // are constant for the screen's lifetime, so there is nothing to freeze and nothing to go stale.
+    AnalyzeEntryMaterialPicker(
+        initialText = initialText,
+        initialInputKind = initialInputKind,
+        onFileSelected = { path, name ->
+            viewModel.sendIntent(AnalyzeScreenIntent.OnFileSelected(path, name))
+        },
+    )
 
     val title = if (screenState.isFillMode) {
         stringResource(Res.string.analyze_fill_title)
@@ -242,10 +259,16 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun AnalyzeContent(
+internal fun AnalyzeContent(
     screenState: AnalyzeScreenState,
     onIntent: (AnalyzeScreenIntent) -> Unit
 ) {
+    // UI-only, and deliberately NOT in the ViewModel: "is the picker open" survives nothing and
+    // means nothing to the domain. rememberSaveable rather than remember so a rotation (or a process
+    // death behind the system file dialog) does not silently re-open a grid the user had closed —
+    // the initialiser runs once, and after a restore the saved value wins.
+    var pickerExpanded by rememberSaveable { mutableStateOf(screenState.selectedInputType == null) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -253,37 +276,38 @@ private fun AnalyzeContent(
             .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
-        item {
+        item(key = "top-spacer") {
             Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
         }
 
-        item {
-            Text(
-                text = stringResource(Res.string.analyze_select_source),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+        // Only while nothing is chosen. Once a material is picked, the pill showing it says what it
+        // is and the editor below says what to do — a heading there labels nothing. The long
+        // "What would you like to analyze?" is gone in both states: it repeated the top bar's own
+        // title and ran to two lines on a 320dp screen.
+        if (screenState.selectedInputType == null) {
+            item(key = "source-heading") {
+                Text(
+                    text = stringResource(Res.string.analyze_select_source_short),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
-        item {
-            InputTypeSelector(
+        item(key = "source-picker") {
+            AnalyzeSourcePicker(
                 selectedType = screenState.selectedInputType,
+                expanded = pickerExpanded,
+                onExpandedChange = { pickerExpanded = it },
                 onTypeSelected = { onIntent(AnalyzeScreenIntent.OnInputTypeSelected(it)) }
             )
         }
 
-        // Input section based on selected type
+        // Input section based on selected type. No "Add your content" heading above it any more:
+        // every one of the six sections names itself ("Choose Photo", the URL field's own label,
+        // "Tap to record"), so the heading labelled nothing and cost a whole row of the first screen.
         screenState.selectedInputType?.let { type ->
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-                Text(
-                    text = stringResource(Res.string.analyze_enter_data),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            item {
+            item(key = "input-section") {
                 InputSection(
                     type = type,
                     inputText = screenState.inputText,
@@ -305,129 +329,8 @@ private fun AnalyzeContent(
             }
         }
 
-        item {
+        item(key = "bottom-spacer") {
             Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
-        }
-    }
-}
-
-@Composable
-private fun InputTypeSelector(
-    selectedType: InputDataType?,
-    onTypeSelected: (InputDataType) -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            InputTypeCard(
-                icon = Icons.Outlined.Image,
-                title = stringResource(Res.string.analyze_source_photo),
-                isSelected = selectedType == InputDataType.PHOTO,
-                onClick = { onTypeSelected(InputDataType.PHOTO) },
-                modifier = Modifier.weight(1f)
-            )
-            InputTypeCard(
-                icon = Icons.Outlined.PictureAsPdf,
-                title = stringResource(Res.string.analyze_source_pdf),
-                isSelected = selectedType == InputDataType.PDF,
-                onClick = { onTypeSelected(InputDataType.PDF) },
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            InputTypeCard(
-                icon = Icons.Outlined.Description,
-                title = stringResource(Res.string.analyze_source_text_file),
-                isSelected = selectedType == InputDataType.TEXT_FILE,
-                onClick = { onTypeSelected(InputDataType.TEXT_FILE) },
-                modifier = Modifier.weight(1f)
-            )
-            InputTypeCard(
-                icon = Icons.Outlined.Link,
-                title = stringResource(Res.string.analyze_source_link),
-                isSelected = selectedType == InputDataType.WEB_LINK,
-                onClick = { onTypeSelected(InputDataType.WEB_LINK) },
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            InputTypeCard(
-                icon = Icons.Outlined.TextFields,
-                title = stringResource(Res.string.analyze_source_text),
-                isSelected = selectedType == InputDataType.RAW_TEXT,
-                onClick = { onTypeSelected(InputDataType.RAW_TEXT) },
-                modifier = Modifier.weight(1f)
-            )
-            InputTypeCard(
-                icon = Icons.Outlined.Mic,
-                title = stringResource(Res.string.analyze_source_voice),
-                isSelected = selectedType == InputDataType.VOICE,
-                onClick = { onTypeSelected(InputDataType.VOICE) },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun InputTypeCard(
-    icon: ImageVector,
-    title: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val borderModifier = if (isSelected) {
-        Modifier.border(
-            width = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-            shape = MaterialTheme.shapes.medium
-        )
-    } else {
-        Modifier
-    }
-
-    AppCard(
-        onClick = onClick,
-        modifier = modifier.then(borderModifier)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = AppDimens.SpacingSm),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(32.dp)
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
@@ -453,12 +356,20 @@ private fun InputSection(
 ) {
     when (type) {
         InputDataType.PHOTO, InputDataType.PDF, InputDataType.TEXT_FILE -> {
-            FileInputSection(
-                type = type,
-                selectedFilePath = selectedFilePath,
-                selectedFileName = selectedFileName,
-                onFileSelected = onFileSelected
-            )
+            // `toFilePickerType()` answers for exactly these three materials, so this branch's set and
+            // the mapping's non-null set are the same set. `?.let` rather than `!!` or an elvis
+            // fallback: the null case is unreachable, and the two ways of "handling" it anyway are
+            // both worse — a crash on the screen the user is standing on, or the plausible-wrong
+            // picker this nullability was introduced to delete.
+            type.toFilePickerType()?.let { pickerType ->
+                FileInputSection(
+                    type = type,
+                    pickerType = pickerType,
+                    selectedFilePath = selectedFilePath,
+                    selectedFileName = selectedFileName,
+                    onFileSelected = onFileSelected
+                )
+            }
         }
 
         InputDataType.WEB_LINK -> {
@@ -501,6 +412,11 @@ private fun InputSection(
 @Composable
 private fun FileInputSection(
     type: InputDataType,
+    /**
+     * Resolved by the caller through `toFilePickerType()` — the same mapping the on-entry auto-open
+     * uses, so the button and the auto-open can never open two different dialogs for one material.
+     */
+    pickerType: FilePickerType,
     selectedFilePath: String?,
     selectedFileName: String?,
     onFileSelected: (filePath: String, fileName: String) -> Unit
@@ -511,15 +427,8 @@ private fun FileInputSection(
     val selectText = stringResource(Res.string.select)
     val selectedText = stringResource(Res.string.selected)
 
-    val filePickerType = when (type) {
-        InputDataType.PHOTO -> FilePickerType.IMAGE
-        InputDataType.PDF -> FilePickerType.PDF
-        InputDataType.TEXT_FILE -> FilePickerType.TEXT
-        else -> FilePickerType.TEXT
-    }
-
     val filePickerLauncher = rememberFilePickerLauncher(
-        type = filePickerType,
+        type = pickerType,
         onResult = { result ->
             if (result != null) {
                 onFileSelected(result.filePath, result.fileName)

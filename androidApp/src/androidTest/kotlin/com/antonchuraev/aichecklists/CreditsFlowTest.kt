@@ -122,7 +122,7 @@ class CreditsFlowTest : BaseUiTest() {
 
         // Select an input type
         composeTestRule
-            .onNodeWithText("Paste Text")
+            .onNodeWithText(ANALYZE_SOURCE_TEXT)
             .performClick()
         waitForIdle()
 

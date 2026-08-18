@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.cancel
+import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.checklist_delete_message
 import aichecklists.core.designsystem.generated.resources.checklist_delete_title
 import aichecklists.core.designsystem.generated.resources.checklist_name_placeholder
@@ -9,6 +10,7 @@ import aichecklists.core.designsystem.generated.resources.checklist_rename
 import aichecklists.core.designsystem.generated.resources.checklist_rename_title
 import aichecklists.core.designsystem.generated.resources.delete
 import aichecklists.core.designsystem.generated.resources.delete_checklist
+import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_display_options
 import aichecklists.core.designsystem.generated.resources.inbox_empty_description
@@ -83,6 +85,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -100,7 +103,6 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -133,12 +135,15 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSec
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppPlanNudge
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSkeletonLine
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChromeScrim
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
-import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
@@ -306,22 +311,42 @@ fun InboxScreen(
     // frame of a swipe.
     val currentPage = content?.pages?.getOrNull(content.selectedPage)
 
-    // ── Capture-dock scrim: TWO tiled scrims, one flag ───────────────────────────────────────────
-    // Same anatomy as the item-create scrim on ChecklistDetailScreen, and for the same reason. The
-    // dock lives in the scaffold's `bottomBar`, so the CONTENT scrim (a child of the content slot)
-    // already stops exactly where the dock begins — the dock, the snackbar and the system-nav strip
-    // stay bright with nothing to measure and nothing to subtract.
+    // ── Capture-dock scrim: TWO tiled scrims over the page, one ceiling ──────────────────────────
+    // Same anatomy as the item-create scrim on ChecklistDetailScreen. The dock lives in the
+    // scaffold's `bottomBar`, so the CONTENT scrim (a child of the content slot) is bounded by that
+    // slot's own size and can never reach the dock, the snackbar or the system-nav strip.
     //
     // A single full-screen scrim with the dock's height cut out of the bottom was tried instead and
     // is what this replaces: the slot's ime ∪ navigationBars padding is applied by the scaffold
     // OUTSIDE the measured node, so once the keyboard was up the cut-out sat a keyboard's height
-    // BELOW the dock — dimming the input and leaving a bright band under it. The height of a dock
-    // that rides the keyboard is not a number this screen can hold correctly; the slot boundary is.
+    // BELOW the dock — dimming the input and leaving a bright band under it.
     //
-    // [contentTopPx] is the content slot's y in the root = the height of the zone the scaffold owns
-    // above it (status bar + app bar). The TOP scrim uses exactly it, so the two tile edge-to-edge:
-    // no bright gap at the seam, no double-dark overlap.
-    var contentTopPx by remember { mutableStateOf(0f) }
+    // [contentTopPx] is the content slot's y in the root, i.e. the height of the zone the scaffold
+    // owns above it (status bar + app bar) — the TOP scrim's height, and the seam where the two tiles
+    // meet.
+    //
+    // ⚠️ [dockTopPx] is the CEILING, and it is a separate measurement because the two stop agreeing
+    // exactly when it matters. While the scaffold has room, the content slot's offset is above the
+    // dock and the seam is the whole story. Once `topBar + bottomBar` exceeds the window — a dock
+    // this tall reaches that as soon as the keyboard is up — Material3 places the two bars
+    // OVERLAPPING and collapses the content slot to zero height at the top bar's offset, which is now
+    // below the dock's top edge. Sized from that offset alone, the top tile ran 65px INTO the dock on
+    // a Pixel 9 (owner: "the black bar covers the sheet", 2026-08-17): the dock's first 24dp dimmed
+    // once, and its shoulders — already carrying the behind-the-dock tile — dimmed twice. See
+    // [captureScrimBottomPx].
+    //
+    // ⚠️ Both are held as UNDELEGATED state and never read in this body. They change on every frame of
+    // the keyboard animation — the dock rides the ime inset — so reading either here would invalidate
+    // the whole screen once per frame for the length of that animation (the repo's own
+    // `windowinsets-hoist-widens-recomposition-scope` trap). They are read inside
+    // [CaptureChromeScrim]'s layout lambda instead, in the LAYOUT phase of that one node.
+    val contentTopPx = remember { mutableFloatStateOf(0f) }
+    // Keyed on the dock's own gate so the ceiling goes back to "unmeasured" the moment the dock
+    // leaves the composition. Only the dock writes this, and a closed dock writes nothing: an
+    // unkeyed `remember` would hand the next OPEN its predecessor's number, and if the window
+    // changed in between (rotation, keyboard, a resized foldable) the first frame would cap the top
+    // tile at a stale offset — a bright band across the toolbar for one frame.
+    val dockTopPx = remember(captureDockRenders) { mutableFloatStateOf(CaptureDockTopUnmeasured) }
     val captureScrimColor = captureDockScrimColor()
 
     // Root box so the TOP scrim can be a sibling ABOVE the scaffold — the app bar is the scaffold's
@@ -397,7 +422,15 @@ fun InboxScreen(
                         // content scrim cannot reach them: it stops at the content slot's edge, which
                         // is deliberately the dock's top edge. Same colour, same alpha, so the
                         // shoulder and the page above it composite to the same value.
-                        modifier = Modifier.background(captureScrimColor),
+                        //
+                        // ...which holds only while this tile is the ONLY one painting below the
+                        // dock's top edge, and that is what the measurement in the same chain buys.
+                        // It is taken here, on the dock itself, because no slot of the scaffold
+                        // reports it once the two bars overlap — see [captureScrimBottomPx]. Reported
+                        // in root coordinates to match [contentTopPx], which the tiles below share.
+                        modifier = Modifier
+                            .onGloballyPositioned { dockTopPx.floatValue = it.positionInRoot().y }
+                            .background(captureScrimColor),
                         // The same chip row the checklist detail screen has always had. Until now
                         // this dock was a bare text field, so a capture made on the home tab could
                         // carry no reminder and no priority — the surface the user reaches FIRST
@@ -420,8 +453,18 @@ fun InboxScreen(
                         // at all — the funnel "saw the v2 shell → started a analysis" read 31 → 0.
                         // A door that has to be discovered is the state we are leaving, not
                         // arriving at.
+                        //
+                        // With its HEADING, not bare: four unlabelled pills sitting under a task
+                        // field read as "attach one of these to the task you are typing" — an offer
+                        // the app already serves elsewhere — instead of "or hand me this and I will
+                        // build the whole list". The Inbox's in-list door has carried a heading for
+                        // that exact reason since it shipped; this copy had none, and the owner
+                        // reported it (2026-08-17). Its own string rather than the Inbox's: here the
+                        // row is the ALTERNATIVE to a task already being typed, so the copy has to
+                        // say "or".
                         belowInput = {
-                            SourceRow(
+                            SourceRowSection(
+                                title = stringResource(Res.string.capture_dock_ai_entry_title),
                                 onSelect = { kind ->
                                     onIntent(
                                         InboxIntent.OnAiSourceTapped(
@@ -457,7 +500,7 @@ fun InboxScreen(
                         // the chrome above it (status bar + app bar), which the top scrim uses as its
                         // own height. Measured rather than assumed because the bar carries a subtitle
                         // and grows with fontScale.
-                        .onGloballyPositioned { contentTopPx = it.positionInRoot().y },
+                        .onGloballyPositioned { contentTopPx.floatValue = it.positionInRoot().y },
                 ) {
                     InboxContent(
                         content = content,
@@ -475,10 +518,16 @@ fun InboxScreen(
                         onPlanDayClick = onPlanDayClick,
                     )
 
-                    // CONTENT scrim + tap-outside-to-dismiss, in one node. It ends where the content
-                    // slot ends, which is exactly where the dock's slot begins — so the dock stays
-                    // bright at any keyboard height, and the system-nav strip its slot pads for is
-                    // never dimmed (rule `designsystem`: the strip and the dock are one surface).
+                    // CONTENT scrim + tap-outside-to-dismiss, in one node, and the ONE tile that needs
+                    // no ceiling: `matchParentSize` binds it to the content slot, which the scaffold
+                    // lays out either inside `[contentTop, dockTop]` or — when the keyboard leaves no
+                    // room at all — at zero height. Neither reaches the dock, so the dock, the
+                    // snackbar and the system-nav strip its slot pads for stay out of the dim (rule
+                    // `designsystem`: the strip and the dock are one surface).
+                    //
+                    // Zero height is also why this tile cannot stand in for the top one: on a short
+                    // window it paints nothing, and every visible pixel of dim comes from the tile
+                    // below — which is exactly the case that used to run past the dock.
                     //
                     // `detectTapGestures`, NOT `clickable`: the dock stays open across several adds, and
                     // `clickable` claims the initial press, so the list underneath stopped scrolling
@@ -500,20 +549,29 @@ fun InboxScreen(
         }
 
         // TOP-BAR scrim — the other tile. Dims the status-bar zone and the app bar, which belong to
-        // the scaffold and are out of reach from inside its content slot. Height is exactly the
-        // content slot's offset, so it meets the content scrim edge-to-edge.
+        // the scaffold and are out of reach from inside its content slot. It reaches the content
+        // slot's offset, so it meets the content scrim edge-to-edge — but never past the dock's top
+        // edge, which is a different number as soon as the keyboard over-constrains the scaffold and
+        // is the whole subject of [captureScrimBottomPx].
+        //
+        // Capping it rather than moving the dim into the scaffold: the tile split exists so the app
+        // bar is dimmed WITHOUT its actions being swallowed, and merging the two would cost either
+        // the toolbar's tappability (a tap detector over it) or the snackbar's brightness (a single
+        // root tile is drawn over the snackbar, which the content tile is not).
         //
         // No pointer-input modifier on purpose: a node with only a background takes no part in
         // hit-testing, so the toolbar's actions stay pressable through the dim instead of being
         // swallowed by it.
-        if (createDockOpen && contentTopPx > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(with(LocalDensity.current) { contentTopPx.toDp() })
-                    .background(captureScrimColor),
-            )
-        }
+        //
+        // Both positions arrive as LAMBDAS and the height gate lives in the tile's layout pass — see
+        // [CaptureChromeScrim]. Read here instead, they would recompose this whole screen on every
+        // frame the keyboard is moving.
+        CaptureChromeScrim(
+            visible = createDockOpen,
+            color = captureScrimColor,
+            contentTopPx = { contentTopPx.floatValue },
+            dockTopPx = { dockTopPx.floatValue },
+        )
     }
 
     // Sheets live OUTSIDE the scaffold so they float above the whole screen, matching the detail
@@ -1098,6 +1156,20 @@ private fun InboxPageList(
     // carries exactly one inset and the empty state carries only its own.
     val rowInset = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal)
 
+    // ── Which carrier holds the add-task action on THIS page ─────────────────────────────────────
+    // The single source of truth for a decision with two readers, written the way the Today page
+    // writes it (`hostsAddTaskAction()`): the placeholder's `onAction` slot is this, and the trailing
+    // row is composed for the complement of it. Both derive from ONE named condition, so the pair
+    // cannot drift into a page with two controls labelled "Add task" (ambiguous to a screen reader and
+    // to every UI test matching that label) or with none at all — which on Compact would delete this
+    // tab's only route into the capture dock.
+    //
+    // `page.tasks`, not a leaf projection: it is the very list the sections below are built from, so
+    // "the page renders no rows" and "this is true" are the same statement. (The trap is real in this
+    // repo — `visibleFillItemIds` held only leaves while the list rendered folder nodes too, and an
+    // emptiness test on the wrong set printed "No tasks yet" over a screen full of folders.)
+    val emptyStateHostsAddTask = showAddTaskRow && page.tasks.isEmpty()
+
     // Hoisted out of the LazyColumn purely so the regroup below can ask whether the user's finger
     // is currently on the list. Same scope the implicit one lived in, so scroll position survives
     // exactly as before.
@@ -1172,6 +1244,24 @@ private fun InboxPageList(
             // taller: the 60% band or the content.
             if (page.tasks.isEmpty()) {
                 item(key = "empty_state") {
+                    // ── The add-task action IS the placeholder's action slot ──────────────────────
+                    // On an empty page the "add task" affordance moved from a separate row under the
+                    // illustration INTO `EmptyState`'s own `action` slot (owner request, 2026-08-17;
+                    // the Calendar page's "Create Checklist" CTA was the named reference). Two things
+                    // this buys: the one thing to do next sits where the eye already is, and the empty
+                    // state stops being a dead-end panel with the action orphaned below it.
+                    //
+                    // Gated on `emptyStateHostsAddTask` — the ONE named condition the trailing row is
+                    // withheld by, declared at the top of this composable. It folds in
+                    // `showAddTaskRow`, not just `page.tasks`: at rail and drawer width the shell keeps
+                    // its own "+", and while the dock is up the dock IS this control expanded. Either
+                    // must silence the button exactly as it silences the row.
+                    //
+                    // Same string as the row (`inbox_add_task_row`) on purpose: it is one action, and
+                    // two spellings of it would read as two features.
+                    val onAddTask: (() -> Unit)? =
+                        if (emptyStateHostsAddTask) ({ onIntent(InboxIntent.OnAddTaskRowClick) }) else null
+                    val addTaskLabel = stringResource(Res.string.inbox_add_task_row)
                     Box(
                         modifier = Modifier.heightIn(min = emptyStateMinHeight),
                         contentAlignment = Alignment.Center,
@@ -1181,6 +1271,8 @@ private fun InboxPageList(
                                 icon = Icons.Outlined.Inbox,
                                 title = stringResource(Res.string.inbox_empty_title),
                                 description = stringResource(Res.string.inbox_empty_description),
+                                actionLabel = addTaskLabel,
+                                onAction = onAddTask,
                             )
                         } else {
                             EmptyState(
@@ -1189,6 +1281,8 @@ private fun InboxPageList(
                                 description = stringResource(
                                     Res.string.inbox_project_empty_description
                                 ),
+                                actionLabel = addTaskLabel,
+                                onAction = onAddTask,
                             )
                         }
                     }
@@ -1272,16 +1366,16 @@ private fun InboxPageList(
             // without it the row would butt straight against the last task with no divider between
             // them. No rule is drawn above it on purpose — a divider would enrol it into the list it
             // must stand apart from.
-            if (showAddTaskRow) {
+            // NOT while the placeholder is carrying the same action: the complement of
+            // `emptyStateHostsAddTask`, derived from that one named condition rather than from a second
+            // `when` over `page.tasks` — see its declaration at the top of this composable for why the
+            // two readers must not be written twice. Both at once is what the owner's request rules
+            // out, and it would put two nodes labelled "Add task" on one screen, which the strings file
+            // explicitly forbids for exactly this pair.
+            if (showAddTaskRow && !emptyStateHostsAddTask) {
                 item(key = "inline_add_task") {
                     AddTaskRow(
                         onClick = { onIntent(InboxIntent.OnAddTaskRowClick) },
-                        // On an EMPTY page this row is the only action on screen and it sits under a
-                        // full empty state, so it grows instead of staying the list-sized line it is
-                        // among tasks. Keyed on the page's own emptiness rather than on a flag from
-                        // the host: the host cannot see which page the pager settled on, and the
-                        // Inbox and a project page can differ on exactly this.
-                        prominent = page.tasks.isEmpty(),
                         modifier = rowInset.padding(top = AppDimens.SpacingSm),
                     )
                 }
@@ -1314,20 +1408,19 @@ private fun InboxPageList(
             // gate guarantees.
             if (page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
                 item(key = "ai_source_row") {
-                    // One Column, not two siblings: a LazyColumn item is a single slot, and two
-                    // children in it are stacked at the same origin rather than laid out in order.
-                    Column(modifier = Modifier.padding(top = AppDimens.SpacingLg)) {
                     // The heading carries the promise; the pills carry the doors. Without it four
                     // bare pills read as "attach something to a task", which is a different (and
                     // already-served) offer — the words are what make this the listing's own
                     // "any content -> checklist".
-                    Text(
-                        text = stringResource(Res.string.inbox_ai_entry_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = rowInset.padding(bottom = AppDimens.SpacingSm),
-                    )
-                    SourceRow(
+                    //
+                    // Heading + row come from ONE shared component (`SourceRowSection`), which is also
+                    // what the capture dock mounts. They used to be a hand-rolled Column here and a
+                    // bare row there, which is exactly how the dock ended up with no heading at all;
+                    // one component means the two cannot drift in type scale or in the gap between
+                    // heading and pills again. The inset and the top gap stay HERE — they are this
+                    // list's rhythm, not the section's.
+                    SourceRowSection(
+                        title = stringResource(Res.string.inbox_ai_entry_title),
                         onSelect = { kind ->
                             onIntent(
                                 InboxIntent.OnAiSourceTapped(
@@ -1343,9 +1436,8 @@ private fun InboxPageList(
                                 )
                             )
                         },
-                        modifier = rowInset,
+                        modifier = rowInset.padding(top = AppDimens.SpacingLg),
                     )
-                    }
                 }
             }
         }

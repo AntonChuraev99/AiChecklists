@@ -331,15 +331,14 @@
     <string name="analyze_button">विश्लेषण करें</string>
     <string name="analyze_loading">आपका कंटेंट विश्लेषण हो रहा है</string>
     <string name="analyze_loading_description">AI चेकलिस्ट आइटम निकाल रहा है...</string>
-    <string name="analyze_select_source">आप क्या विश्लेषण करना चाहते हैं?</string>
-    <string name="analyze_enter_data">अपना कंटेंट जोड़ें</string>
     <string name="analyze_source_photo">फ़ोटो</string>
     <string name="analyze_source_pdf">PDF</string>
-    <string name="analyze_source_text_file">टेक्स्ट फ़ाइल</string>
-    <string name="analyze_source_link">वेब लिंक</string>
     <string name="analyze_source_link_short">लिंक</string>
-    <string name="analyze_source_text">टेक्स्ट पेस्ट करें</string>
     <string name="analyze_source_voice">वॉइस</string>
+    <string name="analyze_source_text_file_short">फ़ाइल</string>
+    <string name="analyze_source_text_short">टेक्स्ट</string>
+    <string name="analyze_source_change">स्रोत बदलें: %1$s</string>
+    <string name="analyze_select_source_short">स्रोत चुनें</string>
     <string name="analyze_url_label">URL</string>
     <string name="analyze_url_placeholder">https://example.com/article</string>
     <string name="analyze_text_placeholder">मीटिंग नोट्स, आर्टिकल, निर्देश पेस्ट करें — जो कुछ भी आप चेकलिस्ट में बदलना चाहते हैं...</string>
@@ -1609,6 +1608,7 @@
     <string name="inbox_empty_description">आप जो कुछ भी नोट करेंगे वह पहले यहीं आएगा। अभी टास्क जोड़ें और बाद में उसे किसी प्रोजेक्ट में लगा दें।</string>
     <string name="inbox_project_empty_description">इस प्रोजेक्ट में अभी कोई टास्क नहीं है।</string>
     <string name="inbox_ai_entry_title">कंटेंट को चेकलिस्ट में बदलें</string>
+    <string name="capture_dock_ai_entry_title">या इनसे चेकलिस्ट बनाएँ:</string>
     <string name="inbox_open_project_action">प्रोजेक्ट खोलें</string>
     <string name="inbox_task_sheet_move">प्रोजेक्ट में ले जाएं</string>
     <string name="inbox_task_sheet_delete">टास्क हटाएं</string>

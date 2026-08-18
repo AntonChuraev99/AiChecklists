@@ -52,9 +52,9 @@ class MainScreenFlowTest : BaseUiTest() {
         // Navigate to analyze via: Create Checklist → Create with AI
         navigateToAnalyze()
 
-        // Then: Analyze screen is displayed
+        // Then: Analyze screen is displayed, on its source picker with nothing chosen
         composeTestRule
-            .onNodeWithText("What would you like to analyze?")
+            .onNodeWithText(ANALYZE_SOURCE_HEADING)
             .assertIsDisplayed()
     }
 

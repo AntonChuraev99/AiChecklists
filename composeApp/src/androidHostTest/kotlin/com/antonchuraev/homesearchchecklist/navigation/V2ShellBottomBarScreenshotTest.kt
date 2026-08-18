@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,18 +23,20 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
-import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import org.jetbrains.compose.resources.stringResource
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -52,9 +56,14 @@ import java.util.Locale
  * ## The three states this file has now recorded, in order
  *  1. **White bar on a cream page.** ΔL\* **+1.7** (1.04:1) — no tonal step at all, the whole
  *     separation riding on a 1dp hairline. Rejected: "отвратительно… это что веб?"
- *  2. **The ink plinth** (`inverseSurface`, ΔL\* −78.4). Fixed light, and left dark on the top of the
- *     container ladder at ΔL\* **+13.5** — the palest slab on a dark screen. Rejected from the
- *     device: "при чёрной теме проглядывается белый цвет под нижней навигацией".
+ *  2. **A near-black slab** (`inverseSurface`, ΔL\* −78.4). Fixed light, and left dark on the top of
+ *     the container ladder at ΔL\* **+13.5** — the palest slab on a dark screen. Rejected from the
+ *     device: "при чёрной теме проглядывается белый цвет под нижней навигацией". ⛔ Rejected in FULL,
+ *     including the painted shadow band it came with: nothing from this state is a reference for
+ *     anything, and its `claude_design` mock-ups are not either. The band nevertheless survived the
+ *     first cancellation because that cancellation was carried out by renaming its tokens rather than
+ *     deleting them — the `rejected-design-survives-under-a-new-name` pattern, which is why this entry
+ *     now says so out loud instead of quoting the variant's numbers as a target.
  *  3. **One grey for the whole bottom chrome** (current) — see [AppSurface.bottomChrome] for the full
  *     ΔL\* table and for why dark moves DOWN from +13.5 to +4.3 rather than going darker than the
  *     page (going darker measures −2.0, i.e. less separation, not more).
@@ -66,8 +75,12 @@ import java.util.Locale
  *    (owner's verdict from a Pixel 9: "при создании чеклиста в открытом состоянии не должна быть
  *    видна нижняя навигация"), it reaches the window's bottom edge, and its own clipped shoulders
  *    read as the dimmed page rather than as two bright nicks;
- *  - the bar is a different plane from the page it sits under, carried by tone PLUS
- *    [AppSurface.bottomChromeShadow], because neither theme's tone step is large enough alone;
+ *  - the bar is a different plane from the page it sits under, carried by tone plus the 28dp `SheetTop`
+ *    corners — and by nothing else since 2026-08-17, when the owner removed the painted 16dp shadow
+ *    band ("потом на главном экране убери тени от нижней навигации"). That makes the CONTENT-under-bar
+ *    frames the ones to look at: `compactBar_*_listUnderBar` runs the list right up to the bar's edge,
+ *    which is the case the band used to carry and the case a tone step of −10.5 / +4.3 now carries
+ *    alone. The rest of these cells end their stub list well above the bar and cannot show it;
  *  - the ACTIVE tab is obvious at a glance (the old `secondaryContainer` pill on white was 1.31:1);
  *  - every label stays readable on the chrome in both themes;
  *  - the bar still grows instead of truncating at fontScale ≥ 1.3 in RU/HI, and the raised AI button
@@ -112,6 +125,7 @@ class V2ShellBottomBarScreenshotTest {
         selectedTab: String = V2Destination.Inbox,
         barVisible: Boolean = true,
         captureOpen: Boolean = false,
+        listUnderBar: Boolean = false,
     ) {
         // BOTH, and neither alone is enough. `setQualifiers` moves the Android resource
         // configuration, which is what Robolectric measures against; Compose Resources
@@ -137,7 +151,9 @@ class V2ShellBottomBarScreenshotTest {
                         barVisible = barVisible,
                         captureOpen = captureOpen,
                         overlayContent = null,
-                        content = { InboxStub(captureOpen = captureOpen) },
+                        content = {
+                            InboxStub(captureOpen = captureOpen, listUnderBar = listUnderBar)
+                        },
                     )
                 }
             }
@@ -147,11 +163,21 @@ class V2ShellBottomBarScreenshotTest {
 
     // ── The main frame: what the owner looks at ──────────────────────────────
 
-    /** Reference frame — the one to hold against `claude_design/…/d_inkPlinth_light.png`. */
+    /**
+     * The main frame: one grey for the bar and the chat dock together, `SheetTop`'s 28dp top corners,
+     * and no shadow band. There is no mock-up to hold it against — the `claude_design` sheets belong
+     * to the rejected near-black variant (state 2 above) and would re-approve it by comparison. What
+     * this frame is judged on is the list above: one surface at the bottom, an obvious active tab, and
+     * a tonal step that carries the edge on its own.
+     */
     @Test
     fun compactBar_412dp_light() = shoot("w412dp-h891dp")
 
-    /** Dark: the plinth converges to an ordinary raised surface and must NOT use `inverse*`. */
+    /**
+     * Dark: the same single chrome grey, a step UP from the page rather than down (+4.3 ΔL\*, and
+     * going darker measures −2.0, i.e. LESS separation). ⛔ Must not use `inverse*` — that is the
+     * rejected variant's role, and the report it produced was "белый цвет под нижней навигацией".
+     */
     @Test
     fun compactBar_412dp_dark() = shoot("w412dp-h891dp", dark = true)
 
@@ -169,7 +195,7 @@ class V2ShellBottomBarScreenshotTest {
     @Test
     fun compactBar_360dp_light() = shoot("w360dp-h640dp")
 
-    /** Medium: the rail, deliberately untouched by the plinth. */
+    /** Medium: the rail, deliberately untouched by the bottom chrome — a rail has no bottom edge. */
     @Test
     fun mediumRail_600dp_light() = shoot("w600dp-h800dp")
 
@@ -247,9 +273,27 @@ class V2ShellBottomBarScreenshotTest {
             locale = Locale("ru", "RU"),
         )
 
-    /** A pushed detail route: no plinth, no button, and the content owns the whole window. */
+    /** A pushed detail route: no chrome, no button, and the content owns the whole window. */
     @Test
     fun compactBar_412dp_light_barHidden() = shoot("w412dp-h891dp", barVisible = false)
+
+    // ── Content meeting the bar: the case the deleted shadow band used to carry ──
+    //
+    // The band was 16dp of `Transparent → black` drawn OVER the content, so a list scrolling under the
+    // bar was shaded by it and the bar read as a plane the rows slid behind. With the band gone by the
+    // owner's decision, the whole separation between a card row and the chrome it stops against is the
+    // tone step — light −10.5 ΔL\*, dark +4.3 — plus the 28dp corners. These two cells are the only
+    // frames in this file where that is visible at all, and they are the ones to reject the change on
+    // if it is not enough.
+
+    @Test
+    fun compactBar_412dp_light_listUnderBar() =
+        shoot("w412dp-h891dp", listUnderBar = true)
+
+    /** The harder half: dark's step is +4.3, less than half of light's, and it runs the other way. */
+    @Test
+    fun compactBar_412dp_dark_listUnderBar() =
+        shoot("w412dp-h891dp", dark = true, listUnderBar = true)
 
     // ── Fake screen under the chrome ─────────────────────────────────────────
 
@@ -271,7 +315,7 @@ class V2ShellBottomBarScreenshotTest {
      * nick.
      */
     @Composable
-    private fun InboxStub(captureOpen: Boolean) {
+    private fun InboxStub(captureOpen: Boolean, listUnderBar: Boolean = false) {
         // = the scaffold's own container: what is behind BOTH slots, and therefore what any hole in
         // either of them shows.
         Column(
@@ -284,6 +328,11 @@ class V2ShellBottomBarScreenshotTest {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Clips the overflow when [listUnderBar] asks for more rows than fit, the way a
+                        // real scrolled `LazyColumn` does. Unconditional because it is a no-op on the
+                        // short list — a conditional modifier here would be a second thing to keep in
+                        // step with the row count.
+                        .clipToBounds()
                         .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
                 ) {
@@ -299,7 +348,7 @@ class V2ShellBottomBarScreenshotTest {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
-                    listOf(
+                    val titles = listOf(
                         "Book the venue for Saturday",
                         "Pick up dry cleaning",
                         "Draft Q3 planning notes",
@@ -308,7 +357,12 @@ class V2ShellBottomBarScreenshotTest {
                         "Renew gym membership",
                         "Call the landlord back",
                         "Prepare the sprint demo",
-                    ).forEach { TaskRowStub(it) }
+                    )
+                    // Twice round the list when the frame is about content meeting the bar: eight rows
+                    // stop ~250px short of it on an 891dp window, which is precisely why every other
+                    // cell in this file was blind to the seam the shadow band used to cover.
+                    val rows = if (listUnderBar) titles + titles else titles
+                    rows.forEach { TaskRowStub(it) }
                 }
                 if (captureOpen) {
                     // The CONTENT scrim, exactly as `InboxScreen` and `CalendarScreen` paint it:
@@ -340,7 +394,18 @@ class V2ShellBottomBarScreenshotTest {
                             ),
                         )
                     },
-                    belowInput = { SourceRow(onSelect = {}) },
+                    belowInput = {
+                        // `SourceRowSection`, exactly as both hosts mount it — NOT the bare
+                        // `SourceRow`. A fixture that keeps passing the bare row records a dock one
+                        // text line shorter than the one the app draws, which is the very defect
+                        // `SourceRowScreenshotTest`'s KDoc warns about. The heading comes from
+                        // `strings.xml` for the same reason the hosts read it there: a literal here
+                        // would measure the English line in every locale.
+                        SourceRowSection(
+                            title = stringResource(Res.string.capture_dock_ai_entry_title),
+                            onSelect = {},
+                        )
+                    },
                 )
             }
         }

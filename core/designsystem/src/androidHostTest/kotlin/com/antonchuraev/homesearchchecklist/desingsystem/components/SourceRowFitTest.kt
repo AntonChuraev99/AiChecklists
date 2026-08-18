@@ -1,11 +1,17 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.unit.Density
@@ -142,6 +148,81 @@ class SourceRowFitTest {
         override fun toString() = "$label(left=$left, top=$top, h=$height)"
     }
 
+    // ── Semantics: four DOORS are not a selection ────────────────────────────
+
+    /**
+     * None of the four doors carries `selected`.
+     *
+     * [SourceRow] opens a flow; it does not remember what you last opened. Reporting
+     * `selected = false` on all four made TalkBack say "not selected" about controls that were never
+     * selectable — a statement about state where there is no state — and it did so on the v2 shell's
+     * ONLY route into Analyze. `SourcePill`'s `selected` is `Boolean?` for exactly this: `null` writes
+     * nothing.
+     *
+     * Asserted through the node the text query returns, which IS the capsule: `Modifier.clickable`
+     * merges the pill's descendants, so the label and the selection state are on one node.
+     */
+    @Test
+    fun theFourDoorsCarryNoSelectedState() {
+        RuntimeEnvironment.setQualifiers("w412dp-h891dp")
+        var labels = emptyList<String>()
+        composeTestRule.setContent {
+            labels = doorLabels()
+            AppTheme(darkTheme = false) {
+                SourceRow(onSelect = {}, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        labels.forEach { label ->
+            val node = composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes().single()
+            assertEquals(
+                "\"$label\" is a door, not an option — it must expose no Selected property at all, " +
+                    "got ${node.config.getOrNull(SemanticsProperties.Selected)}",
+                null,
+                node.config.getOrNull(SemanticsProperties.Selected),
+            )
+        }
+    }
+
+    // ── An UNBOUNDED width must not collapse the row ─────────────────────────
+
+    /**
+     * With infinite room the grid takes the TOP rung, not the bottom one.
+     *
+     * `constraints.maxWidth` is `Constraints.Infinity` (Int.MAX_VALUE) inside a horizontally
+     * scrollable parent, and the fit arithmetic — `widestPill * rung` and
+     * `maxWidth - gapPx * (perRow - 1)` — overflows to a NEGATIVE Int there. Every rung then fails its
+     * check and four doors stack into a single 200dp-tall column. `fillMaxWidth` makes this unreachable
+     * from either host today; it is one hoist into a scrollable row away from being reachable, and the
+     * failure is silent.
+     */
+    @Test
+    fun givenUnboundedWidth_theRowStaysFourAbreast() {
+        RuntimeEnvironment.setQualifiers("w412dp-h891dp")
+        var labels = emptyList<String>()
+        composeTestRule.setContent {
+            labels = doorLabels()
+            AppTheme(darkTheme = false) {
+                // The unbounded-width parent, which is the whole point of the case.
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    SourceRow(onSelect = {})
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        val tops = labels.map { label ->
+            composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes().single().boundsInRoot.top
+        }
+        assertEquals(
+            "unbounded width must resolve to ONE row of four; the pills landed on ${tops.distinct().size} " +
+                "rows (tops=$tops), which is the Int overflow collapsing the ladder to a single column",
+            1,
+            tops.distinct().size,
+        )
+    }
+
     private fun assertUniformRows(qualifiers: String, fontScale: Float, locale: Locale = Locale.ENGLISH) {
         val pills = layout(qualifiers, fontScale, locale)
         pills.groupBy { it.top }.forEach { (top, rowMates) ->
@@ -189,4 +270,13 @@ class SourceRowFitTest {
             Pill(label, bounds.left, bounds.top, bounds.height)
         }
     }
+
+    /** The four doors' labels, in the order [SourceRow] offers them. */
+    @Composable
+    private fun doorLabels(): List<String> = listOf(
+        stringResource(Res.string.analyze_source_photo),
+        stringResource(Res.string.analyze_source_pdf),
+        stringResource(Res.string.analyze_source_link_short),
+        stringResource(Res.string.analyze_source_voice),
+    )
 }

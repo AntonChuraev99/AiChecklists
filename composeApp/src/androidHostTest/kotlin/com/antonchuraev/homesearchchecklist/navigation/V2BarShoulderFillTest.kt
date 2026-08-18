@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -23,7 +25,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
-import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
@@ -31,6 +33,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.RoborazziTaskType
 import com.github.takahirom.roborazzi.captureRoboImage
+import org.jetbrains.compose.resources.stringResource
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -77,12 +80,19 @@ import javax.imageio.ImageIO
  * shoulders, after it no sentinel pixel survives anywhere in the bar's footprint.
  *
  * ## What is asserted beyond "not a hole"
- * A filled shoulder could still be wrong — a bright fill would reproduce the reported symptom with a
- * predictable colour. So the run down the screen's edge must also be MONOTONIC: page → shadow ramp →
- * shoulder → chrome, with the shoulder no lighter than the shadow band that ends on it
- * ([shoulderContinuesTheShadowBand]) and never lighter than the unshaded page. Before the fix the
- * shoulder was the brightest pixel in the whole region — brighter even than the page — which is what
- * made it read as backdrop rather than as depth.
+ * A filled shoulder could still be wrong in either direction, and the frames recorded while this
+ * change was made show both. Too BRIGHT reproduces the reported symptom with a predictable colour
+ * (`#FAFAFA` with no fill at all). Too DARK is the same hole in the other direction: with the chrome's
+ * painted 16dp shadow band removed by the owner ("убери тени от нижней навигации") the shoulder's old
+ * value — that gradient's terminal black-over-page — was measured as `#0C0C0F` against a `#121317`
+ * page, i.e. a black notch darker than the page AND the chrome beside it.
+ *
+ * So the assertion is an IDENTITY, not a run with a tolerance: the shoulder is `AppSurface.ground()`,
+ * the same value as the plane that ends at the bar's top edge, and the strip above the bar is flat —
+ * no ramp of any height. See [theShoulderIsThePage_light] and
+ * [theShoulderIsThePageEvenUnderACard_light]. This is what the monotonic page → ramp → shoulder →
+ * chrome run used to check, minus the ramp and minus the ±2 tolerance a gradient's last row needed —
+ * and a tolerance is where the dark notch above would have hidden.
  *
  * ## The second subject: the CAPTURE DOCK's shoulders
  * The same shape of defect, one surface up, and it reached a device for the same reason — a bright
@@ -230,83 +240,45 @@ class V2BarShoulderFillTest {
     // ── The shoulder is the right colour, not merely some colour ─────────────
 
     /**
-     * Hypothesis this closes explicitly: "the corners show the white list CARD, because the content
-     * scrolls under the bar". They do not, and they must not — a shoulder whose colour depends on what
-     * the user scrolled to is the same defect wearing a different value.
+     * The shoulder is `AppSurface.ground()` — the page continuing behind the bar's clipped corner —
+     * and the strip above the bar carries no band of any kind.
      *
-     * The frame is rendered with a solid column of `AppSurface.card()` rows clipped at the bar's edge,
-     * so a card really is the last thing painted above the bar. The shoulder must still read as the
-     * shadowed page.
+     * Two claims in one frame because they are one decision. The bar's separator is now tone plus the
+     * 28dp corners and nothing else (owner: "убери тени от нижней навигации"), so the page must run
+     * flat into the bar's top edge AND continue at the same value inside the corner sector. Assert only
+     * the first and the shoulder is free to be the black notch the old terminal-shadow value left
+     * behind (measured `#0C0C0F` on a `#121317` page); assert only the second and a reintroduced ramp
+     * above the bar goes unnoticed.
+     *
+     * Both themes, because they sit on OPPOSITE sides of the chrome — light's page is lighter than the
+     * bottom chrome, dark's is darker — so a regression can be right in one and inverted in the other.
      */
     @Test
-    fun theShoulderIsNotTheCardScrolledUnderIt_light() {
-        val image = render(Phone412, dark = false, cardsUnderTheBar = true, name = "cardUnderBar_light")
-        val barTop = barTopEdge(image)
-        assertRulerIsOnTheBarsOwnSurface(image, barTop, "cardUnderBar_light")
+    fun theShoulderIsThePage_light() = assertShoulderIsThePage(dark = false, cardsUnderTheBar = false)
 
-        // Sampled ABOVE the 16dp shadow band, not two rows above the bar. Inside the band the card is
-        // progressively darkened, so a pixel at `barTop - 2` is not the card's colour at all — the old
-        // probe took that shaded pixel and called it "the card above it" in its own failure message.
-        val cardAboveTheBar = rgb(image, SampleInset, barTop - ShadowBandDp - 4)
-        val shoulder = rgb(image, SampleInset, barTop + 2)
-
-        // The card really is the plane ending at the bar — otherwise this test proves nothing.
-        //
-        // Against the KNOWN card colour, not against a pixel taken INSIDE the bar. The old guard read
-        // "brighter than the chrome", which the bare page (`#FBFAF8`, lum 250) clears exactly as easily
-        // as a card (`#FFFFFF`, 255) — so it passed whether or not any card ever reached the bar, i.e.
-        // it never checked the premise this test's name rests on. `cardsUnderTheBar = false` must be
-        // able to FAIL this line; with the old one it could not.
-        assertEquals(
-            "expected a card row above the bar, found ${hex(cardAboveTheBar)} — the fixture no " +
-                "longer reproduces the case it exists for",
-            hex(cardUnderTest),
-            hex(cardAboveTheBar),
-        )
-        assertTrue(
-            "the shoulder reads ${hex(shoulder)}, the card above it ${hex(cardAboveTheBar)} — the " +
-                "clipped corner is showing whatever the list scrolled to",
-            shoulder != cardAboveTheBar,
-        )
-    }
+    @Test
+    fun theShoulderIsThePage_dark() = assertShoulderIsThePage(dark = true, cardsUnderTheBar = false)
 
     /**
-     * The shoulder must meet the shadow band with no step: it takes that gradient's terminal value, so
-     * the band's last row and the shoulder are the same tone within a rounding step. A brighter
-     * shoulder is the reported defect; a much darker one is a visible arc-shaped stripe.
+     * The same identity with a solid column of `AppSurface.card()` rows clipped at the bar's edge, so a
+     * CARD — not the page — is the last thing painted above the bar.
      *
-     * Both themes, because they land on OPPOSITE sides of the chrome — light's page is lighter than
-     * the bottom chrome, dark's is darker — and only a run measured down the edge catches a regression
-     * that is correct in one and inverted in the other.
+     * This is the hypothesis "the corners show the white list card, because the content scrolls under
+     * the bar", and it closes it by naming the expected value rather than by ruling one out: the
+     * shoulder must be `ground()` even here. A shoulder whose colour depends on what the user scrolled
+     * to is the original defect wearing a different number, and `shoulder != card` — what this used to
+     * assert, light only — passes on every wrong value except one.
+     *
+     * The strip above the bar is checked for FLATNESS rather than for a value: it is card-coloured in
+     * this fixture, and what must not be there is a ramp.
      */
     @Test
-    fun shoulderContinuesTheShadowBand_light() = assertMonotonicEdgeRun(dark = false)
+    fun theShoulderIsThePageEvenUnderACard_light() =
+        assertShoulderIsThePage(dark = false, cardsUnderTheBar = true)
 
     @Test
-    fun shoulderContinuesTheShadowBand_dark() = assertMonotonicEdgeRun(dark = true)
-
-    /**
-     * The same seam with a CARD ending at the bar instead of the bare page — the half
-     * [assertMonotonicEdgeRun] does not cover, and the half `bottomChromeShoulder`'s KDoc used to
-     * promise unconditionally.
-     *
-     * There IS a step here, and it is arithmetic rather than a defect. The band darkens whatever
-     * happens to be under it, so over a card its last row is the CARD at the ramp's terminal alpha;
-     * the shoulder is that same alpha composited over the PAGE, because the shoulder's whole job is
-     * to be the page in shadow. Two different planes, one alpha — so the two ends differ by exactly
-     * what the planes differ by, shrunk by the ramp. Measured: light `#ECECEC` (lum 236) against
-     * `#E8E7E6` (232); dark 18 against 12.
-     *
-     * The bound is therefore derived, not tuned: the gap may not exceed the card↔page difference
-     * itself, since compositing both over black at one alpha can only ever shrink it. A step LARGER
-     * than that means the shoulder stopped tracking the ramp, which is the regression worth catching;
-     * a magic tolerance fitted to today's pixels would not have caught it.
-     */
-    @Test
-    fun shoulderMeetsTheBandOverCards_light() = assertBandSeamOverCards(dark = false)
-
-    @Test
-    fun shoulderMeetsTheBandOverCards_dark() = assertBandSeamOverCards(dark = true)
+    fun theShoulderIsThePageEvenUnderACard_dark() =
+        assertShoulderIsThePage(dark = true, cardsUnderTheBar = true)
 
     // ── shared assertions ────────────────────────────────────────────────────
 
@@ -335,9 +307,10 @@ class V2BarShoulderFillTest {
      * So that the plane ending at the dock's top edge is the PAGE, which is what makes the equality
      * exact. With a card there instead the two probes differ by the card↔page step seen through one
      * alpha (measured: light `#8A8988` shoulder against `#8C8C8C`, dark `#0A0B0D` against `#0F1012`)
-     * — arithmetic, not a defect, and the same arithmetic [shoulderMeetsTheBandOverCards_light]
-     * already bounds for the bar. Bounding it a second time here would trade an exact assertion for a
-     * tolerance, and the tolerance is where a real regression hides.
+     * — arithmetic, not a defect. Bounding that arithmetic here would trade an exact assertion for a
+     * tolerance, and the tolerance is where a real regression hides;
+     * [theShoulderIsThePageEvenUnderACard_light] covers the same "a card is what ends at the edge" case
+     * for the BAR, where the shoulder is opaque and the answer can stay an identity.
      */
     private fun assertCaptureDockShoulderIsTheDimmedPage(dark: Boolean) {
         val name = "captureShoulder_${if (dark) "dark" else "light"}"
@@ -373,60 +346,63 @@ class V2BarShoulderFillTest {
         )
     }
 
-    private fun assertBandSeamOverCards(dark: Boolean) {
-        val name = "bandOverCards_${if (dark) "dark" else "light"}"
-        val image = render(Phone412, dark = dark, cardsUnderTheBar = true, name = name)
+    /**
+     * The two halves of "the chrome's only separators are tone and shape".
+     *
+     *  1. **The strip above the bar is FLAT** — every one of the [FlatStripDp] rows leading down to the
+     *     bar's top edge reads the same value. A row-by-row run rather than "the last row equals a row
+     *     higher up": a gradient's two ends can be sampled at any two heights and a two-probe check has
+     *     to guess which two, while a run needs no guess and catches a band of any height or alpha. The
+     *     expected value is taken from the frame's own top row rather than named, because this fixture
+     *     deliberately puts a CARD there in one of its two configurations — what is under test here is
+     *     the absence of a ramp, not which plane it would have ramped.
+     *  2. **The shoulder is [groundUnderTest]** — `AppSurface.ground()` lifted out of composition, so
+     *     the assertion NAMES the colour it expects instead of comparing two pixels of one frame with
+     *     each other. That is the guard this branch has now tripped over twice; a shoulder compared
+     *     against a neighbour is green on any value both share.
+     */
+    private fun assertShoulderIsThePage(dark: Boolean, cardsUnderTheBar: Boolean) {
+        val name = buildString {
+            append("shoulderIsPage_")
+            append(if (dark) "dark" else "light")
+            if (cardsUnderTheBar) append("_underCard")
+        }
+        val image = render(Phone412, dark = dark, cardsUnderTheBar = cardsUnderTheBar, name = name)
         val barTop = barTopEdge(image)
         assertRulerIsOnTheBarsOwnSurface(image, barTop, name)
 
-        val bandEnd = luminance(image, SampleInset, barTop - 1)
-        val shoulder = luminance(image, SampleInset, barTop + 2)
-        // The two planes the two ends are composited from — both lifted out of composition, so the
-        // bound is the palette's own numbers rather than a constant that has to be re-tuned with it.
-        val planeGap = kotlin.math.abs(luminanceOf(cardUnderTest) - luminanceOf(groundUnderTest))
+        val topOfStrip = rgb(image, SampleInset, barTop - FlatStripDp)
+        for (y in (barTop - FlatStripDp) until barTop) {
+            val here = rgb(image, SampleInset, y)
+            assertEquals(
+                "row ${barTop - y} above the bar reads ${hex(here)} where the row " +
+                    "${FlatStripDp}px up reads ${hex(topOfStrip)} — something is being ramped into " +
+                    "the bar's top edge, and tone plus the 28dp corners are the whole separator " +
+                    "(frame: $name)",
+                hex(topOfStrip),
+                hex(here),
+            )
+        }
 
-        assertTrue(
-            "the shoulder ($shoulder) is BRIGHTER than the band that ends on it ($bandEnd) — the " +
-                "band ramps down onto the shoulder, so the run may only get darker (frame: $name)",
-            shoulder <= bandEnd,
+        // The premise: with cards under the bar the plane ending at its edge must really be a card,
+        // otherwise the "even under a card" cell proves nothing. Checked against the KNOWN card colour
+        // rather than "brighter than the chrome", which the bare page clears just as easily.
+        assertEquals(
+            "the plane ending at the bar reads ${hex(topOfStrip)} — the fixture no longer " +
+                "reproduces the case this cell exists for (frame: $name)",
+            hex(if (cardsUnderTheBar) cardUnderTest else groundUnderTest),
+            hex(topOfStrip),
         )
-        assertTrue(
-            "the band ends at $bandEnd and the shoulder reads $shoulder, a step of " +
-                "${bandEnd - shoulder} — larger than the ${planeGap}-step between the card and the " +
-                "page they are composited from, so the shoulder is no longer tracking the ramp " +
+
+        val shoulder = rgb(image, SampleInset, barTop + 2)
+        assertEquals(
+            "the clipped corner reads ${hex(shoulder)} instead of the page's " +
+                "${hex(groundUnderTest)} — a shoulder brighter than that is the window backdrop " +
+                "showing through, darker is a black notch under the corner, and equal to " +
+                "${hex(cardUnderTest)} is the corner taking on whatever the list scrolled to " +
                 "(frame: $name)",
-            bandEnd - shoulder <= planeGap + BandSeamTolerance,
-        )
-    }
-
-    private fun assertMonotonicEdgeRun(dark: Boolean) {
-        val name = "edgeRun_${if (dark) "dark" else "light"}"
-        val image = render(
-            Phone412,
-            dark = dark,
-            cardsUnderTheBar = false,
-            name = name,
-        )
-        val barTop = barTopEdge(image)
-        assertRulerIsOnTheBarsOwnSurface(image, barTop, name)
-
-        val page = luminance(image, SampleInset, barTop - ShadowBandDp - 8)
-        val bandEnd = luminance(image, SampleInset, barTop - 1)
-        val shoulder = luminance(image, SampleInset, barTop + 2)
-
-        assertTrue(
-            "the shadow band must darken the page before the bar ($bandEnd vs $page)",
-            bandEnd <= page,
-        )
-        assertTrue(
-            "the shoulder ($shoulder) is brighter than the unshaded page ($page) — a clipped corner " +
-                "may never be the brightest thing at the bottom of the screen",
-            shoulder <= page,
-        )
-        assertTrue(
-            "the shoulder ($shoulder) does not continue the shadow band it meets ($bandEnd) — the " +
-                "band ramps to exactly the shoulder's tone, so any step here is a seam",
-            kotlin.math.abs(shoulder - bandEnd) <= BandSeamTolerance,
+            hex(groundUnderTest),
+            hex(shoulder),
         )
     }
 
@@ -491,7 +467,7 @@ class V2BarShoulderFillTest {
 
     /**
      * The ruler points at the bar's top edge — used by the two probes that SAMPLE relative to it
-     * ([theShoulderIsNotTheCardScrolledUnderIt_light], [assertMonotonicEdgeRun]), where a drifted
+     * ([assertShoulderIsThePage]), where a drifted
      * ruler silently moves what "the shoulder" and "the page" mean.
      *
      * Two checks, and both are about a ruler that is too LOW, because that is the direction which
@@ -677,7 +653,18 @@ class V2BarShoulderFillTest {
                     modifier = Modifier
                         .background(captureDockScrimColor())
                         .onGloballyPositioned { dockTopPx = it.positionInRoot().y.toInt() },
-                    belowInput = { SourceRow(onSelect = {}) },
+                    belowInput = {
+                        // `SourceRowSection`, exactly as both hosts mount it — NOT the bare
+                        // `SourceRow`. A fixture that keeps passing the bare row records a dock one
+                        // text line shorter than the one the app draws, which is the very defect
+                        // `SourceRowScreenshotTest`'s KDoc warns about. The heading comes from
+                        // `strings.xml` for the same reason the hosts read it there: a literal here
+                        // would measure the English line in every locale.
+                        SourceRowSection(
+                            title = stringResource(Res.string.capture_dock_ai_entry_title),
+                            onSelect = {},
+                        )
+                    },
                 )
             }
         }
@@ -686,9 +673,10 @@ class V2BarShoulderFillTest {
     /**
      * Top edge of the bar, from the shell's own LAYOUT rather than from colour or from a constant.
      *
-     * Not from colour, for the reason [V2PlinthShadowOverDockTest] had to adopt: a probe asserting
-     * something ABOUT a colour must not locate its subject BY that colour, or re-tuning the chrome
-     * silently moves the ruler.
+     * Not from colour, for the reason every probe in this package had to adopt (see
+     * [V2BottomChromeNoBandTest], which took the same rule over): a probe asserting something ABOUT a
+     * colour must not locate its subject BY that colour, or re-tuning the chrome silently moves the
+     * ruler.
      *
      * And no longer from `image.height - AppDimens.BottomBarHeight`, which was the same mistake one
      * level up. 80dp is the bar's `defaultMinSize`, not its height: `NavigationBar` sizes each item
@@ -709,15 +697,9 @@ class V2BarShoulderFillTest {
 
     private fun rgb(image: BufferedImage, x: Int, y: Int): Int = image.getRGB(x, y) and 0xFFFFFF
 
-    private fun luminanceOf(rgb: Int): Int {
-        val r = (rgb shr 16) and 0xFF
-        val g = (rgb shr 8) and 0xFF
-        val b = rgb and 0xFF
-        return (r * 0.299f + g * 0.587f + b * 0.114f).toInt()
-    }
-
-    private fun luminance(image: BufferedImage, x: Int, y: Int): Int = luminanceOf(rgb(image, x, y))
-
+    // No luminance helper any more, and that is the point: every probe in this file now compares an
+    // exact RGB against a colour lifted out of composition. Luminance existed to give a gradient's ends
+    // a single number to be ordered by, and ordering with a tolerance is what let a wrong shoulder pass.
     private fun hex(rgb: Int): String = "#%06X".format(rgb)
 
     private companion object {
@@ -740,8 +722,17 @@ class V2BarShoulderFillTest {
         /** Clear of the 28dp corner arc at every row this test samples, and clear of the edge itself. */
         const val SampleInset = 2
 
-        /** `AppSurface.bottomChromeShadowHeight()`. */
-        const val ShadowBandDp = 16
+        /**
+         * How far above the bar's top edge the strip that must stay FLAT reaches.
+         *
+         * 24 rather than the 16 the deleted `bottomChromeShadowHeight` was: the number no longer
+         * describes a band that exists, it bounds the region a reintroduced one could occupy, and a
+         * scan taller than the band still catches it (a 16dp ramp lives entirely inside the last 16
+         * of these 24 rows). Sized DOWN from the fixture instead: the short-list configuration puts 2
+         * rows of 64dp at the top of the window, so 24 rows above the bar are bare page in it, and 40
+         * flush 64dp rows make the same strip solid card in the other.
+         */
+        const val FlatStripDp = 24
 
         /**
          * How far above / below the dock's top edge the shoulder probe samples.
@@ -758,12 +749,6 @@ class V2BarShoulderFillTest {
          * so the real bar is this or taller. Used only to catch a ruler that has slipped inside it.
          */
         val MinBarHeightPx = AppDimens.BottomBarHeight.value.toInt()
-
-        /**
-         * The band's last drawn row sits at 15.5/16 of the gradient's alpha while the shoulder takes
-         * the full value, so the two differ by a fraction of one 8-bit step even when correct.
-         */
-        const val BandSeamTolerance = 2
 
         val RowHeight = 64.dp
     }

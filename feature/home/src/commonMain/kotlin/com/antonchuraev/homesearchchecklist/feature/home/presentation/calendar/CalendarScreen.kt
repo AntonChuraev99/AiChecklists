@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,7 +69,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_empty_cta
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.calendar_empty_description
 import aichecklists.core.designsystem.generated.resources.calendar_empty_title
@@ -99,12 +100,15 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWin
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChromeScrim
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
-import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
@@ -118,6 +122,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Today
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.AddTaskRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayBody
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayScreenState
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.hostsAddTaskAction
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -300,12 +305,27 @@ fun CalendarScreen(
     // screen. Both of those collapse to the same rule: whoever is last carries it.
     val bodyBottomPadding = if (captureVisible || captureRowVisible) 0.dp else contentBottomPadding
 
-    // ── Capture-dock scrim: TWO tiled scrims, one flag (same anatomy as the Inbox tab) ───────────
-    // The dock is the scaffold's `bottomBar`, so a scrim scoped to the CONTENT already stops exactly
-    // where the dock begins — at any keyboard height, with nothing to measure. [contentTopPx] is the
-    // content slot's y in the root, i.e. the height of the chrome above it, and the top scrim uses
-    // exactly that so the two tile without a seam.
-    var contentTopPx by remember { mutableStateOf(0f) }
+    // ── Capture-dock scrim: TWO tiled scrims over the page, one ceiling (same anatomy as the Inbox
+    // tab, and the same two numbers) ─────────────────────────────────────────────────────────────
+    // The dock is the scaffold's `bottomBar`, so a scrim scoped to the CONTENT is bounded by the
+    // content slot's own size and cannot reach it. [contentTopPx] is that slot's y in the root, i.e.
+    // the height of the chrome above it, and the top tile reaches exactly that so the two meet
+    // without a seam.
+    //
+    // ⚠️ [dockTopPx] is the top tile's CEILING and has to be measured on the dock: once the keyboard
+    // makes `topBar + bottomBar` taller than the window, Material3 overlaps the two bars and collapses
+    // the content slot to zero height BELOW the dock's top edge, so the content slot's offset stops
+    // being an upper bound for it. Uncapped, this tile dimmed the dock's top edge and double-dimmed
+    // its shoulders on a Pixel 9 — see [captureScrimBottomPx] for the arithmetic.
+    //
+    // ⚠️ Both are UNDELEGATED state and never read in this body — they move once per frame while the
+    // keyboard animates, and a read here would invalidate the whole screen for the length of that
+    // animation. [CaptureChromeScrim] reads them in its own layout pass instead.
+    val contentTopPx = remember { mutableFloatStateOf(0f) }
+    // Keyed on the dock's gate — same reason as the Inbox host: only the dock writes this, a closed
+    // dock writes nothing, so an unkeyed `remember` would hand the next OPEN a stale ceiling measured
+    // in a window that no longer exists, and the first frame would cap the top tile short.
+    val dockTopPx = remember(captureVisible) { mutableFloatStateOf(CaptureDockTopUnmeasured) }
     val captureScrimColor = captureDockScrimColor()
 
     // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
@@ -354,8 +374,12 @@ fun CalendarScreen(
                         // the dimmed page beside them (measured ΔL* +41 in light). The content scrim
                         // above cannot cover them — it stops at the content slot's edge on purpose.
                         // Identical to the Inbox tab's, deliberately: the two docks are one surface
-                        // and must sit in the same depth of dim.
-                        modifier = Modifier.background(captureScrimColor),
+                        // and must sit in the same depth of dim — including the measurement in the
+                        // same chain, which is what keeps this the ONLY tile painting below the dock's
+                        // top edge (see [captureScrimBottomPx]).
+                        modifier = Modifier
+                            .onGloballyPositioned { dockTopPx.floatValue = it.positionInRoot().y }
+                            .background(captureScrimColor),
                         // This tab draws the day's reminders, so its draft arrives with one chip
                         // already selected ("Tonight", or "In 1 hour" once the evening has
                         // started) — that chip is what keeps a task captured here visible on the
@@ -375,7 +399,16 @@ fun CalendarScreen(
                         // Same four doors as the Inbox tab, from the same shared component — the
                         // two tabs must not drift into two different answers to "what can I hand
                         // the AI". Only the reported source differs.
-                        belowInput = { SourceRow(onSelect = onAiSourceTapped) },
+                        //
+                        // With the heading, and the SAME heading the Inbox dock uses: four bare pills
+                        // under a task field read as "attach one of these to this task" rather than as
+                        // "or build me a checklist out of this" (owner report, 2026-08-17).
+                        belowInput = {
+                            SourceRowSection(
+                                title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                onSelect = onAiSourceTapped,
+                            )
+                        },
                     )
                 }
             },
@@ -385,7 +418,7 @@ fun CalendarScreen(
                     .fillMaxSize()
                     // Seam for the top scrim: this column's y in the root is the height of the chrome
                     // above it (status bar + app bar), which the top scrim below uses as its height.
-                    .onGloballyPositioned { contentTopPx = it.positionInRoot().y }
+                    .onGloballyPositioned { contentTopPx.floatValue = it.positionInRoot().y }
                     // CONTENT scrim, as a draw layer rather than an overlay node — the tab row and
                     // the pager beneath it must stay interactive, and an overlay is exactly what the
                     // pager's dismiss comment below rules out (hit-testing stops at the topmost
@@ -468,6 +501,18 @@ fun CalendarScreen(
                             onRetry = onTodayRetry,
                             contentBottomPadding = bodyBottomPadding,
                             canCapture = captureEnabled,
+                            // The SAME callback the pinned row below fires, so the empty state's
+                            // button routes through `TodayIntent.OnAddTaskRowClick` and keeps the
+                            // `source = "inline_row"` analytics — a second entry point with its own
+                            // wiring would silently split that funnel.
+                            //
+                            // Gated on `captureRowVisible`, not on `captureEnabled`: the button is
+                            // this row in another carrier, so it must fall silent for the same three
+                            // reasons the row does (control arm, dock already up, rail/drawer width
+                            // where the shell keeps its own "+"). The body then only draws it for the
+                            // states `hostsAddTaskAction()` names, which is the same predicate the
+                            // pinned row is withheld by.
+                            onAddTaskClick = if (captureRowVisible) onAddTaskRowClick else null,
                         )
                         1 -> CalendarTabBody(
                             state = calendarState,
@@ -492,7 +537,28 @@ fun CalendarScreen(
                 //
                 // Gating and gate ORDER live in [captureRowVisible] at the top of this composable — see
                 // there for why the arm flag is read before the window size.
-                if (captureRowVisible) {
+                //
+                // ── The fourth gate: the visible page is already carrying the action ──────────────
+                // Since 2026-08-17 the Today page's own placeholder hosts an "Add task" button for the
+                // states `hostsAddTaskAction()` names (owner request). Both at once would put two
+                // controls with the SAME accessible name on one screen — ambiguous to a screen reader
+                // and to any UI test matching the label — so the row stands down for exactly those
+                // states, from exactly that predicate.
+                //
+                // Scoped to the page the pager has SETTLED on, not to "either page is empty": page 1
+                // (the agenda) keeps its own "Create Checklist" CTA, which is a different action, so
+                // hiding the row there would delete this tab's only capture route on Compact. The read
+                // happens HERE rather than in the screen body on purpose — the body does not read
+                // `currentPage` at all, and hoisting it there would invalidate the whole screen (top
+                // bar, actions, dock) on every page settle. This Column already reads it for
+                // `PrimaryTabRow`, so nothing new is subscribed.
+                //
+                // ⚠️ Mid-swipe the pager composes BOTH pages, so for the duration of a drag an empty
+                // page 0 can show its button while the row re-appears for page 1. `currentPage` flips
+                // at the 50% mark, so the overlap is transient and inside a gesture; the settled states
+                // — the only ones a screenshot or a test observes — always hold exactly one control.
+                val pageHostsAddTask = pagerState.currentPage == 0 && todayState.hostsAddTaskAction()
+                if (captureRowVisible && !pageHostsAddTask) {
                     AddTaskRow(
                         onClick = onAddTaskRowClick,
                         modifier = Modifier
@@ -518,17 +584,19 @@ fun CalendarScreen(
         }
 
         // TOP-BAR scrim — the other tile, dimming the status-bar zone and the app bar the scaffold
-        // owns and the content cannot reach. Height is exactly the content column's offset, so the
-        // two tiles meet without a bright seam or a double-dark band. No pointer-input modifier: a
+        // owns and the content cannot reach. It reaches the content column's offset, so the two tiles
+        // meet without a bright seam — and stops at the dock's top edge, which is the same number
+        // only while the scaffold has room for both bars. No pointer-input modifier: a
         // background-only node is invisible to hit-testing, so the toolbar stays pressable.
-        if (captureVisible && contentTopPx > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(with(LocalDensity.current) { contentTopPx.toDp() })
-                    .background(captureScrimColor),
-            )
-        }
+        //
+        // Same component and same lambdas as the Inbox host: the two positions are read in the tile's
+        // LAYOUT pass, never in this body, because both move once per frame while the keyboard animates.
+        CaptureChromeScrim(
+            visible = captureVisible,
+            color = captureScrimColor,
+            contentTopPx = { contentTopPx.floatValue },
+            dockTopPx = { dockTopPx.floatValue },
+        )
     }
 }
 

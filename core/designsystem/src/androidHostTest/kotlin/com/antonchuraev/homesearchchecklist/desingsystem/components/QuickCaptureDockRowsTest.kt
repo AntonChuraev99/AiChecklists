@@ -141,12 +141,27 @@ class QuickCaptureDockRowsTest {
             1,
             composeTestRule.onAllNodesWithText(photo).fetchSemanticsNodes().size,
         )
+        // The row's HEADING is part of the row, not decoration on top of it. Four unlabelled pills
+        // under a task field read as "attach one of these to this task" — an offer the app already
+        // serves — instead of "or build me a checklist out of this"; the dock shipped that way and the
+        // owner reported it (2026-08-17). It is asserted on the same matrix as the pills because a
+        // heading is the FIRST thing a future "make the dock shorter" rule would drop, and it is the
+        // one part of the row that carries no icon to hint at its absence.
+        assertEquals(
+            "$qualifiers fs=$fontScale locale=$locale: the source row's heading must stay on screen — " +
+                "without it the four pills are an attachment picker, not a route into Analyze",
+            1,
+            composeTestRule.onAllNodesWithText(SectionHeadingMarker).fetchSemanticsNodes().size,
+        )
     }
 
     /**
      * The presets are a plain [Text] rather than the real `TaskCreateChipsRow`: that component lives
      * in `feature:home` and this module cannot depend on it. What matters here is only that the
      * `aboveInput` slot is occupied and reports whether the dock rendered it.
+     *
+     * `belowInput` carries [SourceRowSection], which is what BOTH hosts pass — the fixture tracks the
+     * production call sites so a size/scale rule cannot start dropping something the app draws.
      */
     @Composable
     private fun DockUnderTest(withSourceRow: Boolean) {
@@ -164,7 +179,7 @@ class QuickCaptureDockRowsTest {
                 )
             },
             belowInput = if (withSourceRow) {
-                { SourceRow(onSelect = {}) }
+                { SourceRowSection(title = SectionHeadingMarker, onSelect = {}) }
             } else {
                 null
             },
@@ -174,5 +189,13 @@ class QuickCaptureDockRowsTest {
     private companion object {
         /** Stands in for the reminder/priority chips; matched by text, so it must be unique. */
         const val PresetsMarker = "Today   Tomorrow   Important"
+
+        /**
+         * Stands in for `capture_dock_ai_entry_title`. A literal rather than the resource so this stays
+         * an assertion about the SECTION rather than about one locale's copy — the RU run below would
+         * otherwise need a second expected string, and matching the localized value is what the host's
+         * own test (`InboxAiSourceRowTest`) does.
+         */
+        const val SectionHeadingMarker = "Or create a checklist from:"
     }
 }
