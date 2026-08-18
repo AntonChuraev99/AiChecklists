@@ -1,8 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayOptions
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxLayout
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxSort
@@ -93,6 +96,30 @@ sealed interface InboxScreenState : State {
     data object Loading : InboxScreenState
 
     /**
+     * The pager could not be loaded.
+     *
+     * ## Why this branch has to exist
+     * Until it did, the sealed interface held only [Loading] and [Content], so **every** load
+     * failure — the pages stream throwing, or the system Inbox row failing to be created — left
+     * `pages` null and the tab on its spinner forever. A snackbar was fired, but a snackbar lasts
+     * four seconds and the spinner lasts until the app is killed: the user is left staring at a
+     * screen that is, as far as it says, still working. That is the project's "every action gets a
+     * visible response" rule broken in the one place it matters most, the first screen of the app.
+     *
+     * @param message the reason, ALREADY resolved from Compose Resources by the ViewModel — same
+     *   contract as [InboxSideEffect.ShowMessage], so a resource key can never leak into the screen
+     *   and be rendered as a literal.
+     * @param canRetry whether a retry can plausibly help. False would render the reason with no
+     *   button rather than a button that re-runs a hopeless call; today every failure this state is
+     *   raised for is transient, so it is always true — the parameter exists so a permanent failure
+     *   does not have to invent a second state.
+     */
+    data class Error(
+        val message: String,
+        val canRetry: Boolean = true,
+    ) : InboxScreenState
+
+    /**
      * @param pages never empty, and index 0 is ALWAYS the system Inbox page — the screen's tab row,
      *   quick-add analytics source and move-target list all rely on that invariant, and the "capture
      *   lands in the Inbox" promise breaks the moment a project can occupy the first slot. ENFORCED
@@ -169,6 +196,31 @@ sealed interface InboxScreenState : State {
          */
         val displayOptions: InboxDisplayOptions = InboxDisplayOptions(),
         val displayOptionsOpen: Boolean = false,
+
+        /**
+         * The clock the list is rendered against — due-chip colours and the date sections both.
+         *
+         * ONE ticking source for the whole tab rather than `currentTimeMillis()` read per row. Two
+         * things depend on that: a row must not be able to disagree with the heading above it about
+         * whether its date has passed, and a screenshot test (or a preview) has to be able to pin
+         * the clock, which an ambient read makes impossible.
+         *
+         * The ViewModel advances this once a minute. WHEN the screen acts on a new value is the
+         * screen's decision — see `rememberSettledNow` in `InboxScreen`: applying a regroup while
+         * the user's finger is on the list would move the row out from under it.
+         */
+        val nowMillis: Long = currentTimeMillis(),
+
+        /**
+         * Whether the "plan your day" invitation is suppressed because it was swiped away within
+         * the last 24 hours.
+         *
+         * Resolved here rather than in the screen because it needs BOTH the persisted timestamp and
+         * the ticking clock, and the ViewModel already holds them. The screen adds the other half of
+         * the condition — how many undated tasks the page it is drawing has — which the ViewModel
+         * cannot know, because it does not know which page is on screen.
+         */
+        val planNudgeDismissed: Boolean = false,
     ) : InboxScreenState {
 
         /** Whether one more attachment fits on an item that already has [currentCount] of them. */
@@ -215,6 +267,24 @@ sealed interface InboxIntent : Intent {
      * of parallel vocabulary that drifts the moment a seventh chip is added.
      */
     data class OnCreateChipAction(val action: GistiItemCreateAction) : InboxIntent
+
+    /**
+     * One of the AI source pills (Photo / PDF / Web Link / Voice) was tapped.
+     *
+     * Routed through the ViewModel rather than through a host callback because BOTH halves of the
+     * response belong together and neither belongs to the shell: the emit of `ai_entry_tapped` and
+     * the navigation into Analyze with that material pre-selected. Splitting them across layers is
+     * how the v2 shell ended up with a credits chip that navigated but reported nothing, and an
+     * Analyze entry that reported nothing because it did not exist at all.
+     *
+     * @param source WHICH of this screen's two doors was tapped — the capture dock, the empty
+     *   state, or the sparse-inbox row. Passed in by the composable rather than inferred here:
+     *   the ViewModel cannot see which of its own surfaces the user was looking at.
+     */
+    data class OnAiSourceTapped(
+        val kind: AnalyzeInputKind,
+        val source: AiEntrySource,
+    ) : InboxIntent
 
     data class OnTaskCheckedChanged(val taskId: String, val checked: Boolean) : InboxIntent
 
@@ -321,6 +391,29 @@ sealed interface InboxIntent : Intent {
     data class OnLayoutSelected(val layout: InboxLayout) : InboxIntent
     data class OnSortSelected(val sort: InboxSort) : InboxIntent
     data class OnShowCompletedChanged(val show: Boolean) : InboxIntent
+
+    /**
+     * Date grouping switched on or off. Persisted like the other three; the list is regrouped from
+     * the stored value coming back, so there is no local copy to fall out of step with.
+     */
+    data class OnGroupByDateChanged(val group: Boolean) : InboxIntent
+
+    /**
+     * The plan-your-day nudge was swiped away. Hides it for 24 hours.
+     *
+     * A snooze rather than a permanent dismissal: the invitation is only useful while there is
+     * something to plan, and "never again" would delete the entry point to the daily review for a
+     * user who swiped once out of curiosity.
+     */
+    data object OnPlanNudgeDismissed : InboxIntent
+
+    /**
+     * "Try again" on [InboxScreenState.Error].
+     *
+     * Re-runs BOTH halves of the load — the Inbox-row guarantee and the pages subscription — since
+     * either can be what failed and the state does not distinguish them for the user.
+     */
+    data object OnRetryLoad : InboxIntent
 
     data object OnListMenuOpen : InboxIntent
     data object OnListMenuDismiss : InboxIntent

@@ -44,6 +44,7 @@ import aichecklists.core.designsystem.generated.resources.chat_message_thumb_up
 import aichecklists.core.designsystem.generated.resources.chat_open_checklist
 import aichecklists.core.designsystem.generated.resources.chat_paywall_cta_credits
 import aichecklists.core.designsystem.generated.resources.chat_retry
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
@@ -56,9 +57,10 @@ import org.jetbrains.compose.resources.stringResource
  * Layout (from AI Chat M3 design):
  * - **User (sent)** — right-aligned, `primaryContainer` background, 20-20-4-20 corners
  *   (tail on bottom-right). Max width 320dp (~78% of phone).
- * - **Assistant (received)** — left-aligned, `surfaceContainerHigh` background,
- *   20-20-20-4 corners (tail on bottom-left). Optional [AiSenderLabel] above the
- *   bubble (24dp avatar + "AI-ассистент"). Max width 340dp (~82%).
+ * - **Assistant (received)** — left-aligned, [AppChatColors.raised] background + a soft 1dp
+ *   [AppChatColors.contentOutline] hairline (both plane-relative — the same bubble renders on the
+ *   page and inside the bottom chrome), 20-20-20-4 corners (tail on bottom-left). Optional
+ *   [AiSenderLabel] above the bubble (24dp avatar + "AI-ассистент"). Max width 340dp (~82%).
  *
  * Below assistant bubbles: an icon action row [Copy] [ThumbUp] [ThumbDown], then a
  * wrap-content chip row of the actionable buttons — [Open checklist] (when the message
@@ -124,20 +126,24 @@ fun ChatMessageBubble(
                         bottomStart = 4.dp,
                     )
                 },
-                // User (sent) keeps the primaryContainer accent fill — it reads as "my message".
-                // Assistant (received) switches from grey `surfaceContainerHigh` to the clean
-                // `surfaceContainerLowest` (white in light) + hairline `outlineVariant` border,
-                // matching AskGistiBar. The grey tonal fill was the "страшный серый" the user
-                // reported in the dock answer field.
+                // User (sent) keeps the `primaryContainer` accent fill — it reads as "my message",
+                // and it is deliberately NOT plane-relative: it differs from the assistant bubble by
+                // hue and alignment as well as by tone, so it is legible on either plane as it is.
+                //
+                // Assistant (received) is plane-relative: the SAME bubble renders on the page (full
+                // ChatScreen) and inside the bottom chrome (dock / overlay), and the old fixed
+                // `surfaceContainerLowest` sat ΔL* −6.2 BELOW the dark chrome — a hole punched in the
+                // dock. The hairline stays SOFT (`outlineVariant`): a bubble is content, not a
+                // target, and it already carries a tonal step. See AppChatColors.
                 color = if (isUser) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.surfaceContainerLowest
+                    AppChatColors.raised()
                 },
                 border = if (isUser) {
                     null
                 } else {
-                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    BorderStroke(1.dp, AppChatColors.contentOutline())
                 },
                 modifier = Modifier.widthIn(max = if (isUser) 320.dp else 340.dp),
             ) {

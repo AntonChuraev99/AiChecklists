@@ -168,9 +168,11 @@ class FillManagementFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Should navigate to analyze screen with checklist context
+        // Should navigate to analyze screen with checklist context. Anchored on the source
+        // heading rather than on the "Fill via AI" title: that string is also the button just
+        // tapped, so it cannot tell "the screen opened" from "the button is still there".
         composeTestRule
-            .onNodeWithText("What would you like to analyze?")
+            .onNodeWithText(ANALYZE_SOURCE_HEADING)
             .assertIsDisplayed()
     }
 }

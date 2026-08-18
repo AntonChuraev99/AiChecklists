@@ -301,11 +301,15 @@ class ScreenshotCatalogTest : BaseUiTest() {
         returnToScreenCatalog()
 
         // 11. catalog_analyze_empty
-        // anchor: "What would you like to analyze?" (analyze_select_source)
+        // anchor: the source heading (analyze_select_source_short), rendered because this catalog
+        // entry opens Analyze with no material preselected. `isDisabledOk` is deliberately NOT set
+        // here: a stale anchor would then be swallowed, and the previous one WAS stale — it pinned
+        // `analyze_select_source`, deleted by the compact-picker redesign, and its 8s timeout threw
+        // and took every remaining store frame in this run down with it.
         // Credits = 10 after seed-with-data, so input fields ARE shown (not the no-credits state).
         captureFromCatalog(
             tagName = "catalog_analyze_empty",
-            anchor = "What would you like to analyze?",
+            anchor = ANALYZE_SOURCE_HEADING,
             screenshotName = "analyze_empty"
         )
 

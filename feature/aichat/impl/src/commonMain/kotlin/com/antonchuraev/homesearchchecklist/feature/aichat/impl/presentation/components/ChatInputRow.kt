@@ -79,6 +79,7 @@ import aichecklists.core.designsystem.generated.resources.chat_input_placeholder
 import aichecklists.core.designsystem.generated.resources.chat_record_voice
 import aichecklists.core.designsystem.generated.resources.chat_send_action
 import aichecklists.core.designsystem.generated.resources.chat_voice_press_hold_hint
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -210,15 +211,17 @@ fun ChatInputRow(
     val cancelThresholdDp = 80.dp
 
     // Outer column applies the surface padding (M3 chat bar — `padding: 8px 16px 12px`).
-    // Inner pill follows the AskGistiBar clean pattern: `surfaceContainerLowest` (white card
-    // in light, near-black in dark) + a hairline `outlineVariant` border so the pill stays
-    // visible on the white dock surface. Previously it was `surfaceContainerHigh` (grey tonal),
-    // which is the "страшный серый" the user reported. 28dp radius, all 4 controls live inside.
-    // minHeight 56dp lets the pill grow when text wraps to multiple lines.
+    // Inner pill is `AppChatColors.raised()` + a 1dp `controlOutline()` — see the Surface below for
+    // why both are plane-relative. (It used to be a fixed `surfaceContainerLowest` + `outlineVariant`,
+    // itself a fix for an earlier `surfaceContainerHigh` grey tonal fill — the "страшный серый" the
+    // user reported. `raised()` keeps that white-in-light result and repairs the dark dock.)
+    // 28dp radius, all 4 controls live inside; minHeight 56dp lets the pill grow when text wraps.
     // NOTE: this component does NOT apply imePadding / navigationBars itself. The bottom inset
     // (keyboard + system-nav) is owned by the HOST so it can be applied exactly once:
     //  - full ChatScreen: root Column already has .imePadding() + Scaffold navbar via scaffoldPadding;
-    //  - inline dock (GistiInlineChatPanel): panel Column applies ime.union(navigationBars).
+    //  - expandable dock: the HOST (GistiGlassChatDock's call site) applies imePadding +
+    //    navigationBarsPadding, lifting the whole dock as one unit;
+    //  - full-screen overlay (GistiFullChatOverlay): its input Column applies ime.union(navigationBars).
     // Applying it here too would double the inset in the full chat (Scaffold already insets navbar).
     Column(
         modifier = modifier
@@ -232,8 +235,13 @@ fun ChatInputRow(
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            // Plane-relative. This same row renders on the page (full ChatScreen) and inside the
+            // bottom chrome (chat dock, capture dock, full-screen overlay); `surfaceContainerLowest`
+            // is a step UP from the light page but ΔL* −6.2 DOWN from the dark chrome, i.e. a hole
+            // in the dock rather than a pill on it. `outline`, not `outlineVariant`, because this is
+            // a tappable target. See AppChatColors.
+            color = AppChatColors.raised(),
+            border = BorderStroke(1.dp, AppChatColors.controlOutline()),
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp),

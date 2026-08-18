@@ -32,35 +32,31 @@ class AnalyzeFlowTest : BaseUiTest() {
     fun analyzeScreen_displaysInputTypeOptions() {
         goToAnalyze()
 
-        // All input type options are displayed
-        composeTestRule
-            .onNodeWithText("Photo")
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("PDF")
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("Text File")
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("Web Link")
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("Paste Text")
-            .assertIsDisplayed()
+        // All SIX materials are offered, each by its own visible label. The labels are the
+        // affordance — a generic "Analyze" door recorded zero photo/pdf/voice analyses in 30 days —
+        // so the whole set is asserted, not a sample of it. Voice was missing here before and the
+        // other three were the LONG forms the compact picker replaced.
+        listOf(
+            ANALYZE_SOURCE_PHOTO,
+            ANALYZE_SOURCE_PDF,
+            ANALYZE_SOURCE_FILE,
+            ANALYZE_SOURCE_LINK,
+            ANALYZE_SOURCE_TEXT,
+            ANALYZE_SOURCE_VOICE,
+        ).forEach { label ->
+            composeTestRule
+                .onNodeWithText(label)
+                .assertIsDisplayed()
+        }
     }
 
     @Test
     fun analyzeScreen_selectInputTypeShowsCostAndAnalyzeButton() {
         goToAnalyze()
 
-        // Select "Paste Text" option
+        // Select the paste-text material
         composeTestRule
-            .onNodeWithText("Paste Text")
+            .onNodeWithText(ANALYZE_SOURCE_TEXT)
             .performClick()
         waitForIdle()
 
@@ -79,9 +75,9 @@ class AnalyzeFlowTest : BaseUiTest() {
     fun analyzeScreen_selectWebLinkShowsCostInfo() {
         goToAnalyze()
 
-        // Select "Web Link" option
+        // Select the web-link material
         composeTestRule
-            .onNodeWithText("Web Link")
+            .onNodeWithText(ANALYZE_SOURCE_LINK)
             .performClick()
         waitForIdle()
 
@@ -102,7 +98,7 @@ class AnalyzeFlowTest : BaseUiTest() {
 
         // Select an input type to show the bottom bar
         composeTestRule
-            .onNodeWithText("Paste Text")
+            .onNodeWithText(ANALYZE_SOURCE_TEXT)
             .performClick()
         waitForIdle()
 
@@ -118,7 +114,7 @@ class AnalyzeFlowTest : BaseUiTest() {
 
         // Select an input type
         composeTestRule
-            .onNodeWithText("Paste Text")
+            .onNodeWithText(ANALYZE_SOURCE_TEXT)
             .performClick()
         waitForIdle()
 
@@ -132,9 +128,9 @@ class AnalyzeFlowTest : BaseUiTest() {
     fun analyzeScreen_backNavigatesToTemplates() {
         goToAnalyze()
 
-        // Verify we're on analyze screen
+        // Verify we're on analyze screen — its source heading, shown while nothing is chosen.
         composeTestRule
-            .onNodeWithText("What would you like to analyze?")
+            .onNodeWithText(ANALYZE_SOURCE_HEADING)
             .assertIsDisplayed()
 
         // Press back - goes from Analyze to Templates
@@ -152,21 +148,24 @@ class AnalyzeFlowTest : BaseUiTest() {
     fun analyzeScreen_inputTypeSelectionChanges() {
         goToAnalyze()
 
-        // Select "Photo"
+        // Choosing a material COLLAPSES the grid to a single current-material pill, so each further
+        // switch costs a tap on that pill first. That is the price the owner accepted for landing a
+        // door straight on its editor; the test walks the real path rather than assuming the grid
+        // stays open.
         composeTestRule
-            .onNodeWithText("Photo")
+            .onNodeWithText(ANALYZE_SOURCE_PHOTO)
             .performClick()
         waitForIdle()
 
-        // Then select "PDF"
+        reopenAnalyzeSourcePicker(ANALYZE_SOURCE_PHOTO)
         composeTestRule
-            .onNodeWithText("PDF")
+            .onNodeWithText(ANALYZE_SOURCE_PDF)
             .performClick()
         waitForIdle()
 
-        // Then select "Paste Text"
+        reopenAnalyzeSourcePicker(ANALYZE_SOURCE_PDF)
         composeTestRule
-            .onNodeWithText("Paste Text")
+            .onNodeWithText(ANALYZE_SOURCE_TEXT)
             .performClick()
         waitForIdle()
 

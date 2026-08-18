@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_typing_indicator_a11y
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -38,7 +39,9 @@ import org.jetbrains.compose.resources.stringResource
  *
  * Design:
  * - Left-aligned row (mirrors assistant bubble alignment)
- * - Bubble uses `surfaceContainerHigh` (same as [ChatMessageBubble] assistant color — M3 Expressive)
+ * - Bubble uses [AppChatColors.raised] + a soft [AppChatColors.contentOutline] hairline — the SAME
+ *   pair as [ChatMessageBubble]'s assistant side, because the real answer replaces this block in
+ *   place and any drift would show as the bubble changing colour the moment the text arrives
  * - Asymmetric tail corner: bottomStart=4dp (matches assistant bubble shape)
  * - 3 dots, 6dp diameter, 4dp gap between them
  * - Alpha animation: 0.3f → 1.0f, staggered 200ms between dots
@@ -67,11 +70,12 @@ fun ChatTypingIndicator(
                 bottomEnd = 16.dp,
                 bottomStart = 4.dp,
             ),
-            // Clean assistant bubble — matches ChatMessageBubble's received bubble:
-            // `surfaceContainerLowest` (white in light) + hairline `outlineVariant` border,
-            // instead of the previous grey `surfaceContainerHigh` tonal fill.
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            // Same pair as ChatMessageBubble's received bubble, and it has to STAY the same pair:
+            // this block is the placeholder that the real answer replaces in place, so any drift
+            // shows up as the bubble changing colour the moment the text arrives. Content, not a
+            // target → the soft hairline. See AppChatColors.
+            color = AppChatColors.raised(),
+            border = BorderStroke(1.dp, AppChatColors.contentOutline()),
             modifier = Modifier.widthIn(max = 80.dp),
         ) {
             Row(
@@ -111,7 +115,9 @@ private fun TypingDot(delayMs: Int) {
 
     Surface(
         shape = CircleShape,
-        // onSurface pairs with surfaceContainerHigh per MD3 tonal pairing rules
+        // The dot is ink on the bubble, so it takes a CONTENT role for whatever the bubble resolved
+        // to. (The old comment claimed a `surfaceContainerHigh` pairing; that fill has not been the
+        // bubble's since the clean-bubble change, and the role below never matched it.)
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .size(6.dp)

@@ -2,9 +2,10 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.templat
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -187,6 +188,11 @@ class TemplatesViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
@@ -282,4 +288,125 @@ class TemplatesViewModelTest {
         )
     }
 
+    // ─── ai_entry_tapped ──────────────────────────────────────────────────────
+    //
+    // The event shipped with no test at all, which is the same hole it exists to close: a typo in a
+    // `wire` value, a dropped `destination` or a silently-vanished `has_query` would all leave this
+    // door looking healthy while its funnel read zero. The assertions therefore pin the WHOLE param
+    // map, never a single key — an extra dimension is as much a defect as a missing one, because
+    // Amplitude registers a property name on first ingest and it cannot be taken back.
+
+    @Test
+    fun `createWithAi_fromTheGalleryHeader_emitsTheFullParamMap`() = runTest {
+        val (viewModel, _) = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.sendIntent(
+            TemplatesScreenIntent.OnCreateWithAiClick(source = AiEntrySource.TEMPLATES_HEADER)
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "ai_entry_tapped" to mapOf<String, Any>(
+                    AnalyticsParams.DESTINATION to "ai_create",
+                    AnalyticsParams.SOURCE to "templates_header",
+                ),
+            ),
+            analytics.events,
+            "The gallery header door must report destination + source and NOTHING else: it has no " +
+                "material to pre-select (no input_type) and no typed query (no has_query/query_len)",
+        )
+    }
+
+    @Test
+    fun `createWithAi_fromTheEmptySearchDoor_carriesTheTypedQuery`() = runTest {
+        val (viewModel, _) = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.sendIntent(
+            TemplatesScreenIntent.OnCreateWithAiClick(
+                source = AiEntrySource.TEMPLATES_EMPTY_SEARCH,
+                query = "socks",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "ai_entry_tapped" to mapOf<String, Any>(
+                    AnalyticsParams.DESTINATION to "ai_create",
+                    AnalyticsParams.SOURCE to "templates_empty_search",
+                    AnalyticsParams.HAS_QUERY to true,
+                    AnalyticsParams.QUERY_LEN to 5,
+                ),
+            ),
+            analytics.events,
+            "A user who typed words we could not match is the highest-intent tap on this screen; " +
+                "has_query is the countable denominator and query_len the shape",
+        )
+    }
+
+    /**
+     * The blank-query branch still SENDS both keys, with `false` / `0`.
+     *
+     * Omitting them instead would leave the "typed something" share without a denominator — the
+     * same missing-dimension defect as `entry_source` being absent rather than `"none"`.
+     */
+    @Test
+    fun `createWithAi_fromTheEmptySearchDoor_withABlankQuery_reportsHasQueryFalse`() = runTest {
+        val (viewModel, _) = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.sendIntent(
+            TemplatesScreenIntent.OnCreateWithAiClick(
+                source = AiEntrySource.TEMPLATES_EMPTY_SEARCH,
+                query = "   ",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "ai_entry_tapped" to mapOf<String, Any>(
+                    AnalyticsParams.DESTINATION to "ai_create",
+                    AnalyticsParams.SOURCE to "templates_empty_search",
+                    AnalyticsParams.HAS_QUERY to false,
+                    AnalyticsParams.QUERY_LEN to 0,
+                ),
+            ),
+            analytics.events,
+            "A blank query must still be counted, as has_query=false — not dropped",
+        )
+    }
+
+    /**
+     * The scoping rule, checked against EVERY door rather than the two that happen to be wired.
+     *
+     * `has_query` means "this user described what they wanted". If a second door ever starts
+     * sending it, the metric silently changes meaning and no chart shows the change — the query
+     * dimensions belong to the empty-search door alone, and a `when`/`if` on the source is exactly
+     * the sort of condition a later edit widens by accident.
+     */
+    @Test
+    fun `onlyTheEmptySearchDoor_carriesTheQueryDimensions`() = runTest {
+        AiEntrySource.entries.forEach { source ->
+            val (viewModel, _) = buildViewModel()
+            advanceUntilIdle()
+            analytics.events.clear()
+
+            viewModel.sendIntent(
+                TemplatesScreenIntent.OnCreateWithAiClick(source = source, query = "socks")
+            )
+            advanceUntilIdle()
+
+            val params = analytics.events.single().second
+            val carriesQuery = AnalyticsParams.HAS_QUERY in params || AnalyticsParams.QUERY_LEN in params
+            assertEquals(
+                source == AiEntrySource.TEMPLATES_EMPTY_SEARCH,
+                carriesQuery,
+                "$source: only templates_empty_search may carry has_query/query_len; got $params",
+            )
+        }
+    }
 }

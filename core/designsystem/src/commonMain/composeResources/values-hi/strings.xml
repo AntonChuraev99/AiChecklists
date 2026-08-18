@@ -293,7 +293,6 @@
     <string name="templates_use_template">टेम्पलेट इस्तेमाल करें</string>
     <string name="templates_section_title">टेम्पलेट चुनें</string>
     <string name="templates_tap_to_use">इस्तेमाल के लिए टैप करें</string>
-    <string name="templates_create_manually">खुद बनाएं</string>
     <string name="templates_create_with_ai">AI से बनाएं</string>
 
     <!-- Template Preview Screen -->
@@ -332,14 +331,14 @@
     <string name="analyze_button">विश्लेषण करें</string>
     <string name="analyze_loading">आपका कंटेंट विश्लेषण हो रहा है</string>
     <string name="analyze_loading_description">AI चेकलिस्ट आइटम निकाल रहा है...</string>
-    <string name="analyze_select_source">आप क्या विश्लेषण करना चाहते हैं?</string>
-    <string name="analyze_enter_data">अपना कंटेंट जोड़ें</string>
     <string name="analyze_source_photo">फ़ोटो</string>
     <string name="analyze_source_pdf">PDF</string>
-    <string name="analyze_source_text_file">टेक्स्ट फ़ाइल</string>
-    <string name="analyze_source_link">वेब लिंक</string>
-    <string name="analyze_source_text">टेक्स्ट पेस्ट करें</string>
+    <string name="analyze_source_link_short">लिंक</string>
     <string name="analyze_source_voice">वॉइस</string>
+    <string name="analyze_source_text_file_short">फ़ाइल</string>
+    <string name="analyze_source_text_short">टेक्स्ट</string>
+    <string name="analyze_source_change">स्रोत बदलें: %1$s</string>
+    <string name="analyze_select_source_short">स्रोत चुनें</string>
     <string name="analyze_url_label">URL</string>
     <string name="analyze_url_placeholder">https://example.com/article</string>
     <string name="analyze_text_placeholder">मीटिंग नोट्स, आर्टिकल, निर्देश पेस्ट करें — जो कुछ भी आप चेकलिस्ट में बदलना चाहते हैं...</string>
@@ -1608,6 +1607,8 @@
     <string name="inbox_empty_title">आपका इनबॉक्स खाली है</string>
     <string name="inbox_empty_description">आप जो कुछ भी नोट करेंगे वह पहले यहीं आएगा। अभी टास्क जोड़ें और बाद में उसे किसी प्रोजेक्ट में लगा दें।</string>
     <string name="inbox_project_empty_description">इस प्रोजेक्ट में अभी कोई टास्क नहीं है।</string>
+    <string name="inbox_ai_entry_title">कंटेंट को चेकलिस्ट में बदलें</string>
+    <string name="capture_dock_ai_entry_title">या इनसे चेकलिस्ट बनाएँ:</string>
     <string name="inbox_open_project_action">प्रोजेक्ट खोलें</string>
     <string name="inbox_task_sheet_move">प्रोजेक्ट में ले जाएं</string>
     <string name="inbox_task_sheet_delete">टास्क हटाएं</string>
@@ -1647,6 +1648,15 @@
     <string name="inbox_display_sort_manual">मैन्युअल</string>
     <string name="inbox_display_sort_name">नाम से</string>
     <string name="inbox_display_sort_priority">महत्व से</string>
+    <string name="inbox_display_group_by_date">तारीख के अनुसार समूह</string>
+
+    <!-- टास्क सूची के सेक्शन शीर्षक -->
+    <string name="inbox_section_overdue">बीत चुका</string>
+    <string name="inbox_section_today">आज</string>
+    <string name="inbox_section_upcoming">आगामी</string>
+    <string name="inbox_section_anytime">कभी भी</string>
+
+    <string name="inbox_error_retry">फिर से आज़माएं</string>
 
     <!-- प्रोजेक्ट्स टैब -->
     <string name="projects_title">प्रोजेक्ट्स</string>
@@ -1714,4 +1724,42 @@
          GetUserLimitsUseCase, never a local constant. -->
     <string name="create_limit_reached_title">फ्री प्लान में %1$d प्रोजेक्ट शामिल हैं</string>
     <string name="create_limit_reached_description">अनलिमिटेड प्रोजेक्ट के लिए प्रीमियम लें, या जिसकी अब ज़रूरत नहीं उसे हटा दें।</string>
+
+    <!-- ─── Plan nudge ───────────────────────────────────────────────────────────────────────
+         Deliberately carries no count of undated tasks — see the English file. -->
+    <string name="plan_nudge_title">Gisti के साथ अपना दिन प्लान करें</string>
+    <string name="plan_nudge_subtitle">एक बार में एक टास्क</string>
+
+    <!-- ─── Due labels (DueLabelFormatter) ───────────────────────────────────────────────────
+         Hindi puts the day before the month, so due_date swaps the arguments (%2$s %1$s). -->
+    <string name="due_today">आज %1$s</string>
+    <string name="due_tomorrow">कल %1$s</string>
+    <string name="due_weekday">%1$s %2$s</string>
+    <!-- %1$s = month, %2$s = day number — reversed for Hindi. -->
+    <string name="due_date">%2$s %1$s</string>
+    <string name="due_overdue_time">बकाया %1$s बजे</string>
+    <string name="due_overdue_day">बकाया %1$s</string>
+    <string name="due_someday">कभी भी</string>
+    <string name="due_repeat_daily">रोज़ %1$s</string>
+    <string name="due_repeat_weekly">%1$s %2$s</string>
+    <string name="due_repeat_weekly_named">हर हफ्ते %1$s %2$s</string>
+    <string name="due_repeat_weekly_any">हर हफ्ते %1$s</string>
+    <string name="due_repeat_monthly">हर महीने %1$s</string>
+    <string name="due_repeat_yearly">हर साल %1$s</string>
+    <string name="due_absolute_date_time">%1$s, %2$s</string>
+    <string name="due_missed">छूट गया (%1$s)</string>
+
+    <!-- Abbreviated month names, sized for a 140dp chip. -->
+    <string name="month_abbr_jan">जन</string>
+    <string name="month_abbr_feb">फ़र</string>
+    <string name="month_abbr_mar">मार्च</string>
+    <string name="month_abbr_apr">अप्रैल</string>
+    <string name="month_abbr_may">मई</string>
+    <string name="month_abbr_jun">जून</string>
+    <string name="month_abbr_jul">जुल</string>
+    <string name="month_abbr_aug">अग</string>
+    <string name="month_abbr_sep">सित</string>
+    <string name="month_abbr_oct">अक्तू</string>
+    <string name="month_abbr_nov">नव</string>
+    <string name="month_abbr_dec">दिस</string>
 </resources>

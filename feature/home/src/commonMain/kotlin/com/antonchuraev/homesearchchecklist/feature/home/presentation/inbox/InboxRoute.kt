@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -75,6 +76,13 @@ fun InboxRoute(
      */
     anchorChecklistId: Long? = null,
     onAnchorChecklistChanged: (Long?) -> Unit = {},
+    /**
+     * Analytics `source` for the top bar's AI-credits chip — see [InboxScreen]. Defaulted to
+     * [CreditsChipSource.V2_INBOX] rather than to null: this route exists only in the v2 arm, so a
+     * host that omitted it would silently drop the paywall entry point from the v2 HOME tab — the
+     * exact defect the chip was added to fix ("я даже не могу найти где пейвол открыть с главного").
+     */
+    creditsSource: String? = CreditsChipSource.V2_INBOX,
     viewModel: InboxViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
@@ -112,6 +120,10 @@ fun InboxRoute(
         }
     }
 
+    // TODO(ux-overhaul step 8): pass `onPlanDayClick = { navigator.navigateToDailyReview() }` once
+    //  DailyReviewScreen and its route exist. Left UNPASSED rather than wired to a no-op on purpose:
+    //  InboxScreen does not compose the plan-your-day nudge at all while the callback is null, so
+    //  today the affordance is simply absent instead of being a button that swallows its own tap.
     InboxScreen(
         state = state,
         contentBottomPadding = contentBottomPadding,
@@ -123,5 +135,6 @@ fun InboxRoute(
         homeSignal = homeSignal,
         anchorChecklistId = anchorChecklistId,
         onAnchorChecklistChanged = onAnchorChecklistChanged,
+        creditsSource = creditsSource,
     )
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 
 /**
@@ -31,8 +32,13 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
  * - [ChoiceRole.Primary]     primary / onPrimary (the recommended action, max one per block)
  * - [ChoiceRole.Default]     primaryContainer / onPrimaryContainer
  * - [ChoiceRole.Destructive] error / onError + a leading trash icon supplied by the caller
- * - [ChoiceRole.Escape]      transparent + 1dp outlineVariant border + onSurfaceVariant text
- * - [ChoiceRole.Add]         surfaceContainer + dashed-look outline + leading "+" supplied by caller
+ * - [ChoiceRole.Escape]      `AppChatColors.raised()` + 1dp `controlOutline()` + onSurfaceVariant text
+ * - [ChoiceRole.Add]         the SAME fill and outline + onSurface text + a leading "+" from the caller
+ *
+ * The first three are absolute (they carry their own hue); the two NEUTRAL roles resolve against the
+ * plane the chat is drawn on, because they are the roles with no hue to fall back on. They share one
+ * fill deliberately — see the `container` branch for what does tell them apart, and for why splitting
+ * the fills today would be designing for a role no production path emits.
  *
  * Loading: when [isLoading] is true the chip shows a 16dp spinner in place of (or beside) the
  * label and uses [loadingLabel]. When [enabled] is false the chip dims to 38% alpha and ignores
@@ -76,12 +82,41 @@ internal fun AiChoiceChip(
     maxLines: Int = 2,
 ) {
     val cs = MaterialTheme.colorScheme
+    // Primary / Default / Destructive are ACCENTS: they carry their own hue and are legible on
+    // either plane, so they stay absolute. Escape and Add are the two neutral roles, and they are
+    // exactly the class of control the reminder chips belong to — Escape was `Color.Transparent`
+    // (the reported "buttons blend into the background" defect, one hairline and nothing else) and
+    // Add's `surfaceContainer` is only ΔL* ~2 off the dark chrome. Both go plane-relative.
+    //
+    // ONE arm for the two of them, not two arms that happen to agree. They were split, and the split
+    // read as an intention to tint them apart that was never carried out. Audited before merging:
+    //  - what actually separates them is the LABEL (`onSurfaceVariant` vs `onSurface` — ΔL* 18.8 in
+    //    light, 10.4 in dark), the leading "+" the caller passes for Add and never for Escape, and
+    //    the layout (AiChoiceResponse puts the escape in its own row BELOW the options);
+    //  - a tonal split of the fills would be designing for a role nothing renders: no production code
+    //    path emits `ChoiceRole.Add` today — the only non-test reference to it is the icon mapping in
+    //    AiChoiceResponse. Give it a fill of its own when something starts producing it, with a spec.
+    //
+    // ## What merging COST, named rather than left to be re-discovered
+    // `Add` used to be `surfaceContainer` — on the light PAGE a step DOWN, ΔL* −3.9. `raised()` is a
+    // step UP, and up from a near-white page is ΔL* +1.7, i.e. nothing. So on that ONE cell of the
+    // matrix (light × page) the chip is now carried by its ring alone; the other three (light chrome
+    // +12.2, dark page +4.3, dark chrome +5.9) all gained or held. Checked on
+    // `ChatSurfacePlanesScreenshotTest.planes_360_light` at 3x: both neutral chips read unambiguously
+    // as pressable there — a 3.33 : 1 `outline` capsule is a boundary you see, which is the whole
+    // difference from the 1.04 : 1 hairline that caused the original "buttons blend into the
+    // background" report. It is also exactly how `SourcePill` renders on the same near-white page,
+    // and that treatment is shipped and approved.
+    //
+    // `quietFill()` would restore the −3.9 and is NOT the answer: its own KDoc scopes it to elements
+    // "that carry no outline at all", because it exists to be a fill that works as the ONLY channel.
+    // Both roles here have a ring. Revisit if the page stops being near-white, or when a production
+    // path starts emitting `Add` and it needs to be told apart from `Escape` by more than its label.
     val container: Color = when (role) {
         ChoiceRole.Primary -> cs.primary
         ChoiceRole.Default -> cs.primaryContainer
         ChoiceRole.Destructive -> cs.error
-        ChoiceRole.Escape -> Color.Transparent
-        ChoiceRole.Add -> cs.surfaceContainer
+        ChoiceRole.Escape, ChoiceRole.Add -> AppChatColors.raised()
     }
     val content: Color = when (role) {
         ChoiceRole.Primary -> cs.onPrimary
@@ -90,17 +125,29 @@ internal fun AiChoiceChip(
         ChoiceRole.Escape -> cs.onSurfaceVariant
         ChoiceRole.Add -> cs.onSurface
     }
+    // Dim the whole chip — fill, text, icon AND ring — uniformly when disabled. We can't disable
+    // Surface's onClick AND keep custom colors with one flag, so we drop alpha on the colors and gate
+    // onClick. The old `if (container == Color.Transparent)` guard is gone with the transparent role
+    // it guarded: every role now has a fill, so every role dims the same way.
+    val dimAlpha = if (enabled) 1f else 0.38f
+    val effectiveContainer = container.copy(alpha = dimAlpha)
+    val effectiveContent = content.copy(alpha = dimAlpha)
+
+    // Both neutral roles are tap targets, so both take the firm control outline. Escape used to take
+    // the soft `outlineVariant` — the weaker of the two channels on the chip that had no other.
+    //
+    // The ring takes `dimAlpha` like everything else, and it has to. Left at full strength it was the
+    // ONE part of a disabled chip that did not fade: a blurred fill and a ghost label inside a
+    // full-contrast `outline` ring reads as an ACTIVE control whose text happens to be faint, which is
+    // the opposite of what "the whole choice block is non-interactive while one chip executes" has to
+    // communicate. The defect predates the plane work and was invisible while `Escape` was
+    // transparent with a soft hairline; moving both neutral roles onto the firm ring is what made it
+    // show.
     val border: BorderStroke? = when (role) {
-        ChoiceRole.Escape -> BorderStroke(1.dp, cs.outlineVariant)
-        ChoiceRole.Add -> BorderStroke(1.dp, cs.outline)
+        ChoiceRole.Escape, ChoiceRole.Add ->
+            BorderStroke(1.dp, AppChatColors.controlOutline().copy(alpha = dimAlpha))
         else -> null
     }
-
-    // Dim the whole chip (fill, text, icon) uniformly when disabled. We can't disable Surface's
-    // onClick AND keep custom colors with one flag, so we drop alpha on the colors and gate onClick.
-    val dimAlpha = if (enabled) 1f else 0.38f
-    val effectiveContainer = if (container == Color.Transparent) container else container.copy(alpha = dimAlpha)
-    val effectiveContent = content.copy(alpha = dimAlpha)
 
     Surface(
         onClick = onClick,

@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -21,6 +22,13 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ProjectsRoute(
     contentBottomPadding: Dp = 0.dp,
+    /**
+     * Analytics `source` for the top bar's AI-credits chip — see [ProjectsScreen]. Defaulted to
+     * [CreditsChipSource.V2_PROJECTS] rather than to null: this route exists only in the v2 arm, so
+     * a host that omitted it would silently drop the tab's only paywall entry point, which is the
+     * exact defect this chip was added to fix.
+     */
+    creditsSource: String? = CreditsChipSource.V2_PROJECTS,
     viewModel: ProjectsViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
@@ -29,5 +37,6 @@ fun ProjectsRoute(
         state = state,
         onIntent = viewModel::sendIntent,
         contentBottomPadding = contentBottomPadding,
+        creditsSource = creditsSource,
     )
 }

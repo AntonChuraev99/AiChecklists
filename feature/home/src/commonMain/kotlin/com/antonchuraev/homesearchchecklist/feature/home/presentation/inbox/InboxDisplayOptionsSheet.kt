@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.inbox_display_group_by_date
 import aichecklists.core.designsystem.generated.resources.inbox_display_layout
 import aichecklists.core.designsystem.generated.resources.inbox_display_layout_cards
 import aichecklists.core.designsystem.generated.resources.inbox_display_layout_compact
@@ -128,21 +129,21 @@ fun InboxDisplayOptionsSheet(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(Res.string.inbox_display_show_completed),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                AppSwitch(
-                    checked = options.showCompleted,
-                    onCheckedChange = { onIntent(InboxIntent.OnShowCompletedChanged(it)) },
-                )
-            }
+            ToggleRow(
+                label = stringResource(Res.string.inbox_display_show_completed),
+                checked = options.showCompleted,
+                onCheckedChange = { onIntent(InboxIntent.OnShowCompletedChanged(it)) },
+            )
+
+            // The fourth block, and deliberately a row on THIS sheet rather than a surface of its
+            // own: grouping is a projection over the list exactly like the sort below it, so it
+            // belongs beside the other three view settings. A separate control somewhere else would
+            // be a second place to look for "why does my list look like that".
+            ToggleRow(
+                label = stringResource(Res.string.inbox_display_group_by_date),
+                checked = options.groupByDate,
+                onCheckedChange = { onIntent(InboxIntent.OnGroupByDateChanged(it)) },
+            )
 
             SectionLabel(stringResource(Res.string.inbox_display_sort))
 
@@ -164,6 +165,32 @@ fun InboxDisplayOptionsSheet(
                 )
             }
         }
+    }
+}
+
+/**
+ * A label plus a switch, applied on tap like every other row on this sheet.
+ *
+ * One composable for both toggles: the second one arrived with date grouping, and a copied Row is
+ * how two controls on the same sheet end up with different label styles and different heights.
+ */
+@Composable
+private fun ToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        AppSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

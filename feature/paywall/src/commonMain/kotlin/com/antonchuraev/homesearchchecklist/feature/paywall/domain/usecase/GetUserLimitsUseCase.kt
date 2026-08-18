@@ -4,8 +4,8 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDe
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.isPremiumUser
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
@@ -54,8 +54,10 @@ class GetUserLimitsUseCase(
             userDataRepository.getUserDataFlow().map { it.isPremium },
             checklistRepository.weeklyChecklistCount
         ) { checklistCount, subscriptionStatus, firestorePremium, weeklyCount ->
-            val revenueCatPremium = subscriptionStatus.activeEntitlements.contains(Entitlements.PREMIUM)
-            val isPremium = revenueCatPremium || firestorePremium
+            // The OR used to be written out here. It now lives in exactly one place, shared with the
+            // credits chip in every v2 toolbar — two copies of a premium gate is how one of them ends
+            // up fixed and the other not.
+            val isPremium = isPremiumUser(subscriptionStatus, firestorePremium)
             UserLimits(
                 maxChecklists = maxChecklists,
                 maxFillsPerChecklist = maxFillsPerChecklist,

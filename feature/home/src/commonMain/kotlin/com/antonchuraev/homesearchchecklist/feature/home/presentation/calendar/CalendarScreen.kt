@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,7 +69,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -81,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_empty_cta
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.calendar_empty_description
 import aichecklists.core.designsystem.generated.resources.calendar_empty_title
@@ -98,14 +100,21 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWin
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
-import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockScrimAlpha
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChromeScrim
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -113,6 +122,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Today
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.AddTaskRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayBody
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayScreenState
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.hostsAddTaskAction
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -215,7 +225,27 @@ fun CalendarScreen(
     onAddTaskRowClick: () -> Unit = {},
     onQuickAddTextChange: (String) -> Unit = {},
     onQuickAddSubmit: () -> Unit = {},
+    /**
+     * One of the capture dock's AI source pills was tapped (Photo / PDF / Web Link / Voice).
+     *
+     * Defaulted to a no-op like its dock siblings above so the standalone Today route — which has
+     * no dock — stays unchanged. The v2 Calendar tab wires it in `CalendarRoute`.
+     */
+    onAiSourceTapped: (AnalyzeInputKind) -> Unit = {},
     snackbarHostState: SnackbarHostState? = null,
+    /**
+     * Analytics `source` for the AI-credits chip in the top bar; **null draws no chip**.
+     *
+     * The arm gate matters MORE here than on the other three v2 tabs, and it is the whole reason this
+     * is a nullable source rather than an unconditional chip: `AppNavRoute.Calendar` is also what the
+     * v1 DRAWER pushes, so this is the one shared screen of the four. An unconditional chip would
+     * plant a brand-new paywall entry point inside the A/B CONTROL arm and confound the experiment
+     * the v2 shell is being judged by. Same reason [captureEnabled] is threaded rather than derived:
+     * the screen cannot see which arm mounted it.
+     *
+     * v2 hosts pass [CreditsChipSource.V2_CALENDAR]; the control arm passes nothing.
+     */
+    creditsSource: String? = null,
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
@@ -275,13 +305,28 @@ fun CalendarScreen(
     // screen. Both of those collapse to the same rule: whoever is last carries it.
     val bodyBottomPadding = if (captureVisible || captureRowVisible) 0.dp else contentBottomPadding
 
-    // ── Capture-dock scrim: TWO tiled scrims, one flag (same anatomy as the Inbox tab) ───────────
-    // The dock is the scaffold's `bottomBar`, so a scrim scoped to the CONTENT already stops exactly
-    // where the dock begins — at any keyboard height, with nothing to measure. [contentTopPx] is the
-    // content slot's y in the root, i.e. the height of the chrome above it, and the top scrim uses
-    // exactly that so the two tile without a seam.
-    var contentTopPx by remember { mutableStateOf(0f) }
-    val captureScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = CaptureDockScrimAlpha)
+    // ── Capture-dock scrim: TWO tiled scrims over the page, one ceiling (same anatomy as the Inbox
+    // tab, and the same two numbers) ─────────────────────────────────────────────────────────────
+    // The dock is the scaffold's `bottomBar`, so a scrim scoped to the CONTENT is bounded by the
+    // content slot's own size and cannot reach it. [contentTopPx] is that slot's y in the root, i.e.
+    // the height of the chrome above it, and the top tile reaches exactly that so the two meet
+    // without a seam.
+    //
+    // ⚠️ [dockTopPx] is the top tile's CEILING and has to be measured on the dock: once the keyboard
+    // makes `topBar + bottomBar` taller than the window, Material3 overlaps the two bars and collapses
+    // the content slot to zero height BELOW the dock's top edge, so the content slot's offset stops
+    // being an upper bound for it. Uncapped, this tile dimmed the dock's top edge and double-dimmed
+    // its shoulders on a Pixel 9 — see [captureScrimBottomPx] for the arithmetic.
+    //
+    // ⚠️ Both are UNDELEGATED state and never read in this body — they move once per frame while the
+    // keyboard animates, and a read here would invalidate the whole screen for the length of that
+    // animation. [CaptureChromeScrim] reads them in its own layout pass instead.
+    val contentTopPx = remember { mutableFloatStateOf(0f) }
+    // Keyed on the dock's gate — same reason as the Inbox host: only the dock writes this, a closed
+    // dock writes nothing, so an unkeyed `remember` would hand the next OPEN a stale ceiling measured
+    // in a window that no longer exists, and the first frame would cap the top tile short.
+    val dockTopPx = remember(captureVisible) { mutableFloatStateOf(CaptureDockTopUnmeasured) }
+    val captureScrimColor = captureDockScrimColor()
 
     // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
     PlatformBackHandler(enabled = captureVisible) { onCaptureDockDismiss() }
@@ -302,6 +347,14 @@ fun CalendarScreen(
                     }
                 }
             } else null,
+            // This tab had NO actions slot at all before — the v2 shell left it without any paywall
+            // entry point, like its three siblings. Flat emission, not a Row: `AppScaffold` forwards
+            // the slot into Material's `actions: RowScope.() -> Unit`.
+            actions = {
+                if (creditsSource != null) {
+                    CreditsToolbarAction(source = creditsSource)
+                }
+            },
             scrollBehavior = scrollBehavior,
             snackbarHost = {
                 if (snackbarHostState != null) SnackbarHost(hostState = snackbarHostState)
@@ -316,6 +369,17 @@ fun CalendarScreen(
                         onTextChange = onQuickAddTextChange,
                         onAdd = onQuickAddSubmit,
                         placeholder = stringResource(Res.string.today_quick_add_placeholder),
+                        // Behind the dock, not over it: the only pixels this reaches are the two
+                        // corners `SheetTop` clips away, which otherwise show the raw page against
+                        // the dimmed page beside them (measured ΔL* +41 in light). The content scrim
+                        // above cannot cover them — it stops at the content slot's edge on purpose.
+                        // Identical to the Inbox tab's, deliberately: the two docks are one surface
+                        // and must sit in the same depth of dim — including the measurement in the
+                        // same chain, which is what keeps this the ONLY tile painting below the dock's
+                        // top edge (see [captureScrimBottomPx]).
+                        modifier = Modifier
+                            .onGloballyPositioned { dockTopPx.floatValue = it.positionInRoot().y }
+                            .background(captureScrimColor),
                         // This tab draws the day's reminders, so its draft arrives with one chip
                         // already selected ("Tonight", or "In 1 hour" once the evening has
                         // started) — that chip is what keeps a task captured here visible on the
@@ -332,6 +396,19 @@ fun CalendarScreen(
                                 showRepeat = false,
                             )
                         },
+                        // Same four doors as the Inbox tab, from the same shared component — the
+                        // two tabs must not drift into two different answers to "what can I hand
+                        // the AI". Only the reported source differs.
+                        //
+                        // With the heading, and the SAME heading the Inbox dock uses: four bare pills
+                        // under a task field read as "attach one of these to this task" rather than as
+                        // "or build me a checklist out of this" (owner report, 2026-08-17).
+                        belowInput = {
+                            SourceRowSection(
+                                title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                onSelect = onAiSourceTapped,
+                            )
+                        },
                     )
                 }
             },
@@ -341,7 +418,7 @@ fun CalendarScreen(
                     .fillMaxSize()
                     // Seam for the top scrim: this column's y in the root is the height of the chrome
                     // above it (status bar + app bar), which the top scrim below uses as its height.
-                    .onGloballyPositioned { contentTopPx = it.positionInRoot().y }
+                    .onGloballyPositioned { contentTopPx.floatValue = it.positionInRoot().y }
                     // CONTENT scrim, as a draw layer rather than an overlay node — the tab row and
                     // the pager beneath it must stay interactive, and an overlay is exactly what the
                     // pager's dismiss comment below rules out (hit-testing stops at the topmost
@@ -424,6 +501,18 @@ fun CalendarScreen(
                             onRetry = onTodayRetry,
                             contentBottomPadding = bodyBottomPadding,
                             canCapture = captureEnabled,
+                            // The SAME callback the pinned row below fires, so the empty state's
+                            // button routes through `TodayIntent.OnAddTaskRowClick` and keeps the
+                            // `source = "inline_row"` analytics — a second entry point with its own
+                            // wiring would silently split that funnel.
+                            //
+                            // Gated on `captureRowVisible`, not on `captureEnabled`: the button is
+                            // this row in another carrier, so it must fall silent for the same three
+                            // reasons the row does (control arm, dock already up, rail/drawer width
+                            // where the shell keeps its own "+"). The body then only draws it for the
+                            // states `hostsAddTaskAction()` names, which is the same predicate the
+                            // pinned row is withheld by.
+                            onAddTaskClick = if (captureRowVisible) onAddTaskRowClick else null,
                         )
                         1 -> CalendarTabBody(
                             state = calendarState,
@@ -448,7 +537,28 @@ fun CalendarScreen(
                 //
                 // Gating and gate ORDER live in [captureRowVisible] at the top of this composable — see
                 // there for why the arm flag is read before the window size.
-                if (captureRowVisible) {
+                //
+                // ── The fourth gate: the visible page is already carrying the action ──────────────
+                // Since 2026-08-17 the Today page's own placeholder hosts an "Add task" button for the
+                // states `hostsAddTaskAction()` names (owner request). Both at once would put two
+                // controls with the SAME accessible name on one screen — ambiguous to a screen reader
+                // and to any UI test matching the label — so the row stands down for exactly those
+                // states, from exactly that predicate.
+                //
+                // Scoped to the page the pager has SETTLED on, not to "either page is empty": page 1
+                // (the agenda) keeps its own "Create Checklist" CTA, which is a different action, so
+                // hiding the row there would delete this tab's only capture route on Compact. The read
+                // happens HERE rather than in the screen body on purpose — the body does not read
+                // `currentPage` at all, and hoisting it there would invalidate the whole screen (top
+                // bar, actions, dock) on every page settle. This Column already reads it for
+                // `PrimaryTabRow`, so nothing new is subscribed.
+                //
+                // ⚠️ Mid-swipe the pager composes BOTH pages, so for the duration of a drag an empty
+                // page 0 can show its button while the row re-appears for page 1. `currentPage` flips
+                // at the 50% mark, so the overlap is transient and inside a gesture; the settled states
+                // — the only ones a screenshot or a test observes — always hold exactly one control.
+                val pageHostsAddTask = pagerState.currentPage == 0 && todayState.hostsAddTaskAction()
+                if (captureRowVisible && !pageHostsAddTask) {
                     AddTaskRow(
                         onClick = onAddTaskRowClick,
                         modifier = Modifier
@@ -474,17 +584,19 @@ fun CalendarScreen(
         }
 
         // TOP-BAR scrim — the other tile, dimming the status-bar zone and the app bar the scaffold
-        // owns and the content cannot reach. Height is exactly the content column's offset, so the
-        // two tiles meet without a bright seam or a double-dark band. No pointer-input modifier: a
+        // owns and the content cannot reach. It reaches the content column's offset, so the two tiles
+        // meet without a bright seam — and stops at the dock's top edge, which is the same number
+        // only while the scaffold has room for both bars. No pointer-input modifier: a
         // background-only node is invisible to hit-testing, so the toolbar stays pressable.
-        if (captureVisible && contentTopPx > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(with(LocalDensity.current) { contentTopPx.toDp() })
-                    .background(captureScrimColor),
-            )
-        }
+        //
+        // Same component and same lambdas as the Inbox host: the two positions are read in the tile's
+        // LAYOUT pass, never in this body, because both move once per frame while the keyboard animates.
+        CaptureChromeScrim(
+            visible = captureVisible,
+            color = captureScrimColor,
+            contentTopPx = { contentTopPx.floatValue },
+            dockTopPx = { dockTopPx.floatValue },
+        )
     }
 }
 
@@ -975,27 +1087,34 @@ private fun WeekGridContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-        ) {
-            for (dayOffset in 0..6) {
-                val cellDate = monday.plus(dayOffset, DateTimeUnit.DAY)
-                val cellEpochDay = cellDate.toEpochDays().toLong()
-                val isToday = cellDate == today
-                val isPast = cellDate < today
-                val hasReminder = cellEpochDay in datesWithReminders
-                val isCurrentScroll = cellEpochDay == currentVisibleEpochDay
+        // BoxWithConstraints, not a bare Row: a cell has to know its own WIDTH to use it as its
+        // minimum HEIGHT, and a `weight(1f)` child cannot read the width it was given. See
+        // [WeekGridCell] for why the square became a floor instead of an aspect ratio.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val cellSide = weekCellSide(maxWidth)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+            ) {
+                for (dayOffset in 0..6) {
+                    val cellDate = monday.plus(dayOffset, DateTimeUnit.DAY)
+                    val cellEpochDay = cellDate.toEpochDays().toLong()
+                    val isToday = cellDate == today
+                    val isPast = cellDate < today
+                    val hasReminder = cellEpochDay in datesWithReminders
+                    val isCurrentScroll = cellEpochDay == currentVisibleEpochDay
 
-                WeekGridCell(
-                    date = cellDate,
-                    isToday = isToday,
-                    isPast = isPast,
-                    hasReminder = hasReminder,
-                    isCurrentScroll = isCurrentScroll,
-                    onClick = { onCellClick(cellEpochDay) },
-                    modifier = Modifier.weight(1f),
-                )
+                    WeekGridCell(
+                        date = cellDate,
+                        isToday = isToday,
+                        isPast = isPast,
+                        hasReminder = hasReminder,
+                        isCurrentScroll = isCurrentScroll,
+                        minSide = cellSide,
+                        onClick = { onCellClick(cellEpochDay) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -1009,8 +1128,9 @@ private fun WeekGridContent(
                 currentVisibleEpochDay
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(3.dp)) {
-            val totalSpacing = AppDimens.SpacingXs * 6
-            val cellW = (this.maxWidth - totalSpacing) / 7
+            // Same helper as the cells above, deliberately: the indicator slides to a cell's centre,
+            // so if the two ever computed the width differently the bar would drift off its day.
+            val cellW = weekCellSide(this.maxWidth)
             val indicatorW = cellW * 0.6f
             val centerOffset = (cellW - indicatorW) / 2
             val targetX = if (currentIdx != null) {
@@ -1044,6 +1164,15 @@ private fun WeekGridContent(
     )
 }
 
+/**
+ * Side of ONE day tile in a week grid [totalWidth] wide: seven equal cells with six [AppDimens.SpacingXs]
+ * gaps between them.
+ *
+ * Shared by the cells (which use it as their minimum height) and by the scroll indicator (which uses
+ * it to place itself under a cell's centre) so the two cannot drift apart.
+ */
+private fun weekCellSide(totalWidth: Dp): Dp = (totalWidth - AppDimens.SpacingXs * 6) / 7
+
 /** Compute the epoch-day of the Monday of the week containing [anchorEpochDay]. */
 private fun weekMondayEpochDay(anchorEpochDay: Long): Long {
     val date = LocalDate.fromEpochDays(anchorEpochDay.toInt())
@@ -1051,6 +1180,11 @@ private fun weekMondayEpochDay(anchorEpochDay: Long): Long {
     return date.minus(mondayOffset, DateTimeUnit.DAY).toEpochDays().toLong()
 }
 
+/**
+ * One day tile of the week grid.
+ *
+ * @param minSide the tile's width, applied as its MINIMUM height — see the `heightIn` call below.
+ */
 @Composable
 private fun WeekGridCell(
     date: LocalDate,
@@ -1058,6 +1192,7 @@ private fun WeekGridCell(
     isPast: Boolean,
     hasReminder: Boolean,
     isCurrentScroll: Boolean,
+    minSide: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1082,7 +1217,25 @@ private fun WeekGridCell(
 
     Column(
         modifier = modifier
-            .aspectRatio(1f)
+            .testTag(WeekGridCellTestTag)
+            // A MINIMUM square, not `aspectRatio(1f)`.
+            //
+            // `aspectRatio` pins height == width exactly, and width here is a fraction of the SCREEN
+            // (a dp), while everything inside is measured in sp and grows with the system font scale.
+            // The two never had to agree, and `clip()` above silently cut whatever did not fit: the
+            // reminder dot rendered as a dash welded to the tile's bottom edge at fontScale 1.0 on a
+            // 411dp phone, vanished entirely at 360dp, and at fontScale 1.3 the DAY NUMBER itself was
+            // sliced through the middle. Recut typography (`Type.kt`, `lineHeightStyle = Trim.None`
+            // on every role) is what pushed an already-tight budget over the edge, but the fixed
+            // height is the defect — the same "height() pins min AND max" trap `AppDensity` spells
+            // out for the task rows: heights are minimums, never fixed values.
+            //
+            // With `heightIn(min = …)` the tile is exactly square whenever the content fits — the
+            // common case, pixel-identical to the intended design — and grows instead of clipping
+            // when it does not. All seven cells hold the same anatomy (one letter, one number, the
+            // marker slot), so they measure the same height and the row stays even without any
+            // intrinsic-measurement machinery.
+            .heightIn(min = minSide)
             .clip(RoundedCornerShape(AppDimens.SpacingSm))
             .background(bgColor)
             .then(if (isInteractive) Modifier.clickable(onClick = onClick) else Modifier)
@@ -1119,6 +1272,15 @@ private fun WeekGridCell(
         }
     }
 }
+
+/**
+ * Test tag on every day tile of the week grid.
+ *
+ * The tile's box is what the geometry regression asserts against — that its content (weekday letter,
+ * day number, reminder marker) fits INSIDE it — and there is no other way to reach those bounds:
+ * the cell carries no merged semantics, and its vertical origin cannot be derived from the texts.
+ */
+internal const val WeekGridCellTestTag = "calendar_week_day_cell"
 
 /** Formats a LocalDate to "Mon D" short form, e.g. "May 12". KMP-safe, no locale. */
 private fun formatShortDate(date: LocalDate): String {

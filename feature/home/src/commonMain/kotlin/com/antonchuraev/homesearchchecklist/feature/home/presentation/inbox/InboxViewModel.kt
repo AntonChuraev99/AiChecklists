@@ -23,6 +23,7 @@ import aichecklists.core.designsystem.generated.resources.inbox_task_move_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_moved_message
 import aichecklists.core.designsystem.generated.resources.main_error_description
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntryDestination
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -62,6 +63,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.Ens
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -184,17 +187,67 @@ class InboxViewModel(
     private val _listMenu = MutableStateFlow(ListMenuState())
     private val _displayOptionsOpen = MutableStateFlow(false)
 
+    /**
+     * Non-null while the tab cannot be loaded at all — see [InboxScreenState.Error].
+     *
+     * Held apart from [_pages] rather than folded into it as a sealed result: every write path in
+     * this class reads `_pages.value` as "the pager or nothing", and threading a failure through
+     * that type would put an `is Failure ->` branch into two dozen call sites that have no business
+     * knowing about it.
+     */
+    private val _loadError = MutableStateFlow<LoadError?>(null)
+
+    /** [InboxScreenState.Error]'s payload, with the message already resolved. */
+    private data class LoadError(val message: String, val canRetry: Boolean)
+
+    /**
+     * The clock the list renders against, advanced once a minute by [observeClock].
+     *
+     * A single ticking source for the whole tab. Without it a due chip is painted from whatever
+     * `currentTimeMillis()` returned during the composition that happened to draw it, so a task
+     * whose time passed while the screen was open keeps saying "Today 09:00" until something else
+     * causes a recomposition — and, now that the list is grouped, keeps sitting under the wrong
+     * heading too.
+     */
+    private val _now = MutableStateFlow(currentTimeMillis())
+
+    /**
+     * The pages subscription, kept so [InboxIntent.OnRetryLoad] can restart it.
+     *
+     * `pagesFlow` ends after its `catch` emits, so the collector below completes on failure. Without
+     * a handle to relaunch it, "Try again" would clear the error and then wait forever on a stream
+     * that is no longer running.
+     */
+    private var pagesJob: Job? = null
+    private var bootstrapJob: Job? = null
+
     private val _sideEffect = MutableSharedFlow<InboxSideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<InboxSideEffect> = _sideEffect.asSharedFlow()
 
     /**
-     * Display options applied to the pager's pages, plus the open/closed state of the sheet that
-     * edits them. Combined here so the sorted/filtered pages and the sheet share one source.
+     * Display options applied to the pager's pages, the open/closed state of the sheet that edits
+     * them, and the plan-nudge snooze. Combined here so the sorted/filtered pages, the sheet and the
+     * nudge share one source.
      */
     private val displayState = combine(
         displayPrefs.observeDisplayOptions(),
         _displayOptionsOpen,
-    ) { options, sheetOpen -> options to sheetOpen }
+        displayPrefs.observePlanNudgeDismissedAt(),
+    ) { options, sheetOpen, nudgeDismissedAt -> DisplayState(options, sheetOpen, nudgeDismissedAt) }
+
+    private data class DisplayState(
+        val options: InboxDisplayOptions,
+        val sheetOpen: Boolean,
+        val planNudgeDismissedAt: Long,
+    )
+
+    /** Everything the list itself is built from, folded into one source of the outer combine. */
+    private data class ListState(
+        val pages: List<InboxPage>?,
+        val display: DisplayState,
+        val error: LoadError?,
+        val nowMillis: Long,
+    )
 
     override val screenState: StateFlow<InboxScreenState> = combine(
         // Pages arrive from the repository in TEMPLATE order; the display options are applied here,
@@ -202,8 +255,12 @@ class InboxViewModel(
         // move targets) sees exactly what the list shows. Sorting inside the list composable instead
         // would make the toolbar count disagree with the visible rows whenever completed tasks are
         // hidden.
-        combine(_pages, displayState) { pages, (options, sheetOpen) ->
-            Triple(pages?.map { it.applyDisplayOptions(options) }, options, sheetOpen)
+        //
+        // Grouping is deliberately NOT applied here: sorting changes what the toolbar counts, while
+        // grouping only changes where a row is drawn, and the section a row falls into depends on a
+        // clock the screen holds steady while the user scrolls (see `rememberSettledNow`).
+        combine(_pages, displayState, _loadError, _now) { pages, display, error, now ->
+            ListState(pages?.map { it.applyDisplayOptions(display.options) }, display, error, now)
         },
         _selectedPage,
         _draft,
@@ -211,8 +268,15 @@ class InboxViewModel(
         // the limits that gate two of its rows belong to one interaction, so pairing costs no clarity.
         combine(_itemSheet, _userLimits) { sheet, limits -> sheet to limits },
         _listMenu,
-    ) { (pages, displayOptions, displayOptionsOpen), selected, draft, (itemSheet, userLimits), listMenu ->
-        if (pages == null) {
+    ) { list, selected, draft, (itemSheet, userLimits), listMenu ->
+        val (pages, display, loadError, nowMillis) = list
+        val displayOptions = display.options
+        val displayOptionsOpen = display.sheetOpen
+        if (loadError != null) {
+            // BEFORE the null-pages check, not after: a failed load leaves `pages` null too, and
+            // testing Loading first is exactly how the failure used to render as a spinner.
+            InboxScreenState.Error(message = loadError.message, canRetry = loadError.canRetry)
+        } else if (pages == null) {
             InboxScreenState.Loading
         } else {
             // The pager can shrink under us (a project deleted on another device), so the stored
@@ -249,25 +313,71 @@ class InboxViewModel(
                 deleteConfirmationOpen = listMenu.deleteConfirmationOpen && current?.isInbox == false,
                 displayOptions = displayOptions,
                 displayOptionsOpen = displayOptionsOpen,
+                nowMillis = nowMillis,
+                // A snooze, not a permanent hide: the window reopens on its own, and because `now`
+                // ticks every minute it reopens within a minute of expiring rather than on the next
+                // cold start.
+                planNudgeDismissed = display.planNudgeDismissedAt > 0L &&
+                    nowMillis - display.planNudgeDismissedAt < PLAN_NUDGE_SNOOZE_MILLIS,
             )
         }
     }.defaultStateIn(InboxScreenState.Loading)
 
     init {
-        viewModelScope.launch {
+        bootstrap()
+        observeUserLimits()
+        observeClock()
+    }
+
+    /**
+     * The two halves of the load: guarantee the system Inbox row, then subscribe to the pages.
+     *
+     * Extracted from `init` so [InboxIntent.OnRetryLoad] can run exactly the same thing. Kept as two
+     * independent launches rather than a sequence, as it always was: the pages stream is useful the
+     * moment the row exists, whoever created it, so it must not wait behind a write that may be
+     * retrying.
+     */
+    private fun bootstrap() {
+        bootstrapJob?.cancel()
+        bootstrapJob = viewModelScope.launch {
             // getString is suspend and the DOMAIN layer must never touch Compose Resources, so the
             // Inbox title is resolved here and passed down. A literal in the use case would ship
             // one language to every user.
             if (ensureInbox(getString(Res.string.inbox_checklist_name)) == null) {
                 // EnsureInboxUseCase already logged the cause; its contract explicitly hands the
-                // user-facing message to the caller. Without the row the pager never leaves Loading
-                // (see observePages), so this snackbar is the ONLY thing that tells the user why the
-                // tab stays empty — dropping it would turn a failed write into a silent spinner.
+                // user-facing message to the caller. The snackbar stays — it is what tells a user
+                // who is already looking at the screen — and the Error state is what stays on
+                // screen after the four seconds are up, instead of a spinner that never resolves.
                 emitMessage(Res.string.error_create_checklist_failed)
+                setLoadError(Res.string.error_create_checklist_failed)
             }
         }
         observePages()
-        observeUserLimits()
+    }
+
+    /**
+     * Advances [_now] once a minute, forever, while the ViewModel lives.
+     *
+     * A minute is the resolution the UI actually shows (reminders are minute-precision), so a finer
+     * tick would repaint for changes nobody can see and a coarser one would leave a task sitting in
+     * "Today" after its time had visibly passed.
+     *
+     * ⚠️ This emits a new [InboxScreenState.Content] every minute by design. It is the cheapest way
+     * to keep one clock for the whole tab; the alternative — every row reading the clock itself —
+     * is what lets a row and its own section heading disagree.
+     */
+    private fun observeClock() {
+        viewModelScope.launch {
+            while (true) {
+                delay(CLOCK_TICK_MILLIS)
+                _now.value = currentTimeMillis()
+            }
+        }
+    }
+
+    /** Puts the tab into [InboxScreenState.Error] with an already-resolved reason. */
+    private suspend fun setLoadError(reason: StringResource, canRetry: Boolean = true) {
+        _loadError.value = LoadError(message = getString(reason), canRetry = canRetry)
     }
 
     /**
@@ -318,16 +428,23 @@ class InboxViewModel(
             }
         }
 
-        viewModelScope.launch {
+        pagesJob?.cancel()
+        pagesJob = viewModelScope.launch {
             pagesFlow.catch { e ->
                 logger.error(TAG, "inbox pages stream failed: ${e.message}", e)
                 // null, not emptyList: an empty Content would claim "your inbox is empty" (a lie)
-                // and break the pages[0]-is-the-Inbox invariant. The screen therefore keeps its
-                // spinner, which is exactly why the failure also has to reach the snackbar.
+                // and break the pages[0]-is-the-Inbox invariant. The snackbar stays for the user
+                // who is watching, and the Error state is what remains on screen afterwards —
+                // before it existed this branch left the tab spinning for the rest of the session.
                 emit(null)
                 emitMessage(Res.string.main_error_description)
+                setLoadError(Res.string.main_error_description)
             }.collect { pages ->
                 _pages.value = pages
+                // Any successful emission clears the error, whoever fixed it. Without this a failed
+                // ensureInbox followed by the row arriving from a sync on another device would pin
+                // the tab on Error over a problem that no longer exists.
+                if (pages != null) _loadError.value = null
             }
         }
     }
@@ -351,6 +468,21 @@ class InboxViewModel(
                 AnalyticsEvents.Nav.CREATE_FAB_TAPPED,
                 mapOf(AnalyticsParams.SOURCE to SOURCE_INLINE_ROW),
             )
+            // Report BEFORE navigating, and unconditionally. The tap is the fact being measured:
+            // if navigation later fails or the user backs straight out, "someone reached for
+            // Analyze" still has to be true in the data — that is the whole reason the funnel
+            // 31 → 0 was unreadable before this event existed.
+            is InboxIntent.OnAiSourceTapped -> {
+                analytics.event(
+                    AnalyticsEvents.AiEntry.TAPPED,
+                    mapOf(
+                        AnalyticsParams.DESTINATION to AiEntryDestination.ANALYZE.wire,
+                        AnalyticsParams.SOURCE to intent.source.wire,
+                        AnalyticsParams.INPUT_TYPE to intent.kind.wire,
+                    ),
+                )
+                navigator.navigateToAnalyzeWithInput(intent.kind, intent.source)
+            }
             is InboxIntent.OnTaskCheckedChanged -> setTaskChecked(intent.taskId, intent.checked)
             // A fresh ItemSheetState, not a copy: every sub-surface (note draft, reminder tab, custom
             // picker) belongs to the PREVIOUS task, and carrying one over would show the last task's
@@ -496,6 +628,18 @@ class InboxViewModel(
                 displayPrefs.setShowCompleted(intent.show)
             }
 
+            is InboxIntent.OnGroupByDateChanged -> persistDisplayOption("groupByDate=${intent.group}") {
+                displayPrefs.setGroupByDate(intent.group)
+            }
+
+            // Stamped with the CURRENT clock rather than with `_now`: the snooze must run from the
+            // swipe, and `_now` can be up to a minute stale, which would shorten the window.
+            InboxIntent.OnPlanNudgeDismissed -> persistDisplayOption("planNudgeDismissed") {
+                displayPrefs.setPlanNudgeDismissedAt(currentTimeMillis())
+            }
+
+            InboxIntent.OnRetryLoad -> retryLoad()
+
             InboxIntent.OnListMenuOpen -> _listMenu.value = ListMenuState(menuOpen = true)
             InboxIntent.OnListMenuDismiss -> _listMenu.value = ListMenuState()
 
@@ -581,6 +725,21 @@ class InboxViewModel(
                 emitMessage(Res.string.error_save_failed)
             }
         }
+    }
+
+    /**
+     * "Try again" on the error state.
+     *
+     * Clears the error AND resets the pages to null in the same breath, so the tab goes back to its
+     * loading skeleton rather than sitting on the failed screen while the retry runs — a button that
+     * changes nothing on screen reads as a button that did not work. [bootstrap] then relaunches
+     * both halves of the load; both jobs are cancelled first, so a second tap cannot leave two
+     * collectors racing to write `_pages`.
+     */
+    private fun retryLoad() {
+        _loadError.value = null
+        _pages.value = null
+        bootstrap()
     }
 
     /**
@@ -1748,6 +1907,18 @@ class InboxViewModel(
         /** Wire values of [AnalyticsParams.SOURCE] on `inbox_quick_added`. */
         const val SOURCE_INBOX = "inbox"
         const val SOURCE_PROJECT = "project"
+
+        /**
+         * How often the tab's clock advances.
+         *
+         * One minute, because that is the resolution the UI shows: reminders are minute-precision,
+         * so a shorter tick repaints for a change nobody can see, and a longer one leaves a task
+         * sitting under "Today" after its time has visibly gone.
+         */
+        const val CLOCK_TICK_MILLIS = 60_000L
+
+        /** How long a swipe hides the plan-your-day invitation. 24 hours. */
+        const val PLAN_NUDGE_SNOOZE_MILLIS = 24L * 60L * 60L * 1000L
 
         /**
          * Free-tier ceiling on rows carrying an active reminder.

@@ -402,9 +402,45 @@ class PaywallViewModel(
     private fun purchase() {
         val currentState = _screenState.value
         val selectedProduct = selectProductForPlan(currentState.selectedPlan, currentState.products)
+
+        // Read-then-set, synchronously, so a second tap landing in the SAME frame as the first is
+        // reported as the duplicate it is instead of as a second user intent. Marked, never
+        // dropped — the duplicate rate measures how long the billing sheet keeps users waiting.
+        //
+        // Only the READ happens here. The flag is set further down, on the one path that also
+        // creates the job whose invokeOnCompletion clears it: the "no product" branch below returns
+        // without a job, so setting it here would leak `true` forever and misreport EVERY later tap
+        // as a repeat — the same funnel numerator this fix is restoring, zeroed again but silently.
+        val isRepeatTap = purchaseInFlight
+
+        // Emitted BEFORE the product lookup is judged: this event counts user INTENT, and the user
+        // tapped Subscribe whether or not the catalog can serve it. It used to sit below the early
+        // return, so with ~68% of catalog loads failing in prod it hid 283 of 454 real taps (62%) —
+        // the funnel read 171 taps and looked healthy while most users tapped into an error.
+        // Product-scoped params are attached only when a product actually resolved.
+        analyticsTracker.event(
+            AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED,
+            buildMap {
+                put(AnalyticsParams.SOURCE, source)
+                put(AnalyticsParams.SURFACE, surface)
+                put(AnalyticsParams.IS_REPEAT_TAP, isRepeatTap)
+                put("variant", currentState.variant.name)
+                put("selected_plan", currentState.selectedPlan.name)
+                put("plan_type", currentState.selectedPlan.name.lowercase())
+                selectedProduct?.let { product ->
+                    put(AnalyticsParams.PRODUCT_ID, product.id)
+                    put(AnalyticsParams.HAS_FREE_TRIAL, product.hasFreeTrial)
+                    put("sku_id", product.id)
+                }
+                analyticsContext?.toEventParams()?.let { putAll(it) }
+                putAll(modelArmParams())
+            },
+        )
+
         if (selectedProduct == null) {
             // Expected product missing from offering — show error instead of silently
             // buying a different product (compliance: user paid based on shown price).
+            // ADDITIONAL diagnostics next to the tap above, never a substitute for it.
             analyticsTracker.event(
                 "purchase_product_not_found",
                 buildMap {
@@ -426,28 +462,8 @@ class PaywallViewModel(
 
         logger?.info(TAG, "[PAYWALL] purchase() initiated: plan=${currentState.selectedPlan.name}, sku=${selectedProduct.id}, pkg=${selectedProduct.packageId}")
 
-        // Read-then-set, synchronously, so a second tap landing in the SAME frame as the first is
-        // reported as the duplicate it is instead of as a second user intent. Marked, never
-        // dropped — the duplicate rate measures how long the billing sheet keeps users waiting.
-        val isRepeatTap = purchaseInFlight
+        // Set only now: from here on a purchaseJob is guaranteed, and so is the clearing below.
         purchaseInFlight = true
-
-        analyticsTracker.event(
-            AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED,
-            buildMap {
-                put(AnalyticsParams.SOURCE, source)
-                put(AnalyticsParams.SURFACE, surface)
-                put(AnalyticsParams.IS_REPEAT_TAP, isRepeatTap)
-                put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
-                put(AnalyticsParams.HAS_FREE_TRIAL, selectedProduct.hasFreeTrial)
-                put("sku_id", selectedProduct.id)
-                put("variant", currentState.variant.name)
-                put("selected_plan", currentState.selectedPlan.name)
-                put("plan_type", currentState.selectedPlan.name.lowercase())
-                analyticsContext?.toEventParams()?.let { putAll(it) }
-                putAll(modelArmParams())
-            },
-        )
 
         val purchaseJob = viewModelScope.launch {
             _screenState.update { it.copy(isPurchasing = true, error = null) }

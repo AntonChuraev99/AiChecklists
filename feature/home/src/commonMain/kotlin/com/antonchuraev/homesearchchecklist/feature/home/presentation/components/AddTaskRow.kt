@@ -20,16 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
-
-/**
- * Height of the [prominent][AddTaskRow] variant. Above the 48dp minimum on purpose: on an EMPTY page
- * this row is the only action on screen, and at minimum height under a full-height empty state it
- * read as a caption rather than as the one thing to press.
- */
-private val ProminentRowHeight = 56.dp
 
 /**
  * The "+ Add task" affordance — a tonal pill that opens the shared `QuickCaptureDock`.
@@ -74,21 +66,25 @@ private val ProminentRowHeight = 56.dp
  * row: it lost the same "+" FAB, and that FAB was the ONLY way to reach the capture dock there.
  * Copying the composable instead would let the two drift.
  *
+ * ## Why there is no longer an EMPTY-page variant
+ * This row used to take a `prominent` flag — taller, `titleMedium`, full-strength label — for the
+ * case where it was the only action on an empty page. That case no longer reaches this composable:
+ * since 2026-08-17 an empty page hosts its add-task action inside `EmptyState`'s own `action` slot
+ * (an `AppButton`, matching every other empty state in the app), and the callers withhold this row
+ * entirely while that button is drawn. The Inbox was the only caller that ever passed it — the
+ * Calendar always took the default — so after that change the flag had no live caller at all, and a dead
+ * parameter documenting a rendering that can no longer happen is worse than no parameter: the next
+ * reader believes an empty page still shows a taller row. Restore it from git, don't re-invent it, if
+ * the empty-state decision is ever reverted.
+ *
  * @param onClick report the tap to the host — this composable never opens the dock itself. The dock's
  *   open flag is shell state (the shell hides its own chrome while the dock is up), so a screen-local
  *   flag would leave chrome floating over the dock it raised.
- * @param prominent the EMPTY-page variant: taller and set in `titleMedium` with a full-strength
- *   label. A parameter rather than a second composable — a twin would inherit none of the three
- *   defects already fixed inside this one (ripple clipped to the shape, a tap target above the label's
- *   own height, `fillMaxWidth` on a Text mounted inside a HorizontalPager). Same fill in both
- *   variants on purpose: it is one control that grows, not two different buttons, so a page that
- *   fills up must not appear to swap its add affordance for another.
  */
 @Composable
 internal fun AddTaskRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    prominent: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -100,7 +96,7 @@ internal fun AddTaskRow(
             .clickable(role = Role.Button, onClick = onClick)
             // A tap target, not a text line: the label alone is ~24dp tall, which is half the
             // project's MinTouchTarget.
-            .heightIn(min = if (prominent) ProminentRowHeight else AppDimens.MinTouchTarget)
+            .heightIn(min = AppDimens.MinTouchTarget)
             .padding(
                 // Wider than the old containerless row: with a fill, the glyph sitting 8dp from the
                 // pill's edge reads as cramped against the same 16dp the cards inset their text by.
@@ -120,18 +116,8 @@ internal fun AddTaskRow(
         )
         Text(
             text = stringResource(Res.string.inbox_add_task_row),
-            style = if (prominent) {
-                MaterialTheme.typography.titleMedium
-            } else {
-                MaterialTheme.typography.bodyLarge
-            },
-            // Full-strength on an empty page: there is nothing else to read there, so the muted
-            // variant that keeps this row subordinate to a list of tasks has no list to defer to.
-            color = if (prominent) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             // fillMaxWidth is mandatory for any Text inside a HorizontalPager — the Inbox mounts this
             // row inside one, and without it the label overflows the page instead of wrapping
             // (rule ui-card-patterns).

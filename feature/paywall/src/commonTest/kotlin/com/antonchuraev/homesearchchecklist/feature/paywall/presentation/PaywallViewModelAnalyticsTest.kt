@@ -3,11 +3,13 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm
 import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -109,10 +111,25 @@ class PaywallViewModelAnalyticsTest {
         experimentArm: AiModelArm? = null,
         // > 0 keeps a purchase in flight across the next intent — see FakePaywallRepository.
         purchaseDelayMs: Long = 0L,
+    ): Pair<PaywallViewModel, RecordingAnalyticsTracker> = createViewModel(
+        products = listOf(product),
+        source = source,
+        purchaseResult = purchaseResult,
+        experimentArm = experimentArm,
+        purchaseDelayMs = purchaseDelayMs,
+    )
+
+    /** Catalog-level overload: an empty (or mismatched) offering is a first-class prod state. */
+    private fun createViewModel(
+        products: List<PaywallProduct>,
+        source: String = "test_source",
+        purchaseResult: PurchaseResult = PurchaseResult.Cancelled,
+        experimentArm: AiModelArm? = null,
+        purchaseDelayMs: Long = 0L,
     ): Pair<PaywallViewModel, RecordingAnalyticsTracker> {
         val tracker = RecordingAnalyticsTracker()
         val paywallRepo = FakePaywallRepository(
-            offering = PaywallOffering(id = "default", products = listOf(product)),
+            offering = PaywallOffering(id = "default", products = products),
             purchaseResult = purchaseResult,
             purchaseDelayMs = purchaseDelayMs,
         )
@@ -347,6 +364,68 @@ class PaywallViewModelAnalyticsTest {
             )
         }
 
+    // ── A tap is a tap, even when the catalog cannot serve it ─────────────────
+
+    /**
+     * Production symptom: `purchase_button_clicked` is emitted BELOW the `selectedProduct == null`
+     * early return, so a tap that lands on an empty or mismatched catalog never reaches the funnel.
+     * With ~68% of catalog loads failing in prod this hid 283 of 454 real taps (62%): the funnel
+     * read 171 taps and looked healthy while most users were tapping into an error dialog.
+     *
+     * `purchase_product_not_found` is diagnostics ADDED to the tap, never a substitute for it —
+     * the two are counted separately below so a fix cannot just swap one name for the other.
+     */
+    // Deliberately NOT `runTest`, and the tap is delivered straight to `onIntent` (the same
+    // function `sendIntent` routes to) instead of through the intent SharedFlow. Reason: the
+    // "no product" branch schedules a localized error message via Compose Resources, and
+    // `getString` throws `Resources.getSystem not mocked` in a plain JVM host test. Draining the
+    // scheduler would surface that environment failure as the test result and mask the real
+    // assertion. The events under test are emitted synchronously inside `purchase()`, so nothing
+    // has to be advanced after the tap — the error coroutine simply stays queued.
+    @Test
+    fun purchaseIntent_recordsOneTapPerTap_evenWhenNoProductMatchesTheSelectedPlan() {
+        // (1) Catalog serves the selected plan — the only case the funnel currently sees.
+        val (servedVm, servedTracker) = createViewModel(monthlyTrialProduct)
+        testDispatcher.scheduler.advanceUntilIdle() // let init -> loadProducts() fill the catalog
+
+        servedVm.onIntent(PaywallIntent.Purchase)
+
+        assertEquals(
+            1,
+            servedTracker.events.count {
+                it.first == AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED
+            },
+            "one tap on a servable catalog is exactly one purchase_button_clicked",
+        )
+        assertEquals(
+            0,
+            servedTracker.events.count { it.first == "purchase_product_not_found" },
+            "the product resolved, so no not-found diagnostics may be emitted",
+        )
+
+        // (2) Catalog empty — the state ~68% of prod paywall opens end up in. Left unadvanced on
+        // purpose: an unloaded catalog IS an empty products list, which is the state under test.
+        val (starvedVm, starvedTracker) = createViewModel(products = emptyList())
+
+        starvedVm.onIntent(PaywallIntent.Purchase)
+
+        assertEquals(
+            1,
+            starvedTracker.events.count {
+                it.first == AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED
+            },
+            "the user tapped Subscribe; the catalog being empty is the app's problem, not a " +
+                "reason to drop the tap from the funnel — purchase_button_clicked must count " +
+                "intent, not successful product lookups",
+        )
+        assertEquals(
+            1,
+            starvedTracker.events.count { it.first == "purchase_product_not_found" },
+            "purchase_product_not_found stays as ADDITIONAL diagnostics next to the tap, " +
+                "not instead of it",
+        )
+    }
+
     // ── AI-model A/B attribution on the purchase event ────────────────────────
 
     @Test
@@ -481,6 +560,11 @@ class PaywallViewModelAnalyticsTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(
             checklistId: Long?,
             fillDefault: Boolean,

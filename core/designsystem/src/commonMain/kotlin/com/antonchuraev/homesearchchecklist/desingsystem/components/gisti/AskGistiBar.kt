@@ -6,7 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,7 +71,9 @@ fun AskGistiBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp),
+            // heightIn, never height — see AppButton's KDoc. The label here is a `bodyLarge`
+            // placeholder or the user's own text, which at fontScale 1.5 does not fit 56dp.
+            .heightIn(min = 56.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),

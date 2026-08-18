@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +45,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefau
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -68,28 +69,36 @@ fun TemplatePreviewScreen(
         scrollBehavior = scrollBehavior,
         bottomBar = {
             if (!state.isLoading && state.template != null) {
+                // Level 2 "Docked" of the depth ladder: a bar anchored to the window edge is not
+                // *raised* above the page, it is attached to it — so it carries no shadow and is
+                // separated by a 1dp hairline on the seam it shares with the content. See AppSurface.
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 8.dp,
-                    color = MaterialTheme.colorScheme.surface
+                    shadowElevation = 0.dp,
+                    color = AppSurface.docked()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(AppDimens.ScreenPaddingHorizontal)
-                            .padding(vertical = AppDimens.SpacingLg)
-                            .navigationBarsPadding()
-                    ) {
-                        AppButton(
-                            text = if (state.isCreating)
-                                stringResource(Res.string.template_preview_creating)
-                            else
-                                stringResource(Res.string.template_preview_create_button, state.editableItems.size),
-                            onClick = { viewModel.sendIntent(TemplatePreviewScreenIntent.OnCreateChecklist) },
-                            icon = Icons.Filled.Add,
-                            enabled = !state.isCreating && state.editableItems.isNotEmpty(),
-                            modifier = Modifier.fillMaxWidth()
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant,
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(AppDimens.ScreenPaddingHorizontal)
+                                .padding(vertical = AppDimens.SpacingLg)
+                        ) {
+                            AppButton(
+                                text = if (state.isCreating)
+                                    stringResource(Res.string.template_preview_creating)
+                                else
+                                    stringResource(Res.string.template_preview_create_button, state.editableItems.size),
+                                onClick = { viewModel.sendIntent(TemplatePreviewScreenIntent.OnCreateChecklist) },
+                                icon = Icons.Filled.Add,
+                                enabled = !state.isCreating && state.editableItems.isNotEmpty(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }

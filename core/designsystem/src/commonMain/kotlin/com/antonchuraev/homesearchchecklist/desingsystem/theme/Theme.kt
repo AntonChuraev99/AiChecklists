@@ -36,12 +36,41 @@ fun AppTheme(
     val colorScheme = dynamicScheme
         ?: if (darkTheme) DarkColorScheme else LightColorScheme
 
+    // TODO(ux-overhaul): resolve from the platform once `isReducedMotionEnabled()` exists — Android
+    //  reads Settings.Global.ANIMATOR_DURATION_SCALE, wasmJs reads the
+    //  `(prefers-reduced-motion: reduce)` media query. The expect/actual is owned by @kmp-expert and
+    //  the platform specialists; `false` here preserves today's behaviour exactly. See
+    //  [LocalReducedMotion] for the contract call sites must honour.
+    val reducedMotion = false
+
     CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,
             shapes = AppShapes,
-            content = content
-        )
+        ) {
+            // Provided INSIDE MaterialTheme's content lambda on purpose: MaterialTheme installs its
+            // own values around the content it wraps, so a provider placed outside it is overwritten
+            // and the change silently does nothing.
+            //
+            // BLOCKED(ux-overhaul): `LocalMotionScheme provides MotionScheme.expressive()` belongs
+            //  here — it would hand the app's spring language to stock M3 components (sheets, FAB,
+            //  Switch) in one line. It does NOT compile on Compose Multiplatform 1.11.0: the symbols
+            //  ship inside material3-1.11.0-alpha07 but are `internal`, so they exist in the klib yet
+            //  are unusable from our code:
+            //      Cannot access 'interface MotionScheme : Any': it is internal in file.
+            //      Cannot access 'fun expressive(): MotionScheme': it is internal in
+            //          'androidx.compose.material3.MotionScheme.Companion'.
+            //      Cannot access 'annotation class ExperimentalMaterial3ExpressiveApi': internal.
+            //      Unresolved reference 'LocalMotionScheme'.
+            //  Not worked around: there is no public substitute, and reaching past `internal` is not
+            //  one. Stock M3 components keep their default motion until CMP repackages androidx
+            //  material3 1.4.x with the expressive API public; app-authored motion is unaffected and
+            //  uses AppMotion directly.
+            CompositionLocalProvider(
+                LocalReducedMotion provides reducedMotion,
+                content = content,
+            )
+        }
     }
 }

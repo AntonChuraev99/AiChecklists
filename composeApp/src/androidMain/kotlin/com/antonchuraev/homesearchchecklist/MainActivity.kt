@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.isAppLocaleOverrideStale
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.reapplyAppLocaleNow
@@ -105,9 +106,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppContextHolder.init(applicationContext)
-        // Initial edge-to-edge (light default) — overridden reactively in setContent once theme is resolved
+        // Initial edge-to-edge, emitted before the stored theme is readable (it lives in
+        // DataStore and arrives asynchronously). `auto` resolves light/dark from the SYSTEM night
+        // setting — the same input @style/Theme.Gisti's window background resolves from — so the
+        // pre-composition frame has bar icons and a backdrop that agree with each other.
+        // This used to hardcode `light` (= dark icons), which was fine only while the window
+        // background was always white; now that it can be dark, dark-on-dark icons would be
+        // invisible for the first frames. Re-asserted from the real app theme in setContent.
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
 
@@ -152,6 +159,20 @@ class MainActivity : ComponentActivity() {
                 AppThemeMode.System -> systemDark
             }
             DisposableEffect(darkTheme) {
+                // The window background paints the cold-start frame and, under edge-to-edge,
+                // every pixel Compose does not cover — most visibly the strip behind the
+                // navigation bar. @style/Theme.Gisti seeds it from the SYSTEM night setting,
+                // but the app's own theme is a DataStore preference (AppThemeMode, default
+                // Light) that the system configuration knows nothing about: a user can run the
+                // dark app on a light phone or vice versa. Re-assert it here from the theme the
+                // app actually renders, so the backdrop can never disagree with the content.
+                window.setBackgroundDrawableResource(
+                    if (darkTheme) {
+                        R.color.gisti_window_background_dark
+                    } else {
+                        R.color.gisti_window_background_light
+                    }
+                )
                 enableEdgeToEdge(
                     statusBarStyle = if (darkTheme) {
                         SystemBarStyle.dark(Color.TRANSPARENT)

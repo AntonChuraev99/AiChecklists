@@ -68,6 +68,11 @@ class CalendarAddTaskRowTest {
         }
         composeTestRule.waitForIdle()
 
+        // The fixture's Today state matters here and it is NOT `Empty` — see [CalendarUnderTest]. With
+        // an `Empty` page the pinned row is deliberately withheld and the only "Add task" node on
+        // screen is the PLACEHOLDER's button, which is centred in the page: the geometry assertion
+        // below would then measure a control that is nowhere near the bottom edge and pass for the
+        // wrong reason, i.e. go green while the invariant it exists for was never exercised.
         composeTestRule.onNodeWithText(addTaskLabel).assertIsDisplayed()
 
         val rootBottom = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.bottom
@@ -139,12 +144,17 @@ class CalendarAddTaskRowTest {
     private fun CalendarUnderTest(
         contentBottomPadding: Dp,
         captureEnabled: Boolean = true,
+        todayState: TodayScreenState = TodayScreenState.NoChecklists,
     ) {
         AppTheme(darkTheme = false) {
             CalendarScreen(
-                // Empty states on both pages: this test is about the row's geometry against the
-                // screen's bottom edge, and an agenda long enough to scroll would only add noise.
-                todayState = TodayScreenState.Empty,
+                // `NoChecklists`, not `Empty`. Both are placeholders with no agenda to scroll — which is
+                // what this fixture wants — but only `NoChecklists` still draws the PINNED row: since
+                // 2026-08-17 the states `hostsAddTaskAction()` names host the action inside the
+                // placeholder instead, and `Empty` is one of them. It also happens to be the sharper
+                // fixture: its placeholder carries a CTA of its OWN ("Create Checklist"), so the pinned
+                // row has to coexist with a button rather than merely with an illustration.
+                todayState = todayState,
                 calendarState = CalendarState.Empty,
                 drawerState = null,
                 onTodayReminderClick = { _, _ -> },

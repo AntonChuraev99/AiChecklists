@@ -6,8 +6,11 @@ import aichecklists.core.designsystem.generated.resources.inbox_task_add_failed
 import aichecklists.core.designsystem.generated.resources.today_task_captured_action
 import aichecklists.core.designsystem.generated.resources.today_task_captured_message
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntryDestination
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
@@ -172,6 +175,23 @@ class TodayViewModel(
             )
 
             is TodayIntent.OnCreateChipAction -> applyCreateChip(intent.action)
+
+            // Report first, navigate second — the tap is the fact being measured, and it must be
+            // true in the data even if the destination never opens.
+            is TodayIntent.OnAiSourceTapped -> {
+                analytics.event(
+                    AnalyticsEvents.AiEntry.TAPPED,
+                    mapOf(
+                        AnalyticsParams.DESTINATION to AiEntryDestination.ANALYZE.wire,
+                        AnalyticsParams.SOURCE to AiEntrySource.CAPTURE_DOCK_CALENDAR.wire,
+                        AnalyticsParams.INPUT_TYPE to intent.kind.wire,
+                    ),
+                )
+                appNavigator.navigateToAnalyzeWithInput(
+                    intent.kind,
+                    AiEntrySource.CAPTURE_DOCK_CALENDAR,
+                )
+            }
             TodayIntent.OnOpenCapturedChecklist -> {
                 val id = lastCapturedChecklistId
                 if (id == null) {
@@ -474,6 +494,15 @@ sealed interface TodayIntent : Intent {
 
     /** A capture-dock chip was tapped (reminder preset or Important). */
     data class OnCreateChipAction(val action: GistiItemCreateAction) : TodayIntent
+
+    /**
+     * One of the AI source pills in the capture dock was tapped.
+     *
+     * Unlike the Inbox's twin intent this one carries no source: the Calendar tab hosts the row in
+     * exactly one place, so naming it at the call site would be a value that can only ever be
+     * `CAPTURE_DOCK_CALENDAR` and could silently be passed wrong.
+     */
+    data class OnAiSourceTapped(val kind: AnalyzeInputKind) : TodayIntent
 
     /** Captures the typed text into the system Inbox. See `TodayViewModel.captureTask`. */
     data object OnQuickAddSubmit : TodayIntent

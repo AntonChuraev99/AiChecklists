@@ -318,39 +318,59 @@ class V2ShellAiButtonTest {
     }
 
     /**
-     * Catches: the AI affordance disappearing — hit area and all — while the quick-capture dock is up.
+     * Catches: any part of the bottom navigation surviving under the quick-capture dock.
      *
-     * The button used to be composed only when `fabsVisible || chatOpen`, and the host clears
-     * `fabsVisible` for BOTH docks. Opening capture (the inline "+ Add task" row) therefore removed the
-     * circle and its hit area while leaving the bar's 76dp gap exactly where it was: a notch in the
-     * middle of a bar that capture does not dim, and 76dp of the bar where a tap did nothing at all.
+     * ## This test used to assert the exact opposite, and that is the point of it
+     * It read `compactShell_whileTheCaptureDockIsUp_theBarCentreStillOpensTheChat` and pinned the bar
+     * — gap, hit area and all — as STAYING lit under the dock, on the reasoning that capture dims
+     * nothing so an empty 76dp notch would be a hole the user is looking at. The owner rejected the
+     * whole arrangement from a Pixel 9: "при создании чеклиста в открытом состоянии не должна быть
+     * видна нижняя навигация". The dock is the bottom chrome now; the notch argument dissolves with
+     * the bar that had the notch in it.
      *
-     * Capture dims nothing, so unlike the chat this is a state the user LOOKS at.
+     * Four probes, because "the bar is hidden" can be got half-right in four separate ways and three
+     * of them leave something tappable on screen with nothing drawn under it:
+     *  - no destination LABEL (the bar's own content),
+     *  - no AI content description (the raised circle AND its 76dp hit area share it — the hit area
+     *    is the node that carries the description, so its absence is what proves no invisible target
+     *    is left in the middle of the dock),
+     *  - a tap where the bar's centre used to be reaches neither the chat nor a tab,
+     *  - the hosted screen is still there (this must not pass by rendering nothing at all).
      */
     @Test
-    fun compactShell_whileTheCaptureDockIsUp_theBarCentreStillOpensTheChat() {
+    fun compactShell_whileTheCaptureDockIsUp_theBottomNavigationIsGone() {
         var inboxLabel = ""
+        var aiDescription = ""
         var openChatCount = 0
+        val navigations = mutableListOf<String>()
         composeTestRule.setContent {
             inboxLabel = stringResource(Res.string.nav_tab_inbox)
-            V2ShellUnderTest(captureOpen = true, onOpenChat = { openChatCount++ })
+            aiDescription = stringResource(Res.string.nav_chat_fab_content_description)
+            V2ShellUnderTest(
+                captureOpen = true,
+                onOpenChat = { openChatCount++ },
+                onNavigate = { navigations += it },
+            )
         }
         composeTestRule.waitForIdle()
 
-        val barCentreY = composeTestRule.onNodeWithText(inboxLabel).fetchSemanticsNode()
-            .boundsInRoot.center.y
-        val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width
+        composeTestRule.onNodeWithText(inboxLabel).assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription(aiDescription).assertDoesNotExist()
+        // The screen is still hosted — otherwise the two assertions above would pass on an empty tree.
+        composeTestRule.onNodeWithText(CONTENT_MARKER).assertIsDisplayed()
 
+        // Where the bar's centre used to be: the shell's bottom edge, in the middle. Nothing of the
+        // chrome may answer there any more.
+        val root = composeTestRule.onRoot().fetchSemanticsNode().size
         composeTestRule.onRoot().performTouchInput {
-            click(Offset(rootWidth / 2f, barCentreY))
+            click(Offset(root.width / 2f, root.height - 8f))
         }
         composeTestRule.waitForIdle()
 
-        assertEquals(
-            1,
-            openChatCount,
-            "The middle of the bar must stay a target while the capture dock is up — the alternative " +
-                "is an empty 76dp notch that swallows taps",
+        assertEquals(0, openChatCount, "No chat affordance may survive under the capture dock")
+        assertTrue(
+            navigations.isEmpty(),
+            "No destination may survive under the capture dock, visible or not — found $navigations",
         )
     }
 

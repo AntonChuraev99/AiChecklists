@@ -72,9 +72,9 @@ class TemplateFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Then: Should navigate to Analyze screen
+        // Then: Should navigate to Analyze screen, on its source picker
         composeTestRule
-            .onNodeWithText("What would you like to analyze?")
+            .onNodeWithText(ANALYZE_SOURCE_HEADING)
             .assertIsDisplayed()
     }
 

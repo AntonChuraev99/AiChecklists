@@ -2,7 +2,9 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -35,6 +37,13 @@ class AnalyzeViewModel(
     private val fillDefault: Boolean = false,
     private val initialText: String? = null,
     private val autoAnalyze: Boolean = false,
+    /**
+     * Material chosen at the DOOR (the v2 capture dock's Photo / PDF / Link / Voice row), so the
+     * screen opens on that input instead of on its own source picker. See [resolveEntryMaterial].
+     */
+    private val initialInputKind: AnalyzeInputKind? = null,
+    /** Which affordance opened this screen — stamped onto every `ai_analyze_*` event below. */
+    private val entrySource: AiEntrySource? = null,
     private val analyzeRepository: AnalyzeRepository,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
@@ -60,7 +69,15 @@ class AnalyzeViewModel(
                 isFillMode = checklistId != null,
                 fillDefault = fillDefault,
                 selectedChecklistId = checklistId,
-                selectedInputType = if (prefill != null) InputDataType.RAW_TEXT else null,
+                // Prefill wins over the door's material: a non-blank [initialText] IS raw text, and
+                // honouring a PHOTO kind here would open the photo picker over text the user can no
+                // longer see. Falling through to [initialInputKind] is what lets the v2 dock's four
+                // named pills land ON their input instead of on the source picker.
+                //
+                // [resolveEntryMaterial] rather than the `when` this used to spell out here: the
+                // screen's on-entry auto-open needs the SAME answer, and the two must never disagree
+                // about whether this visit is "standing on a photo" or "standing on text".
+                selectedInputType = resolveEntryMaterial(initialText, initialInputKind),
                 inputText = prefill.orEmpty()
             )
         }
@@ -131,12 +148,36 @@ class AnalyzeViewModel(
             AnalyzeScreenIntent.OnBackClick -> appNavigator.onBack()
 
             is AnalyzeScreenIntent.OnInputTypeSelected -> {
-                _screenState.update {
-                    it.copy(
-                        selectedInputType = intent.type,
-                        error = null,
-                        analyzeResult = null
-                    )
+                _screenState.update { state ->
+                    // Changing the material clears the FILE fields and only those. Picking a photo and
+                    // then switching to PDF left "Selected receipt-2026-08-17.jpg" sitting under the
+                    // PDF flow, and `buildInputData` would send that jpg to the server as a PDF. The
+                    // defect predates the compact picker; the picker is what makes switching cheap
+                    // enough to hit it.
+                    //
+                    // ⚠️ `selectedFilePath` / `selectedFileName` are the ONLY cross-contaminating
+                    // fields, because PHOTO, PDF and TEXT_FILE all read that one pair — see
+                    // `buildInputData`. Every other payload field is read by exactly one material, so
+                    // it can never be mistaken for another's. Clearing them too would not fix
+                    // anything and would destroy work: one accidental tap on a pill — which this
+                    // picker deliberately made one-handed and cheap — would silently delete a typed
+                    // paragraph or a finished voice recording, with no undo and no snackbar. That is
+                    // a regression traded for nothing, so the wipe stays narrow. `OnClearInput` is
+                    // still the wide reset; it exists because the user ASKED to clear.
+                    if (state.selectedInputType == intent.type) {
+                        // Re-selecting the material you are already on is a no-op, NOT a reset. The
+                        // picker's "never mind, close the grid" tap lands here, and it must not throw
+                        // away the file the user already chose.
+                        state.copy(error = null, analyzeResult = null)
+                    } else {
+                        state.copy(
+                            selectedInputType = intent.type,
+                            error = null,
+                            analyzeResult = null,
+                            selectedFilePath = null,
+                            selectedFileName = null
+                        )
+                    }
                 }
             }
 
@@ -249,7 +290,19 @@ class AnalyzeViewModel(
         }
 
         val inputType = state.selectedInputType?.name?.lowercase() ?: "unknown"
-        analyticsTracker.event(AnalyticsEvents.Analyze.STARTED, mapOf(AnalyticsParams.INPUT_TYPE to inputType))
+        // "none", never a missing property: an omitted dimension has no denominator, so "how many
+        // analyses came through a door we shipped" becomes unanswerable. Same sentinel rule as the
+        // chat's `surface ?: "none"`. Stamped on ALL THREE analyze events rather than only on
+        // STARTED — a dimension present on one event of a funnel and absent on the next cannot
+        // segment that funnel at all.
+        val entrySourceParam = entrySource?.wire ?: "none"
+        analyticsTracker.event(
+            AnalyticsEvents.Analyze.STARTED,
+            mapOf(
+                AnalyticsParams.INPUT_TYPE to inputType,
+                AnalyticsParams.SOURCE to entrySourceParam,
+            ),
+        )
 
         viewModelScope.launch {
             _screenState.update { it.copy(isAnalyzing = true, error = null) }
@@ -272,6 +325,7 @@ class AnalyzeViewModel(
 
                     analyticsTracker.event(AnalyticsEvents.Analyze.COMPLETED, buildMap {
                         put(AnalyticsParams.INPUT_TYPE, inputType)
+                        put(AnalyticsParams.SOURCE, entrySourceParam)
                         put("item_count", result.suggestedItems.size)
                         // Guardrail dimensions — present only when the server sent an arm; omitted
                         // otherwise so the event schema stays clean (matches ai_chat_response_received).
@@ -310,6 +364,7 @@ class AnalyzeViewModel(
                     val reason = AiFailureReason.classify(error)
                     analyticsTracker.event(AnalyticsEvents.Analyze.FAILED, mapOf(
                         AnalyticsParams.INPUT_TYPE to inputType,
+                        AnalyticsParams.SOURCE to entrySourceParam,
                         AnalyticsParams.FAILURE_REASON to reason.wireValue,
                         AnalyticsParams.ERROR to (error.message ?: "unknown")
                     ))

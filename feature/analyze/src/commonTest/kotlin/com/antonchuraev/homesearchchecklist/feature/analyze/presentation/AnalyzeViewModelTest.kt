@@ -3,8 +3,10 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -114,11 +116,15 @@ class AnalyzeViewModelTest {
         fillDefault: Boolean = false,
         initialText: String? = null,
         autoAnalyze: Boolean = false,
+        initialInputKind: AnalyzeInputKind? = null,
+        entrySource: AiEntrySource? = null,
     ): AnalyzeViewModel = AnalyzeViewModel(
         checklistId = checklistId,
         fillDefault = fillDefault,
         initialText = initialText,
         autoAnalyze = autoAnalyze,
+        initialInputKind = initialInputKind,
+        entrySource = entrySource,
         analyzeRepository = fakeAnalyzeRepository,
         checklistRepository = fakeChecklistRepository,
         appNavigator = fakeNavigator,
@@ -128,6 +134,109 @@ class AnalyzeViewModelTest {
         activationCoordinator = fakeActivationCoordinator,
         remoteConfigProvider = fakeRemoteConfigProvider,
     )
+
+    // ── v2 entry points: a door must arrive ON its material, and must be attributable ────────────
+    //
+    // Both properties exist because the v2 shell shipped with NO route to Analyze at all while
+    // Analyze accounts for half of all checklist creators, and the outage was invisible in
+    // Amplitude precisely because `ai_analyze_started` carried no `source`.
+
+    @Test
+    fun initialInputKind_preSelectsThatMaterial_soTheUserDoesNotPickTwice() = runTest {
+        // The dock's "Photo" pill already IS the answer to "what are you handing the AI".
+        // Landing on the source picker would ask the same question a second time.
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+
+        assertEquals(InputDataType.PHOTO, vm.screenState.value.selectedInputType)
+    }
+
+    @Test
+    fun everyInputKind_mapsToASelectedType_noSilentNulls() = runTest {
+        // Totality guard. A kind that maps to null would open the picker anyway — the exact
+        // "tapped Voice, got a menu" dead end this row exists to remove, and it would be silent.
+        AnalyzeInputKind.entries.forEach { kind ->
+            val vm = createViewModel(initialInputKind = kind)
+            advanceUntilIdle()
+            assertNotNull(
+                vm.screenState.value.selectedInputType,
+                "AnalyzeInputKind.$kind must pre-select an InputDataType",
+            )
+        }
+    }
+
+    @Test
+    fun initialText_stillWinsOverInputKind_soThePrefillIsNeverStranded() = runTest {
+        // ACTION_PROCESS_TEXT contract: a non-blank prefill implies RAW_TEXT. If a kind could
+        // override it the screen would open on the Photo picker holding text nobody can see.
+        val vm = createViewModel(initialText = "buy milk", initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+
+        assertEquals(InputDataType.RAW_TEXT, vm.screenState.value.selectedInputType)
+        assertEquals("buy milk", vm.screenState.value.inputText)
+    }
+
+    /**
+     * The seed and the screen's on-entry auto-open must be the SAME answer, from the same function.
+     *
+     * They are two readers of one decision — "what material did this visit open on" — and they used to
+     * be two implementations of it: the ViewModel spelled the precedence out in a `when`, while the
+     * screen froze the ViewModel's resolved value in a `remember`. That freeze died on a back-stack
+     * return and a photo picker opened with no tap. The fix is one function, and this test is what
+     * keeps it one: change either side alone and the two sets stop matching.
+     *
+     * Every door x prefilled/not, so a rule that drifts for one material is not averaged away.
+     */
+    @Test
+    fun theSeededMaterialIsExactlyWhatTheEntryPickerResolves() = runTest {
+        val doors: List<AnalyzeInputKind?> = listOf(null) + AnalyzeInputKind.entries
+        val prefills = listOf(null, "", "   ", "buy milk")
+
+        doors.forEach { door ->
+            prefills.forEach { prefill ->
+                val vm = createViewModel(initialText = prefill, initialInputKind = door)
+                advanceUntilIdle()
+
+                assertEquals(
+                    resolveEntryMaterial(initialText = prefill, initialInputKind = door),
+                    vm.screenState.value.selectedInputType,
+                    "door=$door prefill=${prefill?.let { "\"$it\"" }}: the ViewModel's seed and the " +
+                        "screen's entry picker must not be able to disagree about the material",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun analyzeStarted_carriesEntrySource_soADeadDoorIsVisibleInAmplitude() = runTest {
+        val vm = createViewModel(entrySource = AiEntrySource.CAPTURE_DOCK_INBOX)
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("plan a trip")
+        advanceUntilIdle()
+
+        val started = assertNotNull(
+            fakeAnalyticsTracker.events.firstOrNull { it.first == AnalyticsEvents.Analyze.STARTED },
+            "ai_analyze_started must be recorded",
+        )
+        assertEquals("capture_dock_inbox", started.second["source"])
+        assertEquals("raw_text", started.second["input_type"])
+    }
+
+    @Test
+    fun analyzeStarted_withNoEntrySource_sendsCountableSentinelNotMissingProperty() = runTest {
+        // A missing property has no denominator: "how many analyses came from a door we shipped"
+        // cannot be asked if the doorless ones simply omit the dimension. Same rule the chat's
+        // `surface ?: "none"` follows.
+        val vm = createViewModel(entrySource = null)
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("plan a trip")
+        advanceUntilIdle()
+
+        val started = assertNotNull(
+            fakeAnalyticsTracker.events.firstOrNull { it.first == AnalyticsEvents.Analyze.STARTED },
+        )
+        assertEquals("none", started.second["source"])
+    }
 
     /** Drives a manual (non-hero) analysis: select RAW_TEXT, type a prompt, then tap Analyze. */
     private fun AnalyzeViewModel.startManualRawTextAnalysis(text: String) {
@@ -221,6 +330,116 @@ class AnalyzeViewModelTest {
         assertNull(fakeActivationCoordinator.lastChecklistId)
     }
 
+    // ── Changing the material discards the previous material's payload ──────────
+    //
+    // The picker rewrite made switching material a one-tap affair, which is what surfaced this: the
+    // payload used to survive the switch, so a photo picked for PHOTO stayed in `selectedFilePath`
+    // under the PDF flow and `buildInputData` would post that jpg to the server as a PDF document.
+
+    @Test
+    fun switchingMaterial_clearsTheFileThePreviousMaterialPicked() = runTest {
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnFileSelected("/tmp/receipt.jpg", "receipt.jpg"))
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.PDF))
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(InputDataType.PDF, state.selectedInputType)
+        assertNull(
+            state.selectedFilePath,
+            "a jpg picked for PHOTO must not survive into the PDF flow — buildInputData would " +
+                "wrap it as AnalyzeInputData.PdfDocument and post it as a PDF",
+        )
+        assertNull(state.selectedFileName, "the name must go with the path, not linger under it")
+    }
+
+    @Test
+    fun switchingMaterial_keepsTypedTextAndUrlAndRecording() = runTest {
+        // The mirror of the test above, and the reason that one is scoped to the FILE pair only.
+        //
+        // `selectedFilePath` / `selectedFileName` are shared by PHOTO, PDF and TEXT_FILE, so a stale
+        // value there really can be posted under the wrong material. Nothing else can: `inputText`,
+        // `inputUrl` and `recordedAudioPath` are each read by exactly ONE branch of
+        // `buildInputData`, so a leftover cannot be mistaken for another material's payload.
+        //
+        // Clearing them anyway would buy no correctness and cost real work: the compact picker made
+        // switching a cheap one-handed tap, so a mis-tap would silently delete a typed paragraph or a
+        // finished recording, with no undo and no snackbar. That is the project's anti-regression
+        // rule — a component that already held the user's input must keep holding it. This test is
+        // what fails if someone widens the wipe back out "for symmetry".
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.RAW_TEXT))
+        vm.sendIntent(AnalyzeScreenIntent.OnTextInputChanged("buy milk"))
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.WEB_LINK))
+        vm.sendIntent(AnalyzeScreenIntent.OnUrlInputChanged("https://example.com"))
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.VOICE))
+        vm.sendIntent(AnalyzeScreenIntent.OnRecordingComplete("/tmp/note.m4a", 42_000L))
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.PHOTO))
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(
+            "buy milk",
+            state.inputText,
+            "text typed for RAW_TEXT must survive a switch — only PHOTO/PDF/TEXT_FILE share a field, " +
+                "and buildInputData never reads inputText under PHOTO",
+        )
+        assertEquals(
+            "https://example.com",
+            state.inputUrl,
+            "a URL typed for WEB_LINK must survive — losing it to a mis-tap is a regression, not a fix",
+        )
+        assertEquals(
+            "/tmp/note.m4a",
+            state.recordedAudioPath,
+            "a finished recording must survive — it is the most expensive payload to reproduce",
+        )
+        assertEquals(
+            42_000L,
+            state.recordedAudioDuration,
+            "the duration is read beside the path, so the two have to survive together",
+        )
+    }
+
+    @Test
+    fun reSelectingTheSameMaterial_keepsTheFileAlreadyChosen() = runTest {
+        // The compact picker's "never mind" tap — closing the grid on the material you are already
+        // on — comes through this same intent. Treating it as a change would delete the file the
+        // user picked seconds earlier.
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.PHOTO)
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnFileSelected("/tmp/receipt.jpg", "receipt.jpg"))
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.PHOTO))
+        advanceUntilIdle()
+
+        assertEquals("/tmp/receipt.jpg", vm.screenState.value.selectedFilePath)
+        assertEquals("receipt.jpg", vm.screenState.value.selectedFileName)
+    }
+
+    @Test
+    fun switchingMaterial_stillClearsTheErrorAndTheStaleResult() = runTest {
+        // The behaviour that already existed and must not be lost while adding the payload reset.
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.sendIntent(AnalyzeScreenIntent.OnRecordingError("mic unavailable"))
+        advanceUntilIdle()
+        assertNotNull(vm.screenState.value.error, "precondition: an error is on screen")
+
+        vm.sendIntent(AnalyzeScreenIntent.OnInputTypeSelected(InputDataType.WEB_LINK))
+        advanceUntilIdle()
+
+        assertNull(vm.screenState.value.error)
+        assertNull(vm.screenState.value.analyzeResult)
+    }
+
     // ── Test doubles ────────────────────────────────────────────────────────────
 
     /**
@@ -299,6 +518,11 @@ class AnalyzeViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
+        override fun navigateToAnalyzeWithInput(
+            inputKind: AnalyzeInputKind,
+            entrySource: AiEntrySource,
+        ) = Unit
+
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {
             navigatedToAnalyzeScreen = true
         }

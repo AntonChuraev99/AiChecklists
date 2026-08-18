@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,6 +17,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,6 +39,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefau
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.model.ShareFormat
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.share.ShareLauncher
 import aichecklists.core.designsystem.generated.resources.Res
@@ -88,28 +89,36 @@ private fun ShareScreenContent(
         onBackButtonClick = { onIntent(ShareScreenIntent.OnBackClick) },
         scrollBehavior = scrollBehavior,
         bottomBar = {
+            // Level 2 "Docked" of the depth ladder: a bar anchored to the window edge is not
+            // *raised* above the page, it is attached to it — so it carries no shadow and is
+            // separated by a 1dp hairline on the seam it shares with the content. See AppSurface.
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
+                shadowElevation = 0.dp,
+                color = AppSurface.docked()
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                        .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
-                        .navigationBarsPadding()
-                ) {
-                    AppButton(
-                        text = if (state.isGeneratingPdf) {
-                            stringResource(Res.string.share_generating_pdf)
-                        } else {
-                            stringResource(Res.string.share_button)
-                        },
-                        onClick = { onIntent(ShareScreenIntent.OnShareClick) },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = state.selectedFormat != null && !state.isGeneratingPdf && !state.isLoading
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                            .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
+                    ) {
+                        AppButton(
+                            text = if (state.isGeneratingPdf) {
+                                stringResource(Res.string.share_generating_pdf)
+                            } else {
+                                stringResource(Res.string.share_button)
+                            },
+                            onClick = { onIntent(ShareScreenIntent.OnShareClick) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = state.selectedFormat != null && !state.isGeneratingPdf && !state.isLoading
+                        )
+                    }
                 }
             }
         }

@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,15 +72,16 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -102,7 +102,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -130,6 +133,15 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun TemplatesScreen(
     useProjectTitle: Boolean = false,
+    /**
+     * Opens the AI create flow, optionally seeded with the user's search text.
+     *
+     * **Nullable, and the affordance is not drawn while it is null.** Opening that flow means
+     * raising the shell's chat dock, which only `App` can do — a default no-op would render a
+     * "Create with AI" button that swallows its own tap, and a dead AI button is the exact defect
+     * this whole change exists to remove.
+     */
+    onCreateWithAi: ((query: String?) -> Unit)? = null,
     viewModel: TemplatesViewModel = koinViewModel()
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -197,6 +209,26 @@ fun TemplatesScreen(
                 )
             }
 
+            // "Create with AI" — restored to the gallery, first thing under the search field.
+            //
+            // Above the category list rather than inside it: a card in a horizontal LazyRow is
+            // reachable only by scrolling sideways past templates, and this is not one more
+            // template. It is also NOT in `BottomActionButtons` — "My Week" and the premium unlock
+            // already compete there, and a third CTA beside the paywall button would trade an AI
+            // entry against monetisation.
+            //
+            // A gate on the shell callback rather than a no-op: see [onCreateWithAi].
+            if (onCreateWithAi != null) {
+                CreateWithAiRow(
+                    onClick = {
+                        viewModel.sendIntent(
+                            TemplatesScreenIntent.OnCreateWithAiClick(AiEntrySource.TEMPLATES_HEADER)
+                        )
+                        onCreateWithAi(null)
+                    },
+                )
+            }
+
             // Main content area (scrollable)
             Box(
                 modifier = Modifier
@@ -213,14 +245,50 @@ fun TemplatesScreen(
                         EmptyState(
                             icon = Icons.Outlined.Description,
                             title = stringResource(Res.string.templates_empty_title),
-                            description = stringResource(Res.string.templates_empty_description)
+                            description = stringResource(Res.string.templates_empty_description),
+                            // Reuses EmptyState's existing `action` slot rather than a bespoke
+                            // "empty state with a button" — the slot has been there all along and
+                            // ProjectsScreen already fills it.
+                            action = onCreateWithAi?.let { open ->
+                                {
+                                    CreateWithAiButton(
+                                        onClick = {
+                                            viewModel.sendIntent(
+                                                TemplatesScreenIntent.OnCreateWithAiClick(
+                                                    AiEntrySource.TEMPLATES_EMPTY
+                                                )
+                                            )
+                                            open(null)
+                                        },
+                                    )
+                                }
+                            },
                         )
                     }
                     state.filteredCategories.isEmpty() && state.searchQuery.isNotEmpty() -> {
+                        // The highest-intent moment on this screen: the user described what they
+                        // wanted IN WORDS and we had nothing to show them. The query therefore goes
+                        // into the AI prompt — sending them to an empty chat input would throw away
+                        // the one thing they just told us.
                         EmptyState(
                             icon = Icons.Default.Search,
                             title = stringResource(Res.string.templates_no_results),
-                            description = stringResource(Res.string.templates_no_results_description)
+                            description = stringResource(Res.string.templates_no_results_description),
+                            action = onCreateWithAi?.let { open ->
+                                {
+                                    CreateWithAiButton(
+                                        onClick = {
+                                            viewModel.sendIntent(
+                                                TemplatesScreenIntent.OnCreateWithAiClick(
+                                                    source = AiEntrySource.TEMPLATES_EMPTY_SEARCH,
+                                                    query = state.searchQuery,
+                                                )
+                                            )
+                                            open(state.searchQuery)
+                                        },
+                                    )
+                                }
+                            },
                         )
                     }
                     else -> {
@@ -255,6 +323,39 @@ fun TemplatesScreen(
             )
         }
     }
+}
+
+/**
+ * The gallery's restored AI entry: one full-width row directly under the search field.
+ *
+ * `AppButtonSecondary` rather than the filled `AppButton` on purpose — the primary action of this
+ * screen is still picking a template, and a filled bar across the top would outrank the 81 things
+ * below it. It only has to be FINDABLE, which is what it was not: the string it uses,
+ * `templates_create_with_ai`, sat in all three locales with no call site while the button itself is
+ * on screenshot 6 of the Play listing.
+ */
+@Composable
+private fun CreateWithAiRow(onClick: () -> Unit) {
+    AppButtonSecondary(
+        text = stringResource(Res.string.templates_create_with_ai),
+        onClick = onClick,
+        icon = Icons.Outlined.AutoAwesome,
+        modifier = Modifier
+            .fillMaxWidth()
+            .adaptiveContentWidth()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(top = AppDimens.SpacingMd),
+    )
+}
+
+/** Same affordance inside an [EmptyState]'s action slot, where it is the only thing to do. */
+@Composable
+private fun CreateWithAiButton(onClick: () -> Unit) {
+    AppButton(
+        text = stringResource(Res.string.templates_create_with_ai),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -362,14 +463,22 @@ private fun TemplateCard(
     template: ChecklistTemplate,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .width(180.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp,
-        tonalElevation = 1.dp
+    // Level 1 "Card" of the depth ladder: the app's single card style — flat tonal container plus a
+    // 1dp hairline, zero elevation in every interaction state (AppCardDefaults). Both elevations the
+    // old code carried had to go: the shadow re-introduced the side-"ears" artifact the flat-card
+    // decision removed, and `tonalElevation` was NOT a no-op here — the container was `surface`, the
+    // one role that material3 still mixes `surfaceTint` into, so the card sat a shade blue-grey.
+    //
+    // The click moved from `Modifier.clickable` onto `Card(onClick =)`: the caller's modifier is
+    // applied BEFORE the card's own `clip`, so the ripple used to paint a rectangle past the rounded
+    // corners.
+    Card(
+        onClick = onClick,
+        modifier = Modifier.width(180.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = AppCardDefaults.colors(),
+        elevation = AppCardDefaults.flatElevation(),
+        border = AppCardDefaults.border(),
     ) {
         Column(
             modifier = Modifier.padding(AppDimens.SpacingMd)

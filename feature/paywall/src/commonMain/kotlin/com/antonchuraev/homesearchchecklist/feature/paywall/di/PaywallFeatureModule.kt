@@ -1,6 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.di
 
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.BillingPlatformPreCheck
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.CreditsBadgeProvider
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.CreditsBadgeProviderImpl
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.PremiumEntryPoint
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.PremiumEntryPointImpl
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetPaywallConfigUseCase
@@ -31,6 +35,12 @@ val paywallFeatureModule = module {
     // across every PaywallViewModel instance (the paywall reopens from many sources) yet resets on
     // cold start.
     single { CancelReasonSessionGate() }
+
+    // Premium read/write pair shared by every credits affordance (v2 toolbars today).
+    // `factory`, not `single`: both are stateless projections over repositories that are already
+    // singletons, so there is nothing to share and nothing to leak into a dead composition.
+    factory<CreditsBadgeProvider> { CreditsBadgeProviderImpl(get(), get(), getOrNull()) }
+    factory<PremiumEntryPoint> { PremiumEntryPointImpl(get()) }
 
     // Use cases
     factory { GetSubscriptionStatusUseCase(get()) }

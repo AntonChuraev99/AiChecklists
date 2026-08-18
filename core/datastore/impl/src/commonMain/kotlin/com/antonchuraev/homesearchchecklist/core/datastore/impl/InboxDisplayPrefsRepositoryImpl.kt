@@ -15,6 +15,8 @@ private const val TAG = "InboxDisplayPrefs"
 private const val KEY_LAYOUT = "inbox_display_layout"
 private const val KEY_SORT = "inbox_display_sort"
 private const val KEY_SHOW_COMPLETED = "inbox_display_show_completed"
+private const val KEY_GROUP_BY_DATE = "inbox_display_group_by_date"
+private const val KEY_PLAN_NUDGE_DISMISSED_AT = "inbox_plan_nudge_dismissed_at"
 
 /**
  * Enum names are the wire format, resolved back with a `firstOrNull { it.name == stored }`.
@@ -34,11 +36,13 @@ class InboxDisplayPrefsRepositoryImpl(
         dataStore.observeString(KEY_LAYOUT, defaultValue = defaults.layout.name),
         dataStore.observeString(KEY_SORT, defaultValue = defaults.sort.name),
         dataStore.observeBoolean(KEY_SHOW_COMPLETED, defaultValue = defaults.showCompleted),
-    ) { layout, sort, showCompleted ->
+        dataStore.observeBoolean(KEY_GROUP_BY_DATE, defaultValue = defaults.groupByDate),
+    ) { layout, sort, showCompleted, groupByDate ->
         InboxDisplayOptions(
             layout = InboxLayout.entries.firstOrNull { it.name == layout } ?: defaults.layout,
             sort = InboxSort.entries.firstOrNull { it.name == sort } ?: defaults.sort,
             showCompleted = showCompleted,
+            groupByDate = groupByDate,
         )
     }.catch { e ->
         // The enum guard above only covers a value we could READ. DataStore's own `data` flow
@@ -59,5 +63,34 @@ class InboxDisplayPrefsRepositoryImpl(
 
     override suspend fun setShowCompleted(show: Boolean) {
         dataStore.saveBoolean(KEY_SHOW_COMPLETED, show)
+    }
+
+    override suspend fun setGroupByDate(group: Boolean) {
+        dataStore.saveBoolean(KEY_GROUP_BY_DATE, group)
+    }
+
+    /**
+     * Its own flow rather than a fourth field of [InboxDisplayOptions]: it is not something the
+     * display sheet edits, and a value the sheet's model carries but must never draw is how a
+     * "settings" screen grows rows nobody meant to add.
+     *
+     * Same never-throws guarantee as the options flow — see the interface KDoc. Without the `catch`
+     * a corrupt preferences file would cancel `InboxViewModel.screenState`'s sharing scope over a
+     * dismissal timestamp.
+     */
+    override fun observePlanNudgeDismissedAt(): Flow<Long> =
+        dataStore.observeLong(KEY_PLAN_NUDGE_DISMISSED_AT, defaultValue = NEVER_DISMISSED)
+            .catch { e ->
+                logger.error(TAG, "plan-nudge dismissal unreadable — treating as never: ${e.message}", e)
+                emit(NEVER_DISMISSED)
+            }
+
+    override suspend fun setPlanNudgeDismissedAt(atMillis: Long) {
+        dataStore.saveLong(KEY_PLAN_NUDGE_DISMISSED_AT, atMillis)
+    }
+
+    private companion object {
+        /** Epoch 0 — any real "now" is more than 24h past it, so the nudge shows by default. */
+        const val NEVER_DISMISSED = 0L
     }
 }

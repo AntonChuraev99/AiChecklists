@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
@@ -170,9 +172,11 @@ fun PaywallStep(
             // taps are swallowed by the guard instead of greying the button out.
             onClick = { if (paywallState?.isPurchasing != true) paywallViewModel?.sendIntent(PaywallIntent.Purchase) },
             enabled = product != null,
+            // heightIn, never height — see AppButton's KDoc. Same CTA as OnboardingScreen's, same
+            // `titleMedium` Bold label, same 48dp box it could not fit at fontScale 1.3+.
             modifier = Modifier
                 .fillMaxWidth()
-                .height(AppDimens.ButtonHeight),
+                .heightIn(min = AppDimens.ButtonHeight),
             shape = MaterialTheme.shapes.small,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -193,7 +197,10 @@ fun PaywallStep(
                         stringResource(Res.string.paywall_subscribe_now)
                     },
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                 )
             }
         }

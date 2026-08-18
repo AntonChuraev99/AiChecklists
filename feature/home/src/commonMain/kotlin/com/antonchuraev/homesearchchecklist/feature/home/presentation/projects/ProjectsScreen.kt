@@ -70,6 +70,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
@@ -119,6 +121,14 @@ fun ProjectsScreen(
     state: ProjectsScreenState,
     onIntent: (ProjectsIntent) -> Unit,
     contentBottomPadding: Dp = 0.dp,
+    /**
+     * Analytics `source` for the AI-credits chip in the top bar; **null draws no chip**.
+     *
+     * Same shape as the Inbox and Calendar tabs — see [CalendarScreen] for why the source is threaded
+     * rather than a boolean. Hosts pass [CreditsChipSource.V2_PROJECTS]; null keeps previews and
+     * screenshot tests Koin-free.
+     */
+    creditsSource: String? = null,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.PROJECTS) }
@@ -136,6 +146,16 @@ fun ProjectsScreen(
         // Matches the Inbox tab: start-aligned, so the two tabs do not read as two different apps.
         startAlignedTitle = true,
         actions = {
+            // The credits chip LEADS and is UNCONDITIONAL — unlike the "+" below it. The empty state
+            // is a brand-new user, i.e. exactly the population whose 100-credit lifetime wallet runs
+            // out first, so hiding the paywall entry point there would withhold it from the people
+            // most likely to need it.
+            //
+            // Flat siblings, not a Row: `AppScaffold` forwards this slot into Material's
+            // `actions: RowScope.() -> Unit`, which already lays them out in emission order.
+            if (creditsSource != null) {
+                CreditsToolbarAction(source = creditsSource)
+            }
             // Only when there is already a list. On the empty state the EmptyState's own CTA is the
             // create affordance, and two buttons for one action on one screen is noise.
             if (content?.projects?.isNotEmpty() == true) {

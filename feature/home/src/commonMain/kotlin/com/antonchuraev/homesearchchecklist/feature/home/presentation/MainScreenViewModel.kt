@@ -15,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.premium.PremiumEntryPoint
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
@@ -56,6 +57,11 @@ class MainScreenViewModel(
     private val hintsRepository: HintsRepository,
     private val googleAuthRepository: GoogleAuthRepository,
     private val syncRepository: SyncRepository,
+    // Injected, never constructed here: it is a `fun interface` precisely so a test can substitute a
+    // one-line recorder, and `PremiumEntryPointImpl(appNavigator)` at the call site made the v1 arm
+    // the ONE route through this gate that could not be substituted. Koin already binds it
+    // (PaywallFeatureModule), so this also stops a second construction path from drifting.
+    private val premiumEntryPoint: PremiumEntryPoint,
     private val logger: AppLogger,
 ) : AppViewModel<MainScreenState, MainScreenIntent, MainScreenSideEffect>() {
 
@@ -377,13 +383,25 @@ class MainScreenViewModel(
         }
     }
 
+    /**
+     * v1 home's credits chip / premium banner.
+     *
+     * The branch itself is [PremiumEntryPoint] — the SAME object the four v2 toolbars route
+     * through, so "premium goes to subscription status, everyone else to the paywall" is written
+     * once. It used to be spelled out here, and a second copy was about to be written for v2; a gate
+     * duplicated across handlers drifts, and fixing one site leaves the rest wrong.
+     *
+     * ⚠️ The premium INPUT is deliberately still `subscriptionStatus.isActive` and not
+     * [isPremiumUser]: this handler is the A/B control arm and its behaviour has to stay byte-for-byte
+     * what it was. (That means a Firestore-premium user with a broken RevenueCat session still gets
+     * the paywall here — a pre-existing v1 defect, not one introduced by this change.)
+     */
     private fun handlePremiumOrCreditsClick() {
         val state = screenState.value as? MainScreenState.Success ?: return
-        if (state.subscriptionStatus.isActive) {
-            appNavigator.navigateToSubscriptionStatus()
-        } else {
-            appNavigator.navigateToPaywall(source = "main_credits_chip")
-        }
+        premiumEntryPoint.open(
+            isPremium = state.subscriptionStatus.isActive,
+            source = "main_credits_chip",
+        )
     }
 
     private fun handleSignInClick() {

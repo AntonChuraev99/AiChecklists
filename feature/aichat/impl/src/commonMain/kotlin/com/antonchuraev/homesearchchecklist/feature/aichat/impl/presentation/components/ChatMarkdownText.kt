@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
 /**
@@ -31,7 +32,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  *  3. Numbered lists — lines starting with `1. `, `2. `, etc.
  *  4. Bold           — `**text**`
  *  5. Italic         — `*text*` (only when not a bullet prefix)
- *  6. Inline code    — `` `text` `` (monospace + surfaceContainerHigh bg)
+ *  6. Inline code    — `` `text` `` (monospace + [AppChatColors.inkFill] bg)
  *  7. Headings       — `# `, `## `, `### ` stripped; rendered as bold paragraph
  *  8. Plain text     — fallback
  *
@@ -47,8 +48,12 @@ fun ChatMarkdownText(
 ) {
     if (markdown.isBlank()) return
 
-    // Capture code background color inside composition (requires MaterialTheme)
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
+    // Capture the code background inside composition (an AnnotatedString SpanStyle is built outside
+    // one). Plane-relative, and it has to be: this text is drawn INSIDE a bubble, the bubble is
+    // `AppChatColors.raised()`, and a fixed `surfaceContainerHigh` IS that bubble's own colour on the
+    // dark bottom chrome — the patch disappeared entirely there while still reading on the page. See
+    // AppChatColors.inkFill.
+    val codeBackground = AppChatColors.inkFill()
 
     val blocks = remember(markdown) { parseMarkdownBlocks(markdown) }
 
@@ -209,7 +214,7 @@ private fun parseMarkdownBlocks(input: String): List<MdBlock> {
  * [AnnotatedString] with appropriate [SpanStyle]s applied.
  *
  * Supported (in order of precedence inside the string):
- *  - `` `code` ``  — monospace + surfaceContainerHigh background
+ *  - `` `code` ``  — monospace + the [codeBackground] the caller resolved from the current plane
  *  - `**bold**`     — FontWeight.Bold
  *  - `*italic*`     — FontStyle.Italic  (only when preceded by non-space)
  *

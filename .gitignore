@@ -102,6 +102,26 @@ docs/pricing-strategy.md
 !docs/healthcheck/
 docs/healthcheck/*
 !docs/healthcheck/snapshot-*.json
+
+# Exception: the UX-overhaul roadmap is tracked so it travels with the MR whose code it
+# describes — the plan and the slice implementing it get reviewed together, and the next
+# session picks the branch up from a file that is in the repo rather than in one working copy.
+# It is written for a PUBLIC repo: product intent and code paths only, never revenue,
+# purchase counts, conversion or pricing — those stay in the gitignored docs it points at.
+# Everything else under docs/roadmap/ stays ignored, same shape as the healthcheck rule above.
+!docs/roadmap/
+docs/roadmap/*
+!docs/roadmap/ux-overhaul-roadmap.md
+
+# Exception: named solution documents travel with the MR whose work produced them, so the next
+# session finds them in the repo rather than in one working copy. This is a PER-FILE allowlist and
+# not `!docs/solutions/`, deliberately: the directory holds ~190 documents, ~40 of which quote
+# revenue, purchase counts, conversion or pricing, and this repo is PUBLIC — re-including the
+# directory would publish all of it permanently. A document is added here only after being read and
+# written for publication; business figures stay in the ignored docs it points at by name.
+!docs/solutions/
+docs/solutions/*
+!docs/solutions/release-slice-from-a-long-lived-branch-2026-08-18.md
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 
@@ -131,3 +151,8 @@ client_secret_*.json
 *.wrangler-dev.log
 mcp-publisher.exe
 mcp-server/mcp-publisher.exe
+
+# JVM crash dumps — HotSpot drops these next to whatever cwd the daemon had. Never source,
+# and this repo is PUBLIC: a heap/stack dump added by `git add -A` is published for good.
+hs_err_pid*.log
+replay_pid*.log

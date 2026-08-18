@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.today_all_done_description
 import aichecklists.core.designsystem.generated.resources.today_all_done_title
@@ -61,7 +62,6 @@ import aichecklists.core.designsystem.generated.resources.today_section_past_due
 import aichecklists.core.designsystem.generated.resources.today_section_today
 import aichecklists.core.designsystem.generated.resources.today_title
 import com.antonchuraev.homesearchchecklist.core.common.api.State
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
@@ -154,6 +154,38 @@ sealed interface TodayScreenState : State {
     ) : TodayScreenState
 }
 
+/**
+ * Does [TodayBody] host the add-task action INSIDE its own placeholder for this state?
+ *
+ * The single source of truth for a decision that has two readers on two different sides of the pager:
+ *  - [TodayBody] builds its `EmptyState(action = …)` slot from it;
+ *  - the host ([com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarScreen])
+ *    withholds its PINNED add-task row for exactly these states.
+ *
+ * Written once because the failure mode of writing it twice is visible: agree wrongly one way and the
+ * screen shows two controls both labelled "Add task" (two identically-named nodes — ambiguous to a
+ * screen reader and to every UI test matching on the label); agree wrongly the other way and an empty
+ * Today page has no way to add a task at all, which on Compact is this tab's ONLY route into the
+ * capture dock.
+ *
+ * ## Why these two states and not the others
+ * - `Empty` / `AllDone` — nothing to act on, the placeholder fills the screen, and the placeholder is
+ *   where the eye is. These are the states the owner's request is about ("All clear / Nothing is
+ *   scheduled…").
+ * - `NoChecklists` and `Error` already carry their own CTA ("Create Checklist" / "Retry"). Stacking a
+ *   second button under those would make the placeholder a two-button dialog, and the pinned row is
+ *   still on screen there — so nothing is lost.
+ * - `Loading` and `Success` render no placeholder at all, so there is no slot to put anything in.
+ */
+internal fun TodayScreenState.hostsAddTaskAction(): Boolean = when (this) {
+    TodayScreenState.Empty, TodayScreenState.AllDone -> true
+    TodayScreenState.Loading,
+    TodayScreenState.NoChecklists,
+    TodayScreenState.Error,
+    is TodayScreenState.Success,
+    -> false
+}
+
 // ---------------------------------------------------------------------------
 // TodayScreen — root composable
 // ---------------------------------------------------------------------------
@@ -242,6 +274,15 @@ fun TodayScreen(
  *   input — is a lie on the standalone Today route and on the classic Calendar screen, neither of
  *   which renders a FAB or a dock. Default false = the neutral wording, i.e. every existing caller
  *   is correct without a change.
+ * @param onAddTaskClick non-null makes the empty states that [hostsAddTaskAction] names carry an
+ *   "Add task" button INSIDE the placeholder (owner request, 2026-08-17 — the Calendar page's own CTA
+ *   was the reference). Null — the default, and what the standalone [TodayScreen] and the classic
+ *   Calendar tab pass — renders exactly what it rendered before.
+ *
+ *   The HOST must withhold its pinned add-task row for precisely the states [hostsAddTaskAction]
+ *   returns true for, which is why that predicate is public and shared rather than a `when` written
+ *   twice. Both readers derive from it, so "the button is here" and "the row is not there" cannot
+ *   drift into a screen with two "Add task" controls or none at all.
  */
 @Composable
 fun TodayBody(
@@ -252,7 +293,16 @@ fun TodayBody(
     modifier: Modifier = Modifier,
     contentBottomPadding: Dp = 0.dp,
     canCapture: Boolean = false,
+    onAddTaskClick: (() -> Unit)? = null,
 ) {
+    // ONE nullable callback, gated by the SAME predicate the host reads, handed to every branch
+    // [hostsAddTaskAction] covers. Deriving it once rather than inline per branch is what makes the
+    // two sides consistent by construction: if the predicate says false this is null and no branch can
+    // draw a button, and if it says true for a branch that forgot to wire it, the branch renders no
+    // action while the host has already withheld its row. Guarded by CONSTRUCTION rather than by a
+    // test: both sides read this one predicate, so there is no second reader to drift from it.
+    val onAddTask: (() -> Unit)? = onAddTaskClick?.takeIf { state.hostsAddTaskAction() }
+
     Box(modifier = modifier.fillMaxSize()) {
         when (state) {
             TodayScreenState.Loading -> TodayLoadingContent()
@@ -265,38 +315,32 @@ fun TodayBody(
                 } else {
                     stringResource(Res.string.today_empty_state_description_no_capture)
                 },
+                actionLabel = stringResource(Res.string.inbox_add_task_row),
+                onAction = onAddTask,
             )
 
             TodayScreenState.AllDone -> EmptyState(
                 icon = Icons.Outlined.CheckCircle,
                 title = stringResource(Res.string.today_all_done_title),
                 description = stringResource(Res.string.today_all_done_description),
+                actionLabel = stringResource(Res.string.inbox_add_task_row),
+                onAction = onAddTask,
             )
 
             TodayScreenState.NoChecklists -> EmptyState(
                 icon = Icons.Outlined.WbSunny,
                 title = stringResource(Res.string.today_empty_state_title),
                 description = stringResource(Res.string.today_no_checklists_description),
-                action = {
-                    AppButton(
-                        text = stringResource(Res.string.main_create_checklist),
-                        onClick = onCreateChecklistClick,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                actionLabel = stringResource(Res.string.main_create_checklist),
+                onAction = onCreateChecklistClick,
             )
 
             TodayScreenState.Error -> EmptyState(
                 icon = Icons.Outlined.ErrorOutline,
                 title = stringResource(Res.string.today_error_title),
                 description = stringResource(Res.string.today_error_description),
-                action = {
-                    AppButton(
-                        text = stringResource(Res.string.today_error_retry),
-                        onClick = onRetry,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                actionLabel = stringResource(Res.string.today_error_retry),
+                onAction = onRetry,
             )
 
             is TodayScreenState.Success -> TodaySuccessContent(

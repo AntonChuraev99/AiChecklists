@@ -57,6 +57,17 @@ data class InboxDisplayOptions(
      * save?" is a worse first impression than a slightly longer list.
      */
     val showCompleted: Boolean = true,
+    /**
+     * Whether the list is broken into Overdue / Today / Upcoming / Anytime groups.
+     *
+     * A **projection**, exactly like [sort]: grouping reads the reminder fields and never writes
+     * them, so switching it off restores the stored order byte for byte.
+     *
+     * Default true, and it costs nothing to a user who has no dated tasks at all: headers are drawn
+     * only once **two or more** groups are non-empty, so the common "everything is undated" list
+     * renders exactly as it does with grouping off.
+     */
+    val groupByDate: Boolean = true,
 )
 
 interface InboxDisplayPrefsRepository {
@@ -72,10 +83,26 @@ interface InboxDisplayPrefsRepository {
      */
     fun observeDisplayOptions(): Flow<InboxDisplayOptions>
 
+    /**
+     * When the user last swiped the "plan your day" nudge away, epoch millis; `0` = never.
+     *
+     * Not part of [InboxDisplayOptions]: that value is what the display sheet edits, and a dismissal
+     * timestamp is not an option the user picks — folding it in would put a field on the sheet's own
+     * model that the sheet must remember never to render.
+     *
+     * Carries the same never-fails contract as [observeDisplayOptions] and for the same reason: it
+     * is combined into `InboxViewModel.screenState`, whose combine has no `catch` of its own.
+     */
+    fun observePlanNudgeDismissedAt(): Flow<Long>
+
     // Writes deliberately PROPAGATE their failure instead of degrading: a swallowed write leaves the
     // sheet showing the old value with nothing to explain why the tap did nothing. The caller owns
     // the user-facing message.
     suspend fun setLayout(layout: InboxLayout)
     suspend fun setSort(sort: InboxSort)
     suspend fun setShowCompleted(show: Boolean)
+    suspend fun setGroupByDate(group: Boolean)
+
+    /** @param atMillis when the dismissal happened. The 24h window is computed by the reader. */
+    suspend fun setPlanNudgeDismissedAt(atMillis: Long)
 }
