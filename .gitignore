@@ -102,6 +102,16 @@ docs/pricing-strategy.md
 !docs/healthcheck/
 docs/healthcheck/*
 !docs/healthcheck/snapshot-*.json
+
+# Exception: the UX-overhaul roadmap is tracked so it travels with the MR whose code it
+# describes — the plan and the slice implementing it get reviewed together, and the next
+# session picks the branch up from a file that is in the repo rather than in one working copy.
+# It is written for a PUBLIC repo: product intent and code paths only, never revenue,
+# purchase counts, conversion or pricing — those stay in the gitignored docs it points at.
+# Everything else under docs/roadmap/ stays ignored, same shape as the healthcheck rule above.
+!docs/roadmap/
+docs/roadmap/*
+!docs/roadmap/ux-overhaul-roadmap.md
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 
