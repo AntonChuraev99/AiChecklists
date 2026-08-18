@@ -131,3 +131,8 @@ client_secret_*.json
 *.wrangler-dev.log
 mcp-publisher.exe
 mcp-server/mcp-publisher.exe
+
+# JVM crash dumps — HotSpot drops these next to whatever cwd the daemon had. Never source,
+# and this repo is PUBLIC: a heap/stack dump added by `git add -A` is published for good.
+hs_err_pid*.log
+replay_pid*.log
