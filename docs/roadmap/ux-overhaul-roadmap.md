@@ -194,7 +194,13 @@ always 0 there. Anything about the IME is unproven by a frame and has to be chec
    below. This is what proves `consume` was narrowed to `navigationBars`.
 3. The same dock on **Calendar** — a second host whose scrim is drawn by a different mechanism
    (`drawWithContent`, not an overlay `Box`).
-4. **wasmJs: the bottom bar's shoulders have never been checked visually by anything.** A Chrome
+4. **Web: the picker does not auto-open, and the failure is silent.** Measured 2026-08-18 in Chrome
+   against the production bundle: entering Analyze fires `input.click()` with
+   `navigator.userActivation.isActive === false`, so the browser drops it without an error; the same
+   click from a manual tap reports `true` and works. The screen stays usable — the source is already
+   chosen and its button works — so this is one extra tap on web, not a dead end. Recorded in
+   `docs/todos/2026-08-18-wasm-auto-open-picker-lacks-user-gesture.md`.
+5. **wasmJs: the bottom bar's shoulders have never been checked visually by anything.** A Chrome
    window will not narrow under automation, because Compose reads the size of the *window* rather
    than the container, and a wide window shows the drawer instead of the bar — where shoulders do
    not exist by construction. Needs a manual pass in a narrow window on `:9090`.
