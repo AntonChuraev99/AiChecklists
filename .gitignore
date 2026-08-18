@@ -55,8 +55,29 @@ aichecklists-*.json
 extensions/*.env
 !extensions/*.env.example
 
-# Claude Code local config
-.claude/
+# Claude Code — project rules and skills are tracked, local session state is not.
+#
+# WHY: `.claude/` was ignored wholesale, and `EnterWorktree` therefore produced a worktree with
+# ZERO project rule files against 10 in the main checkout. The whole feat/ux-overhaul branch —
+# the largest UI task in this repo — ran without designsystem.md / ui-card-patterns.md /
+# adaptive-navigation.md, i.e. without the very files CLAUDE.md points at for UI rules
+# (found 2026-08-17). `.worktreeinclude` papered over it by copying; tracking fixes it.
+#
+# settings.json stays out deliberately: it is a per-machine permission grant, not a project rule.
+#
+# `.claude/skills/` stays out too, and NOT for tidiness: `ai-chat-feedback-fixer/
+# processed-feedback.md` is a verbatim log of real end users' chat messages mined from
+# Amplitude — other people's text, some of it personal. Publishing it would be a privacy
+# incident, not a numbers leak. Open the skills directory only after that file is moved out or
+# redacted, and re-scan the rest for the Amplitude project id and account addresses it also
+# carries.
+#
+# `.claude/hooks/` also stays out: `guard-main-repo-edit.ps1` hardcodes this machine's checkout
+# path twice (`c:\users\admin\…`) — the exact shape this policy strips out of CLAUDE.md, and one
+# the scanner cannot catch there because it only reads *.md. Track it once the roots come from
+# `git rev-parse` instead of a literal.
+.claude/*
+!.claude/rules/
 
 # graphify knowledge graph — local dev-tool output, not portfolio code
 graphify-out/
@@ -85,43 +106,98 @@ composeApp/release/
 # Firebase hosting cache
 hosting/.firebase/
 
-# Docs (local working notes, some contain API keys)
-# `docs/*` rather than `docs/` so a subdirectory can be re-included below: git never
-# descends into an excluded DIRECTORY, so a bare `docs/` makes any later `!docs/...`
-# rule unreachable.
+# ─────────────────────────────────────────────────────────────────────────────
+# Docs — public by directory whitelist (policy changed 2026-08-18)
+#
+# WHY: `docs/` used to be ignored wholesale, which meant a task's documentation could never
+# ride in the same MR as its code — the doc had to be written into a directory git refused to
+# see. The rule now separates the two things that were conflated: WHAT a doc describes
+# (features, bugs, decisions — publishable) from WHAT NUMBERS it carries (sales, analytics,
+# account balances — never publishable).
+#
+# The list below is a WHITELIST on purpose. This repo is public: a push is an instant,
+# irreversible publication that Google indexes and forks copy. A blacklist ("ignore the
+# sensitive ones") fails open — a new doc with an ARPU table in it lands in git the moment
+# somebody forgets. A whitelist fails closed: the worst case is a doc that did not make it
+# into the MR, which is a nuisance, not an incident.
+#
+# The whitelist is only half the gate. `scripts/docs_leak_scan.py` reads every staged *.md
+# and blocks the commit on business/analytics numbers, private dashboard links, third-party
+# identities and credentials — see .github/workflows/docs-leak-guard.yml. Adding a directory
+# here does NOT mean its contents were reviewed; it means the scanner now watches them.
+#
+# `docs/*` rather than `docs/`: git never descends into an excluded DIRECTORY, so a bare
+# `docs/` would make every `!docs/...` line below unreachable.
 docs/*
-# Business-sensitive pricing/geo-growth strategy — keep out of public repo even if docs/ is ever un-ignored
-docs/pricing-strategy.md
 
-# Exception: /healthcheck snapshots are tracked. They are the baseline the skill diffs each
-# run against — untracked, they live in exactly one working copy and a reinstall loses the
-# history. Scanned before un-ignoring (2026-08-06): no API keys, tokens or private keys;
-# third-party account names, user ids and IP/subnet strings are redacted. The owner's own
-# address stays as-is — it is already the public author email on every commit here.
-# Everything else under docs/healthcheck/ (report.html, seen.json) stays ignored.
-!docs/healthcheck/
-docs/healthcheck/*
-!docs/healthcheck/snapshot-*.json
-
-# Exception: the UX-overhaul roadmap is tracked so it travels with the MR whose code it
-# describes — the plan and the slice implementing it get reviewed together, and the next
-# session picks the branch up from a file that is in the repo rather than in one working copy.
-# It is written for a PUBLIC repo: product intent and code paths only, never revenue,
-# purchase counts, conversion or pricing — those stay in the gitignored docs it points at.
-# Everything else under docs/roadmap/ stays ignored, same shape as the healthcheck rule above.
+# Task-shaped documentation — the docs an MR is supposed to carry.
+#
+# This replaces the per-file allowlists added in 7aac7fe8 (`!docs/roadmap/ux-overhaul-roadmap.md`,
+# `!docs/solutions/release-slice-…md`). Their reasoning was right — "~40 of ~190 solution docs
+# quote revenue, so re-including the directory would publish all of it" — and it is exactly what
+# the leak gate removes: the directory can be opened because every file in it is scanned, and a
+# doc carrying revenue cannot be committed whether or not somebody remembered a line here. Both
+# of those files stay tracked; both pass the scanner.
+!docs/active/
+!docs/archive/
+!docs/backlog/
+!docs/brainstorms/
+!docs/completed/
+!docs/decisions/
+!docs/designs/
+!docs/guidelines/
+!docs/plans/
+!docs/redesign/
+!docs/reference/
 !docs/roadmap/
-docs/roadmap/*
-!docs/roadmap/ux-overhaul-roadmap.md
-
-# Exception: named solution documents travel with the MR whose work produced them, so the next
-# session finds them in the repo rather than in one working copy. This is a PER-FILE allowlist and
-# not `!docs/solutions/`, deliberately: the directory holds ~190 documents, ~40 of which quote
-# revenue, purchase counts, conversion or pricing, and this repo is PUBLIC — re-including the
-# directory would publish all of it permanently. A document is added here only after being read and
-# written for publication; business figures stay in the ignored docs it points at by name.
 !docs/solutions/
-docs/solutions/*
-!docs/solutions/release-slice-from-a-long-lived-branch-2026-08-18.md
+!docs/todos/
+!docs/work/
+
+# Technical runbooks referenced from CLAUDE.md — useless to a reader who cannot open them.
+!docs/client-diagnostics.md
+!docs/cloud-functions-diagnostics.md
+!docs/navigation3-migration.md
+!docs/adaptive-architecture.md
+!docs/adaptive-decisions.md
+!docs/README.md
+
+# Markdown ONLY, and ONLY inside the directories named above — an allow-list of one extension
+# rather than a deny-list of many. 311 MB of the old docs/ tree was video, screenshots and
+# exported HTML: none of it is reviewable as text, and a binary committed once stays in history
+# at full weight even after it is deleted. A deny-list also misses what has no extension at all —
+# an early draft of this rule would have published `docs/solutions/*/.complete-stats`.
+#
+# ⚠️ The `docs/*/` prefix is load-bearing and must NOT be relaxed to `docs/**/`. The first
+# version of this block read `docs/**/*` + `!docs/**/` + `!docs/**/*.md`, which re-includes any
+# .md ANYWHERE under docs/ — making the 15 lines above decorative and turning the whole rule
+# into the blacklist this policy exists to avoid. A brand-new `docs/analytics/revenue.md` and a
+# top-level `docs/security-playbook.md` both landed as tracked-by-default under it.
+# `docs/*/**` only ever reaches inside directories that `docs/*` did not exclude — i.e. exactly
+# the whitelisted ones — so an unlisted directory stays invisible to git and the rule fails closed.
+#
+# Read as: re-exclude everything below a whitelisted directory (1), let git descend into its
+# subdirectories so the un-ignore stays reachable (2), then re-include Markdown only (3).
+docs/*/**
+!docs/*/**/
+!docs/*/**/*.md
+
+# Never public regardless of where they are moved — these are the numbers themselves.
+# (Belt-and-braces: none of them sit in a whitelisted directory today.)
+docs/PRODUCT.md
+docs/product-features.md
+docs/unit-economics.md
+docs/pricing-strategy.md
+docs/marketing/
+docs/reports/
+docs/healthcheck/
+docs/onboarding-screenshots/
+# The store listing is the source of truth for Play Console copy and has been tracked since
+# before this policy; the directory around it is screenshots. Re-open the directory so git can
+# descend into it, then close everything in it except that one file.
+!docs/store-screenshots/
+docs/store-screenshots/*
+!docs/store-screenshots/store-listing-en.md
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 
