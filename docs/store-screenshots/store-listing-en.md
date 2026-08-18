@@ -23,6 +23,34 @@ _Updated: 2026-07-02 · App version: 1.17.7 · ASO audit revision · **copy revi
 > `ai_action_cost=20` it buys 5 AI generations for the lifetime of a Free account
 > (see [`docs/PRODUCT.md`](../PRODUCT.md) §2).
 
+> ### Second drift pass — 2026-08-18, against the v2 shell (1.19.2 in prod, 1.20.0 going out)
+>
+> The v2 navigation shell became the default for every install in `b9e2db74` (2026-08-05), and that
+> commit is an ancestor of the 1.19.2 release commit — so **the copy below already describes an app
+> whose home screen no longer exists**. Four new gaps, to be applied to the console and to this doc
+> in one session, together with the two from 2026-08-03 above:
+>
+> 3. **Screenshots 1, 2, 3 and 6 are stale** (frames read visually from `unnamed*.png` in this
+>    folder). 1 (AI Chat) and 3 (Calendar) show the v1 hamburger drawer and the Today/Calendar top
+>    tabs, both gone in v2. 2 shows Analyze as six full-width cards under "What would you like to
+>    analyze?", which 1.20.0 replaces with a pill grid. 6 claims **47 templates** while the app
+>    bundles **81** (`ls data/checklists/*.json` = 81). Frames 4, 5, 7 and 8 are detail surfaces and
+>    survive the shell change untouched.
+> 4. **The v2 vocabulary is missing from the indexed text.** The app now names three first-class
+>    destinations — **Inbox**, **Projects**, **Overview** (`nav_tab_*` in `strings.xml`; tab set
+>    confirmed in `App.kt:isV2TabRoute`) — and none of them appears in title, short or full
+>    description. Play indexes the whole full description, so these are free slots that also close
+>    the gap between store language and app language.
+> 5. **"Today view"** survived the redesign but stopped being its own destination: it renders under
+>    the Calendar tab. The line is not wrong, it just points at something reached differently now.
+> 6. **Price string.** Full description says "$20/year"; the paywall renders **$19.99**
+>    (screenshot 8). Align the text to the SKU.
+>
+> Checked and cleared 2026-08-18: this file is byte-identical to its committed blob
+> (`git hash-object` = `git ls-files -s` = `e721a5cc`). The ` M` git kept reporting was a stale stat
+> cache, cleared by `git update-index --refresh`. **That proves doc == git HEAD, not doc == console**
+> — whether the 2026-07-02 copy below was ever pasted into Play Console remains unverified.
+
 **Changes vs live listing (ASO audit 2026-07-02):**
 - Short description: added `checklist` + `to-do list` keywords (the live version had neither — the second-highest-weight indexed field carried no primary keyword).
 - Full description: live was 1395/4000 chars — expanded to ~3300 (Play indexes all 4000; unused chars are wasted keyword slots). Kept the live version's tone, added long-tail keywords (grocery list, packing list, photo to checklist, weekly planner, to-do list) + a keyword paragraph before the CTA.
