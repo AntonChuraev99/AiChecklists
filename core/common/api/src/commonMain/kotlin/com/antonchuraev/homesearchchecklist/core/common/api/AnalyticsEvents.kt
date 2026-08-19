@@ -986,6 +986,36 @@ object AnalyticsParams {
     const val COMPLETED_COUNT = "completed_count"
     const val HAD_TEXT = "had_text"
 
+    // ── Capture dock: the due date the task was born with (AnalyticsEvents.Inbox.QUICK_ADDED) ──
+    // Three ADDITIVE dimensions on the existing capture event, never a fourth event. The funnel the
+    // due rail is judged by is `nav_create_fab_tapped` → `inbox_quick_added`; a new event would leave
+    // that funnel counting the pre-rail behaviour forever, and this one already carries 30 days of
+    // history to compare against.
+
+    /**
+     * Whether the captured task carried a due date. ALWAYS present, on both capture surfaces.
+     *
+     * The rail's primary metric reads straight off this as a share of the event, with no join against
+     * the item table — which is the point: the "3.4% of tasks get a date" baseline this work exists to
+     * move could not be reproduced in Amplitude at all, because nothing emitted it.
+     */
+    const val HAS_DUE_DATE = "has_due_date"
+
+    /**
+     * Whole days from TODAY to the due date in the user's own zone: 0 = today, 1 = tomorrow, 7 = next
+     * week.
+     *
+     * ABSENT — not 0, not -1 — when there is no date. [HAS_DUE_DATE] is the presence flag, and a
+     * sentinel here would silently join the "today" bucket in every average taken over this property.
+     *
+     * Days rather than millis because the question it answers is which PRESETS the offer set needs: a
+     * histogram over five small integers is readable, one over epoch deltas is not.
+     */
+    const val DUE_DATE_OFFSET_DAYS = "due_date_offset_days"
+
+    /** HOW the date was set — a [DateInputMethod] wire value. Always present. */
+    const val DATE_INPUT_METHOD = "date_input_method"
+
     // AI chat
     const val MESSAGE_ID = "message_id"
     const val ROUTED_LAYER = "routed_layer"

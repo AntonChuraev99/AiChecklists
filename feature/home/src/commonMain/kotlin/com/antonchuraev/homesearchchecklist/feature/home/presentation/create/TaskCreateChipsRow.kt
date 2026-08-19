@@ -72,6 +72,7 @@ fun TaskCreateChipsRow(
         ItemCreateReminderPreset.TOMORROW_MORNING -> GistiItemCreateAction.REMIND_TOMORROW_MORNING
         ItemCreateReminderPreset.TONIGHT -> GistiItemCreateAction.REMIND_TONIGHT
         ItemCreateReminderPreset.CUSTOM -> GistiItemCreateAction.REMIND_PICK
+        ItemCreateReminderPreset.WEEKEND, ItemCreateReminderPreset.NEXT_WEEK -> null
         null -> null
     }
 

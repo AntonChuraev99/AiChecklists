@@ -88,6 +88,7 @@ fun CalendarRoute(
     val todayState by todayViewModel.screenState.collectAsStateWithLifecycle()
     val calendarState by calendarViewModel.screenState.collectAsStateWithLifecycle()
     val draft by todayViewModel.draft.collectAsStateWithLifecycle()
+    val due by todayViewModel.due.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(todayViewModel) {
@@ -116,6 +117,8 @@ fun CalendarRoute(
         drawerState = drawerState,
         contentBottomPadding = contentBottomPadding,
         draft = draft,
+        due = due,
+        onDueIntent = { todayViewModel.sendIntent(TodayIntent.OnDue(it)) },
         captureDockOpen = captureDockOpen,
         captureEnabled = captureEnabled,
         onCaptureDockDismiss = onCaptureDockDismiss,

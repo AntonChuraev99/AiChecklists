@@ -144,7 +144,11 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCapture
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
-import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.CollapsibleSourceRow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueSheetHost
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DueRailSection
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -285,6 +289,26 @@ fun InboxScreen(
     // channel the dismiss gestures use, so the shell's chrome comes back through exactly one path.
     LaunchedEffect(createDockOpen, captureDockRenders) {
         if (createDockOpen && !captureDockRenders) onCreateDockDismiss()
+    }
+
+    // The planner belongs to an OPEN dock, and the dock closes through half a dozen paths (BACK, a
+    // tap outside, the shell, the guard above). Collapsing it off the one value all of them resolve
+    // to is what stops the next open from arriving expanded over a fresh draft, with the AI source
+    // row still folded away and no date to justify it.
+    //
+    // On the TRANSITION only, never on arrival. An effect keyed on the flag alone also runs on first
+    // composition — on a screen whose dock is closed, which is the normal case — and reporting a
+    // state change that did not happen is not free: it is an intent per mount, and a host that reads
+    // "the screen raised something" as "the user reached for the dock" would open it. Not
+    // hypothetical: `InboxAddTaskRowTest` is exactly such a host, and this is what it caught.
+    var dockWasOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(captureDockRenders) {
+        if (captureDockRenders) {
+            dockWasOpen = true
+        } else if (dockWasOpen) {
+            dockWasOpen = false
+            onIntent(InboxIntent.OnDue(DraftDueIntent.OnPlannerCollapse))
+        }
     }
 
     // Whether the trailing add-task row is composed at all. Two independent reasons to withhold it,
@@ -431,20 +455,28 @@ fun InboxScreen(
                         modifier = Modifier
                             .onGloballyPositioned { dockTopPx.floatValue = it.positionInRoot().y }
                             .background(captureScrimColor),
-                        // The same chip row the checklist detail screen has always had. Until now
-                        // this dock was a bare text field, so a capture made on the home tab could
-                        // carry no reminder and no priority — the surface the user reaches FIRST
-                        // was the weakest.
+                        // The due rail, replacing the chip row this dock carried until now.
                         //
-                        // Pick-time and Repeat stay off: both open sheets that only the detail
-                        // screen hosts, and a chip that swallows its tap is worse than an absent
-                        // one.
+                        // Pick time and Repeat are no longer switched OFF: they moved into the rail's
+                        // planner panel, and the sheets behind them are mounted by THIS screen
+                        // ([DraftDueSheetHost], below the scaffold) rather than only by the detail
+                        // screen. The flags existed so a chip could not swallow its tap; the host now
+                        // exists, so the reason is gone.
+                        //
+                        // The Smart-Add token preview goes with the old row on purpose — the leading
+                        // chip is now the single answer to "when" and shows the parsed phrase itself.
                         aboveInput = {
-                            TaskCreateChipsRow(
+                            DueRailSection(
                                 draft = content.draft,
-                                onAction = { onIntent(InboxIntent.OnCreateChipAction(it)) },
-                                showPickTime = false,
-                                showRepeat = false,
+                                due = content.due,
+                                onIntent = { onIntent(InboxIntent.OnDue(it)) },
+                                onImportantToggle = {
+                                    onIntent(InboxIntent.OnCreateChipAction(GistiItemCreateAction.IMPORTANT))
+                                },
+                                // The tab's own ticking clock, so the rail cannot disagree with the
+                                // list behind it about whether a time has passed — and so a
+                                // screenshot can pin it.
+                                nowMillis = content.nowMillis,
                             )
                         },
                         // The main entry into Analyze. Inside the dock rather than behind the "+"
@@ -463,17 +495,27 @@ fun InboxScreen(
                         // row is the ALTERNATIVE to a task already being typed, so the copy has to
                         // say "or".
                         belowInput = {
-                            SourceRowSection(
-                                title = stringResource(Res.string.capture_dock_ai_entry_title),
-                                onSelect = { kind ->
-                                    onIntent(
-                                        InboxIntent.OnAiSourceTapped(
-                                            kind = kind,
-                                            source = AiEntrySource.CAPTURE_DOCK_INBOX,
+                            // Folded away while the planner is open, and folded BACK when it closes.
+                            //
+                            // Not decoration: measured on a 320dp window at fontScale 1.3 in RU, the
+                            // expanded panel and this row together overrun the window and the "Link"
+                            // and "Voice" pills are cut off by its edge — with `ime = 0`, i.e. before
+                            // a real keyboard takes its ~250dp. Animated rather than swapped, because
+                            // a row that vanishes on an unrelated tap reads as a feature that was
+                            // removed; this project has shipped that report before.
+                            CollapsibleSourceRow(collapsed = content.due.plannerExpanded) {
+                                SourceRowSection(
+                                    title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                    onSelect = { kind ->
+                                        onIntent(
+                                            InboxIntent.OnAiSourceTapped(
+                                                kind = kind,
+                                                source = AiEntrySource.CAPTURE_DOCK_INBOX,
+                                            )
                                         )
-                                    )
-                                },
-                            )
+                                    },
+                                )
+                            }
                         },
                     )
                 }
@@ -579,6 +621,20 @@ fun InboxScreen(
     if (content != null) {
         val page = content.pages.getOrNull(content.selectedPage)
         InboxItemSheetHost(content = content, onIntent = onIntent)
+
+        // The v1 reminder sheet and date picker, scoped to the DRAFT rather than to a stored row —
+        // the three exits of the capture dock's planner panel.
+        //
+        // Mounted here, at the screen's level, and never inside the dock: `QuickCaptureDock` lives in
+        // `core:designsystem`, which sits UNDER `feature:checklist` in the module graph and cannot
+        // name `ReminderSheet` at all. Beside `InboxItemSheetHost` rather than inside it, because
+        // that host returns early when no task row is open — which is exactly the state the capture
+        // dock is used in.
+        DraftDueSheetHost(
+            draft = content.draft,
+            due = content.due,
+            onIntent = { onIntent(InboxIntent.OnDue(it)) },
+        )
 
         content.renameDraft?.let { draft ->
             RenameChecklistDialog(

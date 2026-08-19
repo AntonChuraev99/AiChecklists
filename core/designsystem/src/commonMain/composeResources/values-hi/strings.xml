@@ -1762,4 +1762,20 @@
     <string name="month_abbr_oct">अक्तू</string>
     <string name="month_abbr_nov">नव</string>
     <string name="month_abbr_dec">दिस</string>
+
+    <!-- Due rail (capture dock, R1). Labels must stay short - the row wraps at 320dp. -->
+    <string name="due_rail_no_date">बिना तारीख</string>
+    <string name="due_preset_tonight">आज रात</string>
+    <string name="due_preset_tomorrow">कल</string>
+    <string name="due_preset_weekend">सप्ताहांत</string>
+    <string name="due_preset_in_1_hour">1 घंटे में</string>
+    <string name="due_preset_next_week">अगले हफ़्ते</string>
+    <string name="due_rail_clear_a11y">तारीख हटाएं</string>
+    <string name="due_rail_expanded_a11y">खुला है</string>
+    <string name="due_rail_collapsed_a11y">बंद है</string>
+    <string name="due_planner_pick_date">तारीख चुनें</string>
+    <string name="due_planner_time">समय</string>
+    <string name="due_planner_repeat">दोहराएं</string>
+    <string name="due_planner_repeat_off">बंद</string>
+    <string name="due_planner_done">हो गया</string>
 </resources>

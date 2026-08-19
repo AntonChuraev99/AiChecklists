@@ -461,6 +461,26 @@ fun <T> GistiSelectableChipRow(
     }
 }
 
+/**
+ * ONE selectable chip, for a host that places it inside a layout of its own.
+ *
+ * Exists because [GistiSelectableChipRow] is a `LazyRow`, and a lazy row cannot be a child of a
+ * `FlowRow` — it would measure against an infinite width constraint. The due rail needs exactly that
+ * placement for the Important toggle: inside the wrapping row, so the toggle only takes a second line
+ * when the line is genuinely full instead of costing one unconditionally.
+ *
+ * Same body as the row's items, so the two cannot drift: the `selected` semantics (without which a
+ * screen reader announced the presets as identical buttons — this project's own shipped a11y defect)
+ * and the 48dp touch target under a 38dp pill come from the same place.
+ */
+@Composable
+fun GistiSelectableChipItem(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) = SelectablePromptChipItem(icon = icon, label = label, selected = selected, onClick = onClick)
+
 @Composable
 private fun SelectablePromptChipItem(
     icon: ImageVector,

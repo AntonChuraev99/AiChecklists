@@ -1616,4 +1616,20 @@
     <string name="month_abbr_oct">окт.</string>
     <string name="month_abbr_nov">нояб.</string>
     <string name="month_abbr_dec">дек.</string>
+
+    <!-- Due rail (capture dock, R1). Labels must stay short - the row wraps at 320dp. -->
+    <string name="due_rail_no_date">Без даты</string>
+    <string name="due_preset_tonight">Вечером</string>
+    <string name="due_preset_tomorrow">Завтра</string>
+    <string name="due_preset_weekend">Выходные</string>
+    <string name="due_preset_in_1_hour">Через час</string>
+    <string name="due_preset_next_week">След. неделя</string>
+    <string name="due_rail_clear_a11y">Убрать дату</string>
+    <string name="due_rail_expanded_a11y">Развёрнуто</string>
+    <string name="due_rail_collapsed_a11y">Свёрнуто</string>
+    <string name="due_planner_pick_date">Своя дата</string>
+    <string name="due_planner_time">Время</string>
+    <string name="due_planner_repeat">Повтор</string>
+    <string name="due_planner_repeat_off">Выкл.</string>
+    <string name="due_planner_done">Готово</string>
 </resources>

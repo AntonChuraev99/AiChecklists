@@ -20,6 +20,21 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Remin
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +55,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -128,7 +145,9 @@ private class FakeAppLogger : AppLogger {
 }
 
 private open class FakeRepository(
-    private val remindersInRange: List<TodayReminderInfo> = emptyList()
+    private val remindersInRange: List<TodayReminderInfo> = emptyList(),
+    /** How many recurring reminders are already armed — the left side of the repeat gate. */
+    private val activeReminderCount: Int = 0,
 ) : ChecklistRepository {
     override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
     override suspend fun addChecklist(checklist: Checklist): Long = 0L
@@ -142,7 +161,7 @@ private open class FakeRepository(
     override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
     override suspend fun setFoldersEnabled(checklistId: Long, value: Boolean) {}
     override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {}
-    override suspend fun countActiveReminders(): Int = 0
+    override suspend fun countActiveReminders(): Int = activeReminderCount
     override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()
     override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? = null
     override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
@@ -172,6 +191,77 @@ private open class FakeRepository(
     override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
     override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
     override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
+}
+
+// ─── User limits (the capture dock's ONE paywall gate) ──────────────────────
+
+/**
+ * The real [GetUserLimitsUseCase] over fake collaborators — not a stub of it.
+ *
+ * It is a final class, so there is no interface to double; wiring the genuine one means these tests
+ * exercise the SAME composition production runs (Remote Config value → `UserLimits.maxRecurringReminders`
+ * → `canCreateRecurringReminder`). A hand-written `UserLimits` supplier here would keep passing if
+ * the use case stopped reading Remote Config at all.
+ *
+ * [maxRecurringRemindersFree] is a parameter rather than the served default on purpose: a fake pinned
+ * to whatever the config happens to serve today passes against a hardcoded constant just as happily
+ * as against an honest read, so the gate tests pin TWO different values and expect the boundary to
+ * move with them.
+ */
+private fun limitsUseCase(
+    repository: ChecklistRepository = FakeRepository(),
+    subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
+    maxRecurringRemindersFree: Long = RemoteConfigDefaults.MAX_RECURRING_REMINDERS_FREE,
+): GetUserLimitsUseCase = GetUserLimitsUseCase(
+    remoteConfigProvider = FakeRemoteConfigProvider(maxRecurringRemindersFree),
+    checklistRepository = repository,
+    paywallRepository = FakePaywallRepository(subscriptionStatus),
+    userDataRepository = FakeUserDataRepository(),
+)
+
+private val PREMIUM_STATUS = SubscriptionStatus(
+    isActive = true,
+    activeEntitlements = setOf(Entitlements.PREMIUM),
+)
+
+/** Serves the caller's recurring-reminder ceiling and the shipped default for every other key. */
+private class FakeRemoteConfigProvider(
+    private val maxRecurringRemindersFree: Long,
+) : RemoteConfigProvider {
+    override suspend fun fetchAndActivate(): Boolean = true
+    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+    override fun getString(key: String, defaultValue: String): String = defaultValue
+    override fun getLong(key: String, defaultValue: Long): Long =
+        if (key == RemoteConfigKeys.MAX_RECURRING_REMINDERS_FREE) maxRecurringRemindersFree else defaultValue
+}
+
+private class FakePaywallRepository(
+    status: SubscriptionStatus = SubscriptionStatus.FREE,
+) : PaywallRepository {
+    override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(status)
+    override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> = Result.success(null)
+    override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Error("not implemented")
+    override suspend fun restorePurchases(): RestoreResult = RestoreResult.Error("not implemented")
+    override suspend fun refreshSubscriptionStatus() {}
+    override fun isConfigured(): Boolean = true
+    override suspend fun logIn(appUserId: String): Result<LoginResult> = Result.failure(NotImplementedError())
+    override suspend fun logOut(): Result<SubscriptionStatus> = Result.failure(NotImplementedError())
+}
+
+private class FakeUserDataRepository : UserDataRepository {
+    private val userData = UserData(userId = "test", isPremium = false)
+    private val flow = MutableStateFlow(userData)
+    override fun getUserDataFlow(): StateFlow<UserData> = flow
+    override suspend fun getUserData(): UserData = userData
+    override suspend fun update(userData: UserData) {}
+    override suspend fun ensureUserRegistered(): Result<RegistrationData> =
+        Result.success(RegistrationData(userData = userData, isNewUser = false))
+    override suspend fun syncWithServer(): Result<RegistrationData> =
+        Result.success(RegistrationData(userData = userData, isNewUser = false))
+    override suspend fun isPaywallLinked(): Boolean = false
+    override suspend fun setPaywallLinked(linked: Boolean) {}
+    override suspend fun restoreCreditsAfterPurchase(): Result<Int> = Result.success(0)
+    override suspend fun getFirstLaunchAtMillis(): Long = 0L
 }
 
 // ─── Helpers for building test data ─────────────────────────────────────────
@@ -239,7 +329,7 @@ class TodayViewModelTest {
     @Test
     fun emptyState_whenNoReminders() = runTest {
         val repo = FakeRepository(remindersInRange = emptyList())
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         val state = vm.awaitState()
         assertIs<TodayScreenState.Empty>(state)
@@ -266,7 +356,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 2L, reminderAt = FUTURE_TODAY_MS),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -299,7 +389,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 1L, reminderAt = earlierMs),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -313,7 +403,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_itemLevel_navigatesToFillDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, fillId = 42L))
 
@@ -326,7 +416,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_checklistLevel_navigatesToChecklistDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, fillId = null))
 
@@ -339,7 +429,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnCreateChecklistClick_navigatesToTemplates() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         vm.sendIntent(TodayIntent.OnCreateChecklistClick)
 
@@ -355,7 +445,7 @@ class TodayViewModelTest {
                 itemLevelReminder(reminderAt = FUTURE_TODAY_MS, itemText = "Buy milk"),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -376,7 +466,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(reminderAt = FUTURE_TODAY_MS, isRecurring = true),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -416,7 +506,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnRefresh_doesNotNavigate() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         // Refresh is a data concern — it must never move the user off the screen.
         vm.sendIntent(TodayIntent.OnRefresh)
@@ -472,7 +562,7 @@ class TodayViewModelTest {
             )
         )
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -530,7 +620,7 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw cause }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Error>(state)
@@ -556,7 +646,7 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw NullPointerException() }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         assertIs<TodayScreenState.Error>(vm.awaitState())
         assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on failure")
@@ -579,7 +669,7 @@ class TodayViewModelTest {
                 }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
         assertIs<TodayScreenState.Error>(vm.awaitState())
 
         // Heal the repository, then retry: flatMapLatest must re-subscribe.
@@ -608,7 +698,7 @@ class TodayViewModelTest {
                 throw RuntimeException("DB failure")
             }
         }
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
 
         val seen = mutableListOf<TodayScreenState>()
         // Must be unconfined AND share runTest's scheduler: backgroundScope defaults to
@@ -648,7 +738,7 @@ class TodayViewModelTest {
         val analytics = RecordingAnalytics()
         val navigator = FakeNavigator()
         val repo = FakeRepository()
-        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger, limitsUseCase())
 
         vm.sendIntent(TodayIntent.OnAiSourceTapped(AnalyzeInputKind.PHOTO))
 
@@ -679,7 +769,7 @@ class TodayViewModelTest {
         val analytics = RecordingAnalytics()
         val navigator = FakeNavigator()
         val repo = FakeRepository()
-        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger, limitsUseCase())
 
         vm.sendIntent(TodayIntent.OnAiSourceTapped(AnalyzeInputKind.VOICE))
 
@@ -720,6 +810,7 @@ class TodayViewModelTest {
             NoOpScheduler(),
             NoOpAnalytics(),
             logger,
+            limitsUseCase(),
         )
         val message = TodaySideEffect.ShowCaptureMessage(
             text = "Added to Inbox",
@@ -745,6 +836,76 @@ class TodayViewModelTest {
         )
         emitter.cancel()
         collector.cancel()
+    }
+
+    // ── The capture dock's repeat gate, end to end through this host ────────
+
+    /**
+     * The gate a free user at the served ceiling must hit.
+     *
+     * This is the WIRING test, not the rule test ([DraftDueControllerTest] owns the rule): it proves
+     * `TodayViewModel` actually feeds a real `UserLimits` into the delegate. The defect it guards is
+     * the one this parameter already caused once — `getUserLimitsUseCase` was nullable with a
+     * default, Koin silently supplied nothing, and the delegate evaluated the gate against `null`.
+     * A test that drives `DraftDueController` directly cannot see that: the wire is what breaks.
+     */
+    @Test
+    fun repeatClick_freeUserAtTheServedCeiling_opensTheSheetLocked() = runTest {
+        val repo = FakeRepository(activeReminderCount = 2)
+        val vm = TodayViewModel(
+            repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger,
+            limitsUseCase(repository = repo, maxRecurringRemindersFree = 2),
+        )
+
+        vm.onIntent(TodayIntent.OnDue(DraftDueIntent.OnRepeatClick))
+
+        val sheet = assertNotNull(vm.due.value.sheet, "Repeat must open the v1 sheet")
+        assertTrue(sheet.locked, "2 armed reminders against a served ceiling of 2 is AT the limit")
+    }
+
+    /**
+     * The SAME user, the SAME two armed reminders — only the served ceiling moves, 2 → 3.
+     *
+     * Pinning two different values is the whole point: a fake that only ever serves today's number
+     * passes identically against an honest Remote Config read and against a hardcoded constant beside
+     * the gate, which is the drift this project has already paid for (`ToolCallDispatcherImpl`'s
+     * `FREE_ATTACH_LIMIT_PER_ITEM`). Only a boundary that MOVES with the config proves it is read.
+     */
+    @Test
+    fun repeatClick_sameCountUnderALooserServedCeiling_opensTheSheetUnlocked() = runTest {
+        val repo = FakeRepository(activeReminderCount = 2)
+        val vm = TodayViewModel(
+            repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger,
+            limitsUseCase(repository = repo, maxRecurringRemindersFree = 3),
+        )
+
+        vm.onIntent(TodayIntent.OnDue(DraftDueIntent.OnRepeatClick))
+
+        val sheet = assertNotNull(vm.due.value.sheet, "Repeat must open the v1 sheet")
+        assertFalse(sheet.locked, "2 armed reminders against a served ceiling of 3 is BELOW the limit")
+    }
+
+    /**
+     * A premium user is never gated, however many reminders are armed and whatever the free ceiling
+     * says — the regression the nullable parameter shipped was precisely a paying user staring at an
+     * upgrade banner.
+     */
+    @Test
+    fun repeatClick_premiumUserFarPastTheFreeCeiling_opensTheSheetUnlocked() = runTest {
+        val repo = FakeRepository(activeReminderCount = 99)
+        val vm = TodayViewModel(
+            repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger,
+            limitsUseCase(
+                repository = repo,
+                subscriptionStatus = PREMIUM_STATUS,
+                maxRecurringRemindersFree = 1,
+            ),
+        )
+
+        vm.onIntent(TodayIntent.OnDue(DraftDueIntent.OnRepeatClick))
+
+        val sheet = assertNotNull(vm.due.value.sheet, "Repeat must open the v1 sheet")
+        assertFalse(sheet.locked, "Premium is never subject to the free recurring-reminder ceiling")
     }
 
     /**
