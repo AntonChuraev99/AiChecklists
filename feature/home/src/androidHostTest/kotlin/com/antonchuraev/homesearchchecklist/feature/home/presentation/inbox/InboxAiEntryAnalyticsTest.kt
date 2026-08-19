@@ -24,6 +24,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
@@ -50,6 +52,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.datetime.TimeZone
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -215,11 +218,17 @@ class InboxAiEntryAnalyticsTest {
             ),
             attachmentStorage = NoOpAttachmentStorage(),
             calendarEventLauncher = NoOpCalendarEventLauncher(),
+            smartDateParser = NoOpSmartDateParser,
             logger = NoOpAppLogger,
         )
     }
 
     // ─── Fakes ────────────────────────────────────────────────────────────────
+
+    /** Recognises nothing: these tests are about the AI doors, not about Smart-Add. */
+    private object NoOpSmartDateParser : SmartDateParser {
+        override fun parse(input: String, now: Long, timeZone: TimeZone): ParsedDateToken? = null
+    }
 
     private object NoOpAnalytics : AnalyticsTracker {
         override fun setUserId(userId: String) = Unit

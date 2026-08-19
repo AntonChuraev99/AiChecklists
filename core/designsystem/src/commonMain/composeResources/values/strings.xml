@@ -1228,17 +1228,22 @@
          and only the v2 Calendar tab carries a capture input — the classic shell's Calendar and the
          standalone Today route have none, so there the wording must promise no input at all. -->
     <string name="today_empty_state_title">All clear</string>
-    <string name="today_empty_state_description">Nothing is scheduled for today. Add a task below and it lands in your Inbox.</string>
+    <string name="today_empty_state_description">Nothing is scheduled for today. Add a task and it lands in your Inbox.</string>
     <string name="today_empty_state_description_no_capture">Nothing is scheduled for today. Tasks with a reminder show up here.</string>
     <string name="today_all_done_title">You're all done</string>
     <string name="today_all_done_description">Everything scheduled for today is complete. Enjoy the rest of it.</string>
-    <string name="today_no_checklists_description">Create your first checklist to get started.</string>
+    <!-- The "you have nothing at all" placeholder, as distinct from today_empty_state_title's "you
+       have nothing TODAY". Same button as every other empty state in the v2 shell: the unit this
+       shell captures is a task, and its CTA raises the capture dock rather than leaving for the
+       v1 checklist screens. -->
+    <string name="today_no_checklists_title">Nothing here yet</string>
+    <string name="today_no_checklists_description">Add your first task and it lands in your Inbox.</string>
     <!-- Quick capture on Today. The task goes to the Inbox WITHOUT a reminder, so the snackbar has to
          say where it went — otherwise it would look like it vanished (this screen shows reminders
          only, so a task with none is invisible here). -->
     <string name="today_quick_add_placeholder">Add a task</string>
     <string name="today_task_captured_message">Added to Inbox</string>
-    <string name="today_task_captured_action">Open</string>
+    <string name="today_task_captured_action">Open Inbox</string>
     <string name="today_section_past_due">Past due</string>
     <string name="today_section_today">Today</string>
     <string name="today_open_menu">Open menu</string>
@@ -1254,8 +1259,7 @@
     <string name="calendar_nav_label">Calendar</string>
     <string name="calendar_title">Calendar</string>
     <string name="calendar_empty_title">No reminders coming up</string>
-    <string name="calendar_empty_description">Create a checklist with reminders to see your week here.</string>
-    <string name="calendar_empty_cta">Create Checklist</string>
+    <string name="calendar_empty_description">Tasks with a date show up here. Add one and pick when it's due.</string>
     <string name="calendar_error_title">Couldn't load your calendar</string>
     <string name="calendar_error_retry">Retry</string>
     <string name="calendar_section_past_due">Past due</string>
@@ -1680,16 +1684,27 @@
         <item quantity="other">%1$d tasks</item>
     </plurals>
     <string name="inbox_display_options">Display options</string>
-    <string name="inbox_list_actions">Checklist actions</string>
-    <string name="inbox_menu_open_checklist">Open checklist</string>
+    <string name="inbox_list_actions">Project actions</string>
     <string name="checklist_rename">Rename</string>
     <string name="checklist_rename_title">Rename checklist</string>
     <!-- Own key rather than folder_name_placeholder: this dialog renames a checklist, and the folder
          one has no Russian translation, so reusing it shipped English text to RU users. -->
     <string name="checklist_name_placeholder">Enter a name</string>
-    <string name="inbox_checklist_deleted_message">Checklist deleted</string>
-    <string name="inbox_checklist_rename_failed">Couldn't rename the checklist. Please try again.</string>
-    <string name="inbox_checklist_delete_failed">Couldn't delete the checklist. Please try again.</string>
+    <string name="inbox_checklist_deleted_message">Project deleted</string>
+    <string name="inbox_checklist_rename_failed">Couldn't rename the project. Please try again.</string>
+    <string name="inbox_checklist_delete_failed">Couldn't delete the project. Please try again.</string>
+    <!-- Inbox-scoped twins of delete_checklist / checklist_rename_title. Separate ids rather than a
+         retext of those: the v1 checklist detail screen still uses them and "checklist" is the right
+         word there. This screen calls the same object a project in every other string it shows. -->
+    <string name="inbox_project_rename_title">Rename project</string>
+    <string name="inbox_project_delete">Delete project</string>
+    <!-- The dialog rejects a blank name in place; the old copy ("Enter a name") was a snackbar fired
+         AFTER the dialog closed, which is an instruction with no field left to type into. -->
+    <string name="inbox_project_name_required">Project name can't be empty</string>
+    <!-- Bootstrap failure: ensureInbox() could not create the system Inbox row. The user opened a
+         tab, they did not ask to create anything, so error_create_checklist_failed named an action
+         they never took. -->
+    <string name="inbox_open_failed">Couldn't open your Inbox. Please try again.</string>
 
     <!-- Display-options sheet. Every option applies on tap and persists; there is no confirm step. -->
     <string name="inbox_display_title">Display</string>
@@ -1718,11 +1733,11 @@
 
     <!-- Projects tab (v2). One card per checklist: progress ring, name, mini-stat badges. -->
     <string name="projects_title">Projects</string>
-    <string name="projects_add_checklist">New checklist</string>
+    <string name="projects_add_checklist">New project</string>
     <string name="projects_complete">All done</string>
     <plurals name="projects_count">
-        <item quantity="one">%1$d checklist</item>
-        <item quantity="other">%1$d checklists</item>
+        <item quantity="one">%1$d project</item>
+        <item quantity="other">%1$d projects</item>
     </plurals>
     <!-- Trailing count for a checklist that renders nothing when opened — no tasks AND no folders.
          Owned by this screen: the v1 home card's main_no_items used to be borrowed here, and a
@@ -1739,8 +1754,8 @@
         <item quantity="one">%1$d reminder</item>
         <item quantity="other">%1$d reminders</item>
     </plurals>
-    <string name="projects_empty_title">No checklists yet</string>
-    <string name="projects_empty_description">Create one, or capture tasks in your Inbox and sort them into checklists later.</string>
+    <string name="projects_empty_title">No projects yet</string>
+    <string name="projects_empty_description">Create one, or capture tasks in your Inbox and sort them into projects later.</string>
 
     <!-- Debug-only: force the nav A/B arm on device. Writes the persisted arm the resolver reads
          FIRST, so an override survives a restart and does not need a Remote Config parameter. -->
@@ -1891,7 +1906,12 @@
          in every locale, while the older set is a scrolling row that can afford
          "Tomorrow morning" (RU: the 15-character "Сегодня вечером"). Sharing a key would mean one
          of the two rows is always wrong in RU/HI. -->
-    <string name="due_rail_no_date">No date</string>
+    <!-- The lead chip with nothing set. A QUESTION, not the value "No date" it used to hold: a
+         finished-looking answer to a question nobody asked gives the user no reason to tap it,
+         while an open question in an interface pulls to be closed. 96.6% of captures get no date,
+         and this chip is the affordance that number is measured against. It is also shorter than
+         "No date" in all three locales, so the rail gets width back rather than spending it. -->
+    <string name="due_rail_no_date">When?</string>
     <string name="due_preset_tonight">Tonight</string>
     <string name="due_preset_tomorrow">Tomorrow</string>
     <string name="due_preset_weekend">Weekend</string>
@@ -1901,6 +1921,10 @@
          without this it is announced as an unnamed button. "Date", not "reminder": since R1 the
          date is free and only the notification is gated, so the two are no longer the same object
          - which is why this is not the existing due_chip_clear_a11y. -->
+    <!-- Screen-reader name of the lead chip's x when what it would clear is a REPEAT rule rather
+         than a single date. Same button, two truths: hasDate is true for a staged repeat too, so one
+         label would announce "Clear date" over a chip reading "Every day 09:00". -->
+    <string name="due_rail_clear_repeat_a11y">Clear repeat</string>
     <string name="due_rail_clear_a11y">Clear date</string>
     <!-- stateDescription of the leading chip. State, not action: the existing `expand` key tells a
          screen-reader user what they can do, these tell them what happened when they did it. -->
@@ -1911,5 +1935,8 @@
     <string name="due_planner_time">Time</string>
     <string name="due_planner_repeat">Repeat</string>
     <string name="due_planner_repeat_off">Off</string>
+    <!-- A staged repeat rule and a one-off date cannot both hold, so applying a preset discards the
+         rule. Multi-step configuration must not vanish silently. -->
+    <string name="due_rail_repeat_replaced">Repeat removed — a task can have a repeat or a single date</string>
     <string name="due_planner_done">Done</string>
 </resources>

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,7 +54,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -584,14 +585,20 @@ private fun ActivationHeroChip(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.height(38.dp),
+        // heightIn + minimumInteractiveComponentSize, never a fixed `height`: a pinned max clips
+        // Devanagari (matras sit above AND below the baseline) and any label past fontScale 1.3, and
+        // it caps the touch target at 38dp on a real control. Same rule the rail's chips and the
+        // chat's chip row both state by name (UI audit, 2026-08-19).
+        modifier = Modifier
+            .heightIn(min = 38.dp)
+            .minimumInteractiveComponentSize(),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
+            // No hardcoded fontSize: 13.5.sp is a raw number that scales with the user's setting
+            // only because `sp` does, while the box it sat in did not — which is how the clipping
+            // started. labelLarge already carries the design system's step for this size.
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),

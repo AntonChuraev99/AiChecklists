@@ -209,7 +209,6 @@ class V2CreditsChipTest {
                     calendarState = CalendarState.Empty,
                     drawerState = null,
                     onTodayReminderClick = { _, _ -> },
-                    onTodayCreateChecklistClick = {},
                     onTodayRetry = {},
                     onCalendarIntent = {},
                     creditsSource = CreditsChipSource.V2_CALENDAR,
@@ -241,7 +240,6 @@ class V2CreditsChipTest {
                     calendarState = CalendarState.Empty,
                     drawerState = null,
                     onTodayReminderClick = { _, _ -> },
-                    onTodayCreateChecklistClick = {},
                     onTodayRetry = {},
                     onCalendarIntent = {},
                 )

@@ -6,11 +6,11 @@ import aichecklists.core.designsystem.generated.resources.attachment_load_error
 import aichecklists.core.designsystem.generated.resources.attachment_premium_limit_reached_snackbar
 import aichecklists.core.designsystem.generated.resources.attachment_size_too_large_snackbar
 import aichecklists.core.designsystem.generated.resources.calendar_app_not_found
-import aichecklists.core.designsystem.generated.resources.error_create_checklist_failed
+import aichecklists.core.designsystem.generated.resources.inbox_open_failed
 import aichecklists.core.designsystem.generated.resources.error_save_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_update_failed
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
-import aichecklists.core.designsystem.generated.resources.fill_error_name_required
+import aichecklists.core.designsystem.generated.resources.inbox_project_name_required
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_delete_failed
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_deleted_message
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_rename_failed
@@ -45,6 +45,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
@@ -57,6 +58,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.Tas
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.cleared
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dateInputMethod
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dueDateOffsetDays
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.observeDraftTextForSmartAdd
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveDueOutcome
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
@@ -128,6 +130,12 @@ class InboxViewModel(
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val attachmentStorage: AttachmentStoragePort,
     private val calendarEventLauncher: CalendarEventLauncher,
+    /**
+     * Smart-Add, the same instance the checklist detail screen parses with. Required rather than
+     * defaulted: the Calendar tab mounts the SAME dock, and a host that quietly resolved no parser
+     * would ship a field where typing "tomorrow" works on one tab and does nothing on the other.
+     */
+    private val smartDateParser: SmartDateParser,
     private val logger: AppLogger,
 ) : AppViewModel<InboxScreenState, InboxIntent, InboxSideEffect>() {
 
@@ -355,6 +363,10 @@ class InboxViewModel(
         bootstrap()
         observeUserLimits()
         observeClock()
+        // Below the properties it reads — [_draft] is initialised in declaration order, and a
+        // subscription started above it would capture null. Both capture hosts call the SAME
+        // helper rather than each rolling their own debounce; see its KDoc.
+        viewModelScope.observeDraftTextForSmartAdd(_draft, smartDateParser)
     }
 
     /**
@@ -376,8 +388,8 @@ class InboxViewModel(
                 // user-facing message to the caller. The snackbar stays — it is what tells a user
                 // who is already looking at the screen — and the Error state is what stays on
                 // screen after the four seconds are up, instead of a spinner that never resolves.
-                emitMessage(Res.string.error_create_checklist_failed)
-                setLoadError(Res.string.error_create_checklist_failed)
+                emitMessage(Res.string.inbox_open_failed)
+                setLoadError(Res.string.inbox_open_failed)
             }
         }
         observePages()
@@ -544,6 +556,10 @@ class InboxViewModel(
                 // a past trigger immediately — a reminder that "rings" the instant you set it.
                 if (intent.triggerAtMillis <= Clock.System.now().toEpochMilliseconds()) {
                     logger.warning(TAG, "reminder preset ${intent.triggerAtMillis} is in the past — ignored")
+                    // Say so. Dropping the tap with only a log leaves the sheet open, the preset
+                    // unselected and the user with no idea why — the same silent skip the draft
+                    // path 40 files away already answers with this very string.
+                    emitMessage(Res.string.inbox_reminder_time_in_past)
                 } else {
                     saveItemReminder(intent.triggerAtMillis, repeatRule = null, repeatTimeOfDayMinutes = null)
                 }
@@ -1185,7 +1201,7 @@ class InboxViewModel(
                 // Blank input is a user action like any other: closing the dialog with no word about
                 // it reads as "the app ate my rename". The message names the reason.
                 _listMenu.value = ListMenuState()
-                emitMessage(Res.string.fill_error_name_required)
+                emitMessage(Res.string.inbox_project_name_required)
             }
 
             RenameDecision.InvalidTarget -> {

@@ -7,9 +7,9 @@ import aichecklists.core.designsystem.generated.resources.checklist_delete_messa
 import aichecklists.core.designsystem.generated.resources.checklist_delete_title
 import aichecklists.core.designsystem.generated.resources.checklist_name_placeholder
 import aichecklists.core.designsystem.generated.resources.checklist_rename
-import aichecklists.core.designsystem.generated.resources.checklist_rename_title
+import aichecklists.core.designsystem.generated.resources.inbox_project_rename_title
 import aichecklists.core.designsystem.generated.resources.delete
-import aichecklists.core.designsystem.generated.resources.delete_checklist
+import aichecklists.core.designsystem.generated.resources.inbox_project_delete
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_display_options
@@ -17,7 +17,6 @@ import aichecklists.core.designsystem.generated.resources.inbox_empty_descriptio
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
 import aichecklists.core.designsystem.generated.resources.inbox_error_retry
 import aichecklists.core.designsystem.generated.resources.inbox_list_actions
-import aichecklists.core.designsystem.generated.resources.inbox_menu_open_checklist
 import aichecklists.core.designsystem.generated.resources.inbox_open_project_action
 import aichecklists.core.designsystem.generated.resources.inbox_project_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
@@ -149,6 +148,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.Col
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueSheetHost
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DueRailSection
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.smartAddHighlightRange
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -329,6 +329,18 @@ fun InboxScreen(
     val showAddTaskRow = !createDockOpen &&
         rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
 
+    // The in-list "any content -> checklist" block, under the same rule as the row above it: the
+    // capture dock hosts the SAME four pills under its own heading, so while the dock is up both
+    // were on screen at once — EIGHT identical pills under two different phrasings of one promise,
+    // in the state (an almost-empty Inbox) that is exactly a new user (UI audit, 2026-08-19). The
+    // list's copy is the one that stands down, not the dock's: under the dismiss overlay it is a
+    // control that cannot be tapped anyway, while the dock's copy is the tab's only live route into
+    // Analyze during a capture — and content -> checklist is half of all checklist creation here.
+    //
+    // Not gated on window size, unlike the add-task row: the duplication is caused by the dock
+    // being open, and that is true at every width the dock is mounted at.
+    val showAiSourceRow = !createDockOpen
+
     // The toolbar names the page the pager is on — this is what replaced the tab row. Read from the
     // ViewModel's settled index rather than from the pager, because the bar lives OUTSIDE the pager's
     // composable and hoisting the pager state up here would recompose the whole scaffold on every
@@ -437,6 +449,12 @@ fun InboxScreen(
                         onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
                         onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
                         placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
+                        // Smart-Add made visible IN the sentence, not only in the leading chip: the
+                        // recognised phrase is tinted where the user typed it, so "which words did
+                        // it read as a date" has an answer without tapping anything. The extension
+                        // is what guarantees the offsets belong to THIS string — see its KDoc; both
+                        // capture hosts derive it exactly this way and neither computes offsets.
+                        highlightRange = content.draft.smartAddHighlightRange(),
                         // The THIRD tile of the scrim, and the one that is easy to forget because
                         // nothing about it is dim: it is painted BEHIND an opaque dock, so the only
                         // pixels it ever reaches are the two the dock's `SheetTop` clips away. Those
@@ -553,6 +571,7 @@ fun InboxScreen(
                         // that would strand the list above a gap the size of chrome that is not on screen.
                         contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
                         showAddTaskRow = showAddTaskRow,
+                        showAiSourceRow = showAiSourceRow,
                         onIntent = onIntent,
                         homeSignal = homeSignal,
                         anchorChecklistId = anchorChecklistId,
@@ -923,7 +942,7 @@ private fun InboxToolbarActions(
                 onDismissRequest = { onIntent(InboxIntent.OnListMenuDismiss) },
             ) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.inbox_menu_open_checklist)) },
+                    text = { Text(stringResource(Res.string.inbox_open_project_action)) },
                     leadingIcon = {
                         Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
                     },
@@ -939,7 +958,7 @@ private fun InboxToolbarActions(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = stringResource(Res.string.delete_checklist),
+                            text = stringResource(Res.string.inbox_project_delete),
                             color = MaterialTheme.colorScheme.error,
                         )
                     },
@@ -970,7 +989,7 @@ private fun RenameChecklistDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.checklist_rename_title)) },
+        title = { Text(stringResource(Res.string.inbox_project_rename_title)) },
         text = {
             AppTextField(
                 value = draft,
@@ -1030,6 +1049,7 @@ private fun InboxContent(
     layout: InboxLayout,
     contentBottomPadding: Dp,
     showAddTaskRow: Boolean,
+    showAiSourceRow: Boolean,
     onIntent: (InboxIntent) -> Unit,
     homeSignal: Int = 0,
     anchorChecklistId: Long? = null,
@@ -1162,6 +1182,7 @@ private fun InboxContent(
                         sheetOpen = content.sheetForTaskId != null,
                         contentBottomPadding = contentBottomPadding,
                         showAddTaskRow = showAddTaskRow,
+                        showAiSourceRow = showAiSourceRow,
                         planNudgeSuppressed = content.planNudgeDismissed,
                         onPlanDayClick = onPlanDayClick,
                         onIntent = onIntent,
@@ -1186,6 +1207,9 @@ private fun InboxContent(
  * and inlined it sat eight levels deep, where the horizontal inset below could not be read against
  * the list it applies to.
  *
+ * @param showAiSourceRow whether the trailing "any content -> checklist" block is composed. Decided
+ *   by [InboxScreen] for the same reason as [showAddTaskRow] and never here — the capture dock hosts
+ *   the same four pills, and both on screen at once is eight identical pills under two headings.
  * @param showAddTaskRow whether the trailing add-task row is composed. Decided by [InboxScreen] (see
  *   its `showAddTaskRow`), never here: the reasons are the window size and the host's dock flag, and
  *   neither is this composable's business.
@@ -1199,6 +1223,7 @@ private fun InboxPageList(
     sheetOpen: Boolean,
     contentBottomPadding: Dp,
     showAddTaskRow: Boolean,
+    showAiSourceRow: Boolean,
     planNudgeSuppressed: Boolean,
     onPlanDayClick: (() -> Unit)?,
     onIntent: (InboxIntent) -> Unit,
@@ -1462,7 +1487,7 @@ private fun InboxPageList(
             // the owner already reviewed on device. The AI block therefore sits below it as a
             // clearly separate offer — still inside the first viewport, which is what the sparse
             // gate guarantees.
-            if (page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
+            if (showAiSourceRow && page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
                 item(key = "ai_source_row") {
                     // The heading carries the promise; the pills carry the doors. Without it four
                     // bare pills read as "attach something to a task", which is a different (and
@@ -1884,7 +1909,9 @@ private fun InboxPagerDots(
         state = dotsState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(InboxDotsRowHeight),
+            // heightIn, never height: a pinned max would cap the 48dp dot targets inside it back to
+            // the row's own number, which is the exact shape that produced the sub-48dp target.
+            .heightIn(min = InboxDotsRowHeight),
         // A lazy list applies its arrangement only while the whole run fits, so this centres a short
         // run and a long one simply packs from the start and scrolls.
         horizontalArrangement = Arrangement.Center,
@@ -1929,8 +1956,20 @@ private fun InboxPagerDots(
     }
 }
 
-private val InboxDotsRowHeight = 32.dp
-private val InboxDotTouchTarget = 32.dp
+/**
+ * Minimum height of the dots row. `heightIn`, applied by the caller — never a fixed `height`, which
+ * pins min AND max and would silently cap the 48dp targets inside it.
+ */
+private val InboxDotsRowHeight = AppDimens.MinTouchTarget
+
+/**
+ * Tap target of ONE dot. The full [AppDimens.MinTouchTarget], not the 32dp this shipped with: these
+ * dots carry `Role.Tab` and `selected`, so they are real controls — and they are the only way to
+ * switch the project a capture lands in. A sub-48dp target is the a11y defect this codebase has
+ * already fixed once on the 38dp preset chips (UI audit, 2026-08-19). The row scrolls, so the extra
+ * width costs nothing; the ripple stays suppressed for the same reason as before.
+ */
+private val InboxDotTouchTarget = AppDimens.MinTouchTarget
 private val InboxDotSize = 6.dp
 private val InboxDotSizeSelected = 8.dp
 

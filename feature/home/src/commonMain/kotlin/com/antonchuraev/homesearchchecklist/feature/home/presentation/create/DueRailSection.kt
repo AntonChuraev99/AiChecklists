@@ -11,8 +11,10 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -26,6 +28,8 @@ import aichecklists.core.designsystem.generated.resources.due_preset_next_week
 import aichecklists.core.designsystem.generated.resources.due_preset_tomorrow
 import aichecklists.core.designsystem.generated.resources.due_preset_tonight
 import aichecklists.core.designsystem.generated.resources.due_preset_weekend
+import aichecklists.core.designsystem.generated.resources.due_rail_clear_a11y
+import aichecklists.core.designsystem.generated.resources.due_rail_clear_repeat_a11y
 import aichecklists.core.designsystem.generated.resources.due_rail_no_date
 import aichecklists.core.designsystem.generated.resources.item_create_chip_important
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -63,12 +67,16 @@ import org.jetbrains.compose.resources.stringResource
  * created pair), and silently deleting a user-facing control is the most expensive class of defect in
  * this project.
  *
- * It sits INSIDE the rail's own `FlowRow`, via [DueRailRow]'s `trailing` slot, and that placement was
- * paid for: hosted as a sibling row underneath — the first shape this took — it cost a permanent
- * extra line of dock height on EVERY capture, including the 96.6% that never set a date. On the
+ * It sits INSIDE the rail's own row, via [DueRailRow]'s `trailing` slot, and that placement was paid
+ * for: hosted as a sibling row underneath — the first shape this took — it cost a permanent extra
+ * line of dock height on EVERY capture, including the 96.6% that never set a date. On the
  * over-constrained window that made the dock fill the frame edge to edge and left the page scrim
- * nothing to dim; `CaptureDockShoulderTest` failed on exactly that. Inside the flow the toggle wraps
- * only when the line is genuinely full, which is what a wrapping rail is for.
+ * nothing to dim; `CaptureDockShoulderTest` failed on exactly that.
+ *
+ * Since 2026-08-19 the rail scrolls instead of wrapping, so the toggle can no longer cost a line at
+ * any width — and it folds away with the offers while the planner is open (owner's call: «скрывать
+ * при выборе даты»). Folding, not deleting: it is back the moment the panel closes, and the state it
+ * carries is the draft's, untouched by either.
  *
  * @param nowMillis the clock the whole section is rendered against, so a screenshot can pin it. The
  *   Inbox passes its ticking value; the Calendar tab has none and takes the default.
@@ -119,7 +127,7 @@ fun DueRailSection(
         DuePresetCell(
             id = id,
             label = labels.getValue(id),
-            timeLabel = dueTimeLabel(computePresetReminderAt(preset, now, timeZone), nowMillis, timeZone),
+            timeLabel = dueTimeLabel(id, computePresetReminderAt(preset, now, timeZone), nowMillis, timeZone),
         )
     }
 
@@ -133,16 +141,40 @@ fun DueRailSection(
             onClearDate = { onIntent(DraftDueIntent.OnClearDate) },
             onPresetClick = { onIntent(DraftDueIntent.OnPresetClick(it)) },
             horizontalPadding = horizontalPadding,
+            // The `×` clears whatever the lead chip is showing, and with a repeat staged that is the
+            // RULE, not a date — `hasDate` is true for a repeat too. One label announced "Clear
+            // date" over a chip reading "Every day 09:00", which is a screen reader stating the
+            // wrong consequence for a destructive action.
+            clearDateLabel = if (draft.repeat != null) {
+                stringResource(Res.string.due_rail_clear_repeat_a11y)
+            } else {
+                stringResource(Res.string.due_rail_clear_a11y)
+            },
             // The v1 chip component, not a local look-alike: it already carries the `selected`
-            // semantics and the 48dp target under a 38dp pill. Inside the rail's own FlowRow, so it
-            // wraps only when the line is genuinely full — as a sibling row it cost a line of dock
-            // height on every capture, date or no date.
+            // semantics and the 48dp target under a 38dp pill. Inside the rail's own row, so it
+            // never costs a line of dock height — as a sibling row it cost one on every capture,
+            // date or no date.
             trailing = {
                 GistiSelectableChipItem(
-                    icon = Icons.Outlined.StarBorder,
+                    // Filled star when it is ON. The blue fill already says so, but the toggle sits
+                    // pinned at the edge with no label beside it now, so the glyph has to carry the
+                    // state on its own.
+                    icon = if (draft.important) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     label = stringResource(Res.string.item_create_chip_important),
                     selected = draft.important,
                     onClick = onImportantToggle,
+                    // Glyph only. Pinned outside the rail's scroll it costs width permanently, and
+                    // a ~100dp labelled pill would leave under 130dp for the offers on a 320dp
+                    // dock — under two of them. The label survives as the accessible name.
+                    labelVisible = false,
+                    // Raised to the rail's own pill height. This chip rests at 38dp visible with
+                    // `minimumInteractiveComponentSize` making up the touch target, which is right
+                    // in the chat's chip row it was built for — but beside the rail's 48dp pills it
+                    // read as a smaller, different kind of control, and the 5dp of phantom air per
+                    // side also broke the row-gap assumption the rail's SpacingXs was chosen under
+                    // (UI audit, 2026-08-19). `heightIn`, never `height`: it may still grow with
+                    // Devanagari or a large font scale.
+                    modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
                 )
             },
         )
@@ -153,9 +185,8 @@ fun DueRailSection(
             // The GRID is the editor, so the current answer is visible in it — the "exactly one
             // visual answer" rule applies to the RAIL, where the lead chip already states it.
             selectedPreset = appliedId,
-            hasDate = leadAnswer != null,
             timeValueLabel = resolvedDueAt
-                ?.let { dueTimeLabel(it, nowMillis, timeZone) }
+                ?.let { dueTimeLabel(appliedId, it, nowMillis, timeZone) }
                 ?: stringResource(Res.string.create_setting_reminder_none),
             repeatValueLabel = draft.repeat
                 ?.let { resolveRepeatSummaryLabel(it) }
@@ -178,9 +209,13 @@ fun DueRailSection(
  *  1. a staged REPEAT. It is reachable from the planner now, and a saved rule that showed nowhere
  *     would be a control that swallows its tap. It cannot coexist with the others — `withRepeat` and
  *     `withCustomReminder` each clear the other — so this branch never hides a competing answer.
- *  2. the resolved one-shot date.
- *  3. the Smart-Add token: the parser recognised a date in the typed text and nothing has overridden
- *     it, which is exactly the condition under which the send path applies it.
+ *  2. the resolved one-shot date — which, since Smart-Add was wired to the dock on 2026-08-19, is
+ *     ALSO where a recognised phrase arrives: `resolveReminderAtNow` falls back to the token's own
+ *     instant, so a typed "tomorrow at 7" reaches this branch and is formatted by the same
+ *     formatter as a tapped preset. That is the point — the chip and the send path read one
+ *     function, so what is shown and what is written cannot disagree.
+ *  3. the Smart-Add token's own display string. A fallback for a token that carries no resolvable
+ *     instant, which today's parser barely produces; branch 2 catches the rest.
  */
 @Composable
 private fun dueLeadLabel(
@@ -203,13 +238,32 @@ private fun dueLeadLabel(
 
 /**
  * The time under a planner cell: bare "19:00" while the day is obvious from the label above it,
- * the full relative form ("Sat 10:00", "Sep 14") once it is not.
+ * the full relative form ("Tomorrow 19:00", "Sat 10:00", "Sep 14") once it is not.
  *
  * Built from [resolveDueLabel] rather than from a local formatter so the vocabulary and the
  * day-before-month order stay the translation team's decision, in one place, for the whole app.
+ *
+ * ## The day word is dropped only by the cell that already said it
+ * [id] is what makes that decidable, and it is not decoration. "Tonight" rolls over: past
+ * [EVENING_HOUR] the preset resolves to TOMORROW 19:00 (`TaskDraft.computePresetReminderAt`). With
+ * the day word stripped from every Tomorrow form alike, the 20:30 cell read
+ *
+ * ```
+ * Tonight
+ * 19:00
+ * ```
+ *
+ * for a moment 22.5 hours away — and one tap later the lead chip corrected itself to "Tomorrow
+ * 19:00", so the panel contradicted its own result (UI audit, 2026-08-19). Only the cell LABELLED
+ * tomorrow may drop the word tomorrow.
  */
 @Composable
-private fun dueTimeLabel(atMillis: Long, nowMillis: Long, timeZone: TimeZone): String {
+private fun dueTimeLabel(
+    id: DuePresetId?,
+    atMillis: Long,
+    nowMillis: Long,
+    timeZone: TimeZone,
+): String {
     val form = resolveDueLabel(
         reminderAt = atMillis,
         repeatRule = null,
@@ -217,10 +271,10 @@ private fun dueTimeLabel(atMillis: Long, nowMillis: Long, timeZone: TimeZone): S
         timeZone = timeZone,
     )?.form
     return when (form) {
-        // "Tonight"/"Tomorrow" already name the day; repeating it under them wastes the cell's
-        // second line on a word the user just read.
+        // Nothing in this set resolves to a same-day moment other than the one whose label says so.
         is DueLabelForm.Today -> form.time
-        is DueLabelForm.Tomorrow -> form.time
+        is DueLabelForm.Tomorrow ->
+            if (id == DuePresetId.TOMORROW) form.time else form.label()
         null -> ""
         else -> form.label()
     }
@@ -283,23 +337,21 @@ private fun duePresetLabels(): Map<DuePresetId, String> = mapOf(
 /**
  * How many offers the RAIL shows, out of the five the grid holds.
  *
- * TWO, and the binding constraint is Important rather than the presets themselves.
+ * THREE since 2026-08-19, and the change is a consequence of the row, not a new opinion about
+ * offers. While the rail wrapped, this constant was pinned at TWO by Important rather than by the
+ * presets: at three the row measured `No date ⌄` + Tonight + Tomorrow + Weekend + Important ≈ 421dp
+ * against the 380dp available on a 412dp window, `FlowRow` wrapped the toggle onto a second line,
+ * and the dock grew by a row it paid for on EVERY capture (`CaptureDockShoulderTest`, 2026-08-18).
+ * That was already only half a fix — the recorded frames showed Important still wrapping at 360dp,
+ * the commonest phone width there is, where the two-offer row spends the budget just as fully.
  *
- * At three, the row measured `No date ⌄` + Tonight + Tomorrow + Weekend + Important ≈ 421dp against
- * the 380dp available on a 412dp window — so `FlowRow` wrapped Important onto a second line and the
- * dock grew by a row it pays for on EVERY capture, including the vast majority that never set a
- * date. `CaptureDockShoulderTest` caught it: on the over-constrained window the dock then filled the
- * frame edge to edge and the scrim had no page left to dim.
+ * [DueRailRow] scrolls now, so overflow costs a swipe instead of a line of dock height, and the
+ * constant is free to answer the question it is actually about: how many offers are worth showing
+ * before the grid. Three covers the shape of a captured day — tonight, tomorrow, the weekend —
+ * without the row needing to scroll at all on a 412dp window in English.
  *
- * Owner's call, 2026-08-18, over the two alternatives: Important stays a visible one-tap control in
- * the row, and the third offer moves into the grid — which is one tap away and holds all five. The
- * offer that loses its place is the LAST of [presetDisplayOrder], never a reshuffle: the row's
- * contents must not change between two phones.
- *
- * ⚠️ What two buys is width on a WIDE window, not a single line everywhere. Recorded frames:
- * at 412dp the row fits on one line, at 360dp Important still wraps — the English labels plus the
- * lead chip already spend the budget. So the saving is real where it was measured and absent on the
- * commonest phone width; if the count is ever revisited, revisit it against a 360dp frame, because
- * there the third offer costs nothing that the second has not already cost.
+ * The offers that lose their place are the LAST of [presetDisplayOrder], never a reshuffle: the
+ * row's contents must not change between two phones. They are one tap away in the grid, which holds
+ * all five with the time each resolves to.
  */
-private const val RAIL_PRESET_COUNT = 2
+private const val RAIL_PRESET_COUNT = 3

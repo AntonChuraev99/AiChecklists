@@ -1,14 +1,18 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
@@ -68,11 +72,12 @@ class CalendarAddTaskRowTest {
         }
         composeTestRule.waitForIdle()
 
-        // The fixture's Today state matters here and it is NOT `Empty` — see [CalendarUnderTest]. With
-        // an `Empty` page the pinned row is deliberately withheld and the only "Add task" node on
-        // screen is the PLACEHOLDER's button, which is centred in the page: the geometry assertion
-        // below would then measure a control that is nowhere near the bottom edge and pass for the
-        // wrong reason, i.e. go green while the invariant it exists for was never exercised.
+        // The fixture's Today state matters here and it is one `hostsAddTaskAction()` is FALSE for —
+        // see [CalendarUnderTest]. On a state it names, the pinned row is deliberately withheld and
+        // the only "Add task" node on screen is the PLACEHOLDER's button, which is centred in the
+        // page: the geometry assertion below would then measure a control that is nowhere near the
+        // bottom edge and pass for the wrong reason, i.e. go green while the invariant it exists for
+        // was never exercised.
         composeTestRule.onNodeWithText(addTaskLabel).assertIsDisplayed()
 
         val rootBottom = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.bottom
@@ -138,27 +143,117 @@ class CalendarAddTaskRowTest {
         )
     }
 
+    // ── One action, one control — on the CALENDAR page too ───────────────────
+
+    /**
+     * The Calendar page's own empty state raises the capture dock now (it used to offer "Create
+     * Checklist" and navigate twice). That makes it the same action as the pinned row, so the row has
+     * to stand down for it exactly as it does for the Today page's placeholder.
+     *
+     * Fails on the pre-change build with TWO nodes: `pageHostsAddTask` was scoped to page 0, and the
+     * comment beside it asserted page 1 "keeps its own Create Checklist CTA, which is a different
+     * action" — true until this change, false after it.
+     *
+     * The Today page is pinned to `Success` on purpose: a state that hosts NO action of its own, so
+     * the count this asserts can only come from the row and the Calendar page's button.
+     */
+    @Test
+    fun calendarScreen_onCalendarPage_withEmptyAgenda_hasExactlyOneAddTaskControl() {
+        var addTaskLabel = ""
+        var calendarTabLabel = ""
+        composeTestRule.setContent {
+            addTaskLabel = stringResource(Res.string.inbox_add_task_row)
+            calendarTabLabel = stringResource(Res.string.calendar_nav_label)
+            CalendarUnderTest(
+                contentBottomPadding = 0.dp,
+                todayState = TodayScreenState.Success(
+                    dateLabel = "Tuesday, May 6",
+                    pastDue = emptyList(),
+                    today = emptyList(),
+                ),
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onAllNodesWithText(calendarTabLabel)
+            // "Calendar" is on screen TWICE — the top-bar title and the tab. Only the tab is
+            // clickable, so that is the disambiguator; an index would silently follow a re-order.
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText(addTaskLabel).fetchSemanticsNodes().size,
+            "On the settled Calendar page exactly one control may be named \"$addTaskLabel\": the " +
+                "page's placeholder button and the pinned row are ONE action, and two nodes with one " +
+                "accessible name are ambiguous to a screen reader and to every UI test matching it",
+        )
+    }
+
+    /**
+     * The other half of the same gate: with an agenda on screen the Calendar page hosts no button, so
+     * the pinned row must come back. Without this, hiding the row unconditionally on page 1 would pass
+     * the test above and silently delete this tab's only capture route on Compact.
+     */
+    @Test
+    fun calendarScreen_onCalendarPage_withAnAgenda_keepsThePinnedRow() {
+        var addTaskLabel = ""
+        var calendarTabLabel = ""
+        composeTestRule.setContent {
+            addTaskLabel = stringResource(Res.string.inbox_add_task_row)
+            calendarTabLabel = stringResource(Res.string.calendar_nav_label)
+            CalendarUnderTest(
+                contentBottomPadding = 0.dp,
+                todayState = TodayScreenState.Success(
+                    dateLabel = "Tuesday, May 6",
+                    pastDue = emptyList(),
+                    today = emptyList(),
+                ),
+                calendarState = CalendarState.Content(agenda = emptyList()),
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onAllNodesWithText(calendarTabLabel)
+            // "Calendar" is on screen TWICE — the top-bar title and the tab. Only the tab is
+            // clickable, so that is the disambiguator; an index would silently follow a re-order.
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText(addTaskLabel).fetchSemanticsNodes().size,
+            "A Calendar page that draws an agenda hosts no add-task button of its own, so the pinned " +
+                "row is this tab's only capture route on Compact and must be on screen",
+        )
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────────
 
     @Composable
     private fun CalendarUnderTest(
         contentBottomPadding: Dp,
         captureEnabled: Boolean = true,
-        todayState: TodayScreenState = TodayScreenState.NoChecklists,
+        todayState: TodayScreenState = TodayScreenState.Error,
+        calendarState: CalendarState = CalendarState.Empty,
     ) {
         AppTheme(darkTheme = false) {
             CalendarScreen(
-                // `NoChecklists`, not `Empty`. Both are placeholders with no agenda to scroll — which is
-                // what this fixture wants — but only `NoChecklists` still draws the PINNED row: since
-                // 2026-08-17 the states `hostsAddTaskAction()` names host the action inside the
-                // placeholder instead, and `Empty` is one of them. It also happens to be the sharper
-                // fixture: its placeholder carries a CTA of its OWN ("Create Checklist"), so the pinned
-                // row has to coexist with a button rather than merely with an illustration.
+                // `Error`, not `Empty` and no longer `NoChecklists`. This fixture needs a Today page
+                // that is a placeholder with no agenda to scroll AND still draws the PINNED row — i.e.
+                // a state `hostsAddTaskAction()` returns false for, since the states it names host the
+                // action inside the placeholder instead and the row stands down for them. That used to
+                // include `NoChecklists`; on 2026-08-19 its "Create Checklist" CTA became the add-task
+                // action, so it moved to the true side and this fixture moved with it. `Error` keeps
+                // the property that made `NoChecklists` the sharper choice: its placeholder carries a
+                // CTA of its OWN ("Retry"), so the pinned row has to coexist with a button rather than
+                // merely with an illustration.
                 todayState = todayState,
-                calendarState = CalendarState.Empty,
+                calendarState = calendarState,
                 drawerState = null,
                 onTodayReminderClick = { _, _ -> },
-                onTodayCreateChecklistClick = {},
                 onTodayRetry = {},
                 onCalendarIntent = {},
                 contentBottomPadding = contentBottomPadding,

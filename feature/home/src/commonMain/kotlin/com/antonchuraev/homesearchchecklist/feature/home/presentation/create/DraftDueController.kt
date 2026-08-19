@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.create
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.due_rail_repeat_replaced
 import aichecklists.core.designsystem.generated.resources.inbox_reminder_time_in_past
 import aichecklists.core.designsystem.generated.resources.inbox_task_update_failed
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -94,6 +95,12 @@ class DraftDueController(
             // row raises the picker. Two labels for one destination is what the panel's layout asks
             // for; two DIFFERENT surfaces for it would be the thinner v2 twin this project bans.
             DraftDueIntent.OnPickDateClick, DraftDueIntent.OnTimeClick -> openSheet(ReminderTab.ONCE)
+
+            // Reachable from an EMPTY draft, and the planner's chip is no longer greyed until there
+            // is a date (2026-08-19). A repeat is not a modifier on a date — `withRepeat` nulls
+            // `reminderAt` and `reminderPreset`, so the date the old gate demanded was deleted by
+            // the very next step. The free-tier ceiling inside `openRepeatSheet` is a different
+            // gate and stays.
             DraftDueIntent.OnRepeatClick -> openRepeatSheet()
 
             // ── The v1 sheet ─────────────────────────────────────────────────────────────────
@@ -211,9 +218,30 @@ class DraftDueController(
      */
     private fun applyPreset(id: DuePresetId) {
         val preset = id.toReminderPreset()
+        // Read BEFORE the update: `update`'s lambda may be re-run under contention, so a flag set
+        // inside it is not a reliable "this happened once".
+        val hadRepeat = draft.value.repeat != null
         draft.update { current ->
             val next = current.withPreset(preset, now(), timeZone())
             if (next.reminderPreset != null) next.copy(repeat = null) else next
+        }
+        // A staged repeat and a one-off date cannot coexist, so applying an offer discards the rule
+        // — which the user built through four steps of a sheet (type → interval → weekdays → end).
+        // Discarding it while the lead chip quietly relabels itself is the same silent-loss defect
+        // the rail was built to avoid; say it out loud. Not on a toggle-OFF: there `reminderPreset`
+        // comes back null and nothing was dropped.
+        if (hadRepeat && draft.value.reminderPreset != null) {
+            onMessage(Res.string.due_rail_repeat_replaced)
+        }
+        // The question is answered, so the editor closes. A no-op for a tap on the RAIL, where the
+        // panel is shut already; for a tap in the GRID it is what makes the grid cost one tap
+        // instead of two. Left open, the grid also put the answer on screen twice — highlighted cell
+        // plus lead chip — while 212-291dp of panel stood between the user and the keyboard.
+        //
+        // Not on a toggle-OFF: re-tapping the applied offer clears it, and closing the editor on a
+        // draft that now has no answer would read as "your tap did something else".
+        if (draft.value.reminderPreset != null) {
+            _state.update { it.copy(plannerExpanded = false) }
         }
     }
 

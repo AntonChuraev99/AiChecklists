@@ -5,26 +5,31 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
+import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.due_planner_repeat
 import aichecklists.core.designsystem.generated.resources.due_planner_repeat_off
 import aichecklists.core.designsystem.generated.resources.due_planner_time
@@ -44,6 +49,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import org.jetbrains.compose.resources.stringResource
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,6 +59,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipItem
 import aichecklists.core.designsystem.generated.resources.item_create_chip_important
@@ -63,13 +70,17 @@ import aichecklists.core.designsystem.generated.resources.item_create_chip_impor
  *
  * These are REPORT shots, recorded rather than verified: they are what the rail is BUILT against and
  * what travels with the change as evidence. What each frame has to show:
- *  - the rail never scrolls sideways. Every preset is on screen, wrapping to a second line when it
- *    has to (RU at fontScale 1.3 on a 320dp dock is where that happens);
+ *  - the rail is ONE line at every width. It scrolls sideways when the chips outgrow it (RU at
+ *    fontScale 1.3 on a 320dp dock is where that starts) and fades the edge it can scroll towards,
+ *    but it never takes a second line of dock height;
+ *  - with the planner open the rail holds the lead chip ALONE — the offers and the Important toggle
+ *    fold away, because the grid below already carries the offers and Important is not an answer;
  *  - exactly ONE visual answer to "when": the lead chip. A preset is never drawn selected, and the
  *    applied one is gone from the row entirely;
  *  - every target clears 48dp, including the `×` inside the lead chip, and every chip GROWS with the
  *    text instead of clipping it;
- *  - the planner grid stays a 2x3 of equal cells, with Repeat greyed while there is no date.
+ *  - the planner grid stays a 2x3 of equal cells, and BOTH controls under it are live from an
+ *    empty draft — a repeat replaces the date rather than needing one.
  *
  * Record + inspect:
  *   ./gradlew :core:designsystem:recordRoborazziAndroidHostTest --tests "*DueRailScreenshotTest*"
@@ -142,6 +153,16 @@ class DueRailScreenshotTest {
     fun dueRail_360dp_dark_noDate() = shoot("w360dp-h640dp", dark = true) { DockStub() }
 
     /**
+     * Important ON, with a date applied — the state whose ON-ness used to be unobservable.
+     *
+     * Pinned outside the scroll, glyph filled and container blue, beside the widest lead chip the
+     * rail can carry. Both right-hand things at once, which no earlier frame showed.
+     */
+    @Test
+    fun dueRail_360dp_light_importantOn() =
+        shoot("w360dp-h640dp") { DockStub(state = DueRailFixture.DateApplied, important = true) }
+
+    /**
      * State 2: one tap in. The lead chip carries the answer in the active tone with its own `×`, and
      * "Tomorrow" is GONE from the presets — the mock's first defect was that same answer showing
      * twice and costing the width that pushed the rail onto a second line.
@@ -150,7 +171,7 @@ class DueRailScreenshotTest {
     fun dueRail_360dp_light_dateApplied() =
         shoot("w360dp-h640dp") { DockStub(state = DueRailFixture.DateApplied) }
 
-    /** State 3: the planner open. Six offers visible at once, no scroll, Repeat greyed without a date. */
+    /** State 3: the planner open. Six offers visible at once, no scroll, both controls live. */
     @Test
     fun dueRail_360dp_light_expanded() =
         shoot("w360dp-h640dp") { DockStub(state = DueRailFixture.Expanded) }
@@ -241,30 +262,94 @@ class DueRailScreenshotTest {
     }
 
     /**
-     * Repeat without a date is DISABLED, not hidden — and TalkBack has to hear that, otherwise it
-     * offers a tap that does nothing.
+     * Repeat without a date is UNAVAILABLE — greyed, announced, and still tappable.
+     *
+     * ⚠️ **This test previously asserted the opposite** (`assertIsNotEnabled`), and the contract
+     * changed deliberately on 2026-08-19. Two facts from the draft settled it, not taste:
+     * `TaskDraft.withRepeat(config)` nulls `reminderAt` AND `reminderPreset`, so a saved rule
+     * REPLACES the date rather than decorating it; and `InboxViewModel` opens the REPEAT tab
+     * precisely for an item that has a rule and no `reminderAt`. The old gate therefore asked for a
+     * date that the very next step deleted — and `Surface(enabled = false)`, not focusable and with
+     * the tap eaten before any handler, gave the user no way to find that out.
+     */
+    /**
+     * The Important toggle is ON SCREEN in the state that used to swallow it.
+     *
+     * The rail started scrolling on 2026-08-19 and the toggle went with it, inside the scroll and
+     * last. Measured on that day's frames: with three offers it was visible for 23dp against a 24dp
+     * edge fade — every visible pixel of it inside the gradient — and with a date applied the wider
+     * lead chip pushed it off the edge entirely. A shipped control that does not exist on screen in
+     * the commonest state is the defect class this project pays most for, so the toggle is pinned
+     * outside the scroll and this asserts that it stays there.
+     *
+     * ⚠️ Asserted on BOUNDS, not with `assertIsDisplayed`, and that is the difference between a test
+     * and a decoration: `isDisplayed` is satisfied by any non-empty clipped rectangle, so a chip
+     * hanging half-off the viewport passes it. Verified by mutation — putting the toggle back inside
+     * the scroll left `assertIsDisplayed` green. What has to hold is that the chip's own unclipped
+     * box lies INSIDE the root, both edges.
      */
     @Test
-    fun repeat_isDisabledWithoutADate() {
-        var repeat = ""
-        var time = ""
+    fun important_isPinnedOnScreenWithADateApplied() {
+        var important = ""
         composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
-            repeat = stringResource(Res.string.due_planner_repeat)
-            time = stringResource(Res.string.due_planner_time)
-            DockStub(state = DueRailFixture.Expanded)
+            important = stringResource(Res.string.item_create_chip_important)
+            // The widest state the lead chip has — "Tomorrow 09:00 ×" — plus three offers. This is
+            // the arrangement that pushed the toggle off the edge.
+            DockStub(state = DueRailFixture.DateApplied)
         }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText(repeat).assertIsNotEnabled()
-        // The control next to it, from the same fixture, stays live — otherwise the assertion above
-        // would also pass on a panel that had gone dead as a whole.
+        // Glyph only, so the accessible NAME is a contentDescription now — and that this lookup
+        // works at all is the second half of the label-less change.
+        val chip = composeTestRule.onNodeWithContentDescription(important)
+        chip.assertWidthIsAtLeast(AppDimens.MinTouchTarget)
+            .assertHeightIsAtLeast(AppDimens.MinTouchTarget)
+
+        val bounds = chip.getUnclippedBoundsInRoot()
+        val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+        assertTrue(
+            "the pinned toggle must end inside the window, not past it " +
+                "(right=${bounds.right}, window=${root.right})",
+            bounds.right <= root.right,
+        )
+        assertTrue(
+            "…and start inside it (left=${bounds.left})",
+            bounds.left >= root.left,
+        )
+    }
+
+    @Test
+    fun repeat_isReachableWithoutADate() {
+        var repeat = ""
+        var time = ""
+        var repeatTaps = 0
+        composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
+            repeat = stringResource(Res.string.due_planner_repeat)
+            time = stringResource(Res.string.due_planner_time)
+            // Expanded with NO date — the exact state the chip used to be dead in.
+            DockStub(state = DueRailFixture.Expanded, onRepeatClick = { repeatTaps++ })
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText(repeat).assertIsEnabled()
+        // The control beside it, from the same fixture, is live too — otherwise the assertion above
+        // would pass just as well on a panel that had gone live as a whole for an unrelated reason.
         composeTestRule.onNodeWithText(time).assertIsEnabled()
+        // And neither declares an unavailability: there is none left to declare.
+        assertEquals(listOf<String?>(null), composeTestRule.onAllNodesWithTextStateDescriptions(repeat))
+
+        // The tap ARRIVES. This is what `Surface(enabled = false)` used to eat.
+        composeTestRule.onNodeWithText(repeat).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals("the tap must reach the host", 1, repeatTaps)
     }
 
     /**
      * The rail's presets never claim a selection, and the planner's cells always do.
      *
-     * Two halves of the same rule. In the rail the answer belongs to the lead chip alone, so
+     * Two halves of the same rule, and since the rail folds its offers away while the planner is
+     * open they are now observed in the two states that actually show them: the rail COLLAPSED with
+     * a date applied, the grid EXPANDED. In the rail the answer belongs to the lead chip alone, so
      * `selected = false` there would announce state about something that has none AND contradict the
      * chip. In the grid the cells ARE a set with a current member, so every one of them must report
      * true or false — four identical unlabelled buttons is what this project's own chip row shipped
@@ -277,24 +362,94 @@ class DueRailScreenshotTest {
         composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
             tonight = stringResource(Res.string.due_preset_tonight)
             tomorrow = stringResource(Res.string.due_preset_tomorrow)
+            DockStub(state = DueRailFixture.DateApplied)
+        }
+        composeTestRule.waitForIdle()
+
+        // Collapsed with a date applied: "Tonight" is a rail offer and nothing else, and it declares
+        // no selection at all — `null`, which is a third state and not a synonym for false.
+        assertEquals(
+            "a rail preset must carry no selection",
+            listOf(null),
+            composeTestRule.selectedFlagsOf(tonight),
+        )
+        // The APPLIED preset is dropped from the rail entirely; the lead chip is already stating it.
+        assertEquals(
+            "the applied preset must be gone from the rail",
+            emptyList<Boolean?>(),
+            composeTestRule.selectedFlagsOf(tomorrow),
+        )
+    }
+
+    /** The grid half of the same rule: every cell reports a selection, the applied one reports true. */
+    @Test
+    fun selection_isDeclaredByEveryGridCell() {
+        var tonight = ""
+        var tomorrow = ""
+        composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
+            tonight = stringResource(Res.string.due_preset_tonight)
+            tomorrow = stringResource(Res.string.due_preset_tomorrow)
             DockStub(state = DueRailFixture.ExpandedWithDate)
         }
         composeTestRule.waitForIdle()
 
-        // "Tonight" exists twice with a date applied: once as a rail preset, once as a grid cell.
-        // Exactly one of them may carry a `selected` property, and it is the grid one.
         assertEquals(
-            "the rail preset must carry no selection and the grid cell must carry one",
-            listOf(null, false),
+            "an unapplied grid cell must declare a selection and report false",
+            listOf(false),
             composeTestRule.selectedFlagsOf(tonight),
         )
-        // The APPLIED preset is dropped from the rail entirely, so "Tomorrow" exists only in the
-        // grid — and there it is the current answer.
         assertEquals(
-            "the applied preset must be gone from the rail and selected in the grid",
+            "the applied preset must be selected in the grid",
             listOf(true),
             composeTestRule.selectedFlagsOf(tomorrow),
         )
+    }
+
+    /**
+     * Opening the planner leaves the ANSWER in the rail and folds everything else away.
+     *
+     * The offers, because the grid two rows below holds all five of them WITH the time each resolves
+     * to — keeping the pills up here as well puts two controls carrying the same accessible name on
+     * one screen. Important, because it is not an answer to "when" and is the one chip the dock
+     * cannot afford beside a 62dp grid (owner's call, 2026-08-19).
+     *
+     * Asserted in BOTH directions on purpose: a fold that never comes back is the defect this
+     * project has actually shipped, and an assertion that only checks the disappearance passes just
+     * as happily on it.
+     */
+    @Test
+    fun rail_foldsOffersAndTrailingWhileThePlannerIsOpen() {
+        var tonight = ""
+        var important = ""
+        // ONE mount, toggled — `mount` wraps `setContent`, which a test may call exactly once, and
+        // the round trip is the point anyway: two separate mounts could not tell a fold that comes
+        // back from a rail that was built expanded.
+        val fixture = mutableStateOf(DueRailFixture.Idle)
+        composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
+            tonight = stringResource(Res.string.due_preset_tonight)
+            important = stringResource(Res.string.item_create_chip_important)
+            DockStub(state = fixture.value)
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(important).assertExists()
+        // Collapsed, "Tonight" is in the rail only — the grid is not composed.
+        assertEquals(1, composeTestRule.onAllNodesWithText(tonight).fetchSemanticsNodes().size)
+
+        composeTestRule.runOnIdle { fixture.value = DueRailFixture.Expanded }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(important).assertDoesNotExist()
+        // Expanded, "Tonight" is in the GRID only — one node, not two. This is the assertion that
+        // catches a rail which kept its pills: it would read 2.
+        assertEquals(1, composeTestRule.onAllNodesWithText(tonight).fetchSemanticsNodes().size)
+
+        // …and back. The fold is a fold, not a deletion.
+        composeTestRule.runOnIdle { fixture.value = DueRailFixture.Idle }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(important).assertExists()
+        assertEquals(1, composeTestRule.onAllNodesWithText(tonight).fetchSemanticsNodes().size)
     }
 
     // ── Fixture ──────────────────────────────────────────────────────────────
@@ -317,7 +472,11 @@ class DueRailScreenshotTest {
      * (the dock is already 201-213dp with both rows).
      */
     @Composable
-    private fun DockStub(state: DueRailFixture = DueRailFixture.Idle) {
+    private fun DockStub(
+        state: DueRailFixture = DueRailFixture.Idle,
+        onRepeatClick: () -> Unit = {},
+        important: Boolean = false,
+    ) {
         val hasDate = state == DueRailFixture.DateApplied || state == DueRailFixture.ExpandedWithDate
         val expanded = state == DueRailFixture.Expanded || state == DueRailFixture.ExpandedWithDate
         val applied = if (hasDate) DuePresetId.TOMORROW else null
@@ -328,33 +487,37 @@ class DueRailScreenshotTest {
         val inOneHour = stringResource(Res.string.due_preset_in_1_hour)
         val nextWeek = stringResource(Res.string.due_preset_next_week)
 
-        // Two offers plus the Important toggle — the shape both capture hosts actually mount today.
+        // Three offers plus the Important toggle — the shape both capture hosts mount since
+        // 2026-08-19, when the rail started scrolling instead of wrapping and `RAIL_PRESET_COUNT`
+        // went from two to three.
         //
         // The rail renders whatever list it is handed and does not decide the count; that decision
         // lives in `feature:home` (`DueRailSection`), which cannot be imported from here. So this is
         // not a mirrored constant pretending to stay in sync — it is a fixture that draws the shipped
         // arrangement, and the live host frames in `CaptureDockDueRailReportTest` are what prove the
         // real numbers. What these goldens must never be is a picture of a configuration production
-        // does not show: at three offers the trailing toggle wrapped onto a second line, and a golden
-        // nobody can tell is lying is worse than no golden.
+        // does not show, and a golden nobody can tell is lying is worse than no golden.
         val railPresets = listOf(
             DuePresetChip(DuePresetId.TONIGHT, tonight),
             DuePresetChip(DuePresetId.TOMORROW, tomorrow),
+            DuePresetChip(DuePresetId.WEEKEND, weekend),
         ).filter { it.id != applied }
 
         val cells = listOf(
             DuePresetCell(DuePresetId.TONIGHT, tonight, "19:00"),
-            DuePresetCell(DuePresetId.TOMORROW, tomorrow, "9:00"),
+            DuePresetCell(DuePresetId.TOMORROW, tomorrow, "09:00"),
             DuePresetCell(DuePresetId.WEEKEND, weekend, "Sat 10:00"),
             DuePresetCell(DuePresetId.IN_1_HOUR, inOneHour, "14:20"),
-            DuePresetCell(DuePresetId.NEXT_WEEK, nextWeek, "Mon 9:00"),
+            DuePresetCell(DuePresetId.NEXT_WEEK, nextWeek, "Mon 09:00"),
         )
 
         QuickCaptureDock(
             text = "",
             onTextChange = {},
             onAdd = {},
-            placeholder = "Add a task…",
+            // The real resource, not an English literal: a frame named _ru_ that renders two
+            // English strings cannot be used to check a locale, which is what it exists for.
+            placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
             aboveInput = {
                 Column {
                     DueRailRow(
@@ -362,7 +525,7 @@ class DueRailScreenshotTest {
                         // formatter string, so the RU frames get the RU shape rather than an English
                         // literal wearing a Russian frame's name.
                         leadLabel = if (hasDate) {
-                            stringResource(Res.string.due_tomorrow, "9:00")
+                            stringResource(Res.string.due_tomorrow, "09:00")
                         } else {
                             stringResource(Res.string.due_rail_no_date)
                         },
@@ -375,11 +538,16 @@ class DueRailScreenshotTest {
                         // The dock has always carried this toggle, and it is what makes the row's
                         // width budget tight — a frame without it would flatter the layout.
                         trailing = {
+                            // The SHAPE production mounts: glyph only, filled star when on, pinned
+                            // outside the scroll by the rail itself. A labelled fixture would draw a
+                            // ~100dp pill nothing ships and flatter every width measurement here.
                             GistiSelectableChipItem(
-                                icon = Icons.Outlined.StarBorder,
+                                icon = if (important) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                 label = stringResource(Res.string.item_create_chip_important),
-                                selected = false,
+                                selected = important,
                                 onClick = {},
+                                labelVisible = false,
+                                modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
                             )
                         },
                     )
@@ -387,19 +555,21 @@ class DueRailScreenshotTest {
                         expanded = expanded,
                         cells = cells,
                         selectedPreset = applied,
-                        hasDate = hasDate,
                         timeValueLabel = "19:00",
                         repeatValueLabel = stringResource(Res.string.due_planner_repeat_off),
                         onPresetClick = {},
                         onPickDateClick = {},
                         onTimeClick = {},
-                        onRepeatClick = {},
+                        onRepeatClick = onRepeatClick,
                         onDoneClick = {},
                     )
                 }
             },
             belowInput = {
-                SourceRowSection(title = "Or create a checklist from:", onSelect = {})
+                SourceRowSection(
+                    title = stringResource(Res.string.capture_dock_ai_entry_title),
+                    onSelect = {},
+                )
             },
         )
     }

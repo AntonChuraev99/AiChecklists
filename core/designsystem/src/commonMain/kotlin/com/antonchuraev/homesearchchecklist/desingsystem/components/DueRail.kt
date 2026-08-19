@@ -4,12 +4,17 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,8 +46,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -133,21 +145,42 @@ private val ChipLabelPadding = AppDimens.SpacingMd
 private val DueIconSize = 16.dp
 
 /**
- * The due-date rail: the current answer on the left, one-tap presets after it, no horizontal scroll.
+ * The due-date rail: the current answer on the left, one-tap presets after it, on ONE line always.
  *
- * ## Why a [FlowRow] and not a scrolling row
- * Every other chip row in this app is a `LazyRow`. This one is not, and the reason is not taste:
- *  - **wasmJs.** Horizontal scroll under Skiko is a live instability with the mouse wheel and the
- *    trackpad (JetBrains/compose-multiplatform#3366, #4601), and this rail is the shell's primary
- *    route to a due date on both targets.
- *  - **TalkBack.** A `LazyRow` does not compose what is off-screen, so presets past the viewport do
- *    not exist in the semantics tree at all — a screen-reader user is offered whatever happened to
- *    fit. A wrapped row offers all of them.
- *  - **Discoverability.** The metric this rail was built for is that 96.6% of captured tasks get no
- *    date. A preset the user has to swipe to find does not fix that.
+ * ## One scrolling line, not a wrapping one
+ * Owner's call, 2026-08-19, over the wrapping row this shipped as: «Important при создании пункта в
+ * 2 ряду — можно в 1 ряд листающийся». A wrapping row spends a whole line of dock height on the
+ * commonest phone width there is: at 360dp the lead chip plus two English offers plus the Important
+ * toggle already overrun the 328dp available, so the toggle dropped to a second row on EVERY
+ * capture — including the 96.6% that never set a date. Height above the keyboard is the scarcest
+ * thing this surface has.
  *
- * The cost is height: at fontScale ≥ 1.3, in RU/HI, or under ~320dp the row takes a second line.
- * That is the intended trade — a second line is visible, a scrolled-off chip is not.
+ * The row therefore scrolls, and the two objections the wrapping shape was chosen for are answered
+ * rather than accepted:
+ *  - **TalkBack.** A plain [Row] under `horizontalScroll`, NOT a `LazyRow`: it composes every chip
+ *    whether or not it is in the viewport, so all of them are in the semantics tree and TalkBack
+ *    scrolls the container to reach them. A `LazyRow` here would offer a screen-reader user whatever
+ *    happened to fit, which is why the rail must never become one.
+ *  - **Discoverability.** A chip that has scrolled off is invisible, so the row says that it has
+ *    one: the fading edge below is drawn only on a side that can actually scroll, which makes the
+ *    last visible pill bleed out rather than end — the standard "there is more this way" cue.
+ *
+ * ⚠️ **wasmJs.** Horizontal scroll under Skiko has a history with the mouse wheel and the trackpad
+ * (JetBrains/compose-multiplatform#1064, #4975 — both closed, neither with a version this project
+ * can point at). Touch drag is unaffected, and on a desktop-width window the row does not overflow
+ * at all, so the wheel never has to carry it. Verify on `:9090` after any change here anyway; that
+ * is the project rule for wasmJs and this is exactly the class of thing it exists for.
+ *
+ * ## The rail stands down while the planner is open
+ * With [expanded] true the offers and [trailing] fold away and the lead chip is left alone. Both
+ * halves are load-bearing:
+ *  - The grid below holds every offer WITH the time it resolves to. Keeping the pills up here too
+ *    puts two controls carrying the same accessible name ("Tonight") on one screen — ambiguous to a
+ *    screen reader and to any test matching that label.
+ *  - Important is not an answer to "when". While the panel is the whole conversation it is noise,
+ *    and it is the one chip the dock cannot afford beside a 62dp grid at fontScale 1.3.
+ * It FOLDS rather than vanishing, and comes back the same way — a control that disappears on an
+ * unrelated tap reads as a feature that was removed, which this project has shipped and heard about.
  *
  * ## Exactly one visual answer to "when"
  * The lead chip carries the answer and nothing else does. The presets are **never** drawn selected:
@@ -177,7 +210,6 @@ private val DueIconSize = 16.dp
  * @param horizontalPadding the rail's own edge inset. A parameter because the dock's `aboveInput`
  *   slot deliberately applies none — see [QuickCaptureDock].
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DueRailRow(
     leadLabel: String,
@@ -199,53 +231,185 @@ fun DueRailRow(
      * A slot rather than a typed parameter, for the same reason [QuickCaptureDock] takes slots: the
      * toggle is driven by feature-layer draft state that has no business in the design system.
      *
-     * It is rendered INSIDE this `FlowRow`, last, and that placement is the whole point. Hosted as a
+     * It is rendered INSIDE this row, last, and that placement is the whole point. Hosted as a
      * sibling row underneath instead, it costs a permanent extra line of dock height — on the
      * over-constrained window that filled the frame edge to edge and left the scrim no page to dim
-     * (`CaptureDockShoulderTest`, 2026-08-18). Inside the flow it only wraps when the line is
-     * genuinely full, which is the behaviour the wrapping rail exists for.
+     * (`CaptureDockShoulderTest`, 2026-08-18). Here it costs nothing but the scroll it may push the
+     * last offer under, and it folds away entirely while the planner is open.
      */
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    FlowRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding),
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-        // SpacingXs, not SpacingSm. These chips are 48dp of VISIBLE pill (no
-        // `minimumInteractiveComponentSize` phantom air to absorb a gap), and the density rule for a
-        // wrapped chip row in this design system caps the row gap at SpacingXs — anything larger and
-        // the second line reads as a separate section instead of as a continuation.
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+    val scrollState = rememberScrollState()
+    val reduced = LocalReducedMotion.current
+
+    // Opening the planner rewrites what this row holds, and whatever the user had scrolled to is not
+    // it. Snap back so the ANSWER — the one chip that survives the fold — is what is under the
+    // finger when the grid appears, instead of an empty stretch the offers just left.
+    LaunchedEffect(expanded) {
+        if (expanded) scrollState.scrollTo(0)
+    }
+
+    val foldEnter = expandHorizontally(
+        animationSpec = if (reduced) snap() else AppMotion.spatialDefaultTween(),
+    ) + fadeIn(
+        animationSpec = if (reduced) tween(AppMotion.ReducedMotionMillis)
+        else AppMotion.effectsDefaultTween(),
+    )
+    val foldExit = shrinkHorizontally(
+        animationSpec = if (reduced) snap() else AppMotion.spatialDefaultTween(),
+    ) + fadeOut(
+        animationSpec = if (reduced) tween(AppMotion.ReducedMotionMillis)
+        else AppMotion.effectsDefaultTween(),
+    )
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        DueLeadChip(
-            label = leadLabel,
-            hasDate = hasDate,
-            expanded = expanded,
-            clearDateLabel = clearDateLabel,
-            expandedStateLabel = expandedStateLabel,
-            collapsedStateLabel = collapsedStateLabel,
-            onClick = onLeadClick,
-            onClear = onClearDate,
-        )
-        presets.forEach { preset ->
-            DuePresetPill(label = preset.label, onClick = { onPresetClick(preset.id) })
+        Row(
+            modifier = Modifier
+                // weight, so the scrolling half yields the pinned half its width instead of
+                // covering it. This is the whole reason the trailing slot is not inside the scroll.
+                .weight(1f)
+                .scrollableEdgeFade(scrollState)
+                .horizontalScroll(scrollState)
+                // INSIDE the scroll, not outside it. Applied to the viewport instead, the inset
+                // would stay put while the chips slid under it and the row would clip 20dp short of
+                // its own edge; as content padding it scrolls away with the first chip, which is
+                // what makes the fade land on a pill rather than on a gap. No END inset here: this
+                // half runs to the pinned chip, and the fade is what marks that edge.
+                .padding(start = horizontalPadding),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+            // The chips differ in height by a hair (the lead chip carries labelLarge, the pills
+            // labelMedium) and heightIn lets each keep its own. Without this they would be stretched
+            // to the tallest, which is how a 48dp pill becomes a 56dp one at fontScale 1.3.
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DueLeadChip(
+                label = leadLabel,
+                hasDate = hasDate,
+                expanded = expanded,
+                clearDateLabel = clearDateLabel,
+                expandedStateLabel = expandedStateLabel,
+                collapsedStateLabel = collapsedStateLabel,
+                onClick = onLeadClick,
+                onClear = onClearDate,
+            )
+            // The offers fold while the planner is open — see the KDoc. One AnimatedVisibility
+            // around the whole group rather than one per pill: they would otherwise animate their
+            // widths independently and the row would ripple instead of retract.
+            AnimatedVisibility(visible = !expanded, enter = foldEnter, exit = foldExit) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    // The gap the parent would have put between the lead chip and this group is
+                    // inside the group instead — AnimatedVisibility collapses to zero width, and a
+                    // parent gap would survive the fold as a stray 4dp after the lead chip.
+                    modifier = Modifier.padding(start = AppDimens.SpacingXs),
+                ) {
+                    presets.forEach { preset ->
+                        DuePresetPill(label = preset.label, onClick = { onPresetClick(preset.id) })
+                    }
+                }
+            }
         }
-        trailing?.invoke()
+
+        // PINNED, outside the scroll — and that placement is the finding rather than the taste.
+        // Measured on the recorded frames the day the rail started scrolling: with three offers the
+        // Important toggle was visible for 23dp against a 24dp fade, i.e. every visible pixel of it
+        // sat inside the gradient; with a date applied the wider lead chip pushed it off the edge
+        // entirely. A shipped control that does not exist on screen in the commonest state is the
+        // most expensive defect class in this project, and its ON state was unobservable too.
+        //
+        // Pinning also matches what this row already says about itself: the scrolling half is the
+        // list of ANSWERS to "when", and Important is not one of them — it is a modifier on the task
+        // being sent. A list scrolls; a modifier does not go looking for the user.
+        if (trailing != null) {
+            AnimatedVisibility(visible = !expanded, enter = foldEnter, exit = foldExit) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(
+                        start = AppDimens.SpacingXs,
+                        end = horizontalPadding,
+                    ),
+                ) {
+                    trailing()
+                }
+            }
+        }
     }
 }
+
+/**
+ * Fades whichever edge of a horizontally scrolling row still has content behind it.
+ *
+ * The only thing telling a user this row scrolls, so it is drawn from live scroll state rather than
+ * from "is the content wider than the box": at rest with the row scrolled to 0 there is no fade on
+ * the left and one on the right, which reads as "more that way" — and both disappear once the row
+ * fits, so a rail that does not scroll looks exactly as it did before it could.
+ *
+ * `DstIn` against an offscreen layer rather than a gradient painted in the dock's colour, because
+ * this component does not know that colour: [AppChatColors] resolves against `LocalChatSurfaceTone`,
+ * which the DOCK provides, and a hardcoded scrim would be visibly wrong on the other tone and in the
+ * other theme. Fading the alpha channel is colour-blind by construction.
+ *
+ * Both reads of [state] happen in the DRAW lambda, which is a deliberate deferral: read in
+ * composition they would recompose the whole rail on every scrolled pixel — the recomposition-scope
+ * defect this project has already paid for once with window insets.
+ */
+private fun Modifier.scrollableEdgeFade(state: ScrollState): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = EdgeFadeWidth.toPx()
+        if (state.value > 0) {
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startX = 0f,
+                    endX = fade,
+                ),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+        if (state.value < state.maxValue) {
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Black, Color.Transparent),
+                    startX = size.width - fade,
+                    endX = size.width,
+                ),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+    }
+
+/**
+ * How far the scroll cue bleeds in from an edge.
+ *
+ * 24dp: wide enough that the pill under it reads as continuing past the edge rather than as a
+ * rendering glitch, narrow enough that it never eats a whole preset label — the shortest one in the
+ * set ("1 h") is 40dp of text.
+ */
+private val EdgeFadeWidth = 24.dp
 
 /**
  * The rail's leading chip: the current answer, the expander, and — once there is a date — the clear
  * target.
  *
- * Three visual states, two of which share their styling:
+ * Two visual states, and which one applies depends on [hasDate] ALONE:
  *
  * | `hasDate` | `expanded` | fill | border | trailing |
  * |---|---|---|---|---|
  * | false | false | [AppChatColors.raised] | [AppChatColors.controlOutline] | chevron down |
- * | false | true  | [GistiSchedule.activeContainer] | `primary` | chevron up |
+ * | false | true  | [AppChatColors.raised] | [AppChatColors.controlOutline] | chevron up |
  * | true  | any   | [GistiSchedule.activeContainer] | `primary` | `×` |
+ *
+ * ⚠️ The accent used to include `expanded`, so an open panel painted the chip blue whether or not
+ * anything was set. Blue means "this is the answer" everywhere else in this component — on a chip
+ * reading "When?" above an empty grid it announced a value the draft did not have (UI audit,
+ * 2026-08-19). Openness is carried by the CHEVRON and by `stateDescription`, which is where a state
+ * that is not a value belongs.
  *
  * ⚠️ The idle chip is FILLED, not transparent, and that is not a detail. A transparent control on
  * this dock is a shipped defect of this exact codebase: the fill was the only thing separating the
@@ -264,9 +428,8 @@ private fun DueLeadChip(
     onClick: () -> Unit,
     onClear: () -> Unit,
 ) {
-    // `hasDate || expanded` — an open panel is also an active state, so the chip that opened it is
-    // not left looking idle while a grid hangs off it.
-    val accented = hasDate || expanded
+    // `hasDate` ALONE — see the table above. An open panel is a state, not an answer.
+    val accented = hasDate
     // GistiSchedule's ACTIVE tone specifically, not `colors(state)`. The other tones are wrong here
     // for one reason each: `Later` and `Someday` resolve to `AppSurface.recessed()`, which is a step
     // DOWN from the page and lands within ~2 L* of this dock's own chrome — the applied chip would
@@ -431,7 +594,6 @@ private fun DuePresetPill(label: String, onClick: () -> Unit) {
  * @param selectedPreset the preset the current date came from, or `null`. Selection changes FILL and
  *   BORDER only — never padding, weight or glyphs — because a cell that grew on selection would stop
  *   fitting the equal column measured for it.
- * @param hasDate gates [onRepeatClick]. See above.
  * @param timeValueLabel the resolved time shown on the Time chip ("19:00").
  * @param repeatValueLabel the repeat summary shown on the Repeat chip ("Off", "Daily").
  */
@@ -441,7 +603,6 @@ fun DuePlannerPanel(
     expanded: Boolean,
     cells: List<DuePresetCell>,
     selectedPreset: DuePresetId?,
-    hasDate: Boolean,
     timeValueLabel: String,
     repeatValueLabel: String,
     onPresetClick: (DuePresetId) -> Unit,
@@ -533,14 +694,14 @@ fun DuePlannerPanel(
                         icon = Icons.Outlined.Schedule,
                         label = timeLabel,
                         value = timeValueLabel,
-                        enabled = true,
                         onClick = onTimeClick,
                     )
                     DuePlannerControlChip(
                         icon = Icons.Outlined.Repeat,
                         label = repeatLabel,
                         value = repeatValueLabel,
-                        enabled = hasDate,
+                        // Live from an empty draft — a repeat replaces the date rather than needing
+                        // one. See [DuePlannerControlChip].
                         onClick = onRepeatClick,
                     )
                 }
@@ -650,32 +811,27 @@ private fun RowScope.DuePlannerCell(
 /**
  * A `[icon] Label value` chip in the planner's control row — Time and Repeat.
  *
- * Disabled renders at the M3 disabled opacity and keeps its place. `Surface(enabled = false)` also
- * stops it being focusable and marks it `disabled` in semantics, so a screen reader announces the
- * state instead of offering a tap that does nothing.
+ * ## Neither of them is ever disabled, and Repeat is the interesting one
+ * Repeat shipped greyed until there was a date, on the model "a repeat is a modifier on a date".
+ * The draft says otherwise: `TaskDraft.withRepeat(config)` sets `reminderAt = null` and
+ * `reminderPreset = null`, i.e. saving a rule REPLACES the date rather than decorating it, and the
+ * read side agrees — `InboxViewModel` opens the REPEAT tab exactly for an item with a rule and no
+ * `reminderAt`. So the gate asked the user to pick a date that the very next step would delete, and
+ * `Surface(enabled = false)` — not focusable, tap eaten before any handler — left them no way to
+ * find that out. A recurring answer is reachable in one tap now, from an empty draft (2026-08-19).
  */
 @Composable
 private fun DuePlannerControlChip(
     icon: ImageVector,
     label: String,
     value: String,
-    enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (enabled) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledContentAlpha)
-    }
-    val valueColor = if (enabled) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DisabledContentAlpha)
-    }
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val valueColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         onClick = onClick,
-        enabled = enabled,
         shape = AppShapeTokens.Pill,
         color = AppChatColors.raised(),
         border = BorderStroke(AppDimens.DividerThickness, AppChatColors.controlOutline()),

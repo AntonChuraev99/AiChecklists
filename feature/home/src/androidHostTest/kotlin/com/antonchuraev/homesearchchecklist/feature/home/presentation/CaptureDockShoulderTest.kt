@@ -278,7 +278,6 @@ class CaptureDockShoulderTest {
                         calendarState = CalendarState.Empty,
                         drawerState = null,
                         onTodayReminderClick = { _, _ -> },
-                        onTodayCreateChecklistClick = {},
                         onTodayRetry = {},
                         onCalendarIntent = {},
                         captureDockOpen = true,

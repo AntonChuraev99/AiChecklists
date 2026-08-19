@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
@@ -12,9 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -168,15 +173,28 @@ class EmptyStateAddTaskReportTest {
         )
 
     /**
-     * `NoChecklists` already owns a "Create Checklist" CTA, so the predicate must NOT stack a second
-     * button under it. The frame is the proof that it does not.
+     * `NoChecklists` — a user who has never created anything. It used to own a "Create Checklist"
+     * CTA and was excluded from the predicate for that reason; on 2026-08-19 that CTA BECAME the
+     * add-task action (owner: the surface is about tasks everywhere else, and the old button
+     * navigated twice), so this state joined the three the predicate names. The frame shows one
+     * button, and it is the add-task one.
      */
     @Test
-    fun todayNoChecklists_keepsItsOwnCta() =
+    fun todayNoChecklists_hostsTheAddTaskAction() =
         captureToday(
             "today_nochecklists_412_light",
             PHONE,
             withAction = true,
+            state = TodayScreenState.NoChecklists,
+        )
+
+    /** The same state on a host with no capture affordance: a placeholder with no button at all. */
+    @Test
+    fun todayNoChecklists_withoutCapture_412dp_light() =
+        captureToday(
+            "today_nochecklists_nocapture_412_light",
+            PHONE,
+            withAction = false,
             state = TodayScreenState.NoChecklists,
         )
 
@@ -211,6 +229,64 @@ class EmptyStateAddTaskReportTest {
             PHONE,
             todayState = TodayScreenState.Loading,
             expectedAddTaskControls = 1,
+        )
+
+    /**
+     * The CALENDAR page's own empty state. Its CTA raises the capture dock now, so it is the same
+     * action as the pinned row and the row must stand down for it — the frame and the count are the
+     * proof. Two controls here is the pre-change rendering.
+     */
+    @Test
+    fun calendarTab_calendarPageEmpty_412dp_light() =
+        captureCalendarTab(
+            "calendar_page_empty_412_light",
+            PHONE,
+            todayState = TodayScreenState.Loading,
+            settleOnCalendarPage = true,
+            expectedAddTaskControls = 1,
+        )
+
+    @Test
+    fun calendarTab_calendarPageEmpty_320dp_fontScale15() =
+        captureCalendarTab(
+            "calendar_page_empty_320_fs150",
+            SMALL_PHONE,
+            fontScale = 1.5f,
+            todayState = TodayScreenState.Loading,
+            settleOnCalendarPage = true,
+            expectedAddTaskControls = 1,
+        )
+
+    @Test
+    fun calendarTab_calendarPageEmpty_412dp_dark() =
+        captureCalendarTab(
+            "calendar_page_empty_412_dark",
+            PHONE,
+            dark = true,
+            todayState = TodayScreenState.Loading,
+            settleOnCalendarPage = true,
+            expectedAddTaskControls = 1,
+        )
+
+    /**
+     * The A/B CONTROL arm on the same page, and the frame the owner should look at before this ships:
+     * `captureEnabled = false` means no dock exists to raise, so the placeholder draws NO button at
+     * all. Until 2026-08-19 it carried "Create Checklist" here and navigated to Templates.
+     *
+     * That is a deliberate removal, not an oversight — the CTA's string now reads "Add task" in all
+     * three locales, so keeping the button in an arm with no capture input would label a Templates
+     * jump as an add-task action. The count is asserted at 0 so the control arm can never silently
+     * GAIN a capture control either.
+     */
+    @Test
+    fun calendarTab_calendarPageEmpty_controlArm_412dp_light() =
+        captureCalendarTab(
+            "calendar_page_empty_412_light_CONTROL_ARM",
+            PHONE,
+            todayState = TodayScreenState.Loading,
+            settleOnCalendarPage = true,
+            captureEnabled = false,
+            expectedAddTaskControls = 0,
         )
 
     // ── 4. Checklist detail: empty level (v2 arm) ────────────────────────────
@@ -309,7 +385,6 @@ class EmptyStateAddTaskReportTest {
                     TodayBody(
                         state = state,
                         onReminderClick = { _, _ -> },
-                        onCreateChecklistClick = {},
                         onRetry = {},
                         // The v2 Calendar tab is the only host that passes true, and it is the host
                         // this change is about — the capture-aware copy is the one on screen there.
@@ -328,28 +403,42 @@ class EmptyStateAddTaskReportTest {
         dark: Boolean = false,
         fontScale: Float = 1f,
         todayState: TodayScreenState = TodayScreenState.Empty,
+        settleOnCalendarPage: Boolean = false,
+        captureEnabled: Boolean = true,
         expectedAddTaskControls: Int,
     ) {
         RuntimeEnvironment.setQualifiers(qualifiers)
         var addTaskLabel = ""
+        var calendarTabLabel = ""
         composeTestRule.setContent {
             addTaskLabel = stringResource(Res.string.inbox_add_task_row)
+            calendarTabLabel = stringResource(Res.string.calendar_nav_label)
             Harness(dark = dark, fontScale = fontScale) {
                 CalendarScreen(
                     todayState = todayState,
                     calendarState = CalendarState.Empty,
                     drawerState = null,
                     onTodayReminderClick = { _, _ -> },
-                    onTodayCreateChecklistClick = {},
                     onTodayRetry = {},
                     onCalendarIntent = {},
                     contentBottomPadding = 0.dp,
-                    captureEnabled = true,
+                    captureEnabled = captureEnabled,
                     onAddTaskRowClick = {},
                 )
             }
         }
         composeTestRule.waitForIdle()
+        if (settleOnCalendarPage) {
+            composeTestRule.onAllNodesWithText(calendarTabLabel)
+            // "Calendar" is on screen TWICE — the top-bar title and the tab. Only the tab is
+            // clickable, so that is the disambiguator; an index would silently follow a re-order.
+            .filterToOne(hasClickAction())
+            .performClick()
+            composeTestRule.waitForIdle()
+        }
+        // Shot FIRST, asserted second: a failing count is exactly when the frame is worth looking at,
+        // and an assert above `capture` writes no PNG on the run that needed one.
+        capture(name)
         // A frame nobody opens still has to fail: this is the count the whole change hinges on.
         assertEquals(
             "$name: exactly $expectedAddTaskControls control named \"$addTaskLabel\" may be on screen " +
@@ -358,7 +447,6 @@ class EmptyStateAddTaskReportTest {
             expectedAddTaskControls,
             composeTestRule.onAllNodesWithText(addTaskLabel).fetchSemanticsNodes().size,
         )
-        capture(name)
     }
 
     private fun captureDetailEmpty(

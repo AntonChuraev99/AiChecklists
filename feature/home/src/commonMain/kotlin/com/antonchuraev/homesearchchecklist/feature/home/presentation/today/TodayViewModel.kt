@@ -22,6 +22,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
@@ -36,6 +37,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.Tas
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dateInputMethod
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dayScreenDraft
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dueDateOffsetDays
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.observeDraftTextForSmartAdd
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveDueOutcome
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
@@ -130,6 +132,12 @@ class TodayViewModel(
      * to explain it. A missing binding must fail at graph construction, not at the user's finger.
      */
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
+    /**
+     * Smart-Add. Required, not defaulted, for the reason above: this dock is the SAME dock the Inbox
+     * tab mounts, and a host that silently resolved no parser would ship a capture field where
+     * typing "tomorrow" quietly does nothing on one tab and works on the other.
+     */
+    private val smartDateParser: SmartDateParser,
 ) : AppViewModel<TodayScreenState, TodayIntent, TodaySideEffect>() {
 
     /** Stable snapshot of "now" at VM creation (epoch millis). */
@@ -216,6 +224,9 @@ class TodayViewModel(
 
     init {
         observePremium()
+        // Declared after [_draft] and read by nothing above it — see the property's own note on
+        // initialisation order. Both capture hosts call the SAME helper; see its KDoc.
+        viewModelScope.observeDraftTextForSmartAdd(_draft, smartDateParser)
     }
 
     /**
@@ -243,7 +254,6 @@ class TodayViewModel(
                     appNavigator.navigateToChecklistDetail(intent.checklistId)
                 }
             }
-            TodayIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
             TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
             is TodayIntent.OnQuickAddTextChanged ->
                 _draft.value = _draft.value.copy(text = intent.text)
@@ -622,9 +632,6 @@ class TodayViewModel(
 sealed interface TodayIntent : Intent {
     /** User tapped a reminder row. Navigates to FillDetail (fillId != null) or ChecklistDetail. */
     data class OnReminderClick(val checklistId: Long, val fillId: Long?) : TodayIntent
-    /** User tapped "Create Checklist" in the NoChecklists empty state. */
-    data object OnCreateChecklistClick : TodayIntent
-
     data class OnQuickAddTextChanged(val text: String) : TodayIntent
 
     /** A capture-dock chip was tapped (reminder preset or Important). */

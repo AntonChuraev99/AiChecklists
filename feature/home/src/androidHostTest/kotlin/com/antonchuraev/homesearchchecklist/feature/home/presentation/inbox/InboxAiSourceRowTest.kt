@@ -248,10 +248,42 @@ class InboxAiSourceRowTest {
         composeTestRule.onRoot().captureRoboImage()
     }
 
+    /**
+     * With the capture dock up, this block stands down — the dock hosts the SAME four pills.
+     *
+     * Both at once put EIGHT identical pills on one screen under two different phrasings of one
+     * promise, and it happened in the state that IS a new user: an almost-empty Inbox (UI audit,
+     * 2026-08-19). The list's copy is the one that yields — under the dismiss overlay it is a
+     * control that cannot be tapped, while the dock's is the tab's only live route into Analyze
+     * during a capture.
+     *
+     * COUNTED, not `assertDoesNotExist`: the pills still exist, once, in the dock. An existence
+     * assertion would pass on a screen showing neither and fail on the correct one.
+     */
+    @Test
+    fun dockOpen_leavesExactlyOneCopyOfTheSources() {
+        var photo = ""
+        composeTestRule.setContent {
+            photo = stringResource(Res.string.analyze_source_photo)
+            InboxUnderTest(
+                state = inboxContent(tasks = listOf(task("Buy bread"))),
+                createDockOpen = true,
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText(photo).fetchSemanticsNodes().size,
+            "the dock and the list must not both offer the sources",
+        )
+    }
+
     @Composable
     private fun InboxUnderTest(
         state: InboxScreenState,
         onIntent: (InboxIntent) -> Unit = {},
+        createDockOpen: Boolean = false,
     ) {
         AppTheme(darkTheme = false) {
             InboxScreen(
@@ -260,7 +292,7 @@ class InboxAiSourceRowTest {
                 onIntent = onIntent,
                 snackbarHostState = SnackbarHostState(),
                 swallowRootBack = false,
-                createDockOpen = false,
+                createDockOpen = createDockOpen,
                 onCreateDockDismiss = {},
             )
         }

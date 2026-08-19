@@ -32,7 +32,6 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun CalendarRoute(
     drawerState: DrawerState?,
-    onCreateChecklistClick: () -> Unit,
     /**
      * Extra bottom inset the HOST reserves below this screen (v2 shell: bottom bar + chat FAB).
      * The Calendar had no bottom-padding parameter at all, so without this its agenda rows scroll
@@ -59,8 +58,12 @@ fun CalendarRoute(
     captureEnabled: Boolean = false,
     onCaptureDockDismiss: () -> Unit = {},
     /**
-     * The inline "add task" row under the pager was tapped — the HOST must raise [captureDockOpen]
-     * (and close any other bottom dock first; two of them cannot share the bottom edge).
+     * An add-task affordance on this tab was tapped — the HOST must raise [captureDockOpen] (and
+     * close any other bottom dock first; two of them cannot share the bottom edge).
+     *
+     * "The row" in the name is now the smaller half of the truth: the same callback also backs the
+     * Today page's and the Calendar page's placeholder buttons, which are that row in another
+     * carrier. One action, one callback, one analytics series.
      *
      * No default, unlike the capture params above: those have a correct "off" value for the control
      * arm, this one does not. A host that renders the row ([captureEnabled] = true) and forgets this
@@ -124,7 +127,12 @@ fun CalendarRoute(
         onCaptureDockDismiss = onCaptureDockDismiss,
         // Broadcast, not routed: the ViewModel gets the tap for the analytics (the event used to
         // hang off the shell's "+" FAB, which is being deleted), the host gets it to raise the dock
-        // flag it owns. Same shape as onTodayCreateChecklistClick just below.
+        // flag it owns.
+        //
+        // ONE callback for all THREE doors into the dock on this tab — the pinned row, the Today
+        // page's placeholder button and (since 2026-08-19) the Calendar page's. They are one action,
+        // so they share one wiring; a second entry point with its own would split `inline_row` into
+        // two series that cannot be summed.
         onAddTaskRowClick = {
             todayViewModel.sendIntent(TodayIntent.OnAddTaskRowClick)
             onAddTaskRowClick()
@@ -140,17 +148,8 @@ fun CalendarRoute(
         onTodayReminderClick = { checklistId, fillId ->
             todayViewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))
         },
-        onTodayCreateChecklistClick = {
-            todayViewModel.sendIntent(TodayIntent.OnCreateChecklistClick)
-            onCreateChecklistClick()
-        },
         onTodayRetry = { todayViewModel.sendIntent(TodayIntent.OnRefresh) },
         creditsSource = creditsSource,
-        onCalendarIntent = { intent ->
-            if (intent is CalendarIntent.OnCreateChecklistClick) {
-                onCreateChecklistClick()
-            }
-            calendarViewModel.sendIntent(intent)
-        },
+        onCalendarIntent = calendarViewModel::sendIntent,
     )
 }

@@ -95,6 +95,18 @@ data class TaskDraft(
      * Live Smart-Add parse of [text] ("tomorrow at 7" → a date token), shown as a preview chip.
      * Applied to the created item only when no explicit reminder chip is active — an explicit chip is
      * a deliberate choice and must win over a phrase the parser merely recognised.
+     *
+     * Written by the capture host, debounced, on every change to [text]; [resolveReminderAtNow] is
+     * where it is honoured, which is also what the leading chip's label is read from, so what the
+     * dock SHOWS and what Send WRITES are the same value by construction. Until 2026-08-19 nothing
+     * wrote it at all: the field, the chip branch that renders it and the `parsed_from_text`
+     * analytics value were all reachable only in principle.
+     *
+     * Hosts stage ONE-SHOT tokens only. A recognised repeat ("every Monday") is dropped rather than
+     * staged, for two independent reasons: a recurring reminder is behind the free-tier gate the
+     * planner's Repeat control enforces, and the draft carries a repeat as a `PendingRepeatConfig`
+     * that this token cannot produce — so staging one would file a one-shot at its first occurrence
+     * while the chip said "Weekly".
      */
     val parsedToken: ParsedDateToken? = null,
     val reminderPreset: ItemCreateReminderPreset? = null,
@@ -103,11 +115,62 @@ data class TaskDraft(
     val important: Boolean = false,
     val repeat: PendingRepeatConfig? = null,
     val attachments: List<PendingItemAttachment> = emptyList(),
+    /**
+     * The user has said "no date" OUT LOUD for this draft — the `x` on the leading chip, or Remove
+     * inside the reminder sheet — so a phrase the parser recognises must stay quiet until they
+     * answer differently.
+     *
+     * Without it the `x` on a PARSED date is a control that does not work. [parsedToken] is a live
+     * derivative of [text]: the host re-parses after every keystroke, so clearing a date the text
+     * still spells out lasts exactly until the next character, and the date the user just removed
+     * comes back on its own. The flag is what makes the clear stick for as long as the draft lives;
+     * [cleared] drops it with everything else after Send.
+     *
+     * It is deliberately NOT set by re-tapping an active preset chip. "I don't want THIS chip" and
+     * "I want no date" are different answers, and conflating them would switch Smart-Add off
+     * permanently on the Today tab, whose draft opens with a preset already applied — the only way
+     * to reach the parsed date there is to clear that chip first.
+     */
+    val dueDismissed: Boolean = false,
 ) {
     /** Send is refused on a blank text even when files are staged — an untitled item is unreadable. */
     val canSend: Boolean get() = text.isNotBlank()
 
     val hasAttachments: Boolean get() = attachments.isNotEmpty()
+}
+
+
+/**
+ * The characters of [TaskDraft.text] the capture dock is allowed to tint as "this is the date I
+ * recognised" — or null, meaning show no highlight at all.
+ *
+ * ## The trap this function exists for
+ * [ParsedDateToken.startIndex] / [ParsedDateToken.endIndex] do NOT address the string in the text
+ * field. The parser measures against a whitespace-NORMALISED copy of the input (`trim()` plus every
+ * run of whitespace collapsed to one space), so the moment the user types a leading space or a
+ * double space the offsets slide, silently and by exactly as many characters as were removed. On
+ * " call mum tomorrow" the token's 9..17 lands on " tomorro" — a highlight one character off,
+ * covering a space and clipping a letter, with nothing anywhere to say it is wrong.
+ *
+ * ## Why the answer is a re-check and not a re-computation
+ * The offsets could be mapped back by counting non-whitespace characters, and they could be found
+ * again by searching for [ParsedDateToken.originalSubstring]. Both were rejected: the first
+ * re-implements the parser's private normalisation outside the parser, where it drifts on the next
+ * change to it, and the second picks the WRONG occurrence the first time someone writes "tomorrow,
+ * and again tomorrow". So this only ever ANSWERS the question the indices already claim to answer —
+ * does the raw text, at exactly these offsets, hold exactly the phrase the parser matched? — and
+ * returns null on anything else.
+ *
+ * A missing highlight costs a decoration; a confidently wrong one tells the user the app read a
+ * different word than it did, right before it writes a date from it. Miss quietly, never mislead.
+ */
+fun TaskDraft.smartAddHighlightRange(): IntRange? {
+    val token = parsedToken ?: return null
+    val start = token.startIndex
+    val end = token.endIndex
+    if (start < 0 || start >= end || end > text.length) return null
+    if (text.substring(start, end) != token.originalSubstring) return null
+    return start until end
 }
 
 /**
@@ -122,9 +185,15 @@ fun TaskDraft.withPreset(
     now: Instant = Clock.System.now(),
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ): TaskDraft = if (reminderPreset == preset) {
+    // Re-tap clears the CHIP, not the date question — [dueDismissed] deliberately stays where it is
+    // so a recognised phrase can answer instead. See its KDoc.
     copy(reminderPreset = null, reminderAt = null)
 } else {
-    copy(reminderPreset = preset, reminderAt = computePresetReminderAt(preset, now, timeZone))
+    copy(
+        reminderPreset = preset,
+        reminderAt = computePresetReminderAt(preset, now, timeZone),
+        dueDismissed = false,
+    )
 }
 
 /**
@@ -138,6 +207,14 @@ fun TaskDraft.withCustomReminder(at: Long?): TaskDraft = copy(
     reminderAt = at,
     reminderPreset = if (at != null) ItemCreateReminderPreset.CUSTOM else null,
     repeat = null,
+    // A null [at] is the ONE place the user says "no date" rather than "not this date" — the `x` on
+    // the leading chip and Remove in the sheet both land here. See [TaskDraft.dueDismissed].
+    //
+    // The token goes WITH the flag rather than waiting for the host's debounced re-parse to drop it:
+    // a chip that keeps showing a date for 200ms after the tap that removed it is a control that
+    // looks broken. The flag is what keeps it gone; this is what makes it go now.
+    dueDismissed = at == null,
+    parsedToken = if (at == null) null else parsedToken,
 )
 
 fun TaskDraft.withImportantToggled(): TaskDraft = copy(important = !important)
@@ -147,6 +224,9 @@ fun TaskDraft.withRepeat(config: PendingRepeatConfig?): TaskDraft = copy(
     repeat = config,
     reminderAt = if (config != null) null else reminderAt,
     reminderPreset = if (config != null) null else reminderPreset,
+    // Saving a rule is an answer; removing one is the same "no date" [withCustomReminder] hears.
+    dueDismissed = config == null,
+    parsedToken = if (config == null) null else parsedToken,
 )
 
 fun TaskDraft.withAttachment(attachment: PendingItemAttachment): TaskDraft =
@@ -322,7 +402,8 @@ fun dayScreenDraft(
 ): TaskDraft = TaskDraft().withPreset(defaultDayScreenPreset(now, timeZone), now, timeZone)
 
 /**
- * The reminder to actually write on Send, resolved from the ACTIVE preset at this moment.
+ * The reminder to actually write on Send, resolved from the ACTIVE preset at this moment — or, with
+ * no preset active, from the phrase Smart-Add recognised in the text ([TaskDraft.parsedToken]).
  *
  * [TaskDraft.reminderAt] is fixed when the chip is TAPPED, and the dock then stays open for as long
  * as the user types — so by Send the captured value may be wrong in either direction, and the two
@@ -344,7 +425,16 @@ fun TaskDraft.resolveReminderAtNow(
     now: Instant = Clock.System.now(),
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ): Long? {
-    val preset = reminderPreset ?: return null
+    // No chip: the phrase the user typed answers instead. This one line is what connects Smart-Add
+    // to the capture dock, and it is HERE rather than at the two call sites on purpose — the leading
+    // chip's label and the value Send writes are both read from this function, so a date shown and a
+    // date written cannot disagree. Split across two call sites, they could: the dock would render
+    // "Tomorrow 09:00" over a task filed with no date at all, and report `has_due_date = false`
+    // while the user was looking at the date.
+    //
+    // An explicit chip still wins — it is checked first, and that is the rule [TaskDraft.parsedToken]
+    // states: a tap is a decision, a recognised phrase is a guess about one.
+    val preset = reminderPreset ?: return parsedToken?.reminderAt
     return when (preset.anchor) {
         ReminderAnchor.PICKED -> reminderAt
         ReminderAnchor.OFFSET_FROM_SEND -> computePresetReminderAt(preset, now, timeZone)

@@ -263,7 +263,6 @@ class CaptureDockDueRailReportTest {
             calendarState = CalendarState.Empty,
             drawerState = null,
             onTodayReminderClick = { _, _ -> },
-            onTodayCreateChecklistClick = {},
             onTodayRetry = {},
             onCalendarIntent = {},
             // The real seed this tab uses: the day screen pre-selects a reminder so a task captured

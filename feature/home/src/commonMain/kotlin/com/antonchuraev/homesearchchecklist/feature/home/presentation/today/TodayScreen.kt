@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
-import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.today_all_done_description
 import aichecklists.core.designsystem.generated.resources.today_all_done_title
 import aichecklists.core.designsystem.generated.resources.today_empty_state_description
@@ -57,6 +56,7 @@ import aichecklists.core.designsystem.generated.resources.today_error_descriptio
 import aichecklists.core.designsystem.generated.resources.today_error_retry
 import aichecklists.core.designsystem.generated.resources.today_error_title
 import aichecklists.core.designsystem.generated.resources.today_no_checklists_description
+import aichecklists.core.designsystem.generated.resources.today_no_checklists_title
 import aichecklists.core.designsystem.generated.resources.today_open_menu
 import aichecklists.core.designsystem.generated.resources.today_section_past_due
 import aichecklists.core.designsystem.generated.resources.today_section_today
@@ -168,19 +168,26 @@ sealed interface TodayScreenState : State {
  * Today page has no way to add a task at all, which on Compact is this tab's ONLY route into the
  * capture dock.
  *
- * ## Why these two states and not the others
+ * ## Why these three states and not the others
  * - `Empty` / `AllDone` — nothing to act on, the placeholder fills the screen, and the placeholder is
  *   where the eye is. These are the states the owner's request is about ("All clear / Nothing is
  *   scheduled…").
- * - `NoChecklists` and `Error` already carry their own CTA ("Create Checklist" / "Retry"). Stacking a
- *   second button under those would make the placeholder a two-button dialog, and the pinned row is
- *   still on screen there — so nothing is lost.
+ * - `NoChecklists` joined them on 2026-08-19. It used to be excluded because it carried a CTA of its
+ *   own — but that CTA was "Create Checklist", the last one on this surface still naming a checklist
+ *   where everything else names a task, and its tap navigated TWICE (the ViewModel pushed Templates
+ *   while the host pushed CreateChecklist on the same click). Replacing it with the add-task action
+ *   rather than stacking a second button under it is what keeps the placeholder a one-button
+ *   placeholder.
+ * - `Error` still carries its own CTA ("Retry"). Stacking a second button under it would make the
+ *   placeholder a two-button dialog, and the pinned row is still on screen there — so nothing is lost.
  * - `Loading` and `Success` render no placeholder at all, so there is no slot to put anything in.
  */
 internal fun TodayScreenState.hostsAddTaskAction(): Boolean = when (this) {
-    TodayScreenState.Empty, TodayScreenState.AllDone -> true
-    TodayScreenState.Loading,
+    TodayScreenState.Empty,
+    TodayScreenState.AllDone,
     TodayScreenState.NoChecklists,
+    -> true
+    TodayScreenState.Loading,
     TodayScreenState.Error,
     is TodayScreenState.Success,
     -> false
@@ -200,7 +207,6 @@ internal fun TodayScreenState.hostsAddTaskAction(): Boolean = when (this) {
  * @param onReminderClick Navigation callback. Receives checklistId and optional fillId.
  *        - If fillId != null → navigate to FillDetail(fillId)
  *        - If fillId == null → navigate to ChecklistDetail(checklistId)
- * @param onCreateChecklistClick Called from NoChecklists empty state CTA.
  * @param onRetry Called from the [TodayScreenState.Error] retry CTA — re-fetches reminders.
  * @param onBack Optional explicit back affordance, rendered as the TopAppBar back arrow ONLY when
  *   [drawerState] is null (with a drawer the hamburger owns that slot).
@@ -221,7 +227,6 @@ fun TodayScreen(
     state: TodayScreenState,
     drawerState: DrawerState?,
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
-    onCreateChecklistClick: () -> Unit,
     onRetry: () -> Unit,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -251,7 +256,6 @@ fun TodayScreen(
         TodayBody(
             state = state,
             onReminderClick = onReminderClick,
-            onCreateChecklistClick = onCreateChecklistClick,
             onRetry = onRetry,
         )
     }
@@ -288,7 +292,6 @@ fun TodayScreen(
 fun TodayBody(
     state: TodayScreenState,
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
-    onCreateChecklistClick: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     contentBottomPadding: Dp = 0.dp,
@@ -327,12 +330,15 @@ fun TodayBody(
                 onAction = onAddTask,
             )
 
+            // Its own title, not `today_empty_state_title` ("All clear"): a user who has never
+            // created anything has nothing to be clear of, and the two states now differ only by
+            // copy — both offer the same one button.
             TodayScreenState.NoChecklists -> EmptyState(
                 icon = Icons.Outlined.WbSunny,
-                title = stringResource(Res.string.today_empty_state_title),
+                title = stringResource(Res.string.today_no_checklists_title),
                 description = stringResource(Res.string.today_no_checklists_description),
-                actionLabel = stringResource(Res.string.main_create_checklist),
-                onAction = onCreateChecklistClick,
+                actionLabel = stringResource(Res.string.inbox_add_task_row),
+                onAction = onAddTask,
             )
 
             TodayScreenState.Error -> EmptyState(
@@ -584,12 +590,20 @@ private fun TodayReminderRow(
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
-                    maxLines = 1,
+                    // TWO lines for the task's NAME, one for everything else. The name is the only
+                    // thing that identifies this row; the supporting line under it (checklist + time)
+                    // means nothing on its own and still gets a full line, so spending the row's
+                    // second line on the name is the cheaper half of the budget. RU copy runs ~30%
+                    // longer than EN and fontScale 1.3 halves the budget again — at one line that
+                    // combination truncates mid-word ("Позвонить в поликлинику и запис…") and the
+                    // row stops being identifiable. The row has no fixed height, so it simply grows.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                // Supporting line: context (parent checklist) + time
+                // Supporting line: context (parent checklist) + time. Stays at ONE line — it is
+                // context, and a wrapping subtitle under a wrapping title turns the list into prose.
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
                     verticalAlignment = Alignment.CenterVertically,

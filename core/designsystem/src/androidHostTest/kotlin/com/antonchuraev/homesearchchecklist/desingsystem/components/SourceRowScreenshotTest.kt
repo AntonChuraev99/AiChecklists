@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -23,6 +22,10 @@ import aichecklists.core.designsystem.generated.resources.analyze_source_link_sh
 import aichecklists.core.designsystem.generated.resources.analyze_source_pdf
 import aichecklists.core.designsystem.generated.resources.analyze_source_photo
 import aichecklists.core.designsystem.generated.resources.analyze_source_voice
+import aichecklists.core.designsystem.generated.resources.due_preset_tomorrow
+import aichecklists.core.designsystem.generated.resources.due_preset_tonight
+import aichecklists.core.designsystem.generated.resources.due_preset_weekend
+import aichecklists.core.designsystem.generated.resources.due_rail_no_date
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -112,6 +115,88 @@ class SourceRowScreenshotTest {
     /** Dark theme — the pills must stay distinguishable from the dock surface behind them. */
     @Test
     fun dock_withSources_360dp_dark() = shoot("w360dp-h640dp", dark = true) { DockStub() }
+
+    // ── The input field carries its own weight, and the commit action lives inside it ─────────
+    //
+    // Measured on the frames above before this changed: the field's interior read `222,220,214` —
+    // the dock's own colour, contrast 1.00 : 1 — while the optional date chips a row above were
+    // filled. The one target the dock exists for was the only element with no body, and the "+"
+    // beside it was, empty, the quietest thing in the row. These four frames are what that looks
+    // like now; the empty state is in every `dock_*` shot above, so these cover the two the others
+    // cannot: a field with text (the "+" turns `primary`) and a field with enough text to wrap.
+
+    /** Typed text: the "+" is live, and it must read as the strongest thing in the dock. */
+    @Test
+    fun dock_withText_360dp_light() = shoot("w360dp-h640dp") { DockStub(text = "Call the dentist") }
+
+    /** The same, dark — where the whole separation used to rest on the outline alone. */
+    @Test
+    fun dock_withText_360dp_dark() =
+        shoot("w360dp-h640dp", dark = true) { DockStub(text = "Call the dentist") }
+
+    /**
+     * Enough text to wrap: the field is multiline, so the trailing "+" has to stay put as the box
+     * grows instead of riding the last line or stretching with it.
+     */
+    @Test
+    fun dock_wrappingText_360dp_light() = shoot("w360dp-h640dp") {
+        DockStub(text = "Call the dentist about rescheduling next week's appointment please")
+    }
+
+    /** Wrapping text at a large accessibility scale — the tightest the field ever gets. */
+    @Test
+    fun dock_wrappingText_412dp_fontScale15() = shoot("w412dp-h891dp", fontScale = 1.5f) {
+        DockStub(text = "Call the dentist about rescheduling next week's appointment")
+    }
+
+    // ── Smart-Add made visible: the recognised phrase, tinted in place ───────────────────────
+    //
+    // The date the dock is about to set is stated twice and in two registers: as an answer in the
+    // leading chip, and as the WORDS it was read from, highlighted where the user typed them. The
+    // second is what makes "why did it pick tomorrow" answerable without tapping anything.
+    //
+    // A `primaryContainer` background and nothing else — no bold, no recoloured text. These frames
+    // prove it is legible on both planes; `AppTextFieldHighlightTest` proves it covers exactly the
+    // right characters, which a 360px PNG cannot show.
+
+    /** "tomorrow" tinted inside the typed sentence, light. */
+    @Test
+    fun dock_highlightedPhrase_360dp_light() = shoot("w360dp-h640dp") {
+        DockStub(text = "call mum tomorrow", highlightRange = 9 until 17)
+    }
+
+    /** The same on the dark dock, where the tint has to stay a tint and not become a block. */
+    @Test
+    fun dock_highlightedPhrase_360dp_dark() = shoot("w360dp-h640dp", dark = true) {
+        DockStub(text = "call mum tomorrow", highlightRange = 9 until 17)
+    }
+
+    /**
+     * The narrow, large-text, Russian case — the tightest the field gets AND the language whose
+     * date words are longest. A highlight that wraps across two lines has to stay readable.
+     */
+    @Test
+    fun dock_highlightedPhrase_320dp_fontScale13_ru() =
+        shoot("w320dp-h568dp", fontScale = 1.3f, locale = Locale("ru")) {
+            DockStub(text = "позвонить маме завтра", highlightRange = 15 until 21)
+        }
+
+    // ── The same component on the PAGE plane ─────────────────────────────────────────────────
+    //
+    // `AddItemInputField` has four call sites outside the dock — analyze preview, template preview,
+    // create-checklist, weekly detail — and they draw it on the page, not on the bottom chrome.
+    // `AppChatColors.raised()` resolves per plane, so the fill they get is `card`, a far smaller
+    // step (ΔL* +1.7 light, +4.3 dark) than the dock's +12.2. These two frames are what that looks
+    // like: the field must still read as a field, and must NOT read as a white slab dropped on a
+    // near-white page.
+
+    /** Page plane, light — the near-white case, where the fill has the least room to show. */
+    @Test
+    fun addItemField_onThePagePlane_light() = shoot("w360dp-h640dp") { PageFieldStub() }
+
+    /** Page plane, dark — where the same token has to step UP off a darker page. */
+    @Test
+    fun addItemField_onThePagePlane_dark() = shoot("w360dp-h640dp", dark = true) { PageFieldStub() }
 
     // ── Both rows survive every supported size and text scale ────────────────
     //
@@ -206,11 +291,17 @@ class SourceRowScreenshotTest {
     }
 
     /**
-     * The real [QuickCaptureDock] with a stand-in for the host's chip row.
+     * The real [QuickCaptureDock] with the real [DueRailRow] in its `aboveInput` slot.
      *
-     * The presets are a plain Text rather than the real `TaskCreateChipsRow` because that component
-     * lives in `feature:home` and this module cannot depend on it — what matters here is only that
-     * SOMETHING occupies the `aboveInput` slot, so the collapse rule has something to collapse.
+     * It used to be a plain `Text` reading "Today Tomorrow Important", from back when the host's chip
+     * row lived in `feature:home` and could not be imported here. The rail moved INTO this module
+     * with R1, and the stand-in outlived the reason for it: every frame below went on recording a
+     * dock the app had stopped drawing, beside `DueRailScreenshotTest` recording the one it does.
+     * Two golden sets of two different products is worse than one set of either — the next reader
+     * cannot tell which is the lie.
+     *
+     * Only the row, not the planner panel: what these frames are judged on is that BOTH rows survive
+     * every width and text scale, and the expanded planner is `DueRailScreenshotTest`'s subject.
      *
      * `belowInput` carries the HEADED section, not a bare [SourceRow], because that is what both hosts
      * pass since 2026-08-17 — the dock shipped with four unlabelled pills under the task field, which
@@ -220,18 +311,27 @@ class SourceRowScreenshotTest {
      * only judgeable with the heading in the frame.
      */
     @Composable
-    private fun DockStub() {
+    private fun DockStub(text: String = "", highlightRange: IntRange? = null) {
+        val railPresets = listOf(
+            DuePresetChip(DuePresetId.TONIGHT, stringResource(Res.string.due_preset_tonight)),
+            DuePresetChip(DuePresetId.TOMORROW, stringResource(Res.string.due_preset_tomorrow)),
+            DuePresetChip(DuePresetId.WEEKEND, stringResource(Res.string.due_preset_weekend)),
+        )
         QuickCaptureDock(
-            text = "",
+            text = text,
             onTextChange = {},
             onAdd = {},
             placeholder = "Add a task…",
+            highlightRange = highlightRange,
             aboveInput = {
-                Text(
-                    text = "Today   Tomorrow   Important",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                DueRailRow(
+                    leadLabel = stringResource(Res.string.due_rail_no_date),
+                    hasDate = false,
+                    expanded = false,
+                    presets = railPresets,
+                    onLeadClick = {},
+                    onClearDate = {},
+                    onPresetClick = {},
                 )
             },
             belowInput = {
@@ -243,6 +343,18 @@ class SourceRowScreenshotTest {
                     onSelect = {},
                 )
             },
+        )
+    }
+
+    /** The shared input as the four non-dock call sites mount it: on the page, with no chrome. */
+    @Composable
+    private fun PageFieldStub() {
+        AddItemInputField(
+            text = "Buy milk",
+            onTextChange = {},
+            onAdd = {},
+            placeholder = "Add an item",
+            modifier = Modifier.padding(AppDimens.ScreenPaddingHorizontal),
         )
     }
 

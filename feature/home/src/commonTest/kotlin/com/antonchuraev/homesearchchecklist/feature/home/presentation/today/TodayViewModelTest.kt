@@ -18,6 +18,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ChipDisplay
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.DayKey
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -51,6 +55,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.datetime.TimeZone
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -329,7 +334,9 @@ class TodayViewModelTest {
     @Test
     fun emptyState_whenNoReminders() = runTest {
         val repo = FakeRepository(remindersInRange = emptyList())
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         val state = vm.awaitState()
         assertIs<TodayScreenState.Empty>(state)
@@ -356,7 +363,9 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 2L, reminderAt = FUTURE_TODAY_MS),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -389,7 +398,9 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 1L, reminderAt = earlierMs),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -403,7 +414,9 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_itemLevel_navigatesToFillDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, fillId = 42L))
 
@@ -416,7 +429,9 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_checklistLevel_navigatesToChecklistDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, fillId = null))
 
@@ -424,17 +439,14 @@ class TodayViewModelTest {
         assertTrue(navigator.navigatedFillIds.isEmpty())
     }
 
-    // ── 6. Navigation: OnCreateChecklistClick → TemplatesScreen ────────────
-
-    @Test
-    fun intentOnCreateChecklistClick_navigatesToTemplates() = runTest {
-        val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
-
-        vm.sendIntent(TodayIntent.OnCreateChecklistClick)
-
-        assertTrue(navigator.navigatedToTemplates)
-    }
+    // ── 6. The NoChecklists placeholder no longer routes anywhere ──────────
+    //
+    // `TodayIntent.OnCreateChecklistClick` and the test that pinned it to
+    // `navigateToTemplatesScreen()` were both deleted on 2026-08-19. That placeholder's CTA raises
+    // the HOST's capture dock now — screen state, not navigation — and the intent it used to send
+    // was half of a DOUBLE navigation (this ViewModel pushed Templates while the host pushed
+    // CreateChecklist on the same tap). `TodayNoChecklistsAddTaskTest` covers the button that
+    // replaced it.
 
     // ── 7. Per-item reminder appears in state ──────────────────────────────
 
@@ -445,7 +457,9 @@ class TodayViewModelTest {
                 itemLevelReminder(reminderAt = FUTURE_TODAY_MS, itemText = "Buy milk"),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -466,7 +480,9 @@ class TodayViewModelTest {
                 checklistLevelReminder(reminderAt = FUTURE_TODAY_MS, isRecurring = true),
             )
         )
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -506,7 +522,9 @@ class TodayViewModelTest {
     @Test
     fun intentOnRefresh_doesNotNavigate() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         // Refresh is a data concern — it must never move the user off the screen.
         vm.sendIntent(TodayIntent.OnRefresh)
@@ -562,7 +580,9 @@ class TodayViewModelTest {
             )
         )
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -620,7 +640,9 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw cause }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Error>(state)
@@ -646,7 +668,9 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw NullPointerException() }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         assertIs<TodayScreenState.Error>(vm.awaitState())
         assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on failure")
@@ -669,7 +693,9 @@ class TodayViewModelTest {
                 }
         }
 
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
         assertIs<TodayScreenState.Error>(vm.awaitState())
 
         // Heal the repository, then retry: flatMapLatest must re-subscribe.
@@ -698,7 +724,9 @@ class TodayViewModelTest {
                 throw RuntimeException("DB failure")
             }
         }
-        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         val seen = mutableListOf<TodayScreenState>()
         // Must be unconfined AND share runTest's scheduler: backgroundScope defaults to
@@ -738,7 +766,9 @@ class TodayViewModelTest {
         val analytics = RecordingAnalytics()
         val navigator = FakeNavigator()
         val repo = FakeRepository()
-        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         vm.sendIntent(TodayIntent.OnAiSourceTapped(AnalyzeInputKind.PHOTO))
 
@@ -769,7 +799,9 @@ class TodayViewModelTest {
         val analytics = RecordingAnalytics()
         val navigator = FakeNavigator()
         val repo = FakeRepository()
-        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger, limitsUseCase())
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), analytics, logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
 
         vm.sendIntent(TodayIntent.OnAiSourceTapped(AnalyzeInputKind.VOICE))
 
@@ -811,6 +843,7 @@ class TodayViewModelTest {
             NoOpAnalytics(),
             logger,
             limitsUseCase(),
+            NoOpSmartDateParser,
         )
         val message = TodaySideEffect.ShowCaptureMessage(
             text = "Added to Inbox",
@@ -838,6 +871,45 @@ class TodayViewModelTest {
         collector.cancel()
     }
 
+    // ── Smart-Add, end to end through this host ─────────────────────────────
+
+    /**
+     * The WIRING test for Smart-Add: this host actually subscribes its own draft to the parser.
+     *
+     * The rules themselves live in `CaptureDockSmartAddTest`, which drives the shared helper
+     * directly. What that suite cannot see is a host that never calls it — which is exactly the
+     * state both capture tabs shipped in until 2026-08-19, with `TaskDraft.parsedToken` read by the
+     * leading chip and written by nobody.
+     *
+     * `runTest(dispatcher)` rather than the bare `runTest` every other test here uses: the parse is
+     * debounced, so the assertion needs virtual time on the SAME scheduler the ViewModel's
+     * `viewModelScope` runs on, and this class's dispatcher carries its own.
+     */
+    @Test
+    fun quickAddText_reachesTheParser_andStagesTheDateOnTheDraft() = runTest(dispatcher) {
+        val repo = FakeRepository()
+        val parser = FixedParser(TOMORROW_MS)
+        val vm = TodayViewModel(
+            repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger,
+            limitsUseCase(),
+            parser,
+        )
+
+        vm.onIntent(TodayIntent.OnQuickAddTextChanged("call mum tomorrow"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf("call mum tomorrow"),
+            parser.calls,
+            "The host has to run the parser on the settled text — once",
+        )
+        assertEquals(
+            TOMORROW_MS,
+            vm.draft.value.parsedToken?.reminderAt,
+            "…and stage the result on its own draft, where the leading chip and Send both read it",
+        )
+    }
+
     // ── The capture dock's repeat gate, end to end through this host ────────
 
     /**
@@ -855,6 +927,7 @@ class TodayViewModelTest {
         val vm = TodayViewModel(
             repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger,
             limitsUseCase(repository = repo, maxRecurringRemindersFree = 2),
+            NoOpSmartDateParser,
         )
 
         vm.onIntent(TodayIntent.OnDue(DraftDueIntent.OnRepeatClick))
@@ -877,6 +950,7 @@ class TodayViewModelTest {
         val vm = TodayViewModel(
             repo, ensureInbox(repo), FakeNavigator(), NoOpScheduler(), NoOpAnalytics(), logger,
             limitsUseCase(repository = repo, maxRecurringRemindersFree = 3),
+            NoOpSmartDateParser,
         )
 
         vm.onIntent(TodayIntent.OnDue(DraftDueIntent.OnRepeatClick))
@@ -900,6 +974,7 @@ class TodayViewModelTest {
                 subscriptionStatus = PREMIUM_STATUS,
                 maxRecurringRemindersFree = 1,
             ),
+            NoOpSmartDateParser,
         )
 
         vm.onIntent(TodayIntent.OnDue(DraftDueIntent.OnRepeatClick))
@@ -950,6 +1025,35 @@ class TodayViewModelTest {
         override fun setUserProperties(properties: Map<String, Any>) = Unit
         override fun screenView(name: String) = Unit
         override fun event(name: String, params: Map<String, Any>) = Unit
+    }
+
+    /**
+     * Recognises nothing — every test in this class is about something other than Smart-Add.
+     *
+     * The parser it stands in for is wired in `CaptureDockSmartAddTest`, which owns that behaviour;
+     * here a real one would make the draft's due date depend on whether a test happened to name its
+     * task "tomorrow".
+     */
+    private object NoOpSmartDateParser : SmartDateParser {
+        override fun parse(input: String, now: Long, timeZone: TimeZone): ParsedDateToken? = null
+    }
+
+    /** Recognises everything, at a fixed moment, and records what it was asked. */
+    private class FixedParser(private val at: Long) : SmartDateParser {
+        val calls = mutableListOf<String>()
+
+        override fun parse(input: String, now: Long, timeZone: TimeZone): ParsedDateToken? {
+            calls += input
+            return ParsedDateToken(
+                originalSubstring = "tomorrow",
+                startIndex = 0,
+                endIndex = 8,
+                display = ChipDisplay.RelativeDay(DayKey.TOMORROW, null),
+                reminderAt = at,
+                repeatRule = null,
+                timeOfDayMinutes = null,
+            )
+        }
     }
 
     /** Keeps name AND params so an assertion can pin the whole map, not one key of it. */
