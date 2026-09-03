@@ -175,7 +175,6 @@ class WeekGridCellFitTest {
                     calendarState = CalendarState.Content(agenda = agendaFixture()),
                     drawerState = null,
                     onTodayReminderClick = { _, _ -> },
-                    onTodayCreateChecklistClick = {},
                     onTodayRetry = {},
                     onCalendarIntent = {},
                     contentBottomPadding = 0.dp,

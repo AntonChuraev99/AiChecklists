@@ -51,11 +51,39 @@ sealed interface CalendarIntent : Intent {
     /** User tapped a reminder row. */
     data class OnReminderClick(val info: TodayReminderInfo) : CalendarIntent
 
-    /** User tapped "Create Checklist" from the empty state. */
-    data object OnCreateChecklistClick : CalendarIntent
-
     /** User tapped "Retry" after an error. */
     data object OnRetry : CalendarIntent
+}
+
+// ─── Add-task hosting ─────────────────────────────────────────────────────────
+
+/**
+ * Does the Calendar page host the add-task action INSIDE its own placeholder for this state?
+ *
+ * The twin of
+ * [hostsAddTaskAction][com.antonchuraev.homesearchchecklist.feature.home.presentation.today.hostsAddTaskAction]
+ * on the Today side, and it exists for the same reason: TWO readers on two sides of the pager have to
+ * agree, and the way they cannot drift is by both deriving from one predicate.
+ *  - `CalendarTabBody` builds its placeholder's action slot from it;
+ *  - `CalendarScreen` withholds its PINNED add-task row while the settled page hosts the action.
+ *
+ * Agree wrongly one way and the screen carries two controls both named "Add task" — ambiguous to a
+ * screen reader and to every UI test matching that label. Agree wrongly the other way and an empty
+ * Calendar page has no way into the capture dock, which on Compact is this tab's only route to one.
+ *
+ * ## Why only [CalendarState.Empty]
+ * - `Empty` — nothing to act on, the placeholder fills the page and is where the eye is. This is the
+ *   state the owner's request is about ("кнопка создать чеклист а не пункт чеклиста").
+ * - `Error` already carries its own CTA ("Retry"), and stacking a second button under it would make
+ *   the placeholder a two-button dialog; the pinned row is still on screen there, so nothing is lost.
+ * - `Loading` and `Content` render no placeholder at all — there is no slot to put anything in.
+ */
+internal fun CalendarState.hostsAddTaskAction(): Boolean = when (this) {
+    CalendarState.Empty -> true
+    CalendarState.Loading,
+    is CalendarState.Content,
+    is CalendarState.Error,
+    -> false
 }
 
 // ─── SideEffect ───────────────────────────────────────────────────────────────

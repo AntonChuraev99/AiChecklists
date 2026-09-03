@@ -2180,7 +2180,6 @@ fun App() {
                             } else {
                                 null
                             },
-                            onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                         )
                     }
 
@@ -2191,7 +2190,6 @@ fun App() {
                     ) {
                         CalendarRoute(
                             drawerState = drawerState,
-                            onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                             // 0.dp in control — Calendar's inner lists keep their current insets there.
                             // In v2 it is the same band every Compact tab reserves: the AI button's
                             // overhang. There is no per-tab floating "+" left to clear.

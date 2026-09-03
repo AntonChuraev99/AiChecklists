@@ -15,6 +15,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Repea
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueUiState
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
 
 /**
@@ -141,6 +143,17 @@ sealed interface InboxScreenState : State {
          * one tap deeper.
          */
         val draft: TaskDraft = TaskDraft(),
+        /**
+         * The capture dock's due rail: whether its planner grid is open, and which v1 reminder
+         * surface is up over it.
+         *
+         * Screen state rather than a `remember` inside the dock, even for the plain expand/collapse
+         * flag. Two slots of the dock read it — the planner in `aboveInput`, the AI source row it
+         * hides in `belowInput` — and a screenshot cannot reach the expanded frame by tapping,
+         * because the dock focuses its input on mount and a blinking caret never lets the test clock
+         * go idle.
+         */
+        val due: DraftDueUiState = DraftDueUiState(),
         val sheetForTaskId: String? = null,
         val movePickerOpen: Boolean = false,
         val moveTargets: List<InboxPage> = emptyList(),
@@ -267,6 +280,18 @@ sealed interface InboxIntent : Intent {
      * of parallel vocabulary that drifts the moment a seventh chip is added.
      */
     data class OnCreateChipAction(val action: GistiItemCreateAction) : InboxIntent
+
+    /**
+     * Anything the capture dock's due rail, its planner grid or the v1 reminder sheet behind them
+     * reported.
+     *
+     * ONE case wrapping a shared vocabulary, rather than twenty intents mirrored here and again on
+     * `TodayIntent`: both tabs mount the same dock and must answer "when" identically, and the rules
+     * live in exactly one place ([DraftDueController]). Mirroring the cases per screen is how the two
+     * capture surfaces would drift — which they already did once, when only one of them pre-selected
+     * a reminder.
+     */
+    data class OnDue(val due: DraftDueIntent) : InboxIntent
 
     /**
      * One of the AI source pills (Photo / PDF / Web Link / Voice) was tapped.

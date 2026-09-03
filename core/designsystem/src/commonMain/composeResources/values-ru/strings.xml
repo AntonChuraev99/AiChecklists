@@ -1049,15 +1049,17 @@
     <!-- Экран «Сегодня» -->
     <string name="today_title">Сегодня</string>
     <string name="today_empty_state_title">Всё чисто</string>
-    <string name="today_empty_state_description">На сегодня ничего не запланировано. Добавьте задачу ниже — она попадёт во Входящие.</string>
+    <string name="today_empty_state_description">На сегодня ничего не запланировано. Добавьте задачу — она попадёт во Входящие.</string>
     <!-- Вариант для экранов без поля быстрого ввода: не обещает кнопку, которой там нет -->
     <string name="today_empty_state_description_no_capture">На сегодня ничего не запланировано. Здесь появятся задачи с напоминанием.</string>
     <string name="today_all_done_title">Всё готово</string>
     <string name="today_all_done_description">Все задачи на сегодня выполнены. Отдыхайте.</string>
     <string name="today_quick_add_placeholder">Добавить задачу</string>
     <string name="today_task_captured_message">Добавлено во Входящие</string>
-    <string name="today_task_captured_action">Открыть</string>
-    <string name="today_no_checklists_description">Создайте первый чек-лист, чтобы начать.</string>
+    <string name="today_task_captured_action">Открыть Входящие</string>
+    <string name="today_no_checklists_title">Здесь пока пусто</string>
+    <string name="today_no_checklists_description">Добавьте первую задачу — она попадёт во Входящие.</string>
+    <string name="calendar_empty_description">Задачи со сроком появятся здесь. Добавьте задачу и выберите, когда её сделать.</string>
     <string name="today_section_past_due">Просрочено</string>
     <string name="today_section_today">Сегодня</string>
     <string name="today_open_menu">Открыть меню</string>
@@ -1469,12 +1471,15 @@
         <item quantity="other">%1$d задачи</item>
     </plurals>
     <string name="inbox_display_options">Отображение</string>
-    <string name="inbox_list_actions">Действия со списком</string>
-    <string name="inbox_menu_open_checklist">Открыть чек-лист</string>
+    <string name="inbox_list_actions">Действия с проектом</string>
     <string name="checklist_rename">Переименовать</string>
     <string name="checklist_rename_title">Переименовать чек-лист</string>
     <string name="checklist_name_placeholder">Введите название</string>
-    <string name="inbox_checklist_deleted_message">Чек-лист удалён</string>
+    <string name="inbox_checklist_deleted_message">Проект удалён</string>
+    <string name="inbox_project_rename_title">Переименовать проект</string>
+    <string name="inbox_project_delete">Удалить проект</string>
+    <string name="inbox_project_name_required">Название проекта не может быть пустым</string>
+    <string name="inbox_open_failed">Не удалось открыть Входящие. Попробуйте ещё раз.</string>
     <string name="inbox_checklist_rename_failed">Не удалось переименовать чек-лист. Попробуйте снова.</string>
     <string name="inbox_checklist_delete_failed">Не удалось удалить чек-лист. Попробуйте снова.</string>
 
@@ -1500,13 +1505,13 @@
 
     <!-- Таб «Проекты» -->
     <string name="projects_title">Проекты</string>
-    <string name="projects_add_checklist">Новый чек-лист</string>
+    <string name="projects_add_checklist">Новый проект</string>
     <string name="projects_complete">Всё выполнено</string>
     <plurals name="projects_count">
-        <item quantity="one">%1$d чек-лист</item>
-        <item quantity="few">%1$d чек-листа</item>
-        <item quantity="many">%1$d чек-листов</item>
-        <item quantity="other">%1$d чек-листа</item>
+        <item quantity="one">%1$d проект</item>
+        <item quantity="few">%1$d проекта</item>
+        <item quantity="many">%1$d проектов</item>
+        <item quantity="other">%1$d проекта</item>
     </plurals>
     <string name="projects_no_items">Пусто</string>
     <!-- Только для скринридера (stateDescription строки). %1$d — сделано, %2$d — всего. -->
@@ -1519,8 +1524,8 @@
         <item quantity="many">%1$d напоминаний</item>
         <item quantity="other">%1$d напоминания</item>
     </plurals>
-    <string name="projects_empty_title">Чек-листов пока нет</string>
-    <string name="projects_empty_description">Создайте чек-лист или собирайте задачи во Входящих, а потом разложите их по чек-листам.</string>
+    <string name="projects_empty_title">Проектов пока нет</string>
+    <string name="projects_empty_description">Создайте проект или собирайте задачи во Входящих, а потом разложите их по проектам.</string>
 
     <!-- Экран «Обзор» (таб v2, в котором живёт содержимое drawer-навигации control-арма) -->
     <string name="overview_title">Обзор</string>
@@ -1616,4 +1621,22 @@
     <string name="month_abbr_oct">окт.</string>
     <string name="month_abbr_nov">нояб.</string>
     <string name="month_abbr_dec">дек.</string>
+
+    <!-- Due rail (capture dock, R1). Labels must stay short - the row wraps at 320dp. -->
+    <string name="due_rail_no_date">Когда?</string>
+    <string name="due_preset_tonight">Вечером</string>
+    <string name="due_preset_tomorrow">Завтра</string>
+    <string name="due_preset_weekend">Выходные</string>
+    <string name="due_preset_in_1_hour">Через час</string>
+    <string name="due_preset_next_week">След. неделя</string>
+    <string name="due_rail_clear_repeat_a11y">Убрать повтор</string>
+    <string name="due_rail_clear_a11y">Убрать дату</string>
+    <string name="due_rail_expanded_a11y">Развёрнуто</string>
+    <string name="due_rail_collapsed_a11y">Свёрнуто</string>
+    <string name="due_planner_pick_date">Своя дата</string>
+    <string name="due_planner_time">Время</string>
+    <string name="due_planner_repeat">Повтор</string>
+    <string name="due_rail_repeat_replaced">Повтор снят — у задачи может быть либо повтор, либо одна дата</string>
+    <string name="due_planner_repeat_off">Выкл.</string>
+    <string name="due_planner_done">Готово</string>
 </resources>

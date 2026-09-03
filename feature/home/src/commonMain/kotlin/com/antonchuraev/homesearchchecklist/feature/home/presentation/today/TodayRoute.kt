@@ -26,7 +26,6 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun TodayRoute(
     drawerState: DrawerState?,
-    onCreateChecklistClick: () -> Unit,
     onBack: (() -> Unit)? = null,
     viewModel: TodayViewModel = koinViewModel(),
 ) {
@@ -37,10 +36,6 @@ fun TodayRoute(
         drawerState = drawerState,
         onReminderClick = { checklistId, fillId ->
             viewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))
-        },
-        onCreateChecklistClick = {
-            viewModel.sendIntent(TodayIntent.OnCreateChecklistClick)
-            onCreateChecklistClick()
         },
         onRetry = { viewModel.sendIntent(TodayIntent.OnRefresh) },
         onBack = onBack,

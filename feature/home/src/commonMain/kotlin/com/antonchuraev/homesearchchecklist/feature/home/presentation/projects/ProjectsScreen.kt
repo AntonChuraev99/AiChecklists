@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.projects
 
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.main_error_description
 import aichecklists.core.designsystem.generated.resources.main_error_retry
 import aichecklists.core.designsystem.generated.resources.main_error_title
@@ -170,7 +169,7 @@ fun ProjectsScreen(
         },
     ) {
         when {
-            // The read failed — never an empty list, which would claim the user has no checklists.
+            // The read failed — never an empty list, which would claim the user has no projects.
             state is ProjectsScreenState.Error -> EmptyState(
                 icon = Icons.Outlined.ErrorOutline,
                 title = stringResource(Res.string.main_error_title),
@@ -197,7 +196,10 @@ fun ProjectsScreen(
                 description = stringResource(Res.string.projects_empty_description),
                 action = {
                     AppButton(
-                        text = stringResource(Res.string.main_create_checklist),
+                        // The SAME id the "+" in the toolbar uses. Two spellings of one action on
+                        // one screen ("Create Checklist" here, "New checklist" there) is how a tab
+                        // titled Projects ended up naming its object three ways.
+                        text = stringResource(Res.string.projects_add_checklist),
                         onClick = { onIntent(ProjectsIntent.OnCreateChecklistClick) },
                         modifier = Modifier.fillMaxWidth(),
                     )

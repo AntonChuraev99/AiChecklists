@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -461,12 +462,55 @@ fun <T> GistiSelectableChipRow(
     }
 }
 
+/**
+ * ONE selectable chip, for a host that places it inside a layout of its own.
+ *
+ * Exists because [GistiSelectableChipRow] is a `LazyRow`, and a lazy row cannot be a child of a
+ * `Row` that scrolls — it would measure against an infinite width constraint. The due rail needs
+ * exactly that placement for the Important toggle: inside the rail's own line, so the toggle never
+ * costs a line of dock height of its own.
+ *
+ * Same body as the row's items, so the two cannot drift: the `selected` semantics (without which a
+ * screen reader announced the presets as identical buttons — this project's own shipped a11y defect)
+ * and the 48dp touch target under a 38dp pill come from the same place.
+ *
+ * @param modifier applied to the chip's own `Surface`, ahead of its resting geometry — so a host may
+ *   raise the VISIBLE pill (`heightIn(min = ...)`) without touching the shared resting height. The
+ *   due rail does exactly that: its own chips are 48dp of visible pill, and a 38dp Important beside
+ *   them read as a different, smaller kind of control (UI audit, 2026-08-19).
+ */
+@Composable
+fun GistiSelectableChipItem(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    labelVisible: Boolean = true,
+) = SelectablePromptChipItem(
+    icon = icon,
+    label = label,
+    selected = selected,
+    onClick = onClick,
+    modifier = modifier,
+    labelVisible = labelVisible,
+)
+
+/**
+ * @param labelVisible false renders the glyph alone and moves [label] into `contentDescription`, so
+ *   the control keeps its accessible NAME while giving up its width. For a host that must pin the
+ *   chip against an edge — the due rail keeps Important out of its scroll this way — a 56dp square
+ *   is affordable where a ~100dp pill is not. Never use it for a chip whose glyph does not already
+ *   name the action on its own.
+ */
 @Composable
 private fun SelectablePromptChipItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    labelVisible: Boolean = true,
 ) {
     // Percentage-based rather than a hardcoded 19dp: identical at the 38dp resting height, and it
     // stays a pill once ru/hi copy or a large font scale grows the chip past that.
@@ -498,13 +542,19 @@ private fun SelectablePromptChipItem(
         shape = shape,
         color = containerColor,
         border = border,
-        modifier = Modifier
+        modifier = modifier
             // Surface(onClick) announces Role.Button but never "selected" — so a screen-reader user
             // heard the four reminder presets as four identical buttons with no way to tell which
             // one is active. The blue fill is a sighted-only cue until this is set.
             // `this.` is required: the enclosing function's `selected` parameter shadows the
             // SemanticsPropertyReceiver property of the same name.
-            .semantics { this.selected = isSelected }
+            .semantics {
+                this.selected = isSelected
+                // Without a visible label the glyph is the whole control, and an Icon marked
+                // decorative would leave it an unnamed button. With one, the Text below IS the name
+                // and a description here would replace it rather than add to it.
+                if (!labelVisible) contentDescription = label
+            }
             // heightIn, never height: a fixed 38dp clips Devanagari (matras sit above *and* below
             // the baseline) and clips any label at fontScale >= 1.3. The chip is allowed to grow.
             // minimumInteractiveComponentSize() stays — it is what keeps the touch target at 48dp
@@ -519,7 +569,9 @@ private fun SelectablePromptChipItem(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 14.dp),
+            // Square inset without the label: 14dp beside a 16dp glyph would leave a 44dp pill that
+            // reads as a squeezed pill rather than as a round toggle.
+            modifier = Modifier.padding(horizontal = if (labelVisible) 14.dp else 16.dp),
         ) {
             Icon(
                 imageVector = icon,
@@ -527,17 +579,19 @@ private fun SelectablePromptChipItem(
                 tint = contentColor,
                 modifier = Modifier.size(16.dp),
             )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontSize = 13.5.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeightStyle = centeredLineHeight,
-                ),
-                color = contentColor,
-                maxLines = 1,
-            )
+            if (labelVisible) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 13.5.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeightStyle = centeredLineHeight,
+                    ),
+                    color = contentColor,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

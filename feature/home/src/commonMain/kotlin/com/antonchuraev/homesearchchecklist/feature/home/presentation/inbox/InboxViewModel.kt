@@ -6,11 +6,11 @@ import aichecklists.core.designsystem.generated.resources.attachment_load_error
 import aichecklists.core.designsystem.generated.resources.attachment_premium_limit_reached_snackbar
 import aichecklists.core.designsystem.generated.resources.attachment_size_too_large_snackbar
 import aichecklists.core.designsystem.generated.resources.calendar_app_not_found
-import aichecklists.core.designsystem.generated.resources.error_create_checklist_failed
+import aichecklists.core.designsystem.generated.resources.inbox_open_failed
 import aichecklists.core.designsystem.generated.resources.error_save_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_update_failed
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
-import aichecklists.core.designsystem.generated.resources.fill_error_name_required
+import aichecklists.core.designsystem.generated.resources.inbox_project_name_required
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_delete_failed
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_deleted_message
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_rename_failed
@@ -45,16 +45,21 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueController
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.cleared
-import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveReminderAtNow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dateInputMethod
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dueDateOffsetDays
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.observeDraftTextForSmartAdd
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveDueOutcome
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailViewModel
@@ -125,6 +130,12 @@ class InboxViewModel(
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val attachmentStorage: AttachmentStoragePort,
     private val calendarEventLauncher: CalendarEventLauncher,
+    /**
+     * Smart-Add, the same instance the checklist detail screen parses with. Required rather than
+     * defaulted: the Calendar tab mounts the SAME dock, and a host that quietly resolved no parser
+     * would ship a field where typing "tomorrow" works on one tab and does nothing on the other.
+     */
+    private val smartDateParser: SmartDateParser,
     private val logger: AppLogger,
 ) : AppViewModel<InboxScreenState, InboxIntent, InboxSideEffect>() {
 
@@ -169,6 +180,27 @@ class InboxViewModel(
      * kept racing the Loading → Content transition.
      */
     private val _userLimits = MutableStateFlow<UserLimits?>(null)
+
+    /**
+     * The capture dock's due rail — the SAME rules the Calendar tab runs, not a second copy.
+     *
+     * Declared after [_draft] and [_userLimits] because it captures both: Kotlin initialises
+     * properties in declaration order, and a delegate built above them would capture nulls.
+     *
+     * The gate it is given is the one this class already runs for a per-item reminder, down to the
+     * hardcoded ceiling — a third disagreeing gate would let a free user arm from the dock a repeat
+     * the detail screen refuses.
+     */
+    private val dueController = DraftDueController(
+        scope = viewModelScope,
+        logger = logger,
+        tag = TAG,
+        draft = _draft,
+        limits = { _userLimits.value },
+        countActiveReminders = { repository.countActiveReminders() },
+        onUpgradeClick = { navigator.navigateToPaywall(source = PAYWALL_SOURCE_DOCK_REPEAT) },
+        onMessage = ::emitMessage,
+    )
 
     /**
      * The toolbar overflow's three mutually-exclusive surfaces, held as ONE value.
@@ -263,12 +295,15 @@ class InboxViewModel(
             ListState(pages?.map { it.applyDisplayOptions(display.options) }, display, error, now)
         },
         _selectedPage,
-        _draft,
+        // The staged task and the surfaces its due rail has open, paired for the same reason as the
+        // sheet below: typed `combine` tops out at five sources, and these two are read together on
+        // every frame the dock is up.
+        combine(_draft, dueController.state) { draft, due -> draft to due },
         // Paired so the whole state still fits typed `combine`'s five-source ceiling; the sheet and
         // the limits that gate two of its rows belong to one interaction, so pairing costs no clarity.
         combine(_itemSheet, _userLimits) { sheet, limits -> sheet to limits },
         _listMenu,
-    ) { list, selected, draft, (itemSheet, userLimits), listMenu ->
+    ) { list, selected, (draft, due), (itemSheet, userLimits), listMenu ->
         val (pages, display, loadError, nowMillis) = list
         val displayOptions = display.options
         val displayOptionsOpen = display.sheetOpen
@@ -288,6 +323,7 @@ class InboxViewModel(
                 pages = pages,
                 selectedPage = safeSelected,
                 draft = draft,
+                due = due,
                 sheetForTaskId = itemSheet.taskId,
                 movePickerOpen = itemSheet.movePickerOpen,
                 moveTargets = pages.filter { !it.isInbox && it.checklistId != current?.checklistId },
@@ -327,6 +363,10 @@ class InboxViewModel(
         bootstrap()
         observeUserLimits()
         observeClock()
+        // Below the properties it reads — [_draft] is initialised in declaration order, and a
+        // subscription started above it would capture null. Both capture hosts call the SAME
+        // helper rather than each rolling their own debounce; see its KDoc.
+        viewModelScope.observeDraftTextForSmartAdd(_draft, smartDateParser)
     }
 
     /**
@@ -348,8 +388,8 @@ class InboxViewModel(
                 // user-facing message to the caller. The snackbar stays — it is what tells a user
                 // who is already looking at the screen — and the Error state is what stays on
                 // screen after the four seconds are up, instead of a spinner that never resolves.
-                emitMessage(Res.string.error_create_checklist_failed)
-                setLoadError(Res.string.error_create_checklist_failed)
+                emitMessage(Res.string.inbox_open_failed)
+                setLoadError(Res.string.inbox_open_failed)
             }
         }
         observePages()
@@ -455,6 +495,7 @@ class InboxViewModel(
             is InboxIntent.OnQuickAddTextChanged ->
                 _draft.value = _draft.value.copy(text = intent.text)
             is InboxIntent.OnCreateChipAction -> applyCreateChip(intent.action)
+            is InboxIntent.OnDue -> dueController.onIntent(intent.due)
             InboxIntent.OnQuickAddSubmit -> addTask()
 
             // Analytics ONLY — raising the dock is the host's job (see InboxRoute).
@@ -515,6 +556,10 @@ class InboxViewModel(
                 // a past trigger immediately — a reminder that "rings" the instant you set it.
                 if (intent.triggerAtMillis <= Clock.System.now().toEpochMilliseconds()) {
                     logger.warning(TAG, "reminder preset ${intent.triggerAtMillis} is in the past — ignored")
+                    // Say so. Dropping the tap with only a log leaves the sheet open, the preset
+                    // unselected and the user with no idea why — the same silent skip the draft
+                    // path 40 files away already answers with this very string.
+                    emitMessage(Res.string.inbox_reminder_time_in_past)
                 } else {
                     saveItemReminder(intent.triggerAtMillis, repeatRule = null, repeatTimeOfDayMinutes = null)
                 }
@@ -745,10 +790,11 @@ class InboxViewModel(
     /**
      * Applies a capture-dock chip to the draft.
      *
-     * Only the chips this screen can honour arrive here: [TaskCreateChipsRow] is asked to hide
-     * "Pick time…" and "Repeat", which need a date picker and the repeat sheet (plus its free-tier
-     * gate) that live on the detail screen. The two are still handled — with a log rather than a
-     * silent `else -> {}` — because a chip row is shared code and the next host may enable them.
+     * Since the due rail shipped, the only chip the dock still routes through here is Important —
+     * the date offers go through `DraftDueIntent`, and "Pick time" / "Repeat" are rows of the
+     * planner panel, whose sheets this screen now hosts itself. The other branches are kept, with a
+     * log rather than a silent `else -> {}`, because [GistiItemCreateAction] is shared with the
+     * detail screen and an action arriving here unhandled must not vanish quietly.
      */
     private fun applyCreateChip(action: GistiItemCreateAction) {
         when (action) {
@@ -784,6 +830,21 @@ class InboxViewModel(
             return
         }
 
+        // Resolved ONCE, here, and then both written and reported from the same value. Re-running it
+        // for the analytics would let the two answers disagree across a minute boundary — and it is
+        // resolved at SEND rather than at the tap because a dock left open across 18:00 would
+        // otherwise file a "Tonight" that has already passed.
+        val timeZone = TimeZone.currentSystemDefault()
+        val now = Clock.System.now()
+        val dueOutcome = draft.resolveDueOutcome(now, timeZone)
+        // The task is still created — the text is what the user came to capture, and refusing the
+        // whole capture over a stale time would cost them the note. But the dropped date is said out
+        // loud: a due date that quietly fails to appear is exactly what this rail exists to fix.
+        if (dueOutcome.pickedTimeExpired) {
+            logger.warning(TAG, "picked due time expired before send — task created without a date")
+            emitMessage(Res.string.inbox_reminder_time_in_past)
+        }
+
         viewModelScope.launch {
             runCatching {
                 val checklist = repository.getChecklistById(page.checklistId)
@@ -795,16 +856,14 @@ class InboxViewModel(
                 // is what keeps move/delete/edit from having to guess by text later.
                 val weekday = weekdayFor(checklist)
                 val priority = if (draft.important) 1 else 0
-                // Resolved HERE, not when the chip was tapped: a dock left open across 18:00 would
-                // otherwise write a "Tonight" that is already in the past.
-                val reminderAt = draft.resolveReminderAtNow()
                 // Priority rides BOTH halves of the pair: the template feeds the edit screen and the
                 // fill feeds every list, and a star on only one of them is the template↔fill desync
                 // this domain keeps re-learning (rule `checklist-domain`).
                 val templateItem = ChecklistItem(text = text, weekday = weekday, priority = priority)
-                // reminderAt goes through withReminderAt, not the constructor: ChecklistFillItem's
-                // full parameter list is a PRIVATE constructor (the public one deliberately exposes
-                // only the birth fields), so the reminder is applied as an explicit transition.
+                // The due fields go through withRepeatRule / withReminderAt, not the constructor:
+                // ChecklistFillItem's full parameter list is a PRIVATE constructor (the public one
+                // deliberately exposes only the birth fields), so they are applied as explicit
+                // transitions — the same two the detail screen's create path applies.
                 val fillItem = ChecklistFillItem(
                     text = text,
                     checked = false,
@@ -812,19 +871,51 @@ class InboxViewModel(
                     weekday = weekday,
                     priority = priority,
                     templateItemId = templateItem.id,
-                ).let { item -> reminderAt?.let(item::withReminderAt) ?: item }
+                ).let { item ->
+                    val rule = dueOutcome.repeatRule
+                    val minutes = dueOutcome.repeatTimeOfDayMinutes
+                    val firstAt = dueOutcome.repeatFirstTriggerAt
+                    if (rule != null && minutes != null && firstAt != null) {
+                        item.withRepeatRule(rule, minutes, firstAt)
+                    } else {
+                        item
+                    }
+                }.let { item -> dueOutcome.reminderAt?.let(item::withReminderAt) ?: item }
                 repository.updateFill(fill.copy(items = fill.items + fillItem))
                 repository.updateChecklistTemplate(checklist.copy(items = checklist.items + templateItem))
-                // Persisting reminderAt is only half a reminder — without the alarm the row shows a
-                // bell that never rings, which is worse than no chip at all.
-                reminderAt?.let { at ->
+                // Persisting the due fields is only half a reminder — without the alarm the row shows
+                // a bell that never rings, which is worse than no chip at all. BOTH kinds, because
+                // the dock can now stage either one.
+                dueOutcome.reminderAt?.let { at ->
                     reminderScheduler.scheduleItemReminder(page.checklistId, fill.id, fillItem.id, at)
+                }
+                dueOutcome.repeatFirstTriggerAt?.let { at ->
+                    reminderScheduler.scheduleItemRepeat(page.checklistId, fill.id, fillItem.id, at)
                 }
             }.onSuccess {
                 _draft.value = _draft.value.cleared()
+                // The dock stays open for the next capture, so the rail has to go back to "No date"
+                // with it — a planner left expanded would sit over a fresh draft claiming a date it
+                // does not have, and would keep the AI source row hidden while it did.
+                dueController.reset()
                 analytics.event(
                     AnalyticsEvents.Inbox.QUICK_ADDED,
-                    mapOf(AnalyticsParams.SOURCE to if (page.isInbox) SOURCE_INBOX else SOURCE_PROJECT),
+                    buildMap {
+                        put(AnalyticsParams.SOURCE, if (page.isInbox) SOURCE_INBOX else SOURCE_PROJECT)
+                        // Read off the value that was actually WRITTEN, not recomputed: a second
+                        // resolution here could disagree with the first across a minute boundary and
+                        // report a date the task does not carry.
+                        val dueAt = dueOutcome.dueAtMillis
+                        put(AnalyticsParams.HAS_DUE_DATE, (dueAt != null).toString())
+                        put(AnalyticsParams.DATE_INPUT_METHOD, draft.dateInputMethod(dueAt).wire)
+                        // ABSENT rather than a sentinel when there is no date — see the param's KDoc.
+                        dueAt?.let {
+                            put(
+                                AnalyticsParams.DUE_DATE_OFFSET_DAYS,
+                                dueDateOffsetDays(it, now.toEpochMilliseconds(), timeZone).toString(),
+                            )
+                        }
+                    },
                 )
             }.onFailure { e ->
                 if (e is CancellationException) throw e
@@ -1110,7 +1201,7 @@ class InboxViewModel(
                 // Blank input is a user action like any other: closing the dialog with no word about
                 // it reads as "the app ate my rename". The message names the reason.
                 _listMenu.value = ListMenuState()
-                emitMessage(Res.string.fill_error_name_required)
+                emitMessage(Res.string.inbox_project_name_required)
             }
 
             RenameDecision.InvalidTarget -> {
@@ -1933,6 +2024,16 @@ class InboxViewModel(
 
         /** Paywall attribution for the locked banner inside the item reminder sheet. */
         const val PAYWALL_SOURCE_ITEM_REMINDER = "inbox_item_reminder_limit"
+
+        /**
+         * Paywall attribution for the locked banner behind the capture dock's Repeat control.
+         *
+         * Its own value, not [PAYWALL_SOURCE_ITEM_REMINDER]: the two are different moments in the
+         * product — one is a user editing a task that exists, the other one composing a task that
+         * does not — and folding them into one string would make the dock's contribution to the
+         * paywall funnel unreadable, which is exactly why `paywall_opened` carries a source at all.
+         */
+        const val PAYWALL_SOURCE_DOCK_REPEAT = "inbox_capture_repeat_limit"
 
         /**
          * Stamped on every emit this screen shares with the control arm (`item_checked`,

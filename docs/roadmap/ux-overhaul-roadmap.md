@@ -72,23 +72,67 @@ created in the console and therefore always resolved to the control arm.
 - **The bottom navigation lost its painted shadow ramp**, which used to tint the bottom 16dp of the
   hosted screen, the open dock included (`Elevation.kt`).
 
+### R1 — the capture dock answers "when"
+Built, not yet in a published version. A task gets a due date **in the dock itself**: a row above the
+input carries the current answer as its leading chip, two offers beside it, and the Important toggle;
+tapping the leading chip expands a 2×3 planner inside the dock with every offer, "Pick date", and the
+Time / Repeat rows. `Pick time` and `Repeat` stopped being disabled flags — the v1 `ReminderSheet` is
+now hosted by the two capture screens, so the controls have somewhere to open.
+
+Three corrections to this roadmap's own text for R1, all found by reading the code rather than the
+plan, and worth remembering because the same shape recurs:
+
+- **There is no swipe.** No leader in the category sets a date by swiping the input row, and a hidden
+  gesture with no visible alternative costs roughly a fifth of task completion. The rail is tap-first.
+  ⚠️ **The "does not scroll sideways at all" half of this rule was reversed by the owner on
+  2026-08-19** — the rail is now ONE line that scrolls, because wrapping spent a whole line of dock
+  height on the commonest phone width. The two objections were answered rather than accepted: a plain
+  `Row` under `horizontalScroll` (never a `LazyRow`) composes every chip, so a screen reader is
+  offered all of them, and the edge that can still scroll is faded so the row says it has more. The
+  Important toggle is PINNED outside that scroll — inside it, it was visible for less than the width
+  of the fade, and gone entirely once a date widened the leading chip.
+- **`Pick time` / `Repeat` were never "lost".** They were switched off deliberately, because their
+  sheets only existed on the detail screen. The work was to give those sheets a host, not to re-add
+  two chips.
+- **`ReminderTarget` was not needed.** `TaskDraft` already carried the reminder before the task
+  exists, together with the rules a second model would have had to re-state.
+
+*Where:* `core/designsystem/.../components/DueRail.kt`, `feature/home/.../presentation/create/`
+(`DueRailSection`, `DraftDueController`, `DraftDueSheetHost`, `DraftDue`), both capture hosts.
+*Measured by:* three new properties on the existing `inbox_quick_added` — `has_due_date`,
+`due_date_offset_days`, `date_input_method`. Deliberately additive: a new event would have thrown
+away the funnel's history.
+**Second pass, 2026-08-19** — the owner reviewed the build on device, named his corrections, and then
+picked four improvements out of a design/UX audit while explicitly rejecting the larger ones:
+
+- the rail became one scrolling line and Important was pinned out of it (above);
+- both empty states that offered **"Create Checklist"** now offer **"Add task"** and raise the capture
+  dock — the shell's unit is a task. Removed with them: a double navigation that pushed TWO screens on
+  one tap (the route fired the host callback *and* the ViewModel's own `navigateToTemplatesScreen`);
+- the v2 vocabulary was unified — the pager page is a **project** on every control of the Inbox and
+  Projects tabs, in all three locales, while the v1 checklist screens keep the word "checklist";
+- **Smart-Add is wired** (this closes the todo that used to be listed here): both capture hosts parse
+  the typed text on a debounce, the recognised phrase is highlighted in the field, and it is what Send
+  writes — the chip and the send path now read ONE function, so shown and written cannot disagree;
+- the leading chip asks **"When?"** instead of answering "No date", and its accent means "there is an
+  answer" rather than "the panel is open";
+- the source row no longer appears twice (list + dock) while capturing;
+- the input field got a fill of its own — it used to be exactly the dock's colour, so the optional
+  offers above it read as more solid than the field itself.
+
+*Left open, tracked:* the analytics payload and the expanded dock under the page scrim are not yet
+asserted (`docs/todos/2026-08-19-due-rail-uncovered-analytics-payload-and-expanded-dock-frame.md`);
+the remainder of the UX audit, including the missing undo on Inbox task delete and the unmeasured
+height of the expanded planner against a REAL keyboard, is in
+`docs/todos/2026-08-19-v2-shell-ux-audit-remainder.md`.
+
+*Owner decisions still open on this branch* (next session starts here): the Calendar empty state has
+no CTA at all in the **control arm** of the nav A/B, where there is no dock to raise; and the
+recognised-phrase highlight uses `primaryContainer`, which in dark theme reads like a text selection.
+
 ---
 
 ## 🔨 Next up
-
-### R1 — Capture dock, second pass
-The dock captures text and parses a date, but the date rail from the design spec is missing.
-
-- Swipe rail for setting a due date directly on the row.
-- Six presets (this evening / tomorrow morning / weekend / …) instead of sending the user to a full
-  calendar, which is expensive in UI and rarely used.
-- Bring back **Pick time** and **Repeat**, lost when the dock was rebuilt.
-- `ReminderTarget` for the draft, so a reminder can be attached before the task exists.
-
-*Where:* `core/designsystem/.../components/QuickCaptureDock.kt`, `SmartDateParser` (RU/EN lexicons
-already exist), `ChecklistFillItem.reminderAt` (no Room migration needed).
-*Done when:* a task can get a due date without leaving the dock, and the parsed date is visible as a
-chip that a tap edits.
 
 ### R2 — Calendar and Today earn their tabs
 - Empty state that leads into the daily review instead of dead-ending.

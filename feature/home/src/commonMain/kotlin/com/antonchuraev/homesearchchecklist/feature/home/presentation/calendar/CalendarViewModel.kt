@@ -64,7 +64,6 @@ class CalendarViewModel(
     override fun onIntent(intent: CalendarIntent) {
         when (intent) {
             is CalendarIntent.OnReminderClick -> handleReminderClick(intent.info)
-            CalendarIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
             CalendarIntent.OnRetry -> _retryTrigger.update { it + 1 }
         }
     }

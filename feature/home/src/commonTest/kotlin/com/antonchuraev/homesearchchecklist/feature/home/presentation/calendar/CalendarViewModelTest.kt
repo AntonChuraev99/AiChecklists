@@ -448,16 +448,14 @@ class CalendarViewModelTest {
         assertTrue(navigator.navigatedFillIds.isEmpty())
     }
 
-    // ── 11. Intent: OnCreateChecklistClick → navigateToTemplatesScreen ────────
-
-    @Test
-    fun intent_onCreateChecklistClick_navigatesToTemplates() = runTest {
-        val vm = buildVm()
-
-        vm.sendIntent(CalendarIntent.OnCreateChecklistClick)
-
-        assertTrue(navigator.navigatedToTemplates)
-    }
+    // ── 11. The empty state no longer routes anywhere ────────────────────────
+    //
+    // `CalendarIntent.OnCreateChecklistClick` and the test that pinned it to
+    // `navigateToTemplatesScreen()` were both deleted on 2026-08-19. The empty state's CTA raises
+    // the HOST's capture dock now — screen state, not navigation — so there is no ViewModel
+    // behaviour left to assert here. The button and its wiring are covered by
+    // `CalendarAddTaskRowTest` on the UI side; Templates stays reachable from the dock's source row
+    // and from the Projects tab.
 
     // ── 12. Error: repository throws → Error state + AppLogger.error called
     //         OnRetry re-fetches and transitions back to Content on success ────

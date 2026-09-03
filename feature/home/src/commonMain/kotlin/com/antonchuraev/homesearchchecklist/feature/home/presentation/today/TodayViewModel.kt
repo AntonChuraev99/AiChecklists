@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
+import aichecklists.core.designsystem.generated.resources.inbox_reminder_time_in_past
 import aichecklists.core.designsystem.generated.resources.inbox_task_add_failed
 import aichecklists.core.designsystem.generated.resources.today_task_captured_action
 import aichecklists.core.designsystem.generated.resources.today_task_captured_message
@@ -21,14 +22,23 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueController
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueUiState
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.ItemCreateReminderPreset
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dateInputMethod
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dayScreenDraft
-import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveReminderAtNow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.dueDateOffsetDays
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.observeDraftTextForSmartAdd
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveDueOutcome
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +56,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -69,6 +80,14 @@ private const val SOURCE_CALENDAR = "calendar"
  * surface appears — at that point the constant belongs in `core:common:api`, next to the event name.
  */
 private const val SOURCE_INLINE_ROW = "inline_row"
+
+/**
+ * Paywall attribution for the locked banner behind the capture dock's Repeat control on this tab.
+ *
+ * Its own value rather than the Inbox tab's: the two docks are one component but two surfaces, and
+ * the reason `paywall_opened` carries a source at all is to keep them separable in the funnel.
+ */
+private const val PAYWALL_SOURCE_DOCK_REPEAT = "calendar_capture_repeat_limit"
 
 /**
  * ViewModel for the Today screen.
@@ -103,6 +122,22 @@ class TodayViewModel(
     private val reminderScheduler: ChecklistReminderScheduler,
     private val analytics: AnalyticsTracker,
     private val logger: AppLogger,
+    /**
+     * Premium state, for the ONE gate the capture dock can reach: the recurring-reminder cap behind
+     * the planner's Repeat control. Nothing else in the rail touches a paywall — a due date is free.
+     *
+     * Required, exactly like [InboxViewModel]'s: the two capture hosts run the SAME gate, and a
+     * nullable-with-default here made an eighth parameter compile silently while Koin fed the gate a
+     * null — i.e. a paying user shown the locked upgrade banner behind Repeat, forever, with nothing
+     * to explain it. A missing binding must fail at graph construction, not at the user's finger.
+     */
+    private val getUserLimitsUseCase: GetUserLimitsUseCase,
+    /**
+     * Smart-Add. Required, not defaulted, for the reason above: this dock is the SAME dock the Inbox
+     * tab mounts, and a host that silently resolved no parser would ship a capture field where
+     * typing "tomorrow" quietly does nothing on one tab and works on the other.
+     */
+    private val smartDateParser: SmartDateParser,
 ) : AppViewModel<TodayScreenState, TodayIntent, TodaySideEffect>() {
 
     /** Stable snapshot of "now" at VM creation (epoch millis). */
@@ -117,6 +152,44 @@ class TodayViewModel(
      */
     private val _draft = MutableStateFlow(dayScreenDraft())
     val draft: StateFlow<TaskDraft> = _draft
+
+    /**
+     * Latest premium snapshot, kept fresh so the repeat gate can be evaluated synchronously.
+     *
+     * Collected rather than read on demand for the same reason the Inbox tab keeps one: a suspend
+     * read at gate time opens the sheet unlocked for a frame and then locks it under the user's
+     * finger.
+     */
+    private val _userLimits = MutableStateFlow<UserLimits?>(null)
+
+    /**
+     * The capture dock's due rail — the SAME object the Inbox tab drives, so the two docks cannot
+     * answer "when" differently.
+     *
+     * Declared after [_draft] because it captures it: Kotlin initialises properties in declaration
+     * order, and a delegate built above would capture a null.
+     */
+    private val dueController = DraftDueController(
+        scope = viewModelScope,
+        logger = logger,
+        tag = TAG,
+        draft = _draft,
+        limits = { _userLimits.value },
+        countActiveReminders = { repository.countActiveReminders() },
+        onUpgradeClick = { appNavigator.navigateToPaywall(source = PAYWALL_SOURCE_DOCK_REPEAT) },
+        // This screen has no snackbar of its own — every message it produces rides the capture side
+        // effect, which is also what the dock's own confirmations use.
+        onMessage = { resource ->
+            viewModelScope.launch {
+                emitSideEffect(
+                    TodaySideEffect.ShowCaptureMessage(text = getString(resource), actionLabel = null)
+                )
+            }
+        },
+    )
+
+    /** What the capture dock's due rail currently has open. Collected by `CalendarRoute`. */
+    val due: StateFlow<DraftDueUiState> = dueController.state
 
     private val _sideEffect = MutableSharedFlow<TodaySideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<TodaySideEffect> = _sideEffect.asSharedFlow()
@@ -149,6 +222,28 @@ class TodayViewModel(
         }
         .defaultStateIn(TodayScreenState.Loading)
 
+    init {
+        observePremium()
+        // Declared after [_draft] and read by nothing above it — see the property's own note on
+        // initialisation order. Both capture hosts call the SAME helper; see its KDoc.
+        viewModelScope.observeDraftTextForSmartAdd(_draft, smartDateParser)
+    }
+
+    /**
+     * Keeps [_userLimits] fresh for the one quota-gated control the capture dock offers.
+     *
+     * A read failure is LOGGED and leaves the flag at its last value rather than silently pinning the
+     * user to "free": a wrongly locked Repeat sheet is an upsell shown to someone who already paid,
+     * and with no line in the log there is nothing to explain it afterwards.
+     */
+    private fun observePremium() {
+        viewModelScope.launch {
+            getUserLimitsUseCase()
+                .catch { e -> logger.error(TAG, "user limits stream failed: ${e.message}", e) }
+                .collect { limits -> _userLimits.value = limits }
+        }
+    }
+
     override fun onIntent(intent: TodayIntent) {
         when (intent) {
             is TodayIntent.OnReminderClick -> {
@@ -159,7 +254,6 @@ class TodayViewModel(
                     appNavigator.navigateToChecklistDetail(intent.checklistId)
                 }
             }
-            TodayIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
             TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
             is TodayIntent.OnQuickAddTextChanged ->
                 _draft.value = _draft.value.copy(text = intent.text)
@@ -175,6 +269,7 @@ class TodayViewModel(
             )
 
             is TodayIntent.OnCreateChipAction -> applyCreateChip(intent.action)
+            is TodayIntent.OnDue -> dueController.onIntent(intent.due)
 
             // Report first, navigate second — the tap is the fact being measured, and it must be
             // true in the data even if the destination never opens.
@@ -206,9 +301,11 @@ class TodayViewModel(
     /**
      * Applies a capture-dock chip to the draft.
      *
-     * "Pick time…" and "Repeat" are hidden on this tab ([TaskCreateChipsRow] filters them) because
-     * their picker and repeat sheet live on the detail screen; they are still branched here — with a
-     * log, never a silent `else` — since the chip row is shared and a future host may enable them.
+     * Since the due rail shipped, the only chip the dock still routes through here is Important —
+     * the date offers go through `DraftDueIntent`, and "Pick time" / "Repeat" are rows of the
+     * planner panel, whose sheets this tab now hosts itself. The other branches are kept, with a
+     * log, never a silent `else`, because [GistiItemCreateAction] is shared with the detail screen
+     * and an action arriving here unhandled must not vanish quietly.
      */
     private fun applyCreateChip(action: GistiItemCreateAction) {
         when (action) {
@@ -253,6 +350,25 @@ class TodayViewModel(
             return
         }
 
+        // Resolved ONCE, here, and then both written and reported from the same value. Resolved at
+        // SEND rather than at the tap, because a dock left open across 18:00 would otherwise file a
+        // "Tonight" that has already passed.
+        val timeZone = TimeZone.currentSystemDefault()
+        val now = Clock.System.now()
+        val dueOutcome = draft.resolveDueOutcome(now, timeZone)
+        // Same contract as the Inbox tab: keep the capture, but never drop the date silently.
+        if (dueOutcome.pickedTimeExpired) {
+            logger.warning(TAG, "picked due time expired before send — task created without a date")
+            viewModelScope.launch {
+                emitSideEffect(
+                    TodaySideEffect.ShowCaptureMessage(
+                        text = getString(Res.string.inbox_reminder_time_in_past),
+                        actionLabel = null,
+                    ),
+                )
+            }
+        }
+
         viewModelScope.launch {
             runCatching {
                 // The Inbox row may legitimately not exist yet: a user can reach the Calendar tab
@@ -265,9 +381,6 @@ class TodayViewModel(
                     ?: error("No default fill for checklist $inboxId")
 
                 val priority = if (draft.important) 1 else 0
-                // Resolved at Send, not when the chip was tapped: a dock left open across 18:00 would
-                // otherwise write a "Tonight" that has already passed.
-                val reminderAt = draft.resolveReminderAtNow()
                 // Priority on BOTH halves of the pair — the template feeds the edit screen, the fill
                 // feeds every list (rule `checklist-domain`).
                 val templateItem = ChecklistItem(text = text, priority = priority)
@@ -277,17 +390,34 @@ class TodayViewModel(
                     note = null,
                     priority = priority,
                     templateItemId = templateItem.id,
-                ).let { item -> reminderAt?.let(item::withReminderAt) ?: item }
+                ).let { item ->
+                    val rule = dueOutcome.repeatRule
+                    val minutes = dueOutcome.repeatTimeOfDayMinutes
+                    val firstAt = dueOutcome.repeatFirstTriggerAt
+                    if (rule != null && minutes != null && firstAt != null) {
+                        item.withRepeatRule(rule, minutes, firstAt)
+                    } else {
+                        item
+                    }
+                }.let { item -> dueOutcome.reminderAt?.let(item::withReminderAt) ?: item }
                 repository.updateFill(fill.copy(items = fill.items + fillItem))
                 repository.updateChecklistTemplate(checklist.copy(items = checklist.items + templateItem))
-                reminderAt?.let { at ->
+                // Both kinds, because the dock's planner can now stage either. Persisting without
+                // arming the alarm is a bell that never rings.
+                dueOutcome.reminderAt?.let { at ->
                     reminderScheduler.scheduleItemReminder(inboxId, fill.id, fillItem.id, at)
+                }
+                dueOutcome.repeatFirstTriggerAt?.let { at ->
+                    reminderScheduler.scheduleItemRepeat(inboxId, fill.id, fillItem.id, at)
                 }
                 inboxId
             }.onSuccess { inboxId ->
                 // Reset to a FRESH day draft, not an empty one: the next capture on this screen wants
                 // the same default chip, recomputed against the clock as it stands now.
                 _draft.value = dayScreenDraft()
+                // ...and the rail with it: the dock stays open for the next capture, so a planner
+                // left expanded would sit over a fresh draft with the AI source row still hidden.
+                dueController.reset()
                 lastCapturedChecklistId = inboxId
                 // Same event and param shape as `InboxViewModel.addTask`, with this tab's own SOURCE
                 // value: the create-FAB funnel counts `inbox_quick_added`, so a capture made here and
@@ -296,7 +426,22 @@ class TodayViewModel(
                 // is the thing the two v2 capture surfaces have to stay separable on.
                 analytics.event(
                     AnalyticsEvents.Inbox.QUICK_ADDED,
-                    mapOf(AnalyticsParams.SOURCE to SOURCE_CALENDAR),
+                    buildMap {
+                        put(AnalyticsParams.SOURCE, SOURCE_CALENDAR)
+                        // Read off the value that was WRITTEN. Recomputing it here could disagree
+                        // with the write across a minute boundary and report a date the task does
+                        // not carry.
+                        val dueAt = dueOutcome.dueAtMillis
+                        put(AnalyticsParams.HAS_DUE_DATE, (dueAt != null).toString())
+                        put(AnalyticsParams.DATE_INPUT_METHOD, draft.dateInputMethod(dueAt).wire)
+                        // ABSENT rather than a sentinel when there is no date — see the param's KDoc.
+                        dueAt?.let {
+                            put(
+                                AnalyticsParams.DUE_DATE_OFFSET_DAYS,
+                                dueDateOffsetDays(it, now.toEpochMilliseconds(), timeZone).toString(),
+                            )
+                        }
+                    },
                 )
                 emitSideEffect(
                     TodaySideEffect.ShowCaptureMessage(
@@ -487,13 +632,19 @@ class TodayViewModel(
 sealed interface TodayIntent : Intent {
     /** User tapped a reminder row. Navigates to FillDetail (fillId != null) or ChecklistDetail. */
     data class OnReminderClick(val checklistId: Long, val fillId: Long?) : TodayIntent
-    /** User tapped "Create Checklist" in the NoChecklists empty state. */
-    data object OnCreateChecklistClick : TodayIntent
-
     data class OnQuickAddTextChanged(val text: String) : TodayIntent
 
     /** A capture-dock chip was tapped (reminder preset or Important). */
     data class OnCreateChipAction(val action: GistiItemCreateAction) : TodayIntent
+
+    /**
+     * Anything the capture dock's due rail, its planner grid or the v1 reminder sheet behind them
+     * reported.
+     *
+     * One case wrapping the shared vocabulary, exactly as `InboxIntent.OnDue` does: both tabs mount
+     * the same dock, and the rules live once, in [DraftDueController].
+     */
+    data class OnDue(val due: DraftDueIntent) : TodayIntent
 
     /**
      * One of the AI source pills in the capture dock was tapped.

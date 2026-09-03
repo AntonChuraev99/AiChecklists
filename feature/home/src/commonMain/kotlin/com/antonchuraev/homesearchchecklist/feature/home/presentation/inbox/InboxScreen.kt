@@ -7,9 +7,9 @@ import aichecklists.core.designsystem.generated.resources.checklist_delete_messa
 import aichecklists.core.designsystem.generated.resources.checklist_delete_title
 import aichecklists.core.designsystem.generated.resources.checklist_name_placeholder
 import aichecklists.core.designsystem.generated.resources.checklist_rename
-import aichecklists.core.designsystem.generated.resources.checklist_rename_title
+import aichecklists.core.designsystem.generated.resources.inbox_project_rename_title
 import aichecklists.core.designsystem.generated.resources.delete
-import aichecklists.core.designsystem.generated.resources.delete_checklist
+import aichecklists.core.designsystem.generated.resources.inbox_project_delete
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_display_options
@@ -17,7 +17,6 @@ import aichecklists.core.designsystem.generated.resources.inbox_empty_descriptio
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
 import aichecklists.core.designsystem.generated.resources.inbox_error_retry
 import aichecklists.core.designsystem.generated.resources.inbox_list_actions
-import aichecklists.core.designsystem.generated.resources.inbox_menu_open_checklist
 import aichecklists.core.designsystem.generated.resources.inbox_open_project_action
 import aichecklists.core.designsystem.generated.resources.inbox_project_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
@@ -90,6 +89,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -139,12 +139,18 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChrom
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.ImportantStarToggle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
-import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.CollapsibleSourceRow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueSheetHost
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DueRailSection
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.smartAddHighlightRange
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -287,6 +293,37 @@ fun InboxScreen(
         if (createDockOpen && !captureDockRenders) onCreateDockDismiss()
     }
 
+    // The planner belongs to an OPEN dock, and the dock closes through half a dozen paths (BACK, a
+    // tap outside, the shell, the guard above). Collapsing it off the one value all of them resolve
+    // to is what stops the next open from arriving expanded over a fresh draft, with the AI source
+    // row still folded away and no date to justify it.
+    //
+    // On the TRANSITION only, never on arrival. An effect keyed on the flag alone also runs on first
+    // composition — on a screen whose dock is closed, which is the normal case — and reporting a
+    // state change that did not happen is not free: it is an intent per mount, and a host that reads
+    // "the screen raised something" as "the user reached for the dock" would open it. Not
+    // hypothetical: `InboxAddTaskRowTest` is exactly such a host, and this is what it caught.
+    // `rememberSaveable`, matching the Calendar host, which runs the identical effect.
+    //
+    // ⚠️ For CONSISTENCY, not for a reachable bug, and the difference is worth writing down because
+    // the obvious reading is wrong. A plain `remember` really is lost on a configuration change — but
+    // the restore recreates the composition, which relaunches `LaunchedEffect(captureDockRenders)`
+    // with the dock still open, and that re-sets the flag to true before anything can close. The flag
+    // self-heals, so the two spellings are behaviourally identical here (verified by mutation, and
+    // `CaptureDockPlannerCollapseOnCloseTest` passes on both). What the alignment buys is that the two
+    // capture hosts stop disagreeing about a flag that carries the same meaning in both — the kind of
+    // difference that reads as a deliberate distinction and is not one. It costs one Boolean in the
+    // saved-state bundle.
+    var dockWasOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(captureDockRenders) {
+        if (captureDockRenders) {
+            dockWasOpen = true
+        } else if (dockWasOpen) {
+            dockWasOpen = false
+            onIntent(InboxIntent.OnDue(DraftDueIntent.OnPlannerCollapse))
+        }
+    }
+
     // Whether the trailing add-task row is composed at all. Two independent reasons to withhold it,
     // and both are decided here rather than inside the list, which knows neither:
     //
@@ -304,6 +341,18 @@ fun InboxScreen(
     // shell never composes it.
     val showAddTaskRow = !createDockOpen &&
         rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
+
+    // The in-list "any content -> checklist" block, under the same rule as the row above it: the
+    // capture dock hosts the SAME four pills under its own heading, so while the dock is up both
+    // were on screen at once — EIGHT identical pills under two different phrasings of one promise,
+    // in the state (an almost-empty Inbox) that is exactly a new user (UI audit, 2026-08-19). The
+    // list's copy is the one that stands down, not the dock's: under the dismiss overlay it is a
+    // control that cannot be tapped anyway, while the dock's copy is the tab's only live route into
+    // Analyze during a capture — and content -> checklist is half of all checklist creation here.
+    //
+    // Not gated on window size, unlike the add-task row: the duplication is caused by the dock
+    // being open, and that is true at every width the dock is mounted at.
+    val showAiSourceRow = !createDockOpen
 
     // The toolbar names the page the pager is on — this is what replaced the tab row. Read from the
     // ViewModel's settled index rather than from the pager, because the bar lives OUTSIDE the pager's
@@ -413,6 +462,12 @@ fun InboxScreen(
                         onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
                         onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
                         placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
+                        // Smart-Add made visible IN the sentence, not only in the leading chip: the
+                        // recognised phrase is tinted where the user typed it, so "which words did
+                        // it read as a date" has an answer without tapping anything. The extension
+                        // is what guarantees the offsets belong to THIS string — see its KDoc; both
+                        // capture hosts derive it exactly this way and neither computes offsets.
+                        highlightRange = content.draft.smartAddHighlightRange(),
                         // The THIRD tile of the scrim, and the one that is easy to forget because
                         // nothing about it is dim: it is painted BEHIND an opaque dock, so the only
                         // pixels it ever reaches are the two the dock's `SheetTop` clips away. Those
@@ -431,20 +486,39 @@ fun InboxScreen(
                         modifier = Modifier
                             .onGloballyPositioned { dockTopPx.floatValue = it.positionInRoot().y }
                             .background(captureScrimColor),
-                        // The same chip row the checklist detail screen has always had. Until now
-                        // this dock was a bare text field, so a capture made on the home tab could
-                        // carry no reminder and no priority — the surface the user reaches FIRST
-                        // was the weakest.
+                        // The due rail, replacing the chip row this dock carried until now.
                         //
-                        // Pick-time and Repeat stay off: both open sheets that only the detail
-                        // screen hosts, and a chip that swallows its tap is worse than an absent
-                        // one.
+                        // Pick time and Repeat are no longer switched OFF: they moved into the rail's
+                        // planner panel, and the sheets behind them are mounted by THIS screen
+                        // ([DraftDueSheetHost], below the scaffold) rather than only by the detail
+                        // screen. The flags existed so a chip could not swallow its tap; the host now
+                        // exists, so the reason is gone.
+                        //
+                        // The Smart-Add token preview goes with the old row on purpose — the leading
+                        // chip is now the single answer to "when" and shows the parsed phrase itself.
                         aboveInput = {
-                            TaskCreateChipsRow(
+                            DueRailSection(
                                 draft = content.draft,
-                                onAction = { onIntent(InboxIntent.OnCreateChipAction(it)) },
-                                showPickTime = false,
-                                showRepeat = false,
+                                due = content.due,
+                                onIntent = { onIntent(InboxIntent.OnDue(it)) },
+                                // The tab's own ticking clock, so the rail cannot disagree with the
+                                // list behind it about whether a time has passed — and so a
+                                // screenshot can pin it.
+                                nowMillis = content.nowMillis,
+                            )
+                        },
+                        // Important, in the input row beside the "+" since 2026-09-03 — it used to be
+                        // pinned right of the due rail, where it read as a second primary action and
+                        // folded away with the offers whenever the planner was open. Same intent,
+                        // same draft flag; only the seat changed. See `ImportantStarToggle`.
+                        trailingToggle = {
+                            ImportantStarToggle(
+                                selected = content.draft.important,
+                                onClick = {
+                                    onIntent(
+                                        InboxIntent.OnCreateChipAction(GistiItemCreateAction.IMPORTANT)
+                                    )
+                                },
                             )
                         },
                         // The main entry into Analyze. Inside the dock rather than behind the "+"
@@ -463,17 +537,27 @@ fun InboxScreen(
                         // row is the ALTERNATIVE to a task already being typed, so the copy has to
                         // say "or".
                         belowInput = {
-                            SourceRowSection(
-                                title = stringResource(Res.string.capture_dock_ai_entry_title),
-                                onSelect = { kind ->
-                                    onIntent(
-                                        InboxIntent.OnAiSourceTapped(
-                                            kind = kind,
-                                            source = AiEntrySource.CAPTURE_DOCK_INBOX,
+                            // Folded away while the planner is open, and folded BACK when it closes.
+                            //
+                            // Not decoration: measured on a 320dp window at fontScale 1.3 in RU, the
+                            // expanded panel and this row together overrun the window and the "Link"
+                            // and "Voice" pills are cut off by its edge — with `ime = 0`, i.e. before
+                            // a real keyboard takes its ~250dp. Animated rather than swapped, because
+                            // a row that vanishes on an unrelated tap reads as a feature that was
+                            // removed; this project has shipped that report before.
+                            CollapsibleSourceRow(collapsed = content.due.plannerExpanded) {
+                                SourceRowSection(
+                                    title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                    onSelect = { kind ->
+                                        onIntent(
+                                            InboxIntent.OnAiSourceTapped(
+                                                kind = kind,
+                                                source = AiEntrySource.CAPTURE_DOCK_INBOX,
+                                            )
                                         )
-                                    )
-                                },
-                            )
+                                    },
+                                )
+                            }
                         },
                     )
                 }
@@ -511,6 +595,7 @@ fun InboxScreen(
                         // that would strand the list above a gap the size of chrome that is not on screen.
                         contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
                         showAddTaskRow = showAddTaskRow,
+                        showAiSourceRow = showAiSourceRow,
                         onIntent = onIntent,
                         homeSignal = homeSignal,
                         anchorChecklistId = anchorChecklistId,
@@ -579,6 +664,20 @@ fun InboxScreen(
     if (content != null) {
         val page = content.pages.getOrNull(content.selectedPage)
         InboxItemSheetHost(content = content, onIntent = onIntent)
+
+        // The v1 reminder sheet and date picker, scoped to the DRAFT rather than to a stored row —
+        // the three exits of the capture dock's planner panel.
+        //
+        // Mounted here, at the screen's level, and never inside the dock: `QuickCaptureDock` lives in
+        // `core:designsystem`, which sits UNDER `feature:checklist` in the module graph and cannot
+        // name `ReminderSheet` at all. Beside `InboxItemSheetHost` rather than inside it, because
+        // that host returns early when no task row is open — which is exactly the state the capture
+        // dock is used in.
+        DraftDueSheetHost(
+            draft = content.draft,
+            due = content.due,
+            onIntent = { onIntent(InboxIntent.OnDue(it)) },
+        )
 
         content.renameDraft?.let { draft ->
             RenameChecklistDialog(
@@ -867,7 +966,7 @@ private fun InboxToolbarActions(
                 onDismissRequest = { onIntent(InboxIntent.OnListMenuDismiss) },
             ) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.inbox_menu_open_checklist)) },
+                    text = { Text(stringResource(Res.string.inbox_open_project_action)) },
                     leadingIcon = {
                         Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
                     },
@@ -883,7 +982,7 @@ private fun InboxToolbarActions(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = stringResource(Res.string.delete_checklist),
+                            text = stringResource(Res.string.inbox_project_delete),
                             color = MaterialTheme.colorScheme.error,
                         )
                     },
@@ -914,7 +1013,7 @@ private fun RenameChecklistDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.checklist_rename_title)) },
+        title = { Text(stringResource(Res.string.inbox_project_rename_title)) },
         text = {
             AppTextField(
                 value = draft,
@@ -974,6 +1073,7 @@ private fun InboxContent(
     layout: InboxLayout,
     contentBottomPadding: Dp,
     showAddTaskRow: Boolean,
+    showAiSourceRow: Boolean,
     onIntent: (InboxIntent) -> Unit,
     homeSignal: Int = 0,
     anchorChecklistId: Long? = null,
@@ -1106,6 +1206,7 @@ private fun InboxContent(
                         sheetOpen = content.sheetForTaskId != null,
                         contentBottomPadding = contentBottomPadding,
                         showAddTaskRow = showAddTaskRow,
+                        showAiSourceRow = showAiSourceRow,
                         planNudgeSuppressed = content.planNudgeDismissed,
                         onPlanDayClick = onPlanDayClick,
                         onIntent = onIntent,
@@ -1130,6 +1231,9 @@ private fun InboxContent(
  * and inlined it sat eight levels deep, where the horizontal inset below could not be read against
  * the list it applies to.
  *
+ * @param showAiSourceRow whether the trailing "any content -> checklist" block is composed. Decided
+ *   by [InboxScreen] for the same reason as [showAddTaskRow] and never here — the capture dock hosts
+ *   the same four pills, and both on screen at once is eight identical pills under two headings.
  * @param showAddTaskRow whether the trailing add-task row is composed. Decided by [InboxScreen] (see
  *   its `showAddTaskRow`), never here: the reasons are the window size and the host's dock flag, and
  *   neither is this composable's business.
@@ -1143,6 +1247,7 @@ private fun InboxPageList(
     sheetOpen: Boolean,
     contentBottomPadding: Dp,
     showAddTaskRow: Boolean,
+    showAiSourceRow: Boolean,
     planNudgeSuppressed: Boolean,
     onPlanDayClick: (() -> Unit)?,
     onIntent: (InboxIntent) -> Unit,
@@ -1406,7 +1511,7 @@ private fun InboxPageList(
             // the owner already reviewed on device. The AI block therefore sits below it as a
             // clearly separate offer — still inside the first viewport, which is what the sparse
             // gate guarantees.
-            if (page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
+            if (showAiSourceRow && page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
                 item(key = "ai_source_row") {
                     // The heading carries the promise; the pills carry the doors. Without it four
                     // bare pills read as "attach something to a task", which is a different (and
@@ -1828,7 +1933,9 @@ private fun InboxPagerDots(
         state = dotsState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(InboxDotsRowHeight),
+            // heightIn, never height: a pinned max would cap the 48dp dot targets inside it back to
+            // the row's own number, which is the exact shape that produced the sub-48dp target.
+            .heightIn(min = InboxDotsRowHeight),
         // A lazy list applies its arrangement only while the whole run fits, so this centres a short
         // run and a long one simply packs from the start and scrolls.
         horizontalArrangement = Arrangement.Center,
@@ -1873,8 +1980,20 @@ private fun InboxPagerDots(
     }
 }
 
-private val InboxDotsRowHeight = 32.dp
-private val InboxDotTouchTarget = 32.dp
+/**
+ * Minimum height of the dots row. `heightIn`, applied by the caller — never a fixed `height`, which
+ * pins min AND max and would silently cap the 48dp targets inside it.
+ */
+private val InboxDotsRowHeight = AppDimens.MinTouchTarget
+
+/**
+ * Tap target of ONE dot. The full [AppDimens.MinTouchTarget], not the 32dp this shipped with: these
+ * dots carry `Role.Tab` and `selected`, so they are real controls — and they are the only way to
+ * switch the project a capture lands in. A sub-48dp target is the a11y defect this codebase has
+ * already fixed once on the 38dp preset chips (UI audit, 2026-08-19). The row scrolls, so the extra
+ * width costs nothing; the ripple stays suppressed for the same reason as before.
+ */
+private val InboxDotTouchTarget = AppDimens.MinTouchTarget
 private val InboxDotSize = 6.dp
 private val InboxDotSizeSelected = 8.dp
 

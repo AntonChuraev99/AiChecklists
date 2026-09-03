@@ -214,6 +214,15 @@ fun QuickCaptureDock(
     placeholder: String,
     modifier: Modifier = Modifier,
     /**
+     * Character range of [text] to tint — the phrase Smart-Add recognised in what the user typed.
+     *
+     * A plain range and not the parse result itself, for the same reason the two slots below are
+     * slots: the token is a feature-layer domain type with no business in the design system. It is
+     * also the ONLY shape that lets both hosts stay identical here — the Inbox tab and the
+     * Calendar tab each derive it from their own draft with the same extension.
+     */
+    highlightRange: IntRange? = null,
+    /**
      * Content rendered between the top hairline and the input — in practice the task-create chip row
      * (reminder presets, Important, Repeat).
      *
@@ -247,6 +256,17 @@ fun QuickCaptureDock(
      * the dock is up, which either slot satisfies.
      */
     belowInput: (@Composable () -> Unit)? = null,
+    /**
+     * A toggle rendered INSIDE the input row, in the field's trailing slot immediately before the
+     * "+" — in practice [ImportantStarToggle], carrying the draft's `important` flag.
+     *
+     * A slot for the same reason [aboveInput] is one: the flag belongs to a feature-layer draft. It
+     * is a parameter of the DOCK rather than something the host puts in [aboveInput], because the
+     * arrangement it joins — one container, one trailing edge, two actions on the thing they act on —
+     * is this dock's, and a host that assembled it itself would drift between the two capture tabs.
+     * That drift is exactly what this shared component exists to prevent.
+     */
+    trailingToggle: (@Composable () -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -315,7 +335,9 @@ fun QuickCaptureDock(
                     onTextChange = onTextChange,
                     onAdd = onAdd,
                     placeholder = placeholder,
+                    highlightRange = highlightRange,
                     focusRequester = focusRequester,
+                    trailingToggle = trailingToggle,
                     modifier = Modifier
                         .adaptiveContentWidth()
                         .padding(

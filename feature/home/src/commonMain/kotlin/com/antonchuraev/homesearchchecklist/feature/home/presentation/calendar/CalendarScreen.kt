@@ -80,11 +80,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.calendar_empty_cta
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.capture_dock_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.calendar_empty_description
+import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import aichecklists.core.designsystem.generated.resources.calendar_empty_title
 import aichecklists.core.designsystem.generated.resources.calendar_error_retry
 import aichecklists.core.designsystem.generated.resources.calendar_error_title
@@ -103,6 +103,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChromeScrim
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.ImportantStarToggle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
@@ -110,8 +111,13 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSec
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
-import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskCreateChipsRow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.CollapsibleSourceRow
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueIntent
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueSheetHost
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DraftDueUiState
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.DueRailSection
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.smartAddHighlightRange
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsToolbarAction
@@ -169,7 +175,6 @@ fun CalendarScreen(
     calendarState: CalendarState,
     drawerState: DrawerState?,
     onTodayReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
-    onTodayCreateChecklistClick: () -> Unit,
     onTodayRetry: () -> Unit,
     onCalendarIntent: (CalendarIntent) -> Unit,
     /**
@@ -190,6 +195,17 @@ fun CalendarScreen(
      * drawn above this screen and must hide while it is up.
      */
     draft: TaskDraft = TaskDraft(),
+    /**
+     * The capture dock's due rail: whether its planner grid is open, and which v1 reminder surface is
+     * up over it.
+     *
+     * Threaded as a parameter rather than read off [todayState], for the same reason [draft] is: this
+     * screen is stateless and is also mounted by the A/B control arm, by previews and by screenshot
+     * tests, none of which have a ViewModel. The default is "nothing open", so every existing caller
+     * renders exactly as before.
+     */
+    due: DraftDueUiState = DraftDueUiState(),
+    onDueIntent: (DraftDueIntent) -> Unit = {},
     onCreateChipAction: (GistiItemCreateAction) -> Unit = {},
     captureDockOpen: Boolean = false,
     /**
@@ -331,6 +347,23 @@ fun CalendarScreen(
     // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
     PlatformBackHandler(enabled = captureVisible) { onCaptureDockDismiss() }
 
+    // The planner belongs to an OPEN dock, and the dock closes through several paths (BACK, a tap on
+    // the pager, the shell). Collapsing it off the one value all of them resolve to is what stops the
+    // next open from arriving expanded over a fresh draft with the AI source row still folded away.
+    //
+    // On the TRANSITION only, never on arrival — the Inbox host explains why at length: an effect
+    // keyed on the flag alone reports a state change that did not happen, once per mount, on every
+    // screen whose dock is closed.
+    var dockWasOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(captureVisible) {
+        if (captureVisible) {
+            dockWasOpen = true
+        } else if (dockWasOpen) {
+            dockWasOpen = false
+            onDueIntent(DraftDueIntent.OnPlannerCollapse)
+        }
+    }
+
     // Root box so the scrim below can be a SIBLING of the whole scaffold: as a child of the content
     // slot it dimmed the pager alone and left the toolbar and the tab row bright.
     Box(modifier = Modifier.fillMaxSize()) {
@@ -369,6 +402,10 @@ fun CalendarScreen(
                         onTextChange = onQuickAddTextChange,
                         onAdd = onQuickAddSubmit,
                         placeholder = stringResource(Res.string.today_quick_add_placeholder),
+                        // Identical to the Inbox tab's, down to the extension: the two docks are one
+                        // surface, and a highlight that appeared on one tab and not the other would
+                        // read as the parser working only sometimes.
+                        highlightRange = draft.smartAddHighlightRange(),
                         // Behind the dock, not over it: the only pixels this reaches are the two
                         // corners `SheetTop` clips away, which otherwise show the raw page against
                         // the dimmed page beside them (measured ΔL* +41 in light). The content scrim
@@ -380,20 +417,30 @@ fun CalendarScreen(
                         modifier = Modifier
                             .onGloballyPositioned { dockTopPx.floatValue = it.positionInRoot().y }
                             .background(captureScrimColor),
-                        // This tab draws the day's reminders, so its draft arrives with one chip
-                        // already selected ("Tonight", or "In 1 hour" once the evening has
-                        // started) — that chip is what keeps a task captured here visible on the
-                        // screen that captured it.
+                        // The due rail, the same one the Inbox tab mounts. This tab draws the day's
+                        // reminders, so its draft still arrives with a preset already applied
+                        // ("Tonight", or "In 1 hour" once the evening has started) — the rail shows
+                        // it in the leading chip and drops it from the offers, so the answer appears
+                        // exactly once.
                         //
-                        // Pick-time and Repeat stay off: their picker and repeat sheet live on the
-                        // detail screen, and a chip that swallows its tap is worse than an absent
-                        // one.
+                        // Pick time and Repeat are no longer switched OFF: they live in the rail's
+                        // planner panel now, and THIS screen mounts the sheets behind them
+                        // ([DraftDueSheetHost], below the scaffold). The flags existed only because
+                        // no host outside the detail screen had them.
                         aboveInput = {
-                            TaskCreateChipsRow(
+                            DueRailSection(
                                 draft = draft,
-                                onAction = onCreateChipAction,
-                                showPickTime = false,
-                                showRepeat = false,
+                                due = due,
+                                onIntent = onDueIntent,
+                            )
+                        },
+                        // The same toggle the Inbox dock mounts, in the same seat — the two capture
+                        // tabs are one surface and an Important that lives in two places would be
+                        // exactly the drift this shared dock exists to prevent.
+                        trailingToggle = {
+                            ImportantStarToggle(
+                                selected = draft.important,
+                                onClick = { onCreateChipAction(GistiItemCreateAction.IMPORTANT) },
                             )
                         },
                         // Same four doors as the Inbox tab, from the same shared component — the
@@ -404,10 +451,16 @@ fun CalendarScreen(
                         // under a task field read as "attach one of these to this task" rather than as
                         // "or build me a checklist out of this" (owner report, 2026-08-17).
                         belowInput = {
-                            SourceRowSection(
-                                title = stringResource(Res.string.capture_dock_ai_entry_title),
-                                onSelect = onAiSourceTapped,
-                            )
+                            // Folded away while the planner is open and folded BACK when it closes —
+                            // see [CollapsibleSourceRow]. The two docks must behave identically here:
+                            // a row that stays put on one tab and vanishes on the other is the drift
+                            // this shared component exists to prevent.
+                            CollapsibleSourceRow(collapsed = due.plannerExpanded) {
+                                SourceRowSection(
+                                    title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                    onSelect = onAiSourceTapped,
+                                )
+                            }
                         },
                     )
                 }
@@ -497,7 +550,6 @@ fun CalendarScreen(
                         0 -> TodayBody(
                             state = todayState,
                             onReminderClick = onTodayReminderClick,
-                            onCreateChecklistClick = onTodayCreateChecklistClick,
                             onRetry = onTodayRetry,
                             contentBottomPadding = bodyBottomPadding,
                             canCapture = captureEnabled,
@@ -518,6 +570,13 @@ fun CalendarScreen(
                             state = calendarState,
                             onIntent = onCalendarIntent,
                             contentBottomPadding = bodyBottomPadding,
+                            // The SAME callback, on the SAME gate, as the Today page above — this
+                            // page's placeholder button and the pinned row are one action, so it
+                            // must fall silent for the same three reasons the row does (control arm,
+                            // dock already up, rail/drawer width where the shell keeps its own "+").
+                            // The body then narrows it further to the states
+                            // `CalendarState.hostsAddTaskAction()` names.
+                            onAddTaskClick = if (captureRowVisible) onAddTaskRowClick else null,
                         )
                     }
                 }
@@ -545,19 +604,29 @@ fun CalendarScreen(
                 // and to any UI test matching the label — so the row stands down for exactly those
                 // states, from exactly that predicate.
                 //
-                // Scoped to the page the pager has SETTLED on, not to "either page is empty": page 1
-                // (the agenda) keeps its own "Create Checklist" CTA, which is a different action, so
-                // hiding the row there would delete this tab's only capture route on Compact. The read
-                // happens HERE rather than in the screen body on purpose — the body does not read
-                // `currentPage` at all, and hoisting it there would invalidate the whole screen (top
-                // bar, actions, dock) on every page settle. This Column already reads it for
+                // Scoped to the page the pager has SETTLED on, not to "either page is empty": each page
+                // answers for ITSELF, and the page not on screen must not withhold the row from the one
+                // that is. Page 1 used to be exempt from this gate entirely — its placeholder carried a
+                // "Create Checklist" CTA, a genuinely different action — but since 2026-08-19 it raises
+                // the same capture dock under the same label, so an exemption there would put two
+                // controls named "Add task" on one screen. Both pages therefore read the SAME shape:
+                // "does the visible page host the action inside its own placeholder", each from its own
+                // side's shared predicate.
+                //
+                // The read happens HERE rather than in the screen body on purpose — the body does not
+                // read `currentPage` at all, and hoisting it there would invalidate the whole screen
+                // (top bar, actions, dock) on every page settle. This Column already reads it for
                 // `PrimaryTabRow`, so nothing new is subscribed.
                 //
-                // ⚠️ Mid-swipe the pager composes BOTH pages, so for the duration of a drag an empty
-                // page 0 can show its button while the row re-appears for page 1. `currentPage` flips
-                // at the 50% mark, so the overlap is transient and inside a gesture; the settled states
-                // — the only ones a screenshot or a test observes — always hold exactly one control.
-                val pageHostsAddTask = pagerState.currentPage == 0 && todayState.hostsAddTaskAction()
+                // ⚠️ Mid-swipe the pager composes BOTH pages, so for the duration of a drag the page
+                // being dragged in can show its button while the row is still drawn for the page being
+                // dragged out. `currentPage` flips at the 50% mark, so the overlap is transient and
+                // inside a gesture; the settled states — the only ones a screenshot or a test observes
+                // — always hold exactly one control.
+                val pageHostsAddTask = when (pagerState.currentPage) {
+                    0 -> todayState.hostsAddTaskAction()
+                    else -> calendarState.hostsAddTaskAction()
+                }
                 if (captureRowVisible && !pageHostsAddTask) {
                     AddTaskRow(
                         onClick = onAddTaskRowClick,
@@ -598,15 +667,33 @@ fun CalendarScreen(
             dockTopPx = { dockTopPx.floatValue },
         )
     }
+
+    // The v1 reminder sheet and date picker for the DRAFT — the three exits of the dock's planner.
+    //
+    // Outside the root Box, like every other modal on this screen would be: a `ModalBottomSheet`
+    // renders in its own window, so its position in the tree decides nothing visually, but keeping it
+    // out of the scrimmed subtree keeps the scrim's arithmetic (three tiles, one ceiling) untouched.
+    DraftDueSheetHost(draft = draft, due = due, onIntent = onDueIntent)
 }
 
-/** Calendar tab body (was the body of the standalone CalendarScreen). */
+/**
+ * Calendar tab body (was the body of the standalone CalendarScreen).
+ *
+ * @param onAddTaskClick the HOST's capture-dock callback, or null where the host offers no capture.
+ *   Gated HERE by [hostsAddTaskAction] rather than at the call site, exactly as `TodayBody` gates its
+ *   twin: ONE nullable callback, derived once from the same predicate the host reads to withhold its
+ *   pinned row, so "the button is here" and "the row is not there" stay consistent by construction
+ *   and cannot drift into a page carrying two "Add task" controls or none at all.
+ */
 @Composable
 private fun CalendarTabBody(
     state: CalendarState,
     onIntent: (CalendarIntent) -> Unit,
     contentBottomPadding: Dp = 0.dp,
+    onAddTaskClick: (() -> Unit)? = null,
 ) {
+    val onAddTask: (() -> Unit)? = onAddTaskClick?.takeIf { state.hostsAddTaskAction() }
+
     when (state) {
         CalendarState.Loading -> CalendarLoadingContent()
         is CalendarState.Content -> CalendarContent(
@@ -614,7 +701,7 @@ private fun CalendarTabBody(
             onIntent = onIntent,
             contentBottomPadding = contentBottomPadding,
         )
-        CalendarState.Empty -> CalendarEmptyState(onIntent = onIntent)
+        CalendarState.Empty -> CalendarEmptyState(onAddTaskClick = onAddTask)
         is CalendarState.Error -> CalendarErrorState(state = state, onIntent = onIntent)
     }
 }
@@ -948,7 +1035,12 @@ private fun CalendarReminderRow(
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                    // TWO lines, matching the Today row this agenda sits beside in the same tab —
+                    // see `TodayReminderRow` for the reasoning. Short version: this is the task's
+                    // NAME, the only thing identifying the row, while the supporting line under it
+                    // means nothing alone and still gets a full line; RU copy plus fontScale 1.3
+                    // truncated the name mid-word at one line. The row has no fixed height.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1292,23 +1384,37 @@ private fun formatShortDate(date: LocalDate): String {
 // Empty state
 // ---------------------------------------------------------------------------
 
+/**
+ * @param onAddTaskClick raises the HOST's capture dock — the same callback the pinned add-task row
+ *   fires, deliberately, so this button routes through `TodayIntent.OnAddTaskRowClick` and keeps the
+ *   `source = "inline_row"` analytics. A second entry point with its own wiring would silently split
+ *   that funnel.
+ *
+ *   Null renders NO action, and that is the correct rendering for every host without a capture
+ *   affordance — the A/B control arm, rail and permanent-drawer widths (where the shell keeps its own
+ *   "+"), and a dock that is already up. This CTA used to navigate to Templates instead; it was the
+ *   one control left on this tab still speaking of checklists on a surface that is otherwise entirely
+ *   about tasks, and the tap behind it navigated TWICE (the ViewModel pushed Templates while the host
+ *   pushed CreateChecklist on the same click).
+ */
 @Composable
 private fun CalendarEmptyState(
-    onIntent: (CalendarIntent) -> Unit,
+    onAddTaskClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     EmptyState(
         icon = Icons.Outlined.CalendarMonth,
         title = stringResource(Res.string.calendar_empty_title),
         description = stringResource(Res.string.calendar_empty_description),
+        // The same words as the pinned row and as the Today page's button, because it is the same
+        // The pinned row's OWN id, not a calendar-local twin of it. Two ids holding the same words
+        // is a translation-drift risk with nothing enforcing it: a translator touching one would
+        // split what has to stay a single accessible name, and the "exactly one control named Add
+        // task" rule this page is gated by would fail somewhere far from the edit. One id cannot
+        // drift from itself. (`calendar_empty_cta` was deleted with this change.)
+        actionLabel = stringResource(Res.string.inbox_add_task_row),
+        onAction = onAddTaskClick,
         modifier = modifier,
-        action = {
-            AppButton(
-                text = stringResource(Res.string.calendar_empty_cta),
-                onClick = { onIntent(CalendarIntent.OnCreateChecklistClick) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
     )
 }
 
