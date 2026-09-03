@@ -733,6 +733,7 @@ class ChatViewModel(
         is AgentStepResult.ToolCalls -> modelVariant
         is AgentStepResult.Final -> modelVariant
         is AgentStepResult.Options -> modelVariant
+        is AgentStepResult.InvalidRequest,
         AgentStepResult.InsufficientCredits,
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
@@ -744,6 +745,7 @@ class ChatViewModel(
         is AgentStepResult.ToolCalls -> modelId
         is AgentStepResult.Final -> modelId
         is AgentStepResult.Options -> modelId
+        is AgentStepResult.InvalidRequest,
         AgentStepResult.InsufficientCredits,
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
@@ -755,6 +757,7 @@ class ChatViewModel(
         is AgentStepResult.ToolCalls -> aiFlow
         is AgentStepResult.Final -> aiFlow
         is AgentStepResult.Options -> aiFlow
+        is AgentStepResult.InvalidRequest,
         AgentStepResult.InsufficientCredits,
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
@@ -2902,6 +2905,44 @@ class ChatViewModel(
                     _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_service", retryText = userInput, routedLayer = RoutingLayer.FullChat))
                     return
                 }
+
+                // The server ANSWERED and refused the payload (400) — the opposite situation from
+                // the branch above, and it needs the opposite reply. Three things follow:
+                //
+                //  - The copy names the cause the user can act on. Sharing chat_error_service
+                //    told them the service was down while it was in fact working, and pointed the
+                //    one person who could fix the input away from the input.
+                //  - NO retryText. A 400 is deterministic: the Retry chip re-sends the identical
+                //    rejected payload for the identical refusal. Removing it here is not dropping
+                //    an affordance, it is dropping a button whose only outcome was this same
+                //    bubble again; the actionable move ("send a shorter one") is in the copy.
+                //  - credits_used = 0. The server validates BEFORE reserving, so the wallet was
+                //    untouched; pricing it off the layer would bill Layer 3's flat 3 for a turn
+                //    that cost nothing — the same disagreement between chat history and wallet
+                //    that [OUTCOME_INSUFFICIENT_CREDITS] was split out to end.
+                //
+                // error (not warning): a 400 the client provoked is a client-shape defect for
+                // every cause except the size cap, so it belongs in Crashlytics with its reason.
+                is AgentStepResult.InvalidRequest -> {
+                    // Throwable is what makes this reach Crashlytics — recordException fires only
+                    // on a non-null one, so the sentence above ("belongs in Crashlytics with its
+                    // reason") is only true with it.
+                    val rejectionReason = stepResult.reason ?: "no reason in body"
+                    logger.error(
+                        TAG,
+                        "runAgentTurn: server rejected the turn (400) — $rejectionReason",
+                        IllegalStateException("chat_agent 400: $rejectionReason"),
+                    )
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = OUTCOME_INPUT_REJECTED, creditsUsed = 0)
+                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                    _sideEffect.emit(
+                        ChatScreenSideEffect.ShowAssistantMessage(
+                            messageKey = "chat_error_message_too_long",
+                            routedLayer = RoutingLayer.FullChat,
+                        )
+                    )
+                    return
+                }
             }
         }
 
@@ -3892,6 +3933,18 @@ class ChatViewModel(
          * the success bucket.
          */
         const val OUTCOME_INSUFFICIENT_CREDITS = "insufficient_credits"
+
+        /**
+         * `outcome` for a turn the server REFUSED as malformed or oversized (HTTP 400).
+         *
+         * Its own bucket for the same reason as the one above: folded into "error" it sits beside
+         * genuine outages, and the difference is what a reader needs — an outage is the server's
+         * problem and passes, a rejection is the payload's and repeats until the client or the
+         * user changes something. The 2026-08-18 healthcheck could only find these turns by
+         * eyeballing HTTP `requestSize` in the Cloud Function logs; this dimension is what makes
+         * them countable from the client side.
+         */
+        const val OUTCOME_INPUT_REJECTED = "input_rejected"
         // Stable chip ids for the AiChoiceResponse block.
         const val CHOICE_EXECUTE = "execute"
         const val CHOICE_EXECUTE_ALL = "execute_all"

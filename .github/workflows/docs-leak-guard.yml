@@ -1,0 +1,74 @@
+# Leak gate for tracked documentation.
+#
+# WHY THIS EXISTS: `docs/` stopped being gitignored on 2026-08-18 so that a task's
+# documentation can ride in the same MR as its code. That trade only holds if publishing a doc
+# stays a decision somebody checks: this repository is public, a push is instantly world-visible
+# and indexed, and there is no undo. The .gitignore whitelist decides WHICH directories may be
+# published; this job decides whether what is in them may be.
+#
+# It runs in CI and not only as a pre-commit hook on purpose. The hook lives in .git/hooks,
+# which is not versioned, is absent on a fresh clone, is overwritten whenever review-rules
+# reinstalls itself, and is skipped by `--no-verify`. A gate that a clean checkout does not have
+# is not a gate. This job is the one that actually blocks the merge.
+#
+# Runs on every PR touching a doc, and on master pushes, with no credentials and no network.
+
+name: docs-leak-guard
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.claude/**'
+      - 'CLAUDE.md'
+      - 'scripts/docs_leak_scan.py'
+      - 'scripts/test_docs_leak_scan.py'
+      - '.github/workflows/docs-leak-guard.yml'
+      - '.gitignore'
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - '.claude/**'
+      - 'CLAUDE.md'
+      - 'scripts/docs_leak_scan.py'
+      - 'scripts/test_docs_leak_scan.py'
+      - '.gitignore'
+
+jobs:
+  no-business-numbers-in-public-docs:
+    name: tracked docs carry no sales, analytics or account numbers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: pip install pytest
+
+      # The scanner is a pile of regexes, and a regex that stops matching fails SILENTLY — the
+      # scan goes green and reads exactly like "nothing to hide". The tests pin every pattern to
+      # a line pulled out of this repo's own docs, so a well-meaning edit cannot quietly disarm
+      # the gate. They run FIRST: a broken scanner must not be allowed to bless the corpus.
+      - name: Scanner self-test
+        run: python -m pytest scripts/test_docs_leak_scan.py -q
+
+      # Scans EVERY tracked Markdown file, not just docs/ and not just the diff.
+      #  - not just the diff: a doc that was clean when it landed can be made dirty by a later
+      #    edit touching no other file, and a diff-scoped scan would miss the day somebody
+      #    pastes a metrics table into an existing solution doc;
+      #  - not just docs/: the same policy change first published `.claude/rules/*.md` and put
+      #    reviewed-markers into CLAUDE.md, so those files are in scope by construction — a
+      #    scan that skips them leaves the newly-opened area guarded only by the local hook,
+      #    which this file's own header explains is not a gate.
+      # Scoped to the area this policy governs, not the whole repo: files that predate it
+      # (mcp-server/README.md, module READMEs) carry findings of their own and would make this
+      # job red on arrival — a check people learn to ignore protects nothing. Widening the scope
+      # is a separate cleanup, tracked in docs/todos/.
+      # -z + xargs -0 because an unquoted $(git ls-files) word-splits on spaces and the halves
+      # are then dropped in silence.
+      - name: Scan tracked markdown in the governed area
+        run: git ls-files -z 'docs/**/*.md' 'docs/*.md' '.claude/**/*.md' 'CLAUDE.md' | xargs -0 python scripts/docs_leak_scan.py

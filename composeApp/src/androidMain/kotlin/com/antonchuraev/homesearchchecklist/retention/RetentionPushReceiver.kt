@@ -150,7 +150,9 @@ class RetentionPushReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 // Fire-side signal (warm path) — emitted before any gate so the funnel is complete.
-                runCatching { deps.analytics.event(AnalyticsEvents.Retention.COMEBACK_FIRED) }
+                // Out-of-session throughout this receiver: an AlarmManager broadcast wakes the
+                // process with no Activity, so a plain event would mint a phantom session_start.
+                runCatching { deps.analytics.eventOutOfSession(AnalyticsEvents.Retention.COMEBACK_FIRED) }
                     .onFailure { deps.logger.warning(TAG, "comeback fired-event emit failed: ${it.message}") }
 
                 val force = AppBuildConfig.isDebug && intent.getBooleanExtra(EXTRA_COMEBACK_FORCE, false)
@@ -239,7 +241,7 @@ class RetentionPushReceiver : BroadcastReceiver() {
     private fun emitSkipped(deps: Deps, reason: String) {
         deps.logger.debug(TAG, "comeback: skipped — reason=$reason")
         runCatching {
-            deps.analytics.event(
+            deps.analytics.eventOutOfSession(
                 AnalyticsEvents.Retention.COMEBACK_SKIPPED,
                 mapOf(AnalyticsParams.REASON to reason),
             )
@@ -390,7 +392,7 @@ class RetentionPushReceiver : BroadcastReceiver() {
 
         // "Shown" event — mirrors GistiFirebaseMessagingService.emitReceived, distinguished by push_type.
         runCatching {
-            deps.analytics.event(
+            deps.analytics.eventOutOfSession(
                 AnalyticsEvents.Push.RECEIVED,
                 PushAnalytics.params(
                     campaignId = spec.campaignId,

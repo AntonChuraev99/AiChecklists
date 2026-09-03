@@ -46,6 +46,28 @@ class PushTimingResolverArmPropertyTest {
         )
     }
 
+    /**
+     * The sticky arm is written from `Application.onCreate` (scheduleRetentionPushes) and from the
+     * retention receivers — i.e. on every background process wake, where no Activity exists. A
+     * user-property write is an `$identify` event on the wire, so sending it in-session made the
+     * SDK open a session and stamp a phantom `session_start` on each wake. That is what drove
+     * `session_start` to an order of magnitude above the users who actually reached a screen.
+     */
+    @Test
+    fun ensureStickyArm_publishesTheArmOutOfSession() {
+        val analytics = RecordingAnalyticsTracker()
+        val resolver = createResolver(analytics, arm = PushTimingResolver.ARM_BEHAVIORAL)
+
+        resolver.ensureStickyArm()
+
+        assertEquals(
+            listOf(mapOf<String, Any>(AnalyticsParams.PUSH_TIMING_ARM to PushTimingResolver.ARM_BEHAVIORAL)),
+            analytics.outOfSessionUserProperties,
+            "The timing arm must be published out-of-session — this write runs on every background " +
+                "process wake, and an in-session write mints an empty session_start on each one",
+        )
+    }
+
     @Test
     fun ensureStickyArm_isIdempotentPerProcess() {
         val analytics = RecordingAnalyticsTracker()
@@ -101,10 +123,19 @@ class PushTimingResolverArmPropertyTest {
     }
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {
+        /** Every property write, whichever channel carried it — what segmentation ends up seeing. */
         val userProperties = mutableListOf<Map<String, Any>>()
+
+        /** Only the writes stamped out-of-session. A write missing here mints a `session_start`. */
+        val outOfSessionUserProperties = mutableListOf<Map<String, Any>>()
+
         override fun setUserId(userId: String) {}
         override fun setUserProperties(properties: Map<String, Any>) {
             userProperties.add(properties)
+        }
+        override fun setUserPropertiesOutOfSession(properties: Map<String, Any>) {
+            userProperties.add(properties)
+            outOfSessionUserProperties.add(properties)
         }
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {}

@@ -187,4 +187,4 @@ Questions? churaevanton@gmail.com
 
 - Rating is blocker #1 (stars hidden on the listing): copy improvements drive clicks, not installs. Review prompt after a success moment + reply to every review (replies are indexed).
 - RU locale listing = a separate indexed surface; the app is already bilingual (do only on explicit request — project rule).
-- A/B via Play Store Experiments is premature: not enough impressions at 500+ installs. Ship copy edits directly.
+- A/B via Play Store Experiments is premature at the current install volume — not enough impressions to reach significance. Ship copy edits directly. (Figures: `docs/PRODUCT.md`.)

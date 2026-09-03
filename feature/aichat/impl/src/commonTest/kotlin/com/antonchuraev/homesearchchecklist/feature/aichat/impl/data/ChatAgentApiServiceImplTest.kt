@@ -282,6 +282,67 @@ class ChatAgentApiServiceImplTest {
         assertIs<AgentStepResult.ServiceError>(result)
     }
 
+    // ── 7b. HTTP 400 → InvalidRequest, NOT ServiceError ──────────────────────
+
+    /**
+     * Repro of the prod defect: `chat_agent` rejects an over-cap turn with 400 +
+     * `{"success":false,"error":"transcript text exceeds 12000 chars cap"}`, and the client folded
+     * it into [AgentStepResult.ServiceError] — the "the service is down, try again in a moment"
+     * bucket. Every retry re-sends the same over-cap payload and is refused again.
+     */
+    @Test
+    fun step_400_returnsInvalidRequestCarryingTheServerReason() = runTest {
+        val service = makeService {
+            respond(
+                content = """{"success":false,"error":"transcript text exceeds 12000 chars cap"}""",
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "user-123",
+            transcript = sampleTranscript(),
+            locale = ChatLocale.Ru,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.InvalidRequest>(result)
+        assertEquals(
+            "transcript text exceeds 12000 chars cap",
+            result.reason,
+            "the server's own reason must survive to the log — it is what makes a 400 for any " +
+                "OTHER cause visible instead of hidden behind the too-long copy",
+        )
+    }
+
+    /**
+     * A 400 whose body is not the expected JSON envelope must still classify as
+     * [AgentStepResult.InvalidRequest]: the STATUS is the contract, the body is a courtesy.
+     * Reading the body is inside the same `runCatching` as the request, so a naive
+     * `response.body<…>()` here would throw and demote a deterministic refusal to
+     * [AgentStepResult.NetworkError] — advice to "check your connection" for a working one.
+     */
+    @Test
+    fun step_400WithNonJsonBody_stillReturnsInvalidRequest() = runTest {
+        val service = makeService {
+            respond(
+                content = "<html>400 Bad Request</html>",
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "user-123",
+            transcript = sampleTranscript(),
+            locale = ChatLocale.Ru,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.InvalidRequest>(result)
+    }
+
     // ── 8. Engine throws → NetworkError ──────────────────────────────────────
 
     @Test

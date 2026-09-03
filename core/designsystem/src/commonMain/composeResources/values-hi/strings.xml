@@ -1427,6 +1427,9 @@
     <string name="chat_error_offline">लगता है आप ऑफ़लाइन हैं। अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
     <string name="chat_error_service">AI सेवा अभी जवाब नहीं दे रही है। कृपया थोड़ी देर में फिर से आज़माएं।</string>
     <string name="chat_error_timeout">अनुरोध का समय समाप्त हो गया। कृपया फिर से आज़माएं।</string>
+    <!-- The server ANSWERED and refused the message (HTTP 400) — no Retry, since the identical
+         payload would be refused again. Mirrors the EN source; no length figure by design. -->
+    <string name="chat_error_message_too_long">यह संदेश मेरे लिए बहुत लंबा है। कोई छोटा संदेश भेजें, या उसे कुछ हिस्सों में बांट दें।</string>
     <string name="chat_retry">फिर से आज़माएं</string>
     <string name="chat_history_load_error">चैट हिस्ट्री लोड नहीं हो सकी।</string>
     <string name="chat_feedback_open">फ़ीडबैक दें</string>

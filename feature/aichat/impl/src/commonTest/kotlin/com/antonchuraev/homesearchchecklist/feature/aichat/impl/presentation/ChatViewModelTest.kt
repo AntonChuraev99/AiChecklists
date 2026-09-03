@@ -1463,6 +1463,75 @@ class ChatViewModelTest {
         assertEquals("Here is your week.", assistantMsgs.first().content)
     }
 
+    // ── 35b. Agent 400 → honest "too long" reply, no Retry, no phantom credit charge ──
+
+    /**
+     * Repro of the prod defect behind the 2026-08-18 healthcheck's oversized chat requests.
+     *
+     * `chat_agent` refuses an over-cap turn with HTTP 400 and a machine-readable reason. The
+     * client folded that into [AgentStepResult.ServiceError], so the user read
+     * "The AI service isn't responding right now. Please try again in a moment." beside a Retry
+     * chip. Both halves are false: the service DID answer, and the retry re-sends the identical
+     * over-cap payload, which is refused again — a loop the user cannot win, on the one input
+     * they could actually have fixed if told what was wrong.
+     *
+     * The turn is also charged nothing server-side (validation runs before the credit reserve),
+     * so `credits_used` must be 0 — the same lie [OUTCOME_INSUFFICIENT_CREDITS] was split out to
+     * stop telling.
+     */
+    @Test
+    fun agentLoop_invalidRequest_emitsTooLongReplyWithoutRetryAndChargesNothing() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.InvalidRequest("transcript text exceeds 12000 chars cap"),
+            ),
+        )
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(repo = repo, analytics = analytics)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(ChatScreenIntent.OnInputChange("a very long pasted article"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
+        assertEquals(
+            "chat_error_message_too_long",
+            effect.messageKey,
+            "a 400 must name the reason the user can act on, not the transient-outage copy " +
+                "(chat_error_service) that invites a retry which can never succeed",
+        )
+        assertNull(
+            effect.retryText,
+            "a 400 is deterministic — offering Retry re-sends the identical rejected payload",
+        )
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params)
+        assertEquals(
+            0,
+            params["credits_used"],
+            "the server validates before reserving, so a rejected turn costs 0 — billing it the " +
+                "Layer 3 flat 3 makes the chat's own history disagree with the wallet",
+        )
+        assertEquals(
+            "input_rejected",
+            params["outcome"],
+            "a refusal must be countable apart from an outage — folded into \"error\" it is only " +
+                "findable by eyeballing HTTP requestSize in the server logs, which is how it hid",
+        )
+
+        assertFalse(vm.screenState.value.isProcessing, "the turn must end, not hang on the spinner")
+    }
+
     // ── 36. Read-only tool call → no plan-card, assistant message rendered ──
 
     @Test

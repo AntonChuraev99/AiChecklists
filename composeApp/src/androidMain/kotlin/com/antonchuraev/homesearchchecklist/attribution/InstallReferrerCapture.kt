@@ -99,7 +99,9 @@ class InstallReferrerCapture(
                     val referrerString = client?.installReferrer?.installReferrer.orEmpty()
                     val props = parseReferrer(referrerString)
                     if (props.isNotEmpty()) {
-                        analytics.setUserProperties(props)
+                        // Out-of-session: capture is driven from Application.onCreate and retries on
+                        // every start until it succeeds — including background process wakes.
+                        analytics.setUserPropertiesOutOfSession(props)
                         logger?.info(TAG, "install referrer captured: ${props.keys}")
                     } else {
                         logger?.debug(TAG, "install referrer had no utm/gclid params (organic install)")
@@ -107,7 +109,7 @@ class InstallReferrerCapture(
                     // Unconditional, including the organic/empty case: this event is the acquisition
                     // timeline itself, and skipping the unattributed installs would leave the paid
                     // cohort without the denominator it is judged against.
-                    analytics.event(
+                    analytics.eventOutOfSession(
                         AnalyticsEvents.Attribution.INSTALL_ATTRIBUTED,
                         attributionEventParams(props),
                     )

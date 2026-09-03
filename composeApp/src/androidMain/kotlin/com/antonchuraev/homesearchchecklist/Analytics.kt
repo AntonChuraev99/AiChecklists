@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist
 
 import com.amplitude.android.Amplitude
 import com.amplitude.android.Configuration
+import com.amplitude.android.autocaptureOptions
+import com.amplitude.core.events.EventOptions
 import com.amplitude.core.events.Identify
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -41,9 +43,34 @@ object Analytics : AnalyticsTracker {
         get() = _amplitude
 
     /**
+     * Amplitude's sentinel for "this event belongs to no session".
+     *
+     * Mirrors `com.amplitude.android.Timeline.DEFAULT_SESSION_ID`, which is private to the SDK.
+     * `Timeline.processEvent` compares against it BEFORE deciding whether to open a session:
+     * `if (event.sessionId != DEFAULT_SESSION_ID && ownsSessions()) { startNewSessionIfNeeded(...) }`
+     * — so an event carrying this value is delivered but never mints `session_start`.
+     *
+     * Honouring it requires SDK >= 1.26.1 (PR #365); on older versions an out-of-session event
+     * still triggered a session and this whole mechanism would be a silent no-op.
+     */
+    private const val OUT_OF_SESSION_ID = -1L
+
+    /**
      * Initialize Amplitude with the API key.
      * Must be called after AppContextHolder.init() in GistiAndroidApplication.
      * Safe to call multiple times (no-op if already initialized with same key).
+     *
+     * Construction MUST stay this early (Application.onCreate). The SDK registers its
+     * ActivityLifecycleCallbacks when the instance is built, so a later construction misses the
+     * foreground transition and never opens the real session — verified and disproven as a fix, see
+     * `docs/todos/2026-07-29-amplitude-no-init-in-background-processes.md`.
+     *
+     * `autocapture` replaces the deprecated `trackingSessionEvents` flag: passing the flag selects a
+     * @Deprecated secondary constructor, and on the SDK version this app used to pin (1.22.4) SESSIONS
+     * was NOT in `REQUIRES_ACTIVITY_CALLBACKS`, so a SESSIONS-only config skipped
+     * `registerActivityLifecycleCallbacks` altogether — the SDK's `foreground` flag stayed false for
+     * the whole process life and sessions were cut by timeout even while the user was on screen.
+     * Fixed upstream in 1.25.2 (PR #355), which always registers the callbacks.
      */
     fun initialize(amplitudeKey: String) {
         if (amplitudeKey.isBlank()) return
@@ -52,17 +79,30 @@ object Analytics : AnalyticsTracker {
             Configuration(
                 apiKey = amplitudeKey,
                 context = AppContextHolder.context,
-                trackingSessionEvents = true
+                autocapture = autocaptureOptions { +sessions },
             )
         )
     }
+
+    /** Fresh options each call — [EventOptions] is mutable and the SDK may retain it per event. */
+    private fun outOfSessionOptions() = EventOptions().apply { sessionId = OUT_OF_SESSION_ID }
 
     override fun setUserId(userId: String) {
         firebase.setUserId(userId)
         amplitude?.setUserId(userId)
     }
 
-    override fun setUserProperties(properties: Map<String, Any>) {
+    override fun setUserProperties(properties: Map<String, Any>) =
+        publishUserProperties(properties, options = null)
+
+    /**
+     * Same payload as [setUserProperties], but the `$identify` event is stamped out-of-session so a
+     * background process wake cannot mint a phantom `session_start`. See [eventOutOfSession].
+     */
+    override fun setUserPropertiesOutOfSession(properties: Map<String, Any>) =
+        publishUserProperties(properties, options = outOfSessionOptions())
+
+    private fun publishUserProperties(properties: Map<String, Any>, options: EventOptions?) {
         // Firebase — one call per property (only accepts String values)
         properties.forEach { (name, value) ->
             firebase.setUserProperty(name, value.toString())
@@ -80,7 +120,7 @@ object Analytics : AnalyticsTracker {
                     else -> identify.set(name, value.toString())
                 }
             }
-            amp.identify(identify)
+            amp.identify(identify, options)
         }
     }
 
@@ -128,7 +168,20 @@ object Analytics : AnalyticsTracker {
         )
     }
 
-    override fun event(name: String, params: Map<String, Any>) {
+    override fun event(name: String, params: Map<String, Any>) =
+        publishEvent(name, params, options = null)
+
+    /**
+     * Delivers the event exactly like [event] does, but stamped with Amplitude's out-of-session
+     * sentinel so it neither opens nor extends a session.
+     *
+     * Firebase is unaffected — it is initialized separately, mints no sessions of its own, and keeps
+     * receiving the event unchanged.
+     */
+    override fun eventOutOfSession(name: String, params: Map<String, Any>) =
+        publishEvent(name, params, options = outOfSessionOptions())
+
+    private fun publishEvent(name: String, params: Map<String, Any>, options: EventOptions?) {
         // Firebase
         firebase.logEvent(name) {
             params.forEach { (key, value) ->
@@ -144,7 +197,8 @@ object Analytics : AnalyticsTracker {
         // Amplitude
         amplitude?.track(
             eventType = name,
-            eventProperties = params
+            eventProperties = params,
+            options = options,
         )
     }
 }

@@ -431,7 +431,7 @@ class TestIsPremiumFromFirestore:
         with patch.object(main, "get_user_premium_status", return_value=False) as mock_premium:
             with patch.object(main, "check_usage_limit", return_value=(True, "")):
                 # reserve_credits returns None (not enough credits)
-                with patch.object(main, "reserve_credits", return_value=None):
+                with patch.object(main, "reserve_credits_with_action", return_value=("insufficient", None)):
                     with patch.object(main, "get_credits_config", return_value={
                         "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
                     }):
@@ -541,7 +541,7 @@ class TestReserveCredits:
                 with patch.object(main, "get_credits_config", return_value={
                     "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
                 }):
-                    with patch.object(main, "reserve_credits", return_value=20):
+                    with patch.object(main, "reserve_credits_with_action", return_value=("reserve", 20)):
                         with patch.object(main, "refund_credits", return_value=True) as mock_refund:
                             with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
                                 with patch.object(main, "call_gemini", side_effect=Exception("Gemini error")):
@@ -576,7 +576,7 @@ class TestUsageLimits:
 
         with patch.object(main, "get_user_premium_status", return_value=False):
             with patch.object(main, "check_usage_limit", return_value=(False, "Daily limit of 10 requests exceeded.")):
-                with patch.object(main, "reserve_credits") as mock_reserve:
+                with patch.object(main, "reserve_credits_with_action") as mock_reserve:
                     with patch.object(main, "get_remote_config_value", return_value=True):
                         with app.test_request_context():
                             req = make_request({
@@ -587,7 +587,7 @@ class TestUsageLimits:
                             })
                             response, status = main.analyze_and_fill_checklist(req)
                             assert status == 429
-                            # reserve_credits was NOT called (credits not deducted)
+                            # the reservation was NOT attempted (credits not deducted)
                             mock_reserve.assert_not_called()
 
     def test_premium_user_higher_usage_limit(self, _import_main):
@@ -603,7 +603,7 @@ class TestUsageLimits:
 
         with patch.object(main, "get_user_premium_status", return_value=True):
             with patch.object(main, "check_usage_limit", return_value=(True, "")):
-                with patch.object(main, "reserve_credits", return_value=270):
+                with patch.object(main, "reserve_credits_with_action", return_value=("reserve", 270)):
                     with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
                         with patch.object(main, "call_gemini") as mock_gemini:
                             mock_response = MagicMock()
@@ -1188,7 +1188,7 @@ class TestChatAgentEmptyCandidate:
 
         with patch.object(main, "resolve_experiment_model", return_value=("gemini-x", "control")):
             with patch.object(main, "_reconstruct_agent_contents", return_value=[object()]):
-                with patch.object(main, "reserve_chat_completion_credits", return_value=5):
+                with patch.object(main, "reserve_chat_completion_credits", return_value=("reserve", 5)):
                     with patch.object(main, "increment_usage") as mock_incr:
                         with patch.object(main, "refund_chat_completion_credits") as mock_refund:
                             with patch.object(main, "get_user_credits", return_value=get_credits_return):
@@ -1230,7 +1230,7 @@ class TestChatAgentEmptyCandidate:
 
         with patch.object(main, "resolve_experiment_model", return_value=("gemini-x", "control")):
             with patch.object(main, "_reconstruct_agent_contents", return_value=[object()]):
-                with patch.object(main, "reserve_chat_completion_credits", return_value=5):
+                with patch.object(main, "reserve_chat_completion_credits", return_value=("reserve", 5)):
                     with patch.object(main, "refund_chat_completion_credits") as mock_refund:
                         with patch.object(main, "gemini_client", mock_client):
                             # Throw only on the degrade success-response build; the except path

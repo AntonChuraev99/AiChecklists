@@ -55,7 +55,9 @@ class PushTimingResolver(
         if (stickyArmSet) return
         stickyArmSet = true
         runCatching {
-            analytics.setUserProperties(mapOf(AnalyticsParams.PUSH_TIMING_ARM to arm()))
+            // Out-of-session: scheduling passes run from Application.onCreate and from the
+            // retention receivers, i.e. in processes with no Activity.
+            analytics.setUserPropertiesOutOfSession(mapOf(AnalyticsParams.PUSH_TIMING_ARM to arm()))
         }.onFailure { e ->
             // Allow a retry on the next pass if the set failed (e.g. tracker not ready yet).
             stickyArmSet = false

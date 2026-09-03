@@ -90,5 +90,34 @@ sealed interface AgentStepResult {
 
     data object InsufficientCredits : AgentStepResult   // 402
     data object NetworkError : AgentStepResult           // timeout / connection / parse failure
-    data object ServiceError : AgentStepResult           // non-402 error, success=false, or malformed body
+    data object ServiceError : AgentStepResult           // 5xx, success=false, or malformed body
+
+    /**
+     * HTTP 400 — the server REFUSED this payload.
+     *
+     * Split off [ServiceError] because the two need opposite answers. A 5xx is transient, so
+     * "try again in a moment" is good advice; a 400 is deterministic — the identical request is
+     * refused forever, so the same copy plus a Retry chip is a loop the user cannot win. Until
+     * this variant existed, a rejected turn read as
+     * "The AI service isn't responding right now. Please try again in a moment." — untrue on both
+     * halves: the service answered, and trying again changes nothing.
+     *
+     * ### Why one variant is enough to name a cause
+     *
+     * `chat_agent` answers 400 from six places (`main.py`), and five are unreachable from this
+     * client, because the shape of the request is built here rather than typed by the user:
+     * `user_id` is guarded in [AiChatRepository.agentStep], the transcript is never empty on a
+     * send, entries are constructed as objects over a fixed role vocabulary, and
+     * `AgentTranscriptWindow` caps entries at 30 + 10 live rounds against the server's 60. The
+     * one cap the client cannot pre-empt is the total-chars ceiling: the window deliberately
+     * keeps the newest turn whole even when that turn alone busts it, because dropping the
+     * message the user just typed would be worse than a big request. A single long paste is
+     * therefore what produces this in production, and "too long" is the honest thing to say.
+     *
+     * [reason] is the server's own `error` string, carried for the LOG only — never rendered
+     * (it is English server prose; the UI speaks the user's language). It is what keeps the
+     * paragraph above falsifiable: a 400 arriving for some other cause says so in Crashlytics
+     * instead of hiding behind copy that already fits.
+     */
+    data class InvalidRequest(val reason: String?) : AgentStepResult
 }

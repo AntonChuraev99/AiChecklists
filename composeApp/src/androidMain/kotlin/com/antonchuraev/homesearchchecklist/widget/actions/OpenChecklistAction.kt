@@ -30,6 +30,12 @@ class OpenChecklistAction : ActionCallback {
 
         // Widget-driven return signal. Emitted from this Glance ActionCallback (which starts the
         // Activity directly — no Android-12 receiver trampoline), resolved cold-safe like the toggle.
+        //
+        // Deliberately IN-session, unlike the widget's WorkManager sync and the reminder receiver:
+        // this runs on a user tap and an Activity starts on the next line, so the session it opens
+        // is a real one. Marking it out-of-session would suppress the session of an actual entry
+        // into the app. Decided 2026-08-18 with the phantom-session fix — do not "harmonise" it
+        // with the background emitters without re-reading this.
         runCatching {
             GlobalContext.getOrNull()?.getOrNull<AnalyticsTracker>()?.event(
                 AnalyticsEvents.Widget.OPENED,
