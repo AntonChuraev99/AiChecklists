@@ -482,11 +482,17 @@ class V2BarShoulderFillTest {
      *     wrapped label makes the real bar taller the same arithmetic points 80dp above the BOTTOM
      *     rather than at the top edge, and the strip it claims is short by the growth.
      *
-     * ⚠️ Deliberately NOT "the pixel above the band is not the chrome". `AppSurface.card()` and
-     * `AppSurface.bottomChrome()` are the SAME `surfaceContainerLow` in dark, so a card row above the
-     * bar reads `#1A1C20` exactly like the bar does and that check fails on a correct frame — which
-     * is what it did when it was written. A guard that cannot tell the two planes apart in one theme
-     * is not a guard.
+     * ⚠️ Deliberately NOT "the pixel above the band is not the chrome". It was written when
+     * `AppSurface.card()` and `AppSurface.bottomChrome()` were the SAME `surfaceContainerLow` in
+     * dark: a card row above the bar read `#1A1C20` exactly like the bar did, so the check failed on
+     * a correct frame, and a guard that cannot tell two planes apart in one theme is not a guard.
+     *
+     * That collision is GONE since 2026-09-03 — the chrome is its own literal (`GistiColors.chrome`,
+     * `#191D25` dark / `#DCE2EC` light) while `card()` stays on the palette's neutrals, so the two
+     * differ in both themes again. The check is still not reinstated here, deliberately: this method
+     * validates a RULER, and "what is above it" is the subject of [assertShoulderIsThePage], which
+     * already names both colours and scans the whole strip rather than sampling one pixel. Adding a
+     * second, weaker copy of that claim here would only give the next reader two places to edit.
      *
      * Sampled at a quarter of the width: clear of the 28dp corner arcs, clear of the raised centre AI
      * button that overhangs the bar's top edge, and two rows down so the sample is the surface rather

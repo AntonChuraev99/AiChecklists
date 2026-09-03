@@ -5,26 +5,37 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.ScrollAxisRange
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
@@ -44,7 +55,10 @@ import aichecklists.core.designsystem.generated.resources.due_rail_expanded_a11y
 import aichecklists.core.designsystem.generated.resources.due_rail_no_date
 import aichecklists.core.designsystem.generated.resources.due_tomorrow
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.github.takahirom.roborazzi.RoborazziOptions
+import com.github.takahirom.roborazzi.RoborazziTaskType
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.jetbrains.compose.resources.stringResource
 import org.junit.After
@@ -57,11 +71,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import java.util.Locale
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipItem
+import javax.imageio.ImageIO
+import aichecklists.core.designsystem.generated.resources.due_planner_done
 import aichecklists.core.designsystem.generated.resources.item_create_chip_important
 
 /**
@@ -206,7 +219,76 @@ class DueRailScreenshotTest {
     fun dueRail_412dp_fontScale15_expanded() =
         shoot("w412dp-h891dp", fontScale = 1.5f) { DockStub(state = DueRailFixture.Expanded) }
 
+    /**
+     * The rail SCROLLED TO ITS END — the frame every other golden here is blind to.
+     *
+     * All nine frames above are recorded at scroll 0, so the row's trailing edge is off-screen in
+     * every one of them and the inset regression below shipped invisible. 320dp / fontScale 1.3 / RU
+     * is the narrowest configuration with the longest copy, i.e. the one that overflows hardest.
+     */
+    @Test
+    fun dueRail_320dp_light_scrolledToEnd() {
+        var weekend = ""
+        composeTestRule.mount("w320dp-h568dp", 1.3f, dark = false, locale = Locale("ru")) {
+            weekend = stringResource(Res.string.due_preset_weekend)
+            DockStub()
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.scrollRailToEnd(weekend)
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
     // ── Semantics: the half of the contract a PNG cannot show ────────────────
+
+    /**
+     * Scrolled to its end, the last offer keeps the dock's own inset — it does not run into the edge.
+     *
+     * ## The regression this was written against
+     * The rail's END inset used to live INSIDE `if (trailing != null)`, on the pinned chip, and the
+     * scrolling half carried `padding(start = horizontalPadding)` alone with a comment saying so
+     * ("this half runs to the pinned chip"). When Important left that slot on 2026-09-03 the row lost
+     * its only right-hand inset: scrolled to the end the fade switches off (`state.value ==
+     * state.maxValue`), and the last pill sat flush against the window at 0dp while the lead chip
+     * kept 16dp on the left.
+     *
+     * ## Why no golden could have caught it
+     * Roborazzi records at scroll 0, where the trailing edge is off-screen by construction — which is
+     * exactly why this is an assertion on BOUNDS at `maxValue` and not one more frame. The frame
+     * beside it ([dueRail_320dp_light_scrolledToEnd]) exists to be looked at, not to prove this.
+     */
+    @Test
+    fun rail_scrolledToEnd_keepsTheDocksEndInset() {
+        var weekend = ""
+        composeTestRule.mount("w320dp-h568dp", 1.3f, dark = false, locale = Locale("ru")) {
+            weekend = stringResource(Res.string.due_preset_weekend)
+            DockStub()
+        }
+        composeTestRule.waitForIdle()
+
+        val range = composeTestRule.scrollRailToEnd(weekend)
+
+        // Precondition: the row really did overflow and really is at its end. Without it the
+        // assertion below passes trivially on a rail that never needed to scroll.
+        assertTrue(
+            "the fixture must overflow at 320dp/1.3x — maxValue=${range.maxValue()}",
+            range.maxValue() > 0f,
+        )
+        assertEquals(
+            "…and be scrolled all the way to it",
+            range.maxValue(),
+            range.value(),
+        )
+
+        val last = composeTestRule.onNodeWithText(weekend).getUnclippedBoundsInRoot()
+        val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+        assertTrue(
+            "the last offer ends at ${last.right} in a ${root.right} window — the rail must keep the " +
+                "dock's ${AppDimens.ScreenPaddingHorizontal} inset on the right, the way the lead " +
+                "chip keeps it on the left. Scrolled to the end there is no fade left to mark that " +
+                "edge, so a chip flush against the window is all the user sees",
+            last.right <= root.right - AppDimens.ScreenPaddingHorizontal,
+        )
+    }
 
     /**
      * Opening the planner has to be an EVENT for a screen reader, not a silent layout change.
@@ -262,53 +344,46 @@ class DueRailScreenshotTest {
     }
 
     /**
-     * Repeat without a date is UNAVAILABLE — greyed, announced, and still tappable.
+     * The Important toggle is ON SCREEN in the state that used to swallow it — now from the INPUT
+     * ROW, which is where it moved on 2026-09-03.
      *
-     * ⚠️ **This test previously asserted the opposite** (`assertIsNotEnabled`), and the contract
-     * changed deliberately on 2026-08-19. Two facts from the draft settled it, not taste:
-     * `TaskDraft.withRepeat(config)` nulls `reminderAt` AND `reminderPreset`, so a saved rule
-     * REPLACES the date rather than decorating it; and `InboxViewModel` opens the REPEAT tab
-     * precisely for an item that has a rule and no `reminderAt`. The old gate therefore asked for a
-     * date that the very next step deleted — and `Surface(enabled = false)`, not focusable and with
-     * the tap eaten before any handler, gave the user no way to find that out.
-     */
-    /**
-     * The Important toggle is ON SCREEN in the state that used to swallow it.
-     *
-     * The rail started scrolling on 2026-08-19 and the toggle went with it, inside the scroll and
-     * last. Measured on that day's frames: with three offers it was visible for 23dp against a 24dp
-     * edge fade — every visible pixel of it inside the gradient — and with a date applied the wider
-     * lead chip pushed it off the edge entirely. A shipped control that does not exist on screen in
-     * the commonest state is the defect class this project pays most for, so the toggle is pinned
-     * outside the scroll and this asserts that it stays there.
+     * ## What this test used to assert, and why the contract changed
+     * It read `important_isPinnedOnScreenWithADateApplied` and pinned the toggle to the rail's
+     * `trailing` slot, outside the scroll: with the rail scrolling since 2026-08-19 the chip had been
+     * disappearing off the right edge, and pinning it was the fix. The owner reopened the whole
+     * control on 2026-09-03 ("кнопка добавить в избранное… очень плохо выглядит и находится в плохом
+     * месте"), so it is an [ImportantStarToggle] in the field's trailing slot now, beside the "+".
+     * That is a SPEC change by owner request, not a test yielding to the code — and it is a strictly
+     * stronger position: the input row cannot scroll and does not fold with the planner.
      *
      * ⚠️ Asserted on BOUNDS, not with `assertIsDisplayed`, and that is the difference between a test
-     * and a decoration: `isDisplayed` is satisfied by any non-empty clipped rectangle, so a chip
-     * hanging half-off the viewport passes it. Verified by mutation — putting the toggle back inside
-     * the scroll left `assertIsDisplayed` green. What has to hold is that the chip's own unclipped
-     * box lies INSIDE the root, both edges.
+     * and a decoration: `isDisplayed` is satisfied by any non-empty clipped rectangle, so a control
+     * hanging half-off the viewport passes it. What has to hold is that its own unclipped box lies
+     * INSIDE the root, both edges.
      */
     @Test
-    fun important_isPinnedOnScreenWithADateApplied() {
+    fun important_isInTheInputRowWithADateApplied() {
         var important = ""
+        var leadLabel = ""
         composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
             important = stringResource(Res.string.item_create_chip_important)
-            // The widest state the lead chip has — "Tomorrow 09:00 ×" — plus three offers. This is
-            // the arrangement that pushed the toggle off the edge.
+            leadLabel = stringResource(Res.string.due_tomorrow, "09:00")
+            // The widest state the lead chip has — "Tomorrow 09:00 ×" — plus three offers. The rail
+            // being at its widest must have no effect on the toggle any more.
             DockStub(state = DueRailFixture.DateApplied)
         }
         composeTestRule.waitForIdle()
 
-        // Glyph only, so the accessible NAME is a contentDescription now — and that this lookup
-        // works at all is the second half of the label-less change.
-        val chip = composeTestRule.onNodeWithContentDescription(important)
-        chip.assertWidthIsAtLeast(AppDimens.MinTouchTarget)
+        // Glyph only, so the accessible NAME is a contentDescription — and that this lookup works at
+        // all is the second half of the label-less change.
+        val toggle = composeTestRule.onNodeWithContentDescription(important)
+        toggle.assertWidthIsAtLeast(AppDimens.MinTouchTarget)
             .assertHeightIsAtLeast(AppDimens.MinTouchTarget)
 
-        val bounds = chip.getUnclippedBoundsInRoot()
+        val bounds = toggle.getUnclippedBoundsInRoot()
         val root = composeTestRule.onRoot().getUnclippedBoundsInRoot()
         assertTrue(
-            "the pinned toggle must end inside the window, not past it " +
+            "the toggle must end inside the window, not past it " +
                 "(right=${bounds.right}, window=${root.right})",
             bounds.right <= root.right,
         )
@@ -316,8 +391,129 @@ class DueRailScreenshotTest {
             "…and start inside it (left=${bounds.left})",
             bounds.left >= root.left,
         )
+
+        // In the INPUT row, not in the rail: strictly below the lead chip. Read off that chip's own
+        // box rather than off a constant, so a font scale cannot move the ruler out from under it.
+        val leadChip = composeTestRule.onNodeWithText(leadLabel).getUnclippedBoundsInRoot()
+        assertTrue(
+            "the toggle must sit BELOW the due rail — it is part of the input row now " +
+                "(toggle top=${bounds.top}, rail bottom=${leadChip.bottom})",
+            bounds.top >= leadChip.bottom,
+        )
     }
 
+    /**
+     * Off ↔ on is announced as a STATE on one control, not as two controls.
+     *
+     * `toggleableState`, not a swapped `contentDescription`: a screen reader that hears a different
+     * NAME for each state cannot say the thing was toggled, only that something else is there now.
+     * The name stays `item_create_chip_important` in both, which is also why no new copy was needed.
+     *
+     * The ROLE is asserted with it. A name and a state with no role are announced as a button that
+     * happens to mention "checked", so the one thing the user needs — "double-tap to toggle" — never
+     * gets said; `Surface(onClick)` alone would announce `Button` and contradict the state.
+     */
+    @Test
+    fun importantToggle_announcesItsStateAndReportsTheTap() {
+        var important = ""
+        var taps = 0
+        val on = mutableStateOf(false)
+        composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
+            important = stringResource(Res.string.item_create_chip_important)
+            DockStub(important = on.value, onImportantToggle = { taps++ })
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            "OFF must be announced as an unchecked toggle",
+            listOf(ToggleableState.Off),
+            composeTestRule.toggleStatesOf(important),
+        )
+        composeTestRule.onNodeWithContentDescription(important).assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
+        )
+
+        composeTestRule.onNodeWithContentDescription(important).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals("the tap must reach the host", 1, taps)
+
+        composeTestRule.runOnIdle { on.value = true }
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "ON must be announced as the SAME control in a different state, not a second control",
+            listOf(ToggleableState.On),
+            composeTestRule.toggleStatesOf(important),
+        )
+    }
+
+    /**
+     * Done dismisses the panel, so it must not be the loudest thing in the dock.
+     *
+     * It was an `AppButton` — filled `primary`, pill — sitting ~40dp above the filled `primary`
+     * submit "+", which gave the dock two primary actions and made the louder one the one that only
+     * closes a panel. It is an `AppButtonText` now, and this pins that by COLOUR: no pixel of the
+     * Done row may carry the `primary` fill.
+     *
+     * A pixel probe rather than a type check, because "is it an AppButtonText" is a fact about the
+     * source, while "is there a blue slab in the dock" is the thing the owner is looking at.
+     *
+     * ⚠️ Captured to a FILE through Roborazzi and re-read, never with `captureToImage()`: the dock
+     * focuses its input on mount, a focused field blinks its caret forever, and `captureToImage`
+     * first waits for an idle clock that therefore never arrives (`ComposeTimeoutException`, seen
+     * while writing this test). Roborazzi's capture does not wait. The frame is forced to `Record`
+     * outside the golden directory, so `verifyRoborazzi*` neither compares it nor wants it in git.
+     */
+    @Test
+    fun done_isNotAFilledPrimaryButton() {
+        var done = ""
+        var chromeRgb = 0
+        var primaryRgb = 0
+        composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
+            done = stringResource(Res.string.due_planner_done)
+            // NAMED, not derived from another pixel of the same frame: a probe that compares the
+            // button with its neighbour passes just as happily on a frame where both are wrong.
+            chromeRgb = AppSurface.bottomChrome().toArgb() and 0xFFFFFF
+            primaryRgb = MaterialTheme.colorScheme.primary.toArgb() and 0xFFFFFF
+            DockStub(state = DueRailFixture.Expanded)
+        }
+        composeTestRule.waitForIdle()
+
+        val bounds = composeTestRule.onNodeWithText(done).getUnclippedBoundsInRoot()
+        val file = File("$ProbeDir/done_not_filled.png")
+        file.parentFile?.mkdirs()
+        composeTestRule.onRoot().captureRoboImage(
+            filePath = file.path,
+            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record),
+        )
+        val image = ImageIO.read(file)
+
+        // The button's LEADING edge at its vertical middle — 1dp == 1px at this qualifier's density.
+        // Chosen because it is the one point a pill-shaped fill is guaranteed to cover (the widest
+        // part of the capsule) and the one a text button's LABEL never reaches: `AppButtonText`'s own
+        // content colour IS `primary`, so counting blue pixels anywhere in the box would flag the
+        // word "Done" itself.
+        val x = bounds.left.value.toInt() + EdgeProbeInsetPx
+        val y = ((bounds.top.value + bounds.bottom.value) / 2f).toInt()
+        val here = image.getRGB(x, y) and 0xFFFFFF
+
+        assertEquals(
+            "Done must not be a filled primary button — it dismisses the planner, while the action " +
+                "that commits the task is the '+' in the field below it. Its leading edge reads " +
+                "#%06X where the dock's own #%06X is expected".format(here, chromeRgb) +
+                (if (here == primaryRgb) " — that is the `primary` fill." else ""),
+            chromeRgb,
+            here,
+        )
+    }
+
+    /**
+     * Both settings rows are live with NO date applied, and Repeat is the interesting one.
+     *
+     * Repeat shipped greyed until there was a date. `TaskDraft.withRepeat(config)` nulls `reminderAt`
+     * AND `reminderPreset`, so a saved rule REPLACES the date rather than decorating it — the gate
+     * asked the user to pick a date the very next step would delete, and `Surface(enabled = false)`
+     * left them no way to find that out.
+     */
     @Test
     fun repeat_isReachableWithoutADate() {
         var repeat = ""
@@ -406,40 +602,42 @@ class DueRailScreenshotTest {
     }
 
     /**
-     * Opening the planner leaves the ANSWER in the rail and folds everything else away.
+     * Opening the planner leaves the ANSWER in the rail and folds the offers away.
      *
-     * The offers, because the grid two rows below holds all five of them WITH the time each resolves
-     * to — keeping the pills up here as well puts two controls carrying the same accessible name on
-     * one screen. Important, because it is not an answer to "when" and is the one chip the dock
-     * cannot afford beside a 62dp grid (owner's call, 2026-08-19).
+     * Because the grid two rows below holds all five of them WITH the time each resolves to —
+     * keeping the pills up here as well puts two controls carrying the same accessible name on one
+     * screen.
+     *
+     * ## The Important half of this test is gone, deliberately
+     * It used to assert that the toggle folded with the offers ("скрывать при выборе даты",
+     * 2026-08-19). It does not fold any more because it is not in the rail any more: on 2026-09-03 it
+     * moved into the input row (see [important_isInTheInputRowWithADateApplied]), where it is
+     * reachable in EVERY state — including this one, which is the state it used to be missing from.
+     * The claim was dropped rather than inverted here so that this test keeps one subject.
      *
      * Asserted in BOTH directions on purpose: a fold that never comes back is the defect this
      * project has actually shipped, and an assertion that only checks the disappearance passes just
      * as happily on it.
      */
     @Test
-    fun rail_foldsOffersAndTrailingWhileThePlannerIsOpen() {
+    fun rail_foldsTheOffersWhileThePlannerIsOpen() {
         var tonight = ""
-        var important = ""
         // ONE mount, toggled — `mount` wraps `setContent`, which a test may call exactly once, and
         // the round trip is the point anyway: two separate mounts could not tell a fold that comes
         // back from a rail that was built expanded.
         val fixture = mutableStateOf(DueRailFixture.Idle)
         composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
             tonight = stringResource(Res.string.due_preset_tonight)
-            important = stringResource(Res.string.item_create_chip_important)
             DockStub(state = fixture.value)
         }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithContentDescription(important).assertExists()
         // Collapsed, "Tonight" is in the rail only — the grid is not composed.
         assertEquals(1, composeTestRule.onAllNodesWithText(tonight).fetchSemanticsNodes().size)
 
         composeTestRule.runOnIdle { fixture.value = DueRailFixture.Expanded }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithContentDescription(important).assertDoesNotExist()
         // Expanded, "Tonight" is in the GRID only — one node, not two. This is the assertion that
         // catches a rail which kept its pills: it would read 2.
         assertEquals(1, composeTestRule.onAllNodesWithText(tonight).fetchSemanticsNodes().size)
@@ -448,14 +646,39 @@ class DueRailScreenshotTest {
         composeTestRule.runOnIdle { fixture.value = DueRailFixture.Idle }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithContentDescription(important).assertExists()
         assertEquals(1, composeTestRule.onAllNodesWithText(tonight).fetchSemanticsNodes().size)
+    }
+
+    /**
+     * …and the toggle that no longer folds is still there when the planner is open.
+     *
+     * The other half of the change above, kept as its own cell so the fold test keeps one subject.
+     * This is the state the control was unreachable in before 2026-09-03.
+     */
+    @Test
+    fun important_survivesThePlannerBeingOpen() {
+        var important = ""
+        composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
+            important = stringResource(Res.string.item_create_chip_important)
+            DockStub(state = DueRailFixture.Expanded)
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(important).assertExists()
     }
 
     // ── Fixture ──────────────────────────────────────────────────────────────
 
     /** The four states the rail can be in, as far as layout is concerned. */
     private enum class DueRailFixture { Idle, DateApplied, Expanded, ExpandedWithDate }
+
+    private companion object {
+        /** Scratch frames for the pixel probes, deliberately outside the golden directory. */
+        const val ProbeDir = "build/due-rail-probe"
+
+        /** How far inside a control's leading edge a probe lands — clear of its antialiased rim. */
+        const val EdgeProbeInsetPx = 2
+    }
 
     /**
      * The real [QuickCaptureDock] with the rail in its `aboveInput` slot — the mount the Inbox and
@@ -476,6 +699,7 @@ class DueRailScreenshotTest {
         state: DueRailFixture = DueRailFixture.Idle,
         onRepeatClick: () -> Unit = {},
         important: Boolean = false,
+        onImportantToggle: () -> Unit = {},
     ) {
         val hasDate = state == DueRailFixture.DateApplied || state == DueRailFixture.ExpandedWithDate
         val expanded = state == DueRailFixture.Expanded || state == DueRailFixture.ExpandedWithDate
@@ -535,21 +759,10 @@ class DueRailScreenshotTest {
                         onLeadClick = {},
                         onClearDate = {},
                         onPresetClick = {},
-                        // The dock has always carried this toggle, and it is what makes the row's
-                        // width budget tight — a frame without it would flatter the layout.
-                        trailing = {
-                            // The SHAPE production mounts: glyph only, filled star when on, pinned
-                            // outside the scroll by the rail itself. A labelled fixture would draw a
-                            // ~100dp pill nothing ships and flatter every width measurement here.
-                            GistiSelectableChipItem(
-                                icon = if (important) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                label = stringResource(Res.string.item_create_chip_important),
-                                selected = important,
-                                onClick = {},
-                                labelVisible = false,
-                                modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
-                            )
-                        },
+                        // No trailing slot: Important lives in the INPUT row now (2026-09-03), which
+                        // is what `trailingToggle` below mounts. The rail keeps the parameter as
+                        // design-system API and both capture hosts pass nothing.
+                        trailing = null,
                     )
                     DuePlannerPanel(
                         expanded = expanded,
@@ -571,9 +784,43 @@ class DueRailScreenshotTest {
                     onSelect = {},
                 )
             },
+            // The seat Important took on 2026-09-03: the field's trailing slot, immediately before
+            // the "+". Both capture hosts mount exactly this, so a frame without it would flatter the
+            // input row's width budget.
+            trailingToggle = {
+                ImportantStarToggle(selected = important, onClick = onImportantToggle)
+            },
         )
     }
 }
+
+/**
+ * Scrolls the due rail as far right as it goes and reports where it landed.
+ *
+ * Driven through the node's own `ScrollBy` semantics action with a deliberate overshoot, which the
+ * scroll state clamps to `maxValue` — NOT through `performScrollTo()` on the last chip, which stops
+ * the moment that chip is fully visible and so would land at "chip flush against the viewport", i.e.
+ * exactly the state the inset assertion has to be able to fail on.
+ *
+ * The rail is addressed as "the scrollable that contains [anchorText]" rather than by a test tag:
+ * the dock has other scrollables in other states, and a tag would be production code added for a
+ * test.
+ */
+private fun ComposeContentTestRule.scrollRailToEnd(anchorText: String): ScrollAxisRange {
+    val rail = onNode(hasScrollAction() and hasAnyDescendant(hasText(anchorText)))
+    rail.performSemanticsAction(SemanticsActions.ScrollBy) { it(RailScrollOvershootPx, 0f) }
+    waitForIdle()
+    return rail.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+}
+
+/** Far wider than any rail this test mounts; the scroll state clamps it to `maxValue`. */
+private const val RailScrollOvershootPx = 10_000f
+
+/** Every `SemanticsProperties.ToggleableState` carried by a node named [description], in tree order. */
+private fun ComposeContentTestRule.toggleStatesOf(description: String): List<ToggleableState?> =
+    onAllNodesWithContentDescription(description).fetchSemanticsNodes().map {
+        it.config.getOrElseNullable(SemanticsProperties.ToggleableState) { null }
+    }
 
 /**
  * Every `SemanticsProperties.Selected` value carried by a node whose text is [text], in tree order.

@@ -72,6 +72,23 @@ object GistiColors {
         @Composable @ReadOnlyComposable
         get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFC67C00)
 
+    // ── Bottom-chrome tone ──
+    /**
+     * The tone of the app's bottom chrome — the v2 navigation bar, both docks, the full-screen chat
+     * overlay and the system-nav strip behind them. Read by `AppSurface.bottomChrome()`, never by a
+     * call site.
+     *
+     * A LITERAL rather than a `surfaceContainer*` role because the whole point of the re-tune is
+     * CHROMA: every neutral in this palette at this lightness is a warm grey (`surfaceDim` `#DEDCD6`,
+     * L\* 87.8, chroma ~3), which is what the owner rejected on the device ("серый… точно нужно
+     * поменять"). This pair keeps the measured lightness relationships of the family it replaces
+     * (see `AppSurface.bottomChrome`'s tables) and adds the blue lean the dark page `#121317` — itself
+     * a blue-black — already has.
+     */
+    val chrome: Color
+        @Composable @ReadOnlyComposable
+        get() = if (LocalIsDarkTheme.current) Color(0xFF191D25) else Color(0xFFDCE2EC)
+
     // ── Calm completion green (100% banners, done progress) ──
     val success: Color
         @Composable @ReadOnlyComposable

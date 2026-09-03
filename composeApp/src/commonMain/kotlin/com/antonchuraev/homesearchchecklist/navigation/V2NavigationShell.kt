@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +67,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -147,6 +150,18 @@ object V2ShellMetrics {
      * the whole content reserve — see [FabBandPadding].
      */
     val AiButtonOverhang: Dp = 22.dp
+
+    /**
+     * Width of the page-coloured ring drawn around the AI button, replacing the shadow it used to
+     * carry (owner, 2026-09-03: "убери тени в нижней навигации под кнопкой по центру").
+     *
+     * 3dp: enough to read as a notch where the circle crosses the bar's top edge, small enough that
+     * the button's silhouette is still the 56dp circle rather than a 62dp disc. It is a SIZE, not a
+     * stroke — the ring is a filled circle drawn under the button, so nothing needs to know the bar's
+     * colour. It is drawn ONLY below the bar's top edge; above it the button overhangs the hosted
+     * screen, whose cards are not the page colour. See the draw call.
+     */
+    val AiButtonRing: Dp = 3.dp
 
     /**
      * The 2+2 split: total empty width the bar leaves in its middle, and the width of the button's
@@ -630,6 +645,56 @@ private fun V2ShellCompactBar(
                             traversalIndex = V2ShellMetrics.AiButtonTraversalIndex
                         },
                 )
+                // The RING, and the reason the FAB is wrapped at all.
+                //
+                // The circle used to be separated from the bar by M3's default 6dp shadow, which the
+                // owner removed from the device with the rest of the bottom chrome's shadows ("убери
+                // тени в нижней навигации под кнопкой по центру"). A raised centre button still needs
+                // ONE channel saying it is not painted onto the bar, so it gets a 3dp ring of the
+                // SHOULDER colour — the page — instead of an unknown darkening of whatever is under
+                // it. Where the circle crosses the bar's top edge it cuts a crisp notch out of it.
+                //
+                // ⚠️ CLIPPED to below that edge, and that is the whole reason it is a `drawBehind`
+                // rather than a `background(…, CircleShape)`. The shoulder is the PAGE colour, not
+                // "whatever is behind the button": above the bar the button overhangs the hosted
+                // screen, and a screen scrolls CARDS under it (`AppSurface.card()`, `#1A1C20` in
+                // dark). An unclipped ring painted the page `#121317` over that card, so the top
+                // crescent read as a 3dp cut-out punched through the list — visible on the recorded
+                // `compactBar_412dp_dark_listUnderBar` frame. Below the bar's edge the page colour is
+                // exactly right, because there the ring's job is to notch the bar.
+                //
+                // `offset(y = -AiButtonRing)` keeps the FAB exactly where it was: the ring box is
+                // centred on the button and 2×3dp taller, so without the shift the button would sink
+                // 3dp and [V2ShellMetrics.AiButtonOverhang] would silently become 19dp. It is also
+                // what puts the bar's top edge at `AiButtonOverhang + AiButtonRing` in this box's own
+                // coordinates — the clip line below, derived from the metrics rather than measured.
+                //
+                // The hand-off `graphicsLayer` moved UP here from the FAB on purpose — the ring is
+                // part of the button, and a page-coloured circle left at full opacity while the button
+                // fades into the rising dock is a hole punched in the bar for 180ms.
+                val ringColor = AppSurface.bottomChromeShoulder()
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(V2ShellMetrics.AiButtonSize + V2ShellMetrics.AiButtonRing * 2)
+                        .offset(y = -V2ShellMetrics.AiButtonRing)
+                        // Read in the DRAW phase (lambda form), so the 180ms hand-off does not
+                        // recompose the shell — and with it the hosted screen.
+                        .graphicsLayer {
+                            val scale = lerp(1f, V2ChatMotion.ButtonHandoffScale, handoff)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 1f - handoff
+                        }
+                        .drawBehind {
+                            val barEdge = (
+                                V2ShellMetrics.AiButtonOverhang + V2ShellMetrics.AiButtonRing
+                                ).toPx()
+                            clipRect(top = barEdge) {
+                                drawCircle(color = ringColor)
+                            }
+                        },
+                ) {
                 FloatingActionButton(
                     onClick = onOpenChat,
                     shape = CircleShape,
@@ -647,16 +712,18 @@ private fun V2ShellCompactBar(
                     // purpose — it exists to break the bar's silhouette, and a rail header has none.
                     containerColor = AppSurface.bottomChromeAccent(),
                     contentColor = AppSurface.onBottomChromeAccent(),
+                    // ALL FOUR slots, not just the default one. `pressedElevation` left at M3's 6dp
+                    // brings the shadow back the instant a finger lands on the button — i.e. in
+                    // exactly the frame the owner would be looking at while judging whether it is
+                    // gone. `focused`/`hovered` are the same story on a keyboard and on desktop web.
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp,
+                        focusedElevation = 0.dp,
+                        hoveredElevation = 0.dp,
+                    ),
                     modifier = Modifier
                         .size(V2ShellMetrics.AiButtonSize)
-                        // Read in the DRAW phase (lambda form), so the 180ms hand-off does not
-                        // recompose the shell — and with it the hosted screen.
-                        .graphicsLayer {
-                            val scale = lerp(1f, V2ChatMotion.ButtonHandoffScale, handoff)
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = 1f - handoff
-                        }
                         // The hit area above is the one node TalkBack and the tests see; leaving the
                         // FAB's own button semantics in place would announce the AI entry point
                         // twice and make `onNodeWithContentDescription` ambiguous. Its POINTER input
@@ -664,6 +731,7 @@ private fun V2ShellCompactBar(
                         .clearAndSetSemantics { },
                 ) {
                     Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
+                }
                 }
             }
         }

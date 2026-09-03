@@ -18,8 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -31,15 +29,16 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -125,11 +124,38 @@ data class DuePresetChip(val id: DuePresetId, val label: String)
 @Immutable
 data class DuePresetCell(val id: DuePresetId, val label: String, val timeLabel: String)
 
-/** Visible height floor of the two-line planner cell, before it grows for a wrapped label. */
-private val DueCellMinHeight = 62.dp
+/**
+ * Visible height floor of the two-line planner cell, before it grows for a wrapped label.
+ *
+ * 56dp since 2026-09-03, down from 62dp: the plate's gutters went from 8dp to 2dp, so the six cells
+ * gave back 12dp of grid height, and spending part of it on shorter cells keeps the expanded panel
+ * within the budget the 320×568 frame is measured against. Still a floor, never a height.
+ */
+private val DueCellMinHeight = 56.dp
 
-/** Corner of a planner cell. `AppShapes.medium`'s 16dp on a 62dp box; a pill would read as a chip. */
-private val DueCellCorner = 14.dp
+/**
+ * Corner of a planner cell where it meets ANOTHER cell — a hairline seam inside one plate.
+ *
+ * The six cells used to be six separately outlined boxes 8dp apart, which reads as six framed
+ * controls stacked on a slab (the "table" the owner rejected on 2026-09-03). At a 2dp gutter with a
+ * 6dp inner corner they read as ONE plate whose cells are its segments — the same construction M3
+ * gives a segmented button, where the group carries the boundary and the members do not each wear a
+ * ring. That is also why the idle border could go: the fill alone is ΔL\* +10.3 light / +5.35 dark
+ * off the chrome, a bigger step than the fill+line the rail's chips get.
+ */
+private val DueCellCornerInner = 6.dp
+
+/** Corner of a planner cell where it is an OUTER corner of the plate — the block's own radius. */
+private val DueCellCornerOuter = 16.dp
+
+/**
+ * The ring on the SELECTED planner cell.
+ *
+ * Thicker than [AppDimens.DividerThickness] on purpose: it is now the only cell in the plate carrying
+ * a line at all, so it has to read as a state rather than as a leftover border. Colour is never the
+ * only channel — `GistiSchedule.activeContainer` changes the fill underneath it in the same step.
+ */
+private val DueCellSelectedRing = 1.5.dp
 
 /**
  * Inner horizontal padding of a rail chip's label.
@@ -141,8 +167,18 @@ private val DueCellCorner = 14.dp
  */
 private val ChipLabelPadding = AppDimens.SpacingMd
 
-/** Icon size inside a rail chip / planner control. Matches [SourceRow]'s pills. */
+/** Icon size inside a rail chip / planner cell. Matches [SourceRow]'s pills. */
 private val DueIconSize = 16.dp
+
+/**
+ * Icon size in a [DuePlannerSettingsCard] row — the leading glyph and the trailing chevron.
+ *
+ * 20dp rather than the rail's [DueIconSize]: these rows are a full-width list on a `bodyMedium`
+ * baseline, not chips on a `labelMedium` one, and a 16dp glyph beside 14sp text in a 48dp row reads
+ * as an afterthought. It is also the number the divider's start indent is built from, so the two
+ * cannot come apart.
+ */
+private val DueSettingIconSize = 20.dp
 
 /**
  * The due-date rail: the current answer on the left, one-tap presets after it, on ONE line always.
@@ -225,17 +261,21 @@ fun DueRailRow(
     expandedStateLabel: String = stringResource(Res.string.due_rail_expanded_a11y),
     collapsedStateLabel: String = stringResource(Res.string.due_rail_collapsed_a11y),
     /**
-     * Chips that belong to the same line but are NOT answers to "when" — in practice the Important
-     * toggle the dock has always carried.
+     * A control that belongs to this line but is NOT an answer to "when": pinned after the scrolling
+     * half, folded away with the offers while the planner is open.
      *
-     * A slot rather than a typed parameter, for the same reason [QuickCaptureDock] takes slots: the
-     * toggle is driven by feature-layer draft state that has no business in the design system.
+     * A slot rather than a typed parameter, for the same reason [QuickCaptureDock] takes slots — a
+     * pinned control here is driven by feature-layer state that has no business in the design system.
      *
-     * It is rendered INSIDE this row, last, and that placement is the whole point. Hosted as a
-     * sibling row underneath instead, it costs a permanent extra line of dock height — on the
-     * over-constrained window that filled the frame edge to edge and left the scrim no page to dim
-     * (`CaptureDockShoulderTest`, 2026-08-18). Here it costs nothing but the scroll it may push the
-     * last offer under, and it folds away entirely while the planner is open.
+     * ## Nothing passes it today, and that is not an oversight
+     * Its only user was the Important toggle, which moved into the input row on 2026-09-03 (owner:
+     * the chip "очень плохо выглядит и находится в плохом месте"). Both capture docks now mount it as
+     * `QuickCaptureDock(trailingToggle = …)` → `AddItemInputField`, where it cannot scroll away, does
+     * not fold with the planner and does not spend ~56dp of the rail. The parameter survives because
+     * the *shape* is still the right answer for a pinned non-answer chip, should one appear.
+     *
+     * ⚠️ It owns the row's END inset while it is set — the scrolling half deliberately drops its own
+     * `end` padding in that case, so the dock's 16dp is applied exactly once. See the scroll Row.
      */
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -276,9 +316,20 @@ fun DueRailRow(
                 // INSIDE the scroll, not outside it. Applied to the viewport instead, the inset
                 // would stay put while the chips slid under it and the row would clip 20dp short of
                 // its own edge; as content padding it scrolls away with the first chip, which is
-                // what makes the fade land on a pill rather than on a gap. No END inset here: this
-                // half runs to the pinned chip, and the fade is what marks that edge.
-                .padding(start = horizontalPadding),
+                // what makes the fade land on a pill rather than on a gap.
+                //
+                // The END inset exists only when nothing is pinned after this half, and that
+                // condition is load-bearing rather than tidy. With a [trailing] slot the row runs to
+                // THAT chip, which carries the dock's inset itself — adding one here too would show
+                // as a double gap before it. With no trailing slot (the shape both capture docks took
+                // on 2026-09-03, when Important moved into the input row) the scroll content runs to
+                // the dock's own edge: scrolled to the end the fade switches off, and without this
+                // the last offer sat flush against the window at 0dp while the lead chip kept its
+                // 16dp on the left. Invisible in every golden, because a golden is at scroll 0.
+                .padding(
+                    start = horizontalPadding,
+                    end = if (trailing == null) horizontalPadding else 0.dp,
+                ),
             horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
             // The chips differ in height by a hair (the lead chip carries labelLarge, the pills
             // labelMedium) and heightIn lets each keep its own. Without this they would be stretched
@@ -314,16 +365,15 @@ fun DueRailRow(
             }
         }
 
-        // PINNED, outside the scroll — and that placement is the finding rather than the taste.
-        // Measured on the recorded frames the day the rail started scrolling: with three offers the
-        // Important toggle was visible for 23dp against a 24dp fade, i.e. every visible pixel of it
-        // sat inside the gradient; with a date applied the wider lead chip pushed it off the edge
-        // entirely. A shipped control that does not exist on screen in the commonest state is the
-        // most expensive defect class in this project, and its ON state was unobservable too.
+        // PINNED, outside the scroll — the placement is what the slot is FOR. The scrolling half is
+        // the list of answers to "when"; a control that is not one of them must not go looking for
+        // the user, and measured on the frames of the day this row started scrolling, one that did
+        // was visible for 23dp against a 24dp fade (every visible pixel inside the gradient) and
+        // disappeared entirely once the lead chip carried a date.
         //
-        // Pinning also matches what this row already says about itself: the scrolling half is the
-        // list of ANSWERS to "when", and Important is not one of them — it is a modifier on the task
-        // being sent. A list scrolls; a modifier does not go looking for the user.
+        // It carries the row's END inset while it is set, which is why the scrolling half above
+        // drops its own — two would read as a double gap. Nothing passes this slot today; see the
+        // parameter's KDoc for where Important went.
         if (trailing != null) {
             AnimatedVisibility(visible = !expanded, enter = foldEnter, exit = foldExit) {
                 Row(
@@ -557,8 +607,8 @@ private fun DuePresetPill(label: String, onClick: () -> Unit) {
 }
 
 /**
- * The planner: a 2×3 grid of dated offers plus the `[Time] [Repeat] [Done]` control row, expanding
- * inside the dock under [DueRailRow].
+ * The planner: a 2×3 PLATE of dated offers, the Time / Repeat settings card under it and a trailing
+ * Done, expanding inside the dock under [DueRailRow].
  *
  * ## What this component deliberately does NOT do
  * It does not host a date picker, a time picker or the repeat sheet. Those live in
@@ -571,12 +621,12 @@ private fun DuePresetPill(label: String, onClick: () -> Unit) {
  * It also holds no state. `expanded`, the current preset, the resolved time and the repeat summary
  * are all parameters; the panel renders them and reports taps.
  *
- * ## Repeat is disabled, not hidden, without a date
- * A repeat rule has nothing to repeat FROM until there is an anchor date, so the chip cannot work.
- * It stays on screen and greyed rather than vanishing, because a control that appears and disappears
- * as a side effect of an unrelated tap is a layout that moves under the user's finger — and because
- * a visible-but-off control is what teaches the user that a date unlocks it. `Surface(enabled=false)`
- * carries this to TalkBack as `disabled` for free.
+ * ## Neither setting is ever disabled — Repeat least of all
+ * This paragraph used to say the opposite ("Repeat is disabled, not hidden, without a date"), and it
+ * was stale from 2026-08-19 until 2026-09-03: the gate had already been removed in
+ * [DuePlannerSettingsCard] while this KDoc kept documenting it. A repeat REPLACES the date rather
+ * than decorating it (`TaskDraft.withRepeat` nulls `reminderAt`), so gating it asked the user to pick
+ * a date the very next step would delete. Both rows are live from an empty draft.
  *
  * ## Expansion is animated as a size, not dragged
  * A vertical `AnchoredDraggableState` here would nest a drag inside the dock's own gesture surface
@@ -594,10 +644,9 @@ private fun DuePresetPill(label: String, onClick: () -> Unit) {
  * @param selectedPreset the preset the current date came from, or `null`. Selection changes FILL and
  *   BORDER only — never padding, weight or glyphs — because a cell that grew on selection would stop
  *   fitting the equal column measured for it.
- * @param timeValueLabel the resolved time shown on the Time chip ("19:00").
- * @param repeatValueLabel the repeat summary shown on the Repeat chip ("Off", "Daily").
+ * @param timeValueLabel the resolved time shown on the Time row ("19:00").
+ * @param repeatValueLabel the repeat summary shown on the Repeat row ("Off", "Daily").
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DuePlannerPanel(
     expanded: Boolean,
@@ -635,85 +684,92 @@ fun DuePlannerPanel(
                 .padding(horizontal = horizontalPadding, vertical = AppDimens.SpacingSm),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
         ) {
+            // ── Zone A: the preset PLATE ────────────────────────────────────────────────────────
             // Six slots in rows of three: the five dated offers, then "Pick date". Built as one list
             // and chunked rather than as two hand-written rows, so a set of a different size still
             // produces a grid instead of an off-by-one.
+            //
+            // Its own Column, with the 2dp gutter, nested inside the panel's 8dp one: the plate is a
+            // single object here, and the two settings rows and Done are the zones beside it.
             val slots: List<DuePlannerSlot> =
                 cells.map { DuePlannerSlot.Preset(it) } + DuePlannerSlot.PickDate
-            slots.chunked(DuePlannerColumns).forEach { group ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                    // IntrinsicSize.Min, so every cell in a row is as tall as the tallest one in it.
-                    // Without it a wrapped label ("След. неделя" at fontScale 1.3 on a 320dp dock)
-                    // leaves one cell taller than its row-mates — peers at two different heights,
-                    // the same defect the source-pill grid's equal-column rule exists to prevent.
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                ) {
-                    group.forEach { slot ->
-                        when (slot) {
-                            is DuePlannerSlot.Preset -> DuePlannerCell(
-                                label = slot.cell.label,
-                                secondaryLabel = slot.cell.timeLabel,
-                                icon = null,
-                                selected = slot.cell.id == selectedPreset,
-                                onClick = { onPresetClick(slot.cell.id) },
+            val rows = slots.chunked(DuePlannerColumns)
+            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs)) {
+                rows.forEachIndexed { rowIndex, group ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
+                        // IntrinsicSize.Min, so every cell in a row is as tall as the tallest one in
+                        // it. Without it a wrapped label ("След. неделя" at fontScale 1.3 on a 320dp
+                        // dock) leaves one cell taller than its row-mates — peers at two different
+                        // heights, the same defect the source-pill grid's equal-column rule prevents.
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    ) {
+                        group.forEachIndexed { columnIndex, slot ->
+                            // From the SLOT INDEX, never from "is this the last child": a short final
+                            // row keeps its `Spacer(weight(1f))` padding, so the last CELL of that row
+                            // is not the plate's bottom-right corner and must not be rounded like one.
+                            val shape = duePlannerCellShape(
+                                rowIndex = rowIndex,
+                                columnIndex = columnIndex,
+                                rowCount = rows.size,
                             )
+                            when (slot) {
+                                is DuePlannerSlot.Preset -> DuePlannerCell(
+                                    label = slot.cell.label,
+                                    secondaryLabel = slot.cell.timeLabel,
+                                    icon = null,
+                                    selected = slot.cell.id == selectedPreset,
+                                    shape = shape,
+                                    onClick = { onPresetClick(slot.cell.id) },
+                                )
 
-                            DuePlannerSlot.PickDate -> DuePlannerCell(
-                                label = pickDateLabel,
-                                secondaryLabel = null,
-                                icon = Icons.Outlined.CalendarMonth,
-                                // Not a member of the preset set: this cell opens a picker rather
-                                // than producing a value, so it never carries the current answer.
-                                selected = null,
-                                onClick = onPickDateClick,
-                            )
+                                DuePlannerSlot.PickDate -> DuePlannerCell(
+                                    label = pickDateLabel,
+                                    secondaryLabel = null,
+                                    icon = Icons.Outlined.CalendarMonth,
+                                    // Not a member of the preset set: this cell opens a picker rather
+                                    // than producing a value, so it never carries the current answer.
+                                    selected = null,
+                                    shape = shape,
+                                    onClick = onPickDateClick,
+                                )
+                            }
                         }
+                        // Pad a short final row so its cells keep the width of their peers above
+                        // instead of stretching. Unreachable with the five presets shipped today;
+                        // here because the grid takes its cells as a parameter.
+                        repeat(DuePlannerColumns - group.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    // Pad a short final row so its cells keep the width of their peers above instead
-                    // of stretching. Unreachable with the five presets shipped today; here because
-                    // the grid takes its cells as a parameter.
-                    repeat(DuePlannerColumns - group.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
 
-            // Bottom, not CenterVertically: once the two value chips wrap to two lines (fontScale
-            // 1.5, or RU at 1.3 on a 320dp dock) a centred Done floats against the gap between them.
-            // Aligned to the bottom it sits beside the LAST control, which is also the reading order
-            // — set these, then commit.
-            Row(verticalAlignment = Alignment.Bottom) {
-                // The two value chips wrap between themselves; Done never wraps away from the row.
-                // A Row measures its non-weighted child first, so Done keeps its intrinsic width and
-                // the FlowRow takes whatever is left — which is exactly the priority order here.
-                FlowRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-                ) {
-                    DuePlannerControlChip(
-                        icon = Icons.Outlined.Schedule,
-                        label = timeLabel,
-                        value = timeValueLabel,
-                        onClick = onTimeClick,
-                    )
-                    DuePlannerControlChip(
-                        icon = Icons.Outlined.Repeat,
-                        label = repeatLabel,
-                        value = repeatValueLabel,
-                        // Live from an empty draft — a repeat replaces the date rather than needing
-                        // one. See [DuePlannerControlChip].
-                        onClick = onRepeatClick,
-                    )
-                }
-                Spacer(Modifier.width(AppDimens.SpacingSm))
-                AppButton(
+            // ── Zone B: Time and Repeat, as ONE settings card ───────────────────────────────────
+            DuePlannerSettingsCard(
+                timeLabel = timeLabel,
+                timeValue = timeValueLabel,
+                repeatLabel = repeatLabel,
+                repeatValue = repeatValueLabel,
+                onTimeClick = onTimeClick,
+                onRepeatClick = onRepeatClick,
+            )
+
+            // ── Zone C: Done ────────────────────────────────────────────────────────────────────
+            // Its own row, trailing-aligned, and a TEXT button. Done dismisses the panel; the action
+            // that commits the task is the `+` in the field ~40dp below it, which is filled `primary`.
+            // Two filled blue buttons that close to each other give the dock two primary actions and
+            // make the louder one the one that only closes a panel.
+            //
+            // The old `Row(Bottom) { FlowRow(weight(1f)) { two chips } Done }` went away with the
+            // chips, and with it the wrap-at-fontScale-1.5 hazard that construction existed to
+            // survive: nothing shares this row now.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                AppButtonText(
                     text = doneLabel,
                     onClick = onDoneClick,
-                    // Pill, not AppShapeTokens.Button. This button sits INLINE in a row of pill
-                    // controls, and a 14dp corner beside 24dp ones is the "several kits in one
-                    // frame" reading the bottom-chrome tokens were unified to remove. Everywhere a
-                    // button stands alone, the 14dp default still applies.
-                    shape = AppShapeTokens.Pill,
+                    modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
                 )
             }
         }
@@ -740,6 +796,10 @@ private sealed interface DuePlannerSlot {
  * @param selected `true`/`false` for a member of the preset set, **`null`** for the picker door,
  *   which is not a member of any set. Only the first two write `semantics { selected }`; a door
  *   announced "not selected" is a claim about state on a thing that has none.
+ * @param shape this cell's corners, computed by [duePlannerCellShape] from its slot in the plate —
+ *   round on the plate's four outer corners, near-square against its neighbours. It is a PARAMETER
+ *   because a cell cannot know where it sits, and reading "am I the last child" here is exactly the
+ *   answer a short final row makes wrong.
  */
 @Composable
 private fun RowScope.DuePlannerCell(
@@ -747,6 +807,7 @@ private fun RowScope.DuePlannerCell(
     secondaryLabel: String?,
     icon: ImageVector?,
     selected: Boolean?,
+    shape: RoundedCornerShape,
     onClick: () -> Unit,
 ) {
     // Aliased: inside `semantics { }` the name `selected` resolves to the semantics property being
@@ -755,13 +816,20 @@ private fun RowScope.DuePlannerCell(
     val isFilled = selected == true
     val container = if (isFilled) GistiSchedule.activeContainer else AppChatColors.raised()
     val labelColor = if (isFilled) GistiSchedule.activeContent else MaterialTheme.colorScheme.onSurface
-    val border = if (isFilled) MaterialTheme.colorScheme.primary else AppChatColors.controlOutline()
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(DueCellCorner),
+        shape = shape,
         color = container,
-        border = BorderStroke(AppDimens.DividerThickness, border),
+        // Only the SELECTED cell carries a line. An idle ring on all six turned the plate back into
+        // six framed boxes — see [DueCellCornerInner]. `null` rather than a transparent stroke: a
+        // BorderStroke of any colour still insets the content by its width, and a 1dp inset that
+        // appears on selection would move the label under the user's finger.
+        border = if (isFilled) {
+            BorderStroke(DueCellSelectedRing, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
@@ -809,9 +877,46 @@ private fun RowScope.DuePlannerCell(
 }
 
 /**
- * A `[icon] Label value` chip in the planner's control row — Time and Repeat.
+ * The corners of one plate cell, from its slot rather than from its content.
  *
- * ## Neither of them is ever disabled, and Repeat is the interesting one
+ * 16dp on the four outer corners of the whole block, [DueCellCornerInner] everywhere the cell meets
+ * a neighbour. Taking the row and column INDEX is the point: with a short final row the last cell of
+ * that row is not the plate's bottom-right corner (a `Spacer` is), so "is this the last child" would
+ * round a corner in the middle of the block's bottom edge.
+ */
+private fun duePlannerCellShape(
+    rowIndex: Int,
+    columnIndex: Int,
+    rowCount: Int,
+): RoundedCornerShape {
+    val firstRow = rowIndex == 0
+    val lastRow = rowIndex == rowCount - 1
+    val firstColumn = columnIndex == 0
+    val lastColumn = columnIndex == DuePlannerColumns - 1
+    fun corner(outer: Boolean) = if (outer) DueCellCornerOuter else DueCellCornerInner
+    return RoundedCornerShape(
+        topStart = corner(firstRow && firstColumn),
+        topEnd = corner(firstRow && lastColumn),
+        bottomEnd = corner(lastRow && lastColumn),
+        bottomStart = corner(lastRow && firstColumn),
+    )
+}
+
+/**
+ * Time and Repeat as ONE card of two rows — the v1 `ReminderSheet` row language, lifted rather than
+ * re-invented (project rule: a v2 surface extends the v1 component it replaces).
+ *
+ * ## Why a card and not the two pills it replaces
+ * They were two `[icon] Label value` chips in a `FlowRow` beside a filled Done button: three
+ * pill-shaped controls in one row, two of which open a sheet and one of which closes the panel, all
+ * drawn the same way. Under the plate they now read as what they are — the two settings that qualify
+ * whatever the plate answered.
+ *
+ * [AppChatColors.contentOutline] on the card, not [AppChatColors.controlOutline]: the card is a
+ * GROUP, its rows are the targets, and a firm ring around a full-width settings card is the
+ * "decorative frame" `AppChatColors` exists to avoid. The rows are told apart by the divider.
+ *
+ * ## Neither row is ever disabled, and Repeat is the interesting one
  * Repeat shipped greyed until there was a date, on the model "a repeat is a modifier on a date".
  * The draft says otherwise: `TaskDraft.withRepeat(config)` sets `reminderAt = null` and
  * `reminderPreset = null`, i.e. saving a rule REPLACES the date rather than decorating it, and the
@@ -821,51 +926,92 @@ private fun RowScope.DuePlannerCell(
  * find that out. A recurring answer is reachable in one tap now, from an empty draft (2026-08-19).
  */
 @Composable
-private fun DuePlannerControlChip(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    onClick: () -> Unit,
+private fun DuePlannerSettingsCard(
+    timeLabel: String,
+    timeValue: String,
+    repeatLabel: String,
+    repeatValue: String,
+    onTimeClick: () -> Unit,
+    onRepeatClick: () -> Unit,
 ) {
-    val contentColor = MaterialTheme.colorScheme.onSurface
-    val valueColor = MaterialTheme.colorScheme.onSurfaceVariant
-
     Surface(
-        onClick = onClick,
-        shape = AppShapeTokens.Pill,
+        shape = MaterialTheme.shapes.medium,
         color = AppChatColors.raised(),
-        border = BorderStroke(AppDimens.DividerThickness, AppChatColors.controlOutline()),
-        modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
+        border = BorderStroke(AppDimens.DividerThickness, AppChatColors.contentOutline()),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-            modifier = Modifier.padding(horizontal = AppDimens.SpacingSm),
-        ) {
-            Icon(
-                // Decorative — the label beside it is the accessible name, and `Surface(onClick)`
-                // merges descendants, so a description would replace the name instead of adding.
-                imageVector = icon,
-                contentDescription = null,
-                tint = valueColor,
-                modifier = Modifier.size(DueIconSize),
+        Column(modifier = Modifier.fillMaxWidth()) {
+            DuePlannerSettingRow(
+                icon = Icons.Outlined.Schedule,
+                label = timeLabel,
+                value = timeValue,
+                onClick = onTimeClick,
             )
-            // labelMedium and SpacingSm padding, for the same reason as the rail's pills: at
-            // labelLarge / SpacingMd the pair needed 234dp of the 230dp left beside Done and wrapped
-            // onto two lines at 360dp / fontScale 1.0, which cost ~50dp of an already 200dp+ dock.
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColor,
+            // Indented past the icon column, so the divider separates the two ROWS instead of cutting
+            // the card in half across its leading edge. Expressed as the icon's own width plus the
+            // gap and the padding before it rather than as a 46dp literal, so it follows all three.
+            HorizontalDivider(
+                thickness = AppDimens.DividerThickness,
+                color = AppChatColors.contentOutline(),
+                modifier = Modifier.padding(
+                    start = AppDimens.SpacingMd + DueSettingIconSize + AppDimens.SpacingMd,
+                ),
             )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.labelMedium,
-                color = valueColor,
+            DuePlannerSettingRow(
+                icon = Icons.Outlined.Repeat,
+                label = repeatLabel,
+                value = repeatValue,
+                // Live from an empty draft — a repeat replaces the date rather than needing one.
+                onClick = onRepeatClick,
             )
         }
     }
 }
 
-/** M3's disabled content opacity. Named rather than repeated at the four call sites above. */
-private const val DisabledContentAlpha = 0.38f
+/** One `[icon] Label … value ›` row of [DuePlannerSettingsCard]. */
+@Composable
+private fun DuePlannerSettingRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+) {
+    val valueColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick, role = Role.Button)
+            // `heightIn`, never `height`: the RU and HI labels grow, and a fixed height pins the max
+            // as well as the min — the exact defect this project already fixed once in this file.
+            .heightIn(min = AppDimens.MinTouchTarget)
+            .padding(horizontal = AppDimens.SpacingMd, vertical = AppDimens.SpacingSm),
+    ) {
+        Icon(
+            // Decorative — the label beside it is the row's accessible name, and `clickable` merges
+            // descendants, so a description here would replace that name instead of adding to it.
+            imageVector = icon,
+            contentDescription = null,
+            tint = valueColor,
+            modifier = Modifier.size(DueSettingIconSize),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = valueColor,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = valueColor,
+            modifier = Modifier.size(DueSettingIconSize),
+        )
+    }
+}

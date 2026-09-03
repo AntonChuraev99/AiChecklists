@@ -103,6 +103,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChromeScrim
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.ImportantStarToggle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
@@ -431,9 +432,15 @@ fun CalendarScreen(
                                 draft = draft,
                                 due = due,
                                 onIntent = onDueIntent,
-                                onImportantToggle = {
-                                    onCreateChipAction(GistiItemCreateAction.IMPORTANT)
-                                },
+                            )
+                        },
+                        // The same toggle the Inbox dock mounts, in the same seat — the two capture
+                        // tabs are one surface and an Important that lives in two places would be
+                        // exactly the drift this shared dock exists to prevent.
+                        trailingToggle = {
+                            ImportantStarToggle(
+                                selected = draft.important,
+                                onClick = { onCreateChipAction(GistiItemCreateAction.IMPORTANT) },
                             )
                         },
                         // Same four doors as the Inbox tab, from the same shared component — the

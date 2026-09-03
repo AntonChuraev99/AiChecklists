@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-09-03_
 
-Быстрый поиск по 86+ накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 87 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-09-03 | ui-testing | roborazzi, screenshot-test, focused-input, idle-timeout, colour-probe, overflow-content, layering, clipping | [Roborazzi Screenshot Cycle — Four Traps in UI Testing](ui-improvements/bottom-chrome-screenshot-cycle-traps-2026-09-03.md) |
 | 2026-08-18 | repo-policy | gitignore whitelist, public repo, docs in MR, leak gate, pre-commit, CI guard, worktree rules | [Docs published by whitelist, numbers never](../decisions/2026-08-18-docs-published-by-whitelist.md) |
 | 2026-08-14 | android-manifest | tools:node="remove", InitializationProvider, ContentProvider.onCreate, startup, lazy-init, Configuration.Provider | [Manifest — Remove Third-Party Initializer from Startup Path](manifest-remove-third-party-initializer-2026-08-14.md) |
 | 2026-08-13 | bug-fix | first_launch_at, install_attributed, setUserPropertiesOnce, days_since_install, google-ads-attribution, install-referrer, gclid | [Fix `first_launch_at` and ship `install_attributed` event](install-referrer-attribution-first-launch-date-2026-08-13.md) |

@@ -256,6 +256,17 @@ fun QuickCaptureDock(
      * the dock is up, which either slot satisfies.
      */
     belowInput: (@Composable () -> Unit)? = null,
+    /**
+     * A toggle rendered INSIDE the input row, in the field's trailing slot immediately before the
+     * "+" — in practice [ImportantStarToggle], carrying the draft's `important` flag.
+     *
+     * A slot for the same reason [aboveInput] is one: the flag belongs to a feature-layer draft. It
+     * is a parameter of the DOCK rather than something the host puts in [aboveInput], because the
+     * arrangement it joins — one container, one trailing edge, two actions on the thing they act on —
+     * is this dock's, and a host that assembled it itself would drift between the two capture tabs.
+     * That drift is exactly what this shared component exists to prevent.
+     */
+    trailingToggle: (@Composable () -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -326,6 +337,7 @@ fun QuickCaptureDock(
                     placeholder = placeholder,
                     highlightRange = highlightRange,
                     focusRequester = focusRequester,
+                    trailingToggle = trailingToggle,
                     modifier = Modifier
                         .adaptiveContentWidth()
                         .padding(

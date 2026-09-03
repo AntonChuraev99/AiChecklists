@@ -89,6 +89,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -138,6 +139,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChrom
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.ImportantStarToggle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
@@ -301,7 +303,18 @@ fun InboxScreen(
     // state change that did not happen is not free: it is an intent per mount, and a host that reads
     // "the screen raised something" as "the user reached for the dock" would open it. Not
     // hypothetical: `InboxAddTaskRowTest` is exactly such a host, and this is what it caught.
-    var dockWasOpen by remember { mutableStateOf(false) }
+    // `rememberSaveable`, matching the Calendar host, which runs the identical effect.
+    //
+    // ⚠️ For CONSISTENCY, not for a reachable bug, and the difference is worth writing down because
+    // the obvious reading is wrong. A plain `remember` really is lost on a configuration change — but
+    // the restore recreates the composition, which relaunches `LaunchedEffect(captureDockRenders)`
+    // with the dock still open, and that re-sets the flag to true before anything can close. The flag
+    // self-heals, so the two spellings are behaviourally identical here (verified by mutation, and
+    // `CaptureDockPlannerCollapseOnCloseTest` passes on both). What the alignment buys is that the two
+    // capture hosts stop disagreeing about a flag that carries the same meaning in both — the kind of
+    // difference that reads as a deliberate distinction and is not one. It costs one Boolean in the
+    // saved-state bundle.
+    var dockWasOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(captureDockRenders) {
         if (captureDockRenders) {
             dockWasOpen = true
@@ -488,13 +501,24 @@ fun InboxScreen(
                                 draft = content.draft,
                                 due = content.due,
                                 onIntent = { onIntent(InboxIntent.OnDue(it)) },
-                                onImportantToggle = {
-                                    onIntent(InboxIntent.OnCreateChipAction(GistiItemCreateAction.IMPORTANT))
-                                },
                                 // The tab's own ticking clock, so the rail cannot disagree with the
                                 // list behind it about whether a time has passed — and so a
                                 // screenshot can pin it.
                                 nowMillis = content.nowMillis,
+                            )
+                        },
+                        // Important, in the input row beside the "+" since 2026-09-03 — it used to be
+                        // pinned right of the due rail, where it read as a second primary action and
+                        // folded away with the offers whenever the planner was open. Same intent,
+                        // same draft flag; only the seat changed. See `ImportantStarToggle`.
+                        trailingToggle = {
+                            ImportantStarToggle(
+                                selected = content.draft.important,
+                                onClick = {
+                                    onIntent(
+                                        InboxIntent.OnCreateChipAction(GistiItemCreateAction.IMPORTANT)
+                                    )
+                                },
                             )
                         },
                         // The main entry into Analyze. Inside the dock rather than behind the "+"

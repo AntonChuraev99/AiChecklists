@@ -11,11 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -31,14 +27,12 @@ import aichecklists.core.designsystem.generated.resources.due_preset_weekend
 import aichecklists.core.designsystem.generated.resources.due_rail_clear_a11y
 import aichecklists.core.designsystem.generated.resources.due_rail_clear_repeat_a11y
 import aichecklists.core.designsystem.generated.resources.due_rail_no_date
-import aichecklists.core.designsystem.generated.resources.item_create_chip_important
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.desingsystem.components.DuePlannerPanel
 import com.antonchuraev.homesearchchecklist.desingsystem.components.DuePresetCell
 import com.antonchuraev.homesearchchecklist.desingsystem.components.DuePresetChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.DuePresetId
 import com.antonchuraev.homesearchchecklist.desingsystem.components.DueRailRow
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipItem
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
@@ -52,8 +46,7 @@ import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The capture dock's `aboveInput` slot: the due rail, the planner it expands into, and the Important
- * toggle.
+ * The capture dock's `aboveInput` slot: the due rail and the planner it expands into.
  *
  * ONE composable for both capture hosts. It replaces `TaskCreateChipsRow` in the dock (that row stays
  * on the checklist detail screen, which is a different surface with a different width budget), and
@@ -61,22 +54,20 @@ import org.jetbrains.compose.resources.stringResource
  * can be showing, so drawing it again above the rail would be the same answer twice — and it was
  * literally the second line this rail was designed to reclaim.
  *
- * ## Where "Important" went, and why it is here at all
- * The approved rail mock dropped it. It is not droppable: the chip is shipped behaviour of both docks
+ * ## Where "Important" went — it is NOT here any more
+ * It used to ride in [DueRailRow]'s `trailing` slot, pinned right of the scrolling offers, glyph-only
+ * and filled `primary` when on. The owner reopened that on 2026-09-03 ("кнопка добавить в избранное…
+ * очень плохо выглядит и находится в плохом месте") and it moved into the INPUT ROW, beside the
+ * submit "+", as
+ * [ImportantStarToggle][com.antonchuraev.homesearchchecklist.desingsystem.components.ImportantStarToggle]
+ * — passed by each host to `QuickCaptureDock(trailingToggle = …)`.
+ *
+ * Moved, not dropped: the flag is shipped behaviour of both docks
  * (`GistiItemCreateAction.IMPORTANT` → `TaskDraft.important` → `priority = 1` on both halves of the
  * created pair), and silently deleting a user-facing control is the most expensive class of defect in
- * this project.
- *
- * It sits INSIDE the rail's own row, via [DueRailRow]'s `trailing` slot, and that placement was paid
- * for: hosted as a sibling row underneath — the first shape this took — it cost a permanent extra
- * line of dock height on EVERY capture, including the 96.6% that never set a date. On the
- * over-constrained window that made the dock fill the frame edge to edge and left the page scrim
- * nothing to dim; `CaptureDockShoulderTest` failed on exactly that.
- *
- * Since 2026-08-19 the rail scrolls instead of wrapping, so the toggle can no longer cost a line at
- * any width — and it folds away with the offers while the planner is open (owner's call: «скрывать
- * при выборе даты»). Folding, not deleting: it is back the moment the panel closes, and the state it
- * carries is the draft's, untouched by either.
+ * this project. Two things improved with the move: it no longer folds away when the planner opens (it
+ * was unreachable in that state), and the ~56dp it held outside the rail's scroll goes back to the
+ * offers, which were clipping mid-word at 360dp.
  *
  * @param nowMillis the clock the whole section is rendered against, so a screenshot can pin it. The
  *   Inbox passes its ticking value; the Calendar tab has none and takes the default.
@@ -86,7 +77,6 @@ fun DueRailSection(
     draft: TaskDraft,
     due: DraftDueUiState,
     onIntent: (DraftDueIntent) -> Unit,
-    onImportantToggle: () -> Unit,
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
     nowMillis: Long = currentTimeMillis(),
@@ -150,33 +140,10 @@ fun DueRailSection(
             } else {
                 stringResource(Res.string.due_rail_clear_a11y)
             },
-            // The v1 chip component, not a local look-alike: it already carries the `selected`
-            // semantics and the 48dp target under a 38dp pill. Inside the rail's own row, so it
-            // never costs a line of dock height — as a sibling row it cost one on every capture,
-            // date or no date.
-            trailing = {
-                GistiSelectableChipItem(
-                    // Filled star when it is ON. The blue fill already says so, but the toggle sits
-                    // pinned at the edge with no label beside it now, so the glyph has to carry the
-                    // state on its own.
-                    icon = if (draft.important) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    label = stringResource(Res.string.item_create_chip_important),
-                    selected = draft.important,
-                    onClick = onImportantToggle,
-                    // Glyph only. Pinned outside the rail's scroll it costs width permanently, and
-                    // a ~100dp labelled pill would leave under 130dp for the offers on a 320dp
-                    // dock — under two of them. The label survives as the accessible name.
-                    labelVisible = false,
-                    // Raised to the rail's own pill height. This chip rests at 38dp visible with
-                    // `minimumInteractiveComponentSize` making up the touch target, which is right
-                    // in the chat's chip row it was built for — but beside the rail's 48dp pills it
-                    // read as a smaller, different kind of control, and the 5dp of phantom air per
-                    // side also broke the row-gap assumption the rail's SpacingXs was chosen under
-                    // (UI audit, 2026-08-19). `heightIn`, never `height`: it may still grow with
-                    // Devanagari or a large font scale.
-                    modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
-                )
-            },
+            // No trailing slot any more. Important moved into the INPUT ROW on 2026-09-03 — see this
+            // file's KDoc and `ImportantStarToggle`. The parameter stays on [DueRailRow] as design
+            // system API; this dock passes nothing.
+            trailing = null,
         )
 
         DuePlannerPanel(

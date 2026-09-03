@@ -194,15 +194,37 @@ object AppSurface {
      * |---|---|---|
      * | `surfaceContainerLowest` `#FFFFFF` — the REJECTED bar | +1.7 | 1.04 : 1 |
      * | `surfaceContainerHighest` `#E6E4DF` | −7.7 | 1.22 : 1 |
-     * | **`surfaceDim` `#DEDCD6` — chosen** | **−10.5** | **1.31 : 1** |
+     * | **[GistiColors.chrome] `#DCE2EC` — chosen 2026-09-03** | **−8.6** | **1.25 : 1** |
+     * | `surfaceDim` `#DEDCD6` — the REJECTED warm grey | −10.5 | 1.31 : 1 |
      * | `inverseSurface` `#322F35` — the REJECTED ink plinth | −78.4 | 12.63 : 1 |
      *
      * | Dark: candidate ↔ page `#121317` (L\* 5.9) | ΔL\* | ratio |
      * |---|---|---|
      * | `surfaceContainerLowest` `#0D0E11` | −2.0 | 1.04 : 1 |
-     * | **`surfaceContainerLow` `#1A1C20` — chosen** | **+4.3** | **1.09 : 1** |
+     * | `surfaceContainerLow` `#1A1C20` — the previous value | +4.3 | 1.09 : 1 |
+     * | **[GistiColors.chrome] `#191D25` — chosen 2026-09-03** | **+4.85** | **1.10 : 1** |
      * | `surfaceContainerHigh` `#26282E` | +10.2 | 1.26 : 1 |
      * | `surfaceContainerHighest` `#2D2F35` — the REJECTED pale slab | +13.5 | 1.39 : 1 |
+     *
+     * ## Why a literal, and what the 2026-09-03 re-tune had to survive
+     * The owner rejected the family as GREY, not as mis-levelled ("мне не нравится текущий серый
+     * цвет"), so the axis of this re-tune is CHROMA and no Material role can supply it: every neutral
+     * in this palette at this lightness is a warm grey of chroma ~3. [GistiColors.chrome] is therefore
+     * the one hex the bottom chrome owns, and it is spent on hue while every relationship the family
+     * was tuned for is kept inside a rounding error of where it was:
+     *
+     * | Relationship | Before | After | Verdict |
+     * |---|---|---|---|
+     * | raised ↔ chrome, light (`#FFFFFF`) | +12.2 | +10.3 | pills / field / cells still read as lifted |
+     * | raised ↔ chrome, dark (`#26282E`) | +5.9 | +5.35 | plus the 1dp `controlOutline`, unchanged |
+     * | seam [bottomChromeSeam] on chrome, light | 3.33 : 1 | 3.50 : 1 | better |
+     * | idle nav label ([onBottomChrome] @0.82) light | 4.50 : 1 | ≈4.75 : 1 | AA, with more headroom |
+     * | idle nav label dark @0.75 | 6.18 : 1 | ≈6.07 : 1 | AA |
+     * | [bottomChromeAccent] pill / FAB on chrome, light | 4.19 : 1 | 4.42 : 1 | ≥3 : 1 (1.4.11), room |
+     * | accent on chrome, dark | 9.75 : 1 | 9.58 : 1 | fine |
+     *
+     * **Nothing measured gets worse in light; dark moves by ≤0.2 of a ratio point.** That is the whole
+     * safety argument for changing a colour four screenshot suites are pinned to.
      *
      * ## Why dark goes UP and light goes DOWN — and why "mirror the light fix" is arithmetically wrong
      * The instinct after the light fix is to mirror it: if light gets a plinth DARKER than the page,
@@ -236,11 +258,7 @@ object AppSurface {
      */
     @Composable
     @ReadOnlyComposable
-    fun bottomChrome(): Color = if (LocalIsDarkTheme.current) {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    } else {
-        MaterialTheme.colorScheme.surfaceDim
-    }
+    fun bottomChrome(): Color = GistiColors.chrome
 
     /**
      * Colour of the 1dp line tracing the TOP edge of a [bottomChrome] surface — the chat dock's

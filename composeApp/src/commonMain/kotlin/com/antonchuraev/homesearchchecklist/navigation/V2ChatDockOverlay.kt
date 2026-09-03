@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,7 +33,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -417,12 +417,19 @@ fun V2ChatDockOverlay(
         // `clickable`, deliberately, and NOT the `detectTapGestures` the Inbox capture dock uses: this
         // scrim is modal. Swallowing the initial press is the POINT here — the list under an open chat
         // must not scroll — whereas the capture dock dims nothing and has to leave the list alive.
+        // Hoisted out of `drawBehind`: a colour role is a composition read, and reading it inside the
+        // draw lambda would put a `MaterialTheme` lookup on every frame of the 260ms fade.
+        //
+        // `colorScheme.scrim`, not `Color.Black`. Same pixels today — the role IS black in both
+        // themes — but the capture dock already dims with the role, and two scrims over the same page
+        // written two ways is how they drift apart at the next theme change.
+        val scrimColor = MaterialTheme.colorScheme.scrim
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .drawBehind {
                     drawRect(
-                        color = Color.Black,
+                        color = scrimColor,
                         alpha = emergence.value * V2ChatMotion.ScrimAlpha,
                     )
                 }

@@ -334,6 +334,11 @@ class SourceRowScreenshotTest {
                     onPresetClick = {},
                 )
             },
+            // The Important toggle, exactly where both hosts mount it since 2026-09-03: the field's
+            // trailing slot, before the "+". Without it these frames would record an input row the
+            // app no longer draws — and the row's width budget is precisely what they are judged on,
+            // so a fixture missing a 44dp control would flatter every one of them.
+            trailingToggle = { ImportantStarToggle(selected = false, onClick = {}) },
             belowInput = {
                 SourceRowSection(
                     // Literal, not `stringResource`: this stands in for the host's copy the way the
