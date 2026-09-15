@@ -197,7 +197,7 @@ class StoreListingFramesScreenshotTest {
      */
     @Test
     @Config(qualifiers = "w360dp-h960dp-port-xxxhdpi")
-    fun a3_rawTemplates() {
+    fun a8_rawTemplates() {
         // The REAL bundled gallery (the same Compose Resource the app reads), not a hand-made list.
         val categories = runBlocking { TemplatesRepositoryImpl(NoopLogger).getTemplatesByCategory() }
         captureRaw("templates") { TemplatesUnderTest(categories) }
@@ -234,7 +234,7 @@ class StoreListingFramesScreenshotTest {
 
     @Test
     @Config(qualifiers = RawQualifiers)
-    fun a8_rawInbox() = captureRaw("inbox") { InboxUnderTest() }
+    fun a3_rawInbox() = captureRaw("inbox") { InboxUnderTest() }
 
     // ── Pass b: store frames ─────────────────────────────────────────────────────────────────────
 
@@ -250,10 +250,7 @@ class StoreListingFramesScreenshotTest {
 
     @Test
     @Config(qualifiers = FrameQualifiers)
-    fun b3_frame03() = composeFrame(
-        "03", "81 templates, or ask AI", "Home, travel, study, shopping and more", "templates", 165f,
-        cropTopDp = CompactTopBarDp,
-    )
+    fun b3_frame03Inbox() = composeFrame("03", "Inbox, Projects,\nOverview", "Capture now, sort it later", "inbox", 195f)
 
     @Test
     @Config(qualifiers = FrameQualifiers)
@@ -283,7 +280,10 @@ class StoreListingFramesScreenshotTest {
 
     @Test
     @Config(qualifiers = FrameQualifiers)
-    fun b8_frame08() = composeFrame("08", "Inbox, Projects,\nOverview", "Capture now, sort it later", "inbox", 195f)
+    fun b8_frame08Templates() = composeFrame(
+        "08", "81 templates, or ask AI", "Home, travel, study, shopping and more", "templates", 165f,
+        cropTopDp = CompactTopBarDp,
+    )
 
     // ── Pass c: feature graphic ──────────────────────────────────────────────────────────────────
 
