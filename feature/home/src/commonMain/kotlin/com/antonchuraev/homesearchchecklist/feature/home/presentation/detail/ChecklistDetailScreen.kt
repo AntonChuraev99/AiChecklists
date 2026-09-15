@@ -371,6 +371,35 @@ fun ChecklistDetailScreen(
     }
 }
 
+/**
+ * Stateless entry to the loaded detail screen, without the chat-dock plumbing.
+ *
+ * Delegates to the single implementation below with no dock — exactly how the v2 arm mounts it
+ * (App.kt passes `chatDockContent = null` there). No second copy of the layout: this overload only
+ * hides the dock-typed parameters, so the screen can be drawn from fixed state (store-listing
+ * screenshots) without Koin ViewModels.
+ *
+ * @param weeklyTodayWeekday ISO weekday (1=Mon..7=Sun) highlighted as today in Weekly view; null (the
+ *   default, and what every production path passes) reads the device clock as before.
+ */
+@Composable
+fun ChecklistDetailContent(
+    state: ChecklistDetailState.Content,
+    onIntent: (ChecklistDetailIntent) -> Unit,
+    useInlineAddRow: Boolean = false,
+    onOpenChat: (() -> Unit)? = null,
+    weeklyTodayWeekday: Int? = null,
+) {
+    ChecklistDetailContent(
+        state = state,
+        onIntent = onIntent,
+        chatDockContent = null,
+        useInlineAddRow = useInlineAddRow,
+        onOpenChat = onOpenChat,
+        weeklyTodayWeekday = weeklyTodayWeekday,
+    )
+}
+
 @Composable
 private fun LoadingContent() {
     Box(
@@ -514,6 +543,8 @@ private fun ChecklistDetailContent(
     useInlineAddRow: Boolean = false,
     /** v2: see [ChecklistDetailScreen]'s parameter of the same name. */
     onOpenChat: (() -> Unit)? = null,
+    /** See the public [ChecklistDetailContent] overload. Null = device clock. */
+    weeklyTodayWeekday: Int? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     // Focus plumbing for the v2 inline add row, so the toolbar "+" still has somewhere to send the
@@ -1303,7 +1334,8 @@ private fun ChecklistDetailContent(
                 when (state.checklist.viewMode) {
                 ChecklistViewMode.Weekly -> {
                     val todayWeekday = remember {
-                        Clock.System.todayIn(TimeZone.currentSystemDefault()).dayOfWeek.isoDayNumber
+                        weeklyTodayWeekday
+                            ?: Clock.System.todayIn(TimeZone.currentSystemDefault()).dayOfWeek.isoDayNumber
                     }
                     WeeklyChecklistDetailContent(
                         state = state,

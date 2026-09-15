@@ -149,6 +149,29 @@ fun TemplatesScreen(
 
     val state by viewModel.screenState.collectAsState()
 
+    TemplatesScreen(
+        state = state,
+        onIntent = viewModel::sendIntent,
+        useProjectTitle = useProjectTitle,
+        onCreateWithAi = onCreateWithAi,
+    )
+}
+
+/**
+ * Stateless templates gallery: renders [state] and reports every action through [onIntent].
+ *
+ * The ViewModel overload above is the production caller; this entry exists so the gallery can be
+ * drawn from fixed state (store-listing screenshots) without Koin. [useProjectTitle] and
+ * [onCreateWithAi] mean exactly what they mean there.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TemplatesScreen(
+    state: TemplatesScreenState,
+    onIntent: (TemplatesScreenIntent) -> Unit,
+    useProjectTitle: Boolean = false,
+    onCreateWithAi: ((query: String?) -> Unit)? = null,
+) {
     val searchFocusRequester = remember { FocusRequester() }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -164,11 +187,11 @@ fun TemplatesScreen(
         } else {
             stringResource(Res.string.create_title)
         },
-        onBackButtonClick = { viewModel.sendIntent(TemplatesScreenIntent.OnBackClick) },
+        onBackButtonClick = { onIntent(TemplatesScreenIntent.OnBackClick) },
         scrollBehavior = scrollBehavior,
         actions = {
             IconButton(
-                onClick = { viewModel.sendIntent(TemplatesScreenIntent.OnToggleSearch) }
+                onClick = { onIntent(TemplatesScreenIntent.OnToggleSearch) }
             ) {
                 Icon(
                     imageVector = if (state.isSearchActive) Icons.Default.Close else Icons.Default.Search,
@@ -191,7 +214,7 @@ fun TemplatesScreen(
             ) {
                 AppTextField(
                     value = state.searchQuery,
-                    onValueChange = { viewModel.sendIntent(TemplatesScreenIntent.OnSearchQueryChange(it)) },
+                    onValueChange = { onIntent(TemplatesScreenIntent.OnSearchQueryChange(it)) },
                     placeholder = stringResource(Res.string.templates_search_placeholder),
                     leadingIcon = {
                         Icon(
@@ -221,7 +244,7 @@ fun TemplatesScreen(
             if (onCreateWithAi != null) {
                 CreateWithAiRow(
                     onClick = {
-                        viewModel.sendIntent(
+                        onIntent(
                             TemplatesScreenIntent.OnCreateWithAiClick(AiEntrySource.TEMPLATES_HEADER)
                         )
                         onCreateWithAi(null)
@@ -253,7 +276,7 @@ fun TemplatesScreen(
                                 {
                                     CreateWithAiButton(
                                         onClick = {
-                                            viewModel.sendIntent(
+                                            onIntent(
                                                 TemplatesScreenIntent.OnCreateWithAiClick(
                                                     AiEntrySource.TEMPLATES_EMPTY
                                                 )
@@ -278,7 +301,7 @@ fun TemplatesScreen(
                                 {
                                     CreateWithAiButton(
                                         onClick = {
-                                            viewModel.sendIntent(
+                                            onIntent(
                                                 TemplatesScreenIntent.OnCreateWithAiClick(
                                                     source = AiEntrySource.TEMPLATES_EMPTY_SEARCH,
                                                     query = state.searchQuery,
@@ -294,7 +317,7 @@ fun TemplatesScreen(
                     else -> {
                         TemplatesContent(
                             categories = state.filteredCategories,
-                            onTemplateClick = { viewModel.sendIntent(TemplatesScreenIntent.OnTemplateClick(it)) }
+                            onTemplateClick = { onIntent(TemplatesScreenIntent.OnTemplateClick(it)) }
                         )
                     }
                 }
@@ -306,7 +329,7 @@ fun TemplatesScreen(
                             .align(Alignment.BottomCenter)
                             .padding(AppDimens.SpacingLg),
                         action = {
-                            TextButton(onClick = { viewModel.sendIntent(TemplatesScreenIntent.OnDismissError) }) {
+                            TextButton(onClick = { onIntent(TemplatesScreenIntent.OnDismissError) }) {
                                 Text(stringResource(Res.string.ok))
                             }
                         }
@@ -319,7 +342,7 @@ fun TemplatesScreen(
             // Bottom action buttons
             BottomActionButtons(
                 canCreateWeeklyChecklist = state.canCreateWeeklyChecklist,
-                onCreateWeekly = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWeeklyClick) },
+                onCreateWeekly = { onIntent(TemplatesScreenIntent.OnCreateWeeklyClick) },
             )
         }
     }

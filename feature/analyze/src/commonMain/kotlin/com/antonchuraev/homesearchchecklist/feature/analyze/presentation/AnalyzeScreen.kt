@@ -122,6 +122,25 @@ fun AnalyzeScreen(
         },
     )
 
+    AnalyzeScreenContent(
+        screenState = screenState,
+        onIntent = viewModel::sendIntent,
+    )
+}
+
+/**
+ * Stateless Analyze screen: top bar, bottom CTA, body and error dialog, rendered from [screenState]
+ * with every action reported through [onIntent].
+ *
+ * [AnalyzeScreen] is the production caller and passes its ViewModel's `sendIntent`; this entry exists
+ * so the screen can be drawn from fixed state (store-listing screenshots) without Koin.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AnalyzeScreenContent(
+    screenState: AnalyzeScreenState,
+    onIntent: (AnalyzeScreenIntent) -> Unit,
+) {
     val title = if (screenState.isFillMode) {
         stringResource(Res.string.analyze_fill_title)
     } else {
@@ -132,7 +151,7 @@ fun AnalyzeScreen(
 
     AppScaffold(
         title = title,
-        onBackButtonClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnBackClick) },
+        onBackButtonClick = { onIntent(AnalyzeScreenIntent.OnBackClick) },
         scrollBehavior = scrollBehavior,
         bottomBar = {
             if (screenState.selectedInputType != null && !screenState.isAnalyzing) {
@@ -156,7 +175,7 @@ fun AnalyzeScreen(
 
                     AppButton(
                         text = stringResource(Res.string.analyze_button),
-                        onClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnAnalyzeClick) },
+                        onClick = { onIntent(AnalyzeScreenIntent.OnAnalyzeClick) },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = hasEnoughCredits
                     )
@@ -179,20 +198,20 @@ fun AnalyzeScreen(
         } else {
             AnalyzeContent(
                 screenState = screenState,
-                onIntent = viewModel::sendIntent
+                onIntent = onIntent
             )
         }
 
         // Error dialog
         screenState.error?.let { error ->
             AlertDialog(
-                onDismissRequest = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissError) },
+                onDismissRequest = { onIntent(AnalyzeScreenIntent.OnDismissError) },
                 title = { Text(stringResource(Res.string.error)) },
                 text = { Text(error) },
                 confirmButton = {
                     AppButtonText(
                         text = stringResource(Res.string.ok),
-                        onClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissError) }
+                        onClick = { onIntent(AnalyzeScreenIntent.OnDismissError) }
                     )
                 },
                 containerColor = MaterialTheme.colorScheme.surface,
