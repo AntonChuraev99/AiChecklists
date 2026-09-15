@@ -24,13 +24,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsFifteenReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsSixteenReleaseGroups`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 39 posts across 15 main-versions (v1.6-v1.20)
-        assertEquals(15, releases.size)
+        // 41 posts across 16 main-versions (v1.6-v1.21)
+        assertEquals(16, releases.size)
     }
 
     @Test
@@ -39,8 +39,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.20 has the highest post timestamp)
-        assertEquals("1.20", releases.first().version)
+        // Newest release first (v1.21 has the highest post timestamp)
+        assertEquals("1.21", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -52,9 +52,28 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
+    }
+
+    @Test
+    fun `getReleases_withDefaultJson_v1_21HasTwoPostsLedByDueDateRailWithoutCtaOrStoreDescription`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v121 = releases.first { it.version == "1.21" }
+
+        assertEquals(2, v121.posts.size)
+        // Both posts share one timestamp; the hero due-date-rail post must still lead the card
+        assertEquals("due_date_rail_v1", v121.posts.first().id, "due_date_rail_v1 must lead the 1.21 group")
+        assertEquals("important_star_input_v1", v121.posts[1].id)
+        // In-place input behavior — no standalone destination, so no CTA
+        v121.posts.forEach { post ->
+            assertTrue(post.actions.isEmpty(), "Post ${post.id} must carry no CTA")
+        }
+        // Play note is covered by due_date_rail_v1 — a releaseNotes entry would render it twice
+        assertNull(v121.storeDescription, "v1.21 storeDescription must be null — note covered by posts")
     }
 
     @Test
@@ -291,13 +310,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsThirtyNine`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsFortyOne`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(39, totalPosts)
+        assertEquals(41, totalPosts)
     }
 
     @Test
