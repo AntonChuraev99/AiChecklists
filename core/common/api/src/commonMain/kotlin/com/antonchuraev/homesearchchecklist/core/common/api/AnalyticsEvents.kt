@@ -1042,13 +1042,13 @@ object AnalyticsParams {
     /**
      * The offer this paywall impression was CONFIGURED to show — the RevenueCat offering id
      * resolved from Remote Config `paywall_config.currentOffer`, falling back to
-     * `PaywallRemoteConfig.DEFAULT_OFFER` (the A/B control) when RC is empty or unparsable.
-     * This is the arm of the `CurrentOfferTrialVSNoTrial` experiment (trial offering vs no-trial
-     * offering), carried on EVERY paywall impression.
+     * `PaywallRemoteConfig.DEFAULT_OFFER` (the baseline offer) when RC is empty or unparsable.
+     * Was the arm of the `CurrentOfferTrialVSNoTrial` experiment (closed 2026-09-17); still
+     * carried on EVERY paywall impression.
      *
      * Present unconditionally, in BOTH arms: the value is known in `PaywallViewModel.init`, before
      * RevenueCat is contacted at all, so it does not depend on the product catalog loading. The
-     * guard wraps the DATA (empty RC → control offer), never the EVENT.
+     * guard wraps the DATA (empty RC → baseline offer), never the EVENT.
      *
      * ⚠️ DELIBERATELY NOT the same name as the `current_offer` USER-property set after a
      * successful catalog load. They mean different things and are populated on different

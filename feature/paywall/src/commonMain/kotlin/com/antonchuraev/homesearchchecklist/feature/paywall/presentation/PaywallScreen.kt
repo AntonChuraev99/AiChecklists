@@ -581,7 +581,7 @@ private fun CompareBody(
     //   - Checklists / fills / recurring reminders: hard caps on Free, unlimited on Pro
     //     (RemoteConfig: MAX_CHECKLISTS_FREE=4, MAX_FILLS_FREE=5, MAX_RECURRING_REMINDERS_FREE=10).
     // Removed lies: photo/voice/PDF/link rows (all accessible on Free) and "best AI model"
-    // (server uses gemini-2.5-flash-lite for everyone).
+    // (server uses one model for everyone — gemini-3.1-flash-lite since 2026-09-17).
     val unlimited = stringResource(Res.string.paywall_v1_compare_value_unlimited)
     val rows = listOf(
         CompareRowData(

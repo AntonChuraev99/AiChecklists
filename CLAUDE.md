@@ -148,7 +148,7 @@ Strategy + phased plan: **`docs/plans/2026-07-14-seo-organic-growth-strategy.md`
 
 All dependency versions live in `gradle/libs.versions.toml` — the single source of truth; check it, don't trust a number duplicated in prose. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage). Geo-tiered pricing & organic-growth strategy (India + low-ARPU markets priced at minimal markup to drive organic installs/ratings; **gitignored, business-sensitive**): `docs/pricing-strategy.md`.
 
-**Gemini models are an allowlist, not a constant** (`main.py:89-95`): `gemini-2.5-flash-lite` · `gemini-2.5-flash` · `gemini-3.1-flash-lite` · `gemini-3.5-flash`; anything else 500s. A live server A/B (`ai_model_arm`) runs `gemini-3.1-flash-lite` against control. ⏰ **All `gemini-2.5-*` hit EOL 2026-10-16** — including the control arm.
+**Gemini models are an allowlist, not a constant** (`main.py:89-95`): `gemini-2.5-flash-lite` · `gemini-2.5-flash` · `gemini-3.1-flash-lite` · `gemini-3.5-flash`; anything else 500s. The `ai_model_arm` A/B is closed: since 2026-09-17 the server template and every in-code default run `gemini-3.1-flash-lite` (`docs/decisions/2026-09-17-lock-ab-winners-stop-experiments.md`); no product A/B runs. ⏰ **All `gemini-2.5-*` hit EOL 2026-10-16** — the `main.py` defaults reach prod only with a Cloud Functions redeploy before that date.
 
 | Limit (Remote Config) | Free | Premium | Defaults in code |
 |---|---|---|---|

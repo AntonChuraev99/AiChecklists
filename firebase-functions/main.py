@@ -85,7 +85,9 @@ MODEL_OVERRIDE_TEST_SECRET = os.environ.get("MODEL_OVERRIDE_TEST_SECRET", "")
 # ("no longer available to new users"). Re-probe before adding an id back.
 # Bounds cost too: only these can be selected by the experiment config or the test-override
 # gate, so a fat-fingered config value can never reach an arbitrary (expensive) model.
-# NOTE: the gemini-2.5-* ids below reach EOL 2026-10-16 — migrate the control arm before then.
+# NOTE: every in-code default/fallback model was migrated to gemini-3.1-flash-lite on
+# 2026-09-17 (A/B closed, see below). The gemini-2.5-* ids stay allow-listed only for the
+# eval harness (ai_model_eval.py) until their EOL 2026-10-16 — drop them after that date.
 MODEL_OVERRIDE_ALLOWLIST = {
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
@@ -133,13 +135,19 @@ def resolve_model(default_model: str, requested_model, provided_secret) -> str:
 # -> (default_model, "control") — EXACTLY today's behaviour. In-app defaults mirror control
 # and every resolved model is re-checked against MODEL_OVERRIDE_ALLOWLIST (cost bound).
 # Does NOT change economics — only the Gemini model string per request varies by arm.
+#
+# Status: experiment CLOSED 2026-09-17 — the owner pinned gemini-3.1-flash-lite for all flows.
+# The template now has no `variant_50` condition, every `ai_model_<flow>` = gemini-3.1-flash-lite
+# and `ai_model_arm` defaults to "variant_b"; the in-code model defaults below match that model, so
+# an RC failure no longer falls back to a model past its EOL. The in-code arm stays "control"
+# (= "RC did not decide", part of the control|variant_b|override contract). Mechanism kept for future tests.
 _RC_MODEL_DEFAULTS = {
     "ai_model_arm": "control",
-    "ai_model_chat_agent": "gemini-2.5-flash",
-    "ai_model_classify_chat_intent": "gemini-2.5-flash-lite",
-    "ai_model_analyze": "gemini-2.5-flash-lite",
-    "ai_model_generate": "gemini-2.5-flash-lite",
-    "ai_model_chat_completion": "gemini-2.5-flash",
+    "ai_model_chat_agent": "gemini-3.1-flash-lite",
+    "ai_model_classify_chat_intent": "gemini-3.1-flash-lite",
+    "ai_model_analyze": "gemini-3.1-flash-lite",
+    "ai_model_generate": "gemini-3.1-flash-lite",
+    "ai_model_chat_completion": "gemini-3.1-flash-lite",
 }
 _RC_TTL_SECONDS = 300  # refresh the server template at most every 5 min per warm container
 _rc_template = None
@@ -864,10 +872,10 @@ def call_gemini(prompt: str, input_type: str, input_data: str, audio_mime_type: 
     Callers must normalize browser variants (e.g. "audio/m4a", "audio/webm;codecs=opus")
     before invoking this function.
 
-    [model_id] defaults to gemini-2.5-flash-lite. Callers may pass a test-override value
+    [model_id] defaults to gemini-3.1-flash-lite. Callers may pass a test-override value
     already resolved via [resolve_model]; never pass an unvalidated client value here.
     """
-    model_id = model_id or "gemini-2.5-flash-lite"
+    model_id = model_id or "gemini-3.1-flash-lite"
     if input_type == "image_base64" and input_data:
         return gemini_client.models.generate_content(
             model=model_id,
@@ -1396,7 +1404,7 @@ def analyze_and_fill_checklist(request: Request):
     )
 
     # Model resolution: production A/B experiment (server-driven) + eval override precedence.
-    model_id, model_arm = resolve_experiment_model(user_id, "analyze", "gemini-2.5-flash-lite", data)
+    model_id, model_arm = resolve_experiment_model(user_id, "analyze", "gemini-3.1-flash-lite", data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "analyze"}
 
     try:
@@ -1524,7 +1532,7 @@ def generate_checklist(request: Request):
     )
 
     # Model resolution: production A/B experiment (server-driven) + eval override precedence.
-    model_id, model_arm = resolve_experiment_model(user_id, "generate", "gemini-2.5-flash-lite", data)
+    model_id, model_arm = resolve_experiment_model(user_id, "generate", "gemini-3.1-flash-lite", data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "generate"}
 
     try:
@@ -2329,7 +2337,7 @@ def on_rc_event_created(event: firestore_fn.Event) -> None:
 # ============================================================================
 #
 # Called by AiChatRepositoryImpl when local Layer 1 router returns
-# confidence < 0.7. Routes the user phrase through gemini-2.5-flash-lite with
+# confidence < 0.7. Routes the user phrase through gemini-3.1-flash-lite with
 # structured JSON output. Cost: 1 credit per successful classification
 # (deducted atomically before the AI call — refunded only manually if Gemini
 # returns garbage; intentional simplicity for Phase B MVP).
@@ -2486,7 +2494,7 @@ def classify_chat_intent(request: Request):
     user_id = data["user_id"]
 
     # Model resolution: production A/B experiment (server-driven) + eval override precedence.
-    model_id, model_arm = resolve_experiment_model(user_id, "classify_chat_intent", "gemini-2.5-flash-lite", data)
+    model_id, model_arm = resolve_experiment_model(user_id, "classify_chat_intent", "gemini-3.1-flash-lite", data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "classify_chat_intent"}
 
     # Server is authoritative for credit accounting — client cannot bypass.
@@ -2667,8 +2675,8 @@ def transcribe_audio(request: Request):
 # ============================================================================
 #
 # Called by AiChatRepositoryImpl when intent is FreeForm (open question,
-# planning, summarisation). Routes the conversation through gemini-2.5-flash
-# (NOT lite — Layer 3 needs better reasoning for open questions).
+# planning, summarisation). Routes the conversation through gemini-3.1-flash-lite
+# (pinned 2026-09-17 when the model A/B closed).
 #
 # Cost: 3 credits per successful completion (atomic Firestore deduction).
 #
@@ -2768,12 +2776,12 @@ def refund_chat_completion_credits(user_id: str, reason: str) -> bool:
 
 
 def _call_gemini_flash(prompt: str, model_id: str = None) -> str:
-    """Call gemini-2.5-flash (NOT lite) for free-form reasoning.
+    """Call Gemini for free-form reasoning (legacy chat_completion; Layer 3 is chat_agent).
 
-    [model_id] defaults to gemini-2.5-flash. Callers may pass a test-override value
+    [model_id] defaults to gemini-3.1-flash-lite. Callers may pass a test-override value
     already resolved via [resolve_model]; never pass an unvalidated client value here.
     """
-    response = gemini_client.models.generate_content(model=model_id or "gemini-2.5-flash", contents=prompt)
+    response = gemini_client.models.generate_content(model=model_id or "gemini-3.1-flash-lite", contents=prompt)
     return (response.text or "").strip()
 
 
@@ -2908,7 +2916,7 @@ def chat_completion(request: Request):
 
     # Model resolution: production A/B experiment (server-driven) + eval override precedence.
     # NOTE: chat_completion is legacy/dead (Layer 3 is chat_agent); wired for consistency.
-    model_id, model_arm = resolve_experiment_model(user_id, "chat_completion", "gemini-2.5-flash", data)
+    model_id, model_arm = resolve_experiment_model(user_id, "chat_completion", "gemini-3.1-flash-lite", data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "chat_completion"}
 
     messages_raw = data.get("messages")
@@ -3030,7 +3038,10 @@ def chat_completion(request: Request):
 # ============================================================================
 
 CHAT_AGENT_COST = 3                     # flat per-turn cost (charged on round 1 only)
-CHAT_AGENT_MODEL = "gemini-2.5-flash"   # stable model; thinking_budget=0 verified here
+# Pinned 2026-09-17 (model A/B closed). Ran in prod as variant_b since 2026-07-15 with the same
+# thinking_budget=0 config; on 3.x that does NOT suppress thought signatures — they are
+# round-tripped through the transcript (see _decode_thought_signature).
+CHAT_AGENT_MODEL = "gemini-3.1-flash-lite"
 CHAT_AGENT_MAX_ROUNDS = 5               # server-side defense-in-depth (client caps too)
 CHAT_AGENT_MAX_TRANSCRIPT_ENTRIES = 60  # hard cap on transcript size
 CHAT_AGENT_MAX_TOTAL_CHARS = 12000      # combined chars across all transcript text
@@ -3790,9 +3801,9 @@ def chat_agent(request: Request):
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=agent_tools,
-            # thinking_budget=0 keeps the stable 2.5 arm cheap (no thinking tokens); on 3.x
-            # it is accepted for back-compat but does NOT suppress thought signatures — that
-            # assumption held only for 2.5 and broke the 3.1 arm's tool loop in prod
+            # thinking_budget=0 kept the 2.5 control arm cheap (no thinking tokens); on 3.x
+            # (the locked model since 2026-09-17) it is accepted for back-compat but does NOT
+            # suppress thought signatures — that assumption held only for 2.5 and broke the 3.1 arm's tool loop in prod
             # (400: "Function call is missing a thought_signature"). Signatures are therefore
             # round-tripped through the transcript, not avoided. Do NOT also pass
             # thinking_level here: combining it with thinking_budget is a 400.
