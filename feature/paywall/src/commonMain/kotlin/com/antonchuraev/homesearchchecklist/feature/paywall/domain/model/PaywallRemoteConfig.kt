@@ -16,7 +16,11 @@ data class PaywallRemoteConfig(
     val currentOffer: String? = null,
 ) {
     companion object {
-        /** Hard baseline / A/B control offer when RC is empty, invalid, or omits currentOffer. */
-        const val DEFAULT_OFFER = "month1.99Year20NoTrial"
+        /**
+         * Baseline offer when RC is empty, invalid, or omits currentOffer. Mirrors the locked RC
+         * template default (A/B #6 `CurrentOfferTrialVSNoTrial` closed 2026-09-17), so a failed
+         * or empty fetch shows the same trial offer as the template.
+         */
+        const val DEFAULT_OFFER = "monthAndYear"
     }
 }

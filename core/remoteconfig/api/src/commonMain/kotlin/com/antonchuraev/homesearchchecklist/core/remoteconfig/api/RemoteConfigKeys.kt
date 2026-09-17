@@ -53,7 +53,8 @@ object RemoteConfigKeys {
     // user-set reminders always fire at the time the user chose.
     const val PUSH_TIMING_ARM = "push_timing_arm"
 
-    // New-user activation bundle master switch (boolean). When ON (the default):
+    // New-user activation bundle master switch (boolean). Default OFF since 2026-09-17 (see
+    // RemoteConfigDefaults.ACTIVATION_BUNDLE_V1). When ON:
     //   - SKIP the static first-checklist auto-seed so the user lands on the AI first-run hero,
     //   - render the activation hero (prompt + chips) on the empty MainScreen,
     //   - show the one-time reminder opt-in after the new user's first AI checklist.
@@ -135,11 +136,11 @@ object RemoteConfigDefaults {
     // (2) attach a condition for the split. Until then, treat any timing comparison as invalid.
     const val PUSH_TIMING_ARM = "behavioral"
 
-    // Activation bundle ON by default — this is the desired baseline product behavior (AI
-    // first-run instead of a static seed). Default-ON is fail-open BY DESIGN: a failed/slow
-    // Remote Config fetch keeps the bundle ON. The read MUST NOT be wrapped in a withTimeout
-    // (SplashViewModel already reactively awaits fetchAndActivate() before reading flags), so a
-    // slow-network cold start can never silently flip it off. Set to false in the Console to opt
-    // a control cohort back into the legacy static-auto-create flow for the A/B comparison.
-    const val ACTIVATION_BUNDLE_V1 = true
+    // Activation bundle OFF by default — matches the Firebase Console client-template parameter
+    // `activation_bundle_v1 = false`, locked by the owner on 2026-09-17 after A/B #7 expired
+    // (2026-09-16) with no significant effect. This fallback MUST equal that template value:
+    // otherwise a failed Remote Config fetch silently enrolls the user into the ON variant, which
+    // prod no longer serves. Change both together. The read MUST NOT be wrapped in a withTimeout
+    // (SplashViewModel already reactively awaits fetchAndActivate() before reading flags).
+    const val ACTIVATION_BUNDLE_V1 = false
 }

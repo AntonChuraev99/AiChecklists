@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-09-15_
+_Last updated: 2026-09-17_
 
 Быстрый поиск по 75 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-09-17 | decision | ab-test, remote-config, firebase-ab-testing, experiment-expiry, onboarding, ai_model_arm, gemini-3.1-flash-lite | [Lock A/B winners in Remote Config and stop running experiments](../decisions/2026-09-17-lock-ab-winners-stop-experiments.md) |
 | 2026-09-15 | pattern | store-screenshots, google-play, roborazzi, feature-graphic, alpha-channel, stateless-seam | [Google Play listing frames rendered from real composables](ui-improvements/store-listing-frames-from-real-composables-2026-09-15.md) |
 | 2026-09-03 | ui-testing | roborazzi, screenshot-test, focused-input, idle-timeout, colour-probe, overflow-content, layering, clipping | [Roborazzi Screenshot Cycle — Four Traps in UI Testing](ui-improvements/bottom-chrome-screenshot-cycle-traps-2026-09-03.md) |
 | 2026-08-18 | repo-policy | gitignore whitelist, public repo, docs in MR, leak gate, pre-commit, CI guard, worktree rules | [Docs published by whitelist, numbers never](../decisions/2026-08-18-docs-published-by-whitelist.md) |

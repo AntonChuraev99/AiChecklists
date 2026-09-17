@@ -789,7 +789,7 @@ fun App() {
 
             // ── New-user activation bundle (RC flag activation_bundle_v1) ──────────
             // Resolved once per composition. Read AFTER SplashViewModel awaited fetchAndActivate(),
-            // so by the time MainScreen mounts the flag is fresh. Fail-open default ON.
+            // so by the time MainScreen mounts the flag is fresh. Fetch-failure default OFF (= RC template).
             val remoteConfigProvider: RemoteConfigProvider = koinInject()
             val activationBundleEnabled = remember {
                 remoteConfigProvider.getBoolean(

@@ -377,11 +377,11 @@ class SplashViewModel(
      * Always sets the `first_checklist_variant` user property (so the legacy A/B cohort attribution
      * survives in both arms). Then:
      *
-     *  - **Activation bundle ON (default):** SKIP the static auto-seed entirely so the new user
+     *  - **Activation bundle ON:** SKIP the static auto-seed entirely so the new user
      *    lands on the empty MainScreen and gets the AI first-run hero instead. For a brand-new
      *    registration, persist the new-user-pending flag so the user's FIRST AI checklist triggers
      *    the activation funnel (FIRST_AI_CHECKLIST_CREATED + reminder opt-in) downstream.
-     *  - **Activation bundle OFF:** EXACT pre-activation behavior — seed the one-time "Your first
+     *  - **Activation bundle OFF (default since 2026-09-17):** EXACT pre-activation behavior — seed the one-time "Your first
      *    checklist" starter template for brand-new users in the `auto_create` treatment. Fully
      *    reversible: flipping the flag back to false restores the legacy flow with no code change.
      *    (Since 2026-07-26 this arm ALSO gets the new-user-pending marker. That is analytics-only:

@@ -906,7 +906,7 @@ class ToolCallDispatcherImpl(
     /**
      * Notifies the [ActivationCoordinator] that an AI-path checklist was created. The coordinator
      * owns the new-user / show-once gating, so this is a fire-and-forget hand-off from every create
-     * path. Reads the `activation_bundle_v1` RC flag here (fail-open default ON — see
+     * path. Reads the `activation_bundle_v1` RC flag here (fetch-failure default OFF, same as the RC template — see
      * [RemoteConfigKeys.ACTIVATION_BUNDLE_V1]); never wrapped in a timeout.
      */
     /**
