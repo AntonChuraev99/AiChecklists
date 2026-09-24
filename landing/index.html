@@ -139,6 +139,16 @@
         @keyframes ai-drift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
       }
     }
+    /* Hero promo loop: 16:9 box reserved before the poster/video loads (no CLS). */
+    .hero-video-frame { aspect-ratio: 16 / 9; width: 100%; overflow: hidden; border-radius: 24px;
+      background: var(--ai-gradient-hero); border: 1px solid var(--outline-variant);
+      box-shadow: 0 1px 2px rgba(20,30,60,.06), 0 24px 60px rgba(20,30,60,.14); }
+    .hero-video { display: block; width: 100%; height: 100%; object-fit: cover; }
+    @media (max-width: 640px) { .hero-video-frame { border-radius: 16px; } }
+    /* Local CSS instead of lg:col-span-2 / lg:order-last (not in the built tailwind.css). 1024px = Tailwind lg. */
+    .hero-video-row { min-width: 0; }
+    @media (min-width: 1024px) { .hero-video-row { grid-column: 1 / -1; order: 99; } }
+
     .lift { transition: transform .15s ease, box-shadow .15s ease; }
     .lift:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(20,30,60,.10); }
   </style>
@@ -220,6 +230,31 @@
           <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:18px">verified</span>
           Free forever plan · Android &amp; web, always in sync
         </p>
+      </div>
+
+      <!-- Promo loop: right under the copy on mobile, full-width row below both columns on desktop.
+           Versioned file names (-v1) because landing-worker.js serves /video/* as immutable. -->
+      <div class="hero-video-row">
+        <div class="hero-video-frame">
+          <video class="hero-video" autoplay muted loop playsinline preload="metadata"
+                 poster="/video/hero-poster-v1.jpg" width="1920" height="1080"
+                 aria-label="Gisti app demo: AI chat, reminders and calendar, a photo turned into a checklist, and sync between phone and web">
+            <source src="/video/hero-loop-v1.webm" type="video/webm" />
+            <source src="/video/hero-loop-v1.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <script>
+          // Reduced motion: no autoplay, show the poster; controls let the visitor start it on purpose.
+          (function () {
+            var v = document.currentScript.previousElementSibling.querySelector('video');
+            var mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+            function apply() {
+              if (mq && mq.matches) { v.autoplay = false; v.pause(); v.controls = true; }
+              else { v.controls = false; v.autoplay = true; var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+            }
+            if (mq) { apply(); if (mq.addEventListener) mq.addEventListener('change', apply); }
+          })();
+        </script>
       </div>
 
       <!-- Signature: "anything in → checklist out", built from flat icon+text cards (no device mockups) -->

@@ -5,7 +5,10 @@
 // reaches this script before the asset match). Unknown paths fall through to
 // env.ASSETS.fetch, which returns a real 404 (not_found_handling: "none") —
 // correct for SEO (the app SPA fallback lives on the app worker, not here).
+import { serveVideo } from "./landing-range.js";
+
 const CANONICAL = "gisti-ai.com";
+const VIDEO_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
 // Cloudflare's asset router already normalizes /mcp → /mcp/, but with a **307**
 // (temporary). Google does not consolidate a temporary redirect: it kept
@@ -49,6 +52,15 @@ export default {
 
     // One hop even when both the host and the path need fixing.
     if (redirect) return Response.redirect(url.toString(), 301);
+
+    // Hero video assets are versioned by file name (hero-loop-v1.*): a new cut
+    // ships under a new name, so the browser may keep these for a year. Without
+    // this the asset router sends max-age=0 and every visit revalidates ~2.5 MB.
+    // The worker also answers Range itself (206/416): Static Assets behind
+    // run_worker_first returns a full 200, and Safari won't play mp4 without 206.
+    if (url.pathname.startsWith("/video/")) {
+      return serveVideo(request, (r) => env.ASSETS.fetch(r), VIDEO_CACHE_CONTROL);
+    }
 
     return env.ASSETS.fetch(request); // static landing; unknown paths → 404
   },

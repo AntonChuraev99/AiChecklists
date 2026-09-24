@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-09-17_
+_Last updated: 2026-09-24_
 
-Быстрый поиск по 75 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 76 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-09-24 | bug-fix | landing, hero-video, cloudflare-static-assets, range-request, 206, safari, run_worker_first, immutable-cache | [Landing hero video — Static Assets ignores Range behind the worker](landing-hero-video-range-206-2026-09-24.md) |
 | 2026-09-17 | decision | ab-test, remote-config, firebase-ab-testing, experiment-expiry, onboarding, ai_model_arm, gemini-3.1-flash-lite | [Lock A/B winners in Remote Config and stop running experiments](../decisions/2026-09-17-lock-ab-winners-stop-experiments.md) |
 | 2026-09-15 | pattern | store-screenshots, google-play, roborazzi, feature-graphic, alpha-channel, stateless-seam | [Google Play listing frames rendered from real composables](ui-improvements/store-listing-frames-from-real-composables-2026-09-15.md) |
 | 2026-09-03 | ui-testing | roborazzi, screenshot-test, focused-input, idle-timeout, colour-probe, overflow-content, layering, clipping | [Roborazzi Screenshot Cycle — Four Traps in UI Testing](ui-improvements/bottom-chrome-screenshot-cycle-traps-2026-09-03.md) |
