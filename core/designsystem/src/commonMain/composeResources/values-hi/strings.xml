@@ -371,6 +371,9 @@
     <string name="analyze_voice_permission_required">माइक्रोफ़ोन की अनुमति ज़रूरी है</string>
     <string name="analyze_voice_permission_denied">माइक्रोफ़ोन एक्सेस अस्वीकार हो गया। वॉइस रिकॉर्ड करने के लिए अनुमति दें।</string>
     <string name="analyze_voice_permission_denied_settings">माइक्रोफ़ोन एक्सेस बंद है। वॉइस रिकॉर्ड करने के लिए इसे सेटिंग्स में चालू करें।</string>
+    <string name="analyze_voice_permission_granted">माइक्रोफ़ोन चालू है। शुरू करने के लिए रिकॉर्ड पर टैप करें।</string>
+    <string name="analyze_voice_too_short">रिकॉर्डिंग बहुत छोटी है। फिर से आज़माएं।</string>
+    <string name="analyze_voice_recording_failed">ऑडियो रिकॉर्ड नहीं हो सका। फिर से आज़माएं।</string>
     <string name="analyze_voice_open_settings">सेटिंग्स खोलें</string>
     <string name="analyze_error_no_recording">विश्लेषण के लिए एक वॉइस मैसेज रिकॉर्ड करें</string>
 
@@ -1455,6 +1458,8 @@
     <string name="chat_attach_analyze_failed">«%1$s» का विश्लेषण नहीं हो सका। कृपया फिर से आज़माएं।</string>
     <string name="chat_attach_store_failed">«%1$s» सहेजा नहीं जा सका। स्टोरेज अनुमतियां जांचें।</string>
     <string name="chat_recording_cancelled">रिकॉर्डिंग रद्द हुई।</string>
+    <string name="chat_mic_hold_to_record">माइक्रोफ़ोन चालू है। रिकॉर्ड करने के लिए माइक दबाए रखें।</string>
+    <string name="chat_recording_failed">ऑडियो रिकॉर्ड नहीं हो सका। फिर से आज़माएं।</string>
     <string name="chat_dispatch_created_from_attachment">«%1$s» %2$s आइटम के साथ बनाई गई।</string>
     <string name="chat_dispatch_attached_one">«%1$s» को %3$s में «%2$s» से अटैच किया गया।</string>
     <string name="chat_dispatch_attached_many">%1$s फ़ाइलें %3$s में «%2$s» से अटैच की गईं।</string>

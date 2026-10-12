@@ -487,7 +487,9 @@ fun ChatInputRow(
                 .clip(CircleShape)
                 .semantics {
                     role = Role.Button
-                    customActions = listOf(
+                    // No actions while transcribing (the slot shows the progress spinner): a new
+                    // start() would delete the recording that is still being uploaded.
+                    customActions = if (isTranscribing) emptyList() else listOf(
                         CustomAccessibilityAction(
                             label = pressHoldHint,
                             action = {

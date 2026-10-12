@@ -52,6 +52,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderErrorCodes
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioPlayerLauncher
 import aichecklists.core.designsystem.generated.resources.Res
@@ -498,6 +500,10 @@ private fun VoiceInputSection(
 
     // Pre-fetch the permission denied string for use in callback
     val permissionDeniedMessage = stringResource(Res.string.analyze_voice_permission_denied)
+    val permissionGrantedMessage = stringResource(Res.string.analyze_voice_permission_granted)
+    val tooShortMessage = stringResource(Res.string.analyze_voice_too_short)
+    val recordingFailedMessage = stringResource(Res.string.analyze_voice_recording_failed)
+    val logger: AppLogger = koinInject()
 
     val audioRecorderLauncher = rememberAudioRecorderLauncher(
         onResult = { result ->
@@ -507,14 +513,22 @@ private fun VoiceInputSection(
         },
         onError = { error ->
             when (error) {
-                "PERMISSION_DENIED" -> {
+                AudioRecorderErrorCodes.PERMISSION_DENIED -> {
                     // User denied but can try again - don't show permanent error
                     onRecordingError(permissionDeniedMessage)
                 }
-                "PERMISSION_DENIED_PERMANENTLY" -> {
+                AudioRecorderErrorCodes.PERMISSION_DENIED_PERMANENTLY -> {
                     permissionDeniedPermanently = true
                 }
-                else -> onRecordingError(error)
+                // Tap-to-record normally auto-starts once the permission is granted; this code
+                // only arrives when the request state was lost under the dialog (activity recreated).
+                AudioRecorderErrorCodes.PERMISSION_GRANTED_PRESS_AGAIN -> onRecordingError(permissionGrantedMessage)
+                AudioRecorderErrorCodes.RECORDING_TOO_SHORT -> onRecordingError(tooShortMessage)
+                else -> {
+                    // Any other string is a raw recorder failure message — log it, show a localized text.
+                    logger.error("Analyze", "Voice recorder failed: $error", IllegalStateException(error))
+                    onRecordingError(recordingFailedMessage)
+                }
             }
         }
     )

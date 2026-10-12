@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderErrorCodes
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
@@ -388,24 +389,27 @@ sealed interface ChatScreenIntent : Intent {
 
     /**
      * User pressed-and-held the mic button (voice recording start).
-     * ViewModel flips [ChatScreenState.isRecording] to true.
-     * Phase 3 wires actual AudioRecorder; Phase 1 only bookkeeps state.
+     * ViewModel flips [ChatScreenState.isRecording] to true and logs the funnel start.
+     * It emits NO side effect: the gesture host is the only caller of the recorder's `start()`
+     * (which also owns the permission request), so a ViewModel-driven start would be a second one.
      */
     data object OnVoiceRecordingStarted : ChatScreenIntent
 
     /**
-     * User released the mic button (voice recording stop).
+     * The recorder delivered its terminal callback for the current press.
      * ViewModel flips [ChatScreenState.isRecording] to false and, when [recordingPath]
      * is non-null, sends the file to the transcription Cloud Function
      * ([AiChatRepository.transcribeAudio]) and appends the resulting text to the
      * input field so the user can review and edit before sending.
      *
-     * [recordingPath] is null when recording was cancelled (no-op per silent-skip guard).
-     * A null path → user cancelled → emit ShowSnackbar("chat_recording_cancelled").
+     * A null [recordingPath] means no audio was produced; [cancelReason] says why and picks both
+     * the snackbar and the analytics `reason`. A null [cancelReason] with a null path is read as
+     * [VoiceCancelReason.USER_CANCELLED]. Never a silent skip — every reason shows a snackbar.
      */
     data class OnVoiceRecordingStopped(
         val recordingPath: String?,
         val mimeType: String = "audio/m4a",
+        val cancelReason: VoiceCancelReason? = null,
     ) : ChatScreenIntent
 
     /**
@@ -454,6 +458,37 @@ sealed interface ChatScreenIntent : Intent {
      * @param source Where the chat was opened from ("screen", "dock", or a future deeplink tag).
      */
     data class OnChatOpened(val source: String) : ChatScreenIntent
+}
+
+// ---------------------------------------------------------------------------
+// Voice recording outcome
+// ---------------------------------------------------------------------------
+
+/**
+ * Why a mic press ended without audio. [analyticsValue] is the `reason` parameter of
+ * `ai_chat_voice_cancelled`, so a broken recorder is no longer counted as a user cancel.
+ */
+enum class VoiceCancelReason(val analyticsValue: String) {
+    /** Slide-up cancel, or a release the recorder reported as a plain null result. */
+    USER_CANCELLED("user_cancelled"),
+    TOO_SHORT("too_short"),
+    PERMISSION_DENIED("permission_denied"),
+    PERMISSION_DENIED_PERMANENTLY("permission_denied_permanently"),
+    /** The permission dialog ate the press; nothing was recorded and nothing was cancelled. */
+    PERMISSION_JUST_GRANTED("permission_just_granted"),
+    RECORDER_ERROR("recorder_error"),
+}
+
+/**
+ * Maps an `onError` string of `rememberAudioRecorderLauncher` to a [VoiceCancelReason].
+ * Anything that is not a known [AudioRecorderErrorCodes] constant is a recorder failure message.
+ */
+fun voiceCancelReasonFor(errorCode: String): VoiceCancelReason = when (errorCode) {
+    AudioRecorderErrorCodes.PERMISSION_DENIED -> VoiceCancelReason.PERMISSION_DENIED
+    AudioRecorderErrorCodes.PERMISSION_DENIED_PERMANENTLY -> VoiceCancelReason.PERMISSION_DENIED_PERMANENTLY
+    AudioRecorderErrorCodes.PERMISSION_GRANTED_PRESS_AGAIN -> VoiceCancelReason.PERMISSION_JUST_GRANTED
+    AudioRecorderErrorCodes.RECORDING_TOO_SHORT -> VoiceCancelReason.TOO_SHORT
+    else -> VoiceCancelReason.RECORDER_ERROR
 }
 
 // ---------------------------------------------------------------------------
@@ -507,14 +542,6 @@ sealed interface ChatScreenSideEffect : SideEffect {
     data class NavigateToChecklist(val checklistId: Long) : ChatScreenSideEffect
 
     // ── Attachment side-effects (Phase 1 contract; UI wiring lives in Phase 3) ──
-
-    /**
-     * Request the RECORD_AUDIO Android permission before starting voice recording.
-     * Emitted by [OnVoiceRecordingStarted] when the ViewModel cannot confirm permission
-     * has already been granted. Phase 3 observes this in ChatRoute and calls
-     * rememberPermissionState(...).launchPermissionRequest().
-     */
-    data object RequestRecordAudioPermission : ChatScreenSideEffect
 
     /**
      * Ask the UI to open a platform file picker for the given [source] type.

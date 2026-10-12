@@ -521,18 +521,21 @@ class ChatViewModel(
             ChatScreenIntent.OnVoiceRecordingStarted -> {
                 // Mic tapped — user initiated a voice recording. Track EVERY mic action (start →
                 // cancel / transcribe / fail) so we can measure how popular voice input is and where
-                // it drops off. Emit RequestRecordAudioPermission so the UI can ask at the right moment.
+                // it drops off. No side effect here: the gesture host already called the recorder's
+                // start() (which owns the permission request) — asking the UI to start it again
+                // released the running recorder and deleted its file.
                 analytics.event(name = AnalyticsEvents.Chat.VOICE_STARTED)
-                viewModelScope.launch {
-                    _sideEffect.emit(ChatScreenSideEffect.RequestRecordAudioPermission)
-                }
                 _screenState.value = _screenState.value.copy(
                     isRecording = true,
                     voiceRecordingError = null,
                 )
             }
 
-            is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(intent.recordingPath, intent.mimeType)
+            is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(
+                recordingPath = intent.recordingPath,
+                mimeType = intent.mimeType,
+                cancelReason = intent.cancelReason,
+            )
 
             is ChatScreenIntent.OnFeedbackOpen -> {
                 // Opening the feedback sheet IS the thumb-down moment (the bubble's feedback icon
@@ -2251,14 +2254,34 @@ class ChatViewModel(
         )
     }
 
-    private fun handleVoiceRecordingStopped(recordingPath: String?, mimeType: String) {
+    private fun handleVoiceRecordingStopped(
+        recordingPath: String?,
+        mimeType: String,
+        cancelReason: VoiceCancelReason?,
+    ) {
         _screenState.value = _screenState.value.copy(isRecording = false)
 
         if (recordingPath == null) {
-            // User cancelled — silent skip FORBIDDEN, emit snackbar
-            analytics.event(name = AnalyticsEvents.Chat.VOICE_CANCELLED)
+            // No audio — silent skip FORBIDDEN: every reason gets its own snackbar.
+            val reason = cancelReason ?: VoiceCancelReason.USER_CANCELLED
+            // A press swallowed by the permission dialog is not a cancel: the user never got to
+            // record. Counting it would inflate the cancel rate of every first-time user.
+            if (reason != VoiceCancelReason.PERMISSION_JUST_GRANTED) {
+                analytics.event(
+                    name = AnalyticsEvents.Chat.VOICE_CANCELLED,
+                    params = mapOf(AnalyticsParams.REASON to reason.analyticsValue),
+                )
+            }
+            val messageKey = when (reason) {
+                VoiceCancelReason.USER_CANCELLED -> "chat_recording_cancelled"
+                VoiceCancelReason.TOO_SHORT -> "chat_voice_too_short"
+                VoiceCancelReason.PERMISSION_DENIED,
+                VoiceCancelReason.PERMISSION_DENIED_PERMANENTLY -> "chat_mic_permission_denied"
+                VoiceCancelReason.PERMISSION_JUST_GRANTED -> "chat_mic_hold_to_record"
+                VoiceCancelReason.RECORDER_ERROR -> "chat_recording_failed"
+            }
             viewModelScope.launch {
-                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_recording_cancelled"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar(messageKey))
             }
             return
         }

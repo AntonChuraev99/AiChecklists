@@ -387,6 +387,9 @@
     <string name="analyze_voice_permission_required">Microphone permission is required</string>
     <string name="analyze_voice_permission_denied">Microphone access was denied. Please grant permission to record voice.</string>
     <string name="analyze_voice_permission_denied_settings">Microphone access is disabled. Please enable it in Settings to record voice.</string>
+    <string name="analyze_voice_permission_granted">Microphone is on. Tap record to start.</string>
+    <string name="analyze_voice_too_short">Recording too short. Try again.</string>
+    <string name="analyze_voice_recording_failed">Couldn't record audio. Try again.</string>
     <string name="analyze_voice_open_settings">Open Settings</string>
     <string name="analyze_error_no_recording">Record a voice message to analyze</string>
 
@@ -1486,6 +1489,8 @@
     <string name="chat_attach_analyze_failed">Could not analyze «%1$s». Please try again.</string>
     <string name="chat_attach_store_failed">Could not save «%1$s». Check storage permissions.</string>
     <string name="chat_recording_cancelled">Recording cancelled.</string>
+    <string name="chat_mic_hold_to_record">Microphone is on. Hold the mic to record.</string>
+    <string name="chat_recording_failed">Couldn't record audio. Try again.</string>
     <string name="chat_dispatch_created_from_attachment">Created «%1$s» with %2$s items.</string>
     <string name="chat_dispatch_attached_one">«%1$s» attached to «%2$s» in %3$s.</string>
     <string name="chat_dispatch_attached_many">%1$s files attached to «%2$s» in %3$s.</string>
