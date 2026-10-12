@@ -394,6 +394,57 @@ class AiChatRepositoryImplTest {
         assertEquals(inputText, classifier.lastText)
     }
 
+    // ── 9a. Input over the classifier's length limit never reaches Layer 2 ────
+    //
+    // 🔴 RED repro. The server rejects anything over 500 characters with HTTP 400 «text too long»
+    // (firebase-functions/main.py, CHAT_INTENT_MAX_INPUT_LEN) and the client escalated to Layer 3
+    // only AFTER that refusal — a wasted round trip on every long message. The literals below are the server's limit on purpose: a test that read the
+    // client constant would pass for any value of it.
+
+    @Test
+    fun classify_inputOverClassifierLimit_skipsLayer2AndEscalatesToLayer3() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+        )
+
+        val result = repo.classify("a".repeat(501), ChatLocale.En)
+
+        assertEquals(
+            0,
+            classifier.callCount,
+            "Layer 2 is guaranteed to answer 400 to this input — calling it is a wasted request",
+        )
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertNull(result.preBuiltToolCall)
+    }
+
+    @Test
+    fun classify_inputExactlyAtClassifierLimit_stillCallsLayer2() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+        )
+
+        val result = repo.classify("a".repeat(500), ChatLocale.En)
+
+        assertEquals(1, classifier.callCount, "the limit is inclusive — the server accepts 500")
+        assertEquals(RoutingLayer.Classifier, result.layer)
+    }
+
+    // The reject flow enters Layer 2 through the same function, so the guard covers it too.
+    @Test
+    fun classify_skipLayer1_inputOverClassifierLimit_skipsLayer2() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+            deepThinking = true,
+        )
+
+        val result = repo.classify("a".repeat(501), ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(0, classifier.callCount)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+    }
+
     // ── Deep Thinking toggle ─────────────────────────────────────────────────
 
     // ── 10. Deep Thinking ON → straight to Layer 3, Layer 2 never charged ────

@@ -47,7 +47,10 @@ internal fun buildPaywallUiState(
     savingsLabel: String?,
 ): PaywallUiState {
     // The ONLY place an empty product list is still allowed to mean "unknown" rather than "none".
-    val catalogPending = state.isLoading && state.products.isEmpty()
+    // A reload is excluded: it starts from a catalog already KNOWN to be empty (the user tapped the
+    // CTA over it), so the optimistic default offer would re-promise a price and a trial the
+    // screen has just withdrawn — and withdraw them again if the reload fails.
+    val catalogPending = state.isLoading && !state.isReloadingCatalog && state.products.isEmpty()
     val defaults = PaywallUiState()
 
     val yearlyProduct = state.products.yearly()

@@ -26,6 +26,32 @@ enum class PaywallErrorCode {
 }
 
 /**
+ * Whether asking for the catalog again can plausibly succeed.
+ *
+ * `true` — transient: the network, the store backend, or Play Billing not connected yet.
+ * `false` — the device or the project cannot sell right now, and no number of retries changes
+ * that (no Google Play services, a Play Store too old for product details, a misconfigured
+ * offering). Telling such a user to "check your connection" sends them to fix the wrong thing.
+ *
+ * Exhaustive on purpose (no `else`): a new code must be classified before it compiles.
+ */
+fun PaywallErrorCode.isRetryableCatalogError(): Boolean = when (this) {
+    PaywallErrorCode.NETWORK_ERROR,
+    PaywallErrorCode.OFFLINE,
+    PaywallErrorCode.STORE_PROBLEM,
+    PaywallErrorCode.UNKNOWN_BACKEND,
+    PaywallErrorCode.BILLING_NOT_INITIALIZED,
+    PaywallErrorCode.UNKNOWN -> true
+
+    PaywallErrorCode.CONFIGURATION_ERROR,
+    PaywallErrorCode.INVALID_CREDENTIALS,
+    PaywallErrorCode.PRODUCT_NOT_AVAILABLE,
+    PaywallErrorCode.NOT_CONFIGURED,
+    PaywallErrorCode.GMS_UNAVAILABLE,
+    PaywallErrorCode.PRODUCT_DETAILS_UNSUPPORTED -> false
+}
+
+/**
  * Rich error wrapper for paywall operations.
  * Preserves error code and underlying details from RevenueCat SDK.
  *

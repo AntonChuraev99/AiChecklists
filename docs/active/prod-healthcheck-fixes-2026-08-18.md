@@ -21,8 +21,9 @@ verification:
     baseline: "На всех версиях до фикса session_start держался кратно выше числа пользователей, дошедших хотя бы до одного экрана; доля дошедших до экрана падала неделя к неделе."
     success: "На версии с фиксом отношение session_start к screen_view кратно ближе к 1, чем на предыдущих версиях, И push_received/retention_* на ней ненулевые. Пропажа фоновых событий = FAILURE, а не успех."
     earliest: "релиз + 7 суток экспозиции"
-    status: blocked
-    blocked_by: "Android release"
+    status: confirmed
+    checked: 2026-10-12
+    result: "ПОДТВЕРЖДЕНО прогоном /healthcheck 2026-10-12. На версии с фиксом число пользователей с session_start сравнялось с числом пользователей, дошедших до экрана; на предыдущей версии оно оставалось кратно выше. Фоновые события (push_received, retention_*, срабатывания напоминаний) на версии с фиксом присутствуют, то есть фикс не обменял пустые сессии на потерю телеметрии. Замеры — в локальном снапшоте healthcheck (вне git)."
   - id: configured-offer-present
     what: "Арм эксперимента виден у каждого открытия пэйвола, а не только там, где загрузился каталог"
     shipped: "Новый event-параметр configured_offer в paywall_opened/paywall_shown из resolved PaywallRemoteConfig.currentOffer (PaywallViewModel init). User-property current_offer оставлено как есть — оно несёт фактически показанный offering."
@@ -31,8 +32,9 @@ verification:
     baseline: "Арм читался только через user-property current_offer, которое проставлялось после успешной загрузки каталога, поэтому отсутствовало у подавляющего большинства импрешенов."
     success: "Доля paywall_opened со значением configured_offer на версии с фиксом близка к 100%." # docs-leak-scan: reviewed — критерий приёмки, не замер
     earliest: "релиз + 7 суток экспозиции"
-    status: blocked
-    blocked_by: "Android release"
+    status: confirmed
+    checked: 2026-10-12
+    result: "ПОДТВЕРЖДЕНО прогоном /healthcheck 2026-10-12. На версиях с фиксом параметр configured_offer присутствует у каждого paywall_opened; на более ранних версиях его нет, как и ожидалось. Оговорка к полю how: фильтр rc_activated на paywall_opened неприменим — это параметр события onboarding_rc_resolved, а не свойство пользователя. Замеры — в локальном снапшоте healthcheck (вне git)."
   - id: chat-invalid-request-surfaced
     what: "Отказ chat_agent по размеру больше не показывается как «сервис не отвечает» с бесполезной кнопкой Retry"
     shipped: "AgentStepResult.InvalidRequest: отдельная ветка на HTTP 400, текст без числа, без retryText, credits_used=0, outcome=input_rejected."
@@ -41,8 +43,9 @@ verification:
     baseline: "Такой отказ приходил как outcome=error с ненулевой ценой хода и предлагал Retry, который пере-отправлял тот же payload."
     success: "Появились события outcome=input_rejected, и на них credits_used=0."
     earliest: "релиз + 7 суток экспозиции"
-    status: blocked
-    blocked_by: "Android release"
+    status: too-early
+    checked: 2026-10-12
+    result: "РАНО (прогон /healthcheck 2026-10-12): события outcome=input_rejected за окно наблюдения не пришли ни на одной версии. Эмит в коде на месте (ChatViewModel, ветка InvalidRequest), значит это «нет данных» — путь ни разу не исполнялся, а не провал фикса. Перепроверить, когда появится первое такое событие."
   - id: credit-402-reason-split
     what: "402 различает «нет кредитов» и «нет пользователя» — и в логах, и в теле ответа" # docs-leak-scan: reviewed — слово «пользователя» в описании ветки кода, не размер аудитории
     shipped: "reserve_chat_credit / reserve_chat_completion_credits возвращают (action, value); credit_error_response(action, message) добавляет поле reason. Покрыты и чат, и analyze/generate. HTTP-код и строка error не менялись."
@@ -51,8 +54,9 @@ verification:
     baseline: "Строки не существовало вовсе: обе причины возвращали идентичное тело, и различить их по логам было нельзя."
     success: "В логах присутствует 'credit reservation refused: reason=' со значением no_user и/или insufficient_credits."
     earliest: "деплой CF + 7 суток"
-    status: blocked
-    blocked_by: "деплой Cloud Functions из главного checkout"
+    status: confirmed
+    checked: 2026-10-12
+    result: "ПОДТВЕРЖДЕНО прогоном /healthcheck 2026-10-12 для chat-agent и generate-checklist: у каждого отказа 402 после деплоя в логе есть строка 'credit reservation refused: reason=' со значением insufficient_credits. Значение no_user за окно не встретилось. У classify-chat-intent отказов 402 после деплоя не было — для этого сервиса проверять нечем. Замеры — в локальном снапшоте healthcheck (вне git)."
 ---
 
 **Статус:** Partially Done

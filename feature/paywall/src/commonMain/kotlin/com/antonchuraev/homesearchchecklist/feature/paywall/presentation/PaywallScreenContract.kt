@@ -55,11 +55,20 @@ enum class CancelReasonStage { Asking, Thanks }
 
 data class PaywallState(
     val isLoading: Boolean = true,
+    // The catalog is being asked for AGAIN because the subscribe CTA was tapped over an empty one.
+    // Set together with [isLoading], and it changes what loading means: on first load nothing is
+    // known yet, so the optimistic default offer stands in; on a reload the catalog is known to be
+    // empty, so no price and no trial may be shown until real ones arrive. Drives the CTA spinner.
+    val isReloadingCatalog: Boolean = false,
     val isPurchasing: Boolean = false,
     val isRestoring: Boolean = false,
     val products: List<PaywallProduct> = emptyList(),
     val selectedProductId: String? = null,
     val error: String? = null,
+    // Non-error feedback (already localized), e.g. "prices loaded, tap again" after a tap-triggered
+    // catalog reload. Separate from [error] so a success is never reported through the error
+    // channel; the Route shows it in the same snackbar and DismissError clears both.
+    val notice: String? = null,
     val purchaseSuccess: Boolean = false,
     val source: String = "unknown",
     // A/B test fields — populated from Remote Config

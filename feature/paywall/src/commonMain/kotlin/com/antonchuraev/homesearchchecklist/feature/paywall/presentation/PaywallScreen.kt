@@ -143,6 +143,10 @@ internal fun PaywallScreen(
     isPurchasing: Boolean = false,
     isRestoring: Boolean = false,
     showHeroIllustration: Boolean = true,
+    // The catalog is being re-requested after a tap on the CTA over an empty catalog: the CTA
+    // spins. Deliberately NOT part of `busy` below — a hung store request must never lock the
+    // user on the paywall, so Back and the close (X) stay live.
+    isCatalogReloading: Boolean = false,
 ) {
     // Block navigation while a purchase/restore is in flight: swallow system back +
     // disable the close (X). Prevents leaving mid-transaction (RevenueCat validation +
@@ -214,7 +218,7 @@ internal fun PaywallScreen(
                 else
                     stringResource(Res.string.paywall_subscribe_now),
                 sub = ctaSub,
-                loading = isPurchasing,
+                loading = isPurchasing || isCatalogReloading,
                 // Keep the CTA bright (not greyed) while its OWN purchase spins, so the white
                 // spinner stays visible; only grey it out when a restore is the active operation.
                 enabled = !isRestoring,

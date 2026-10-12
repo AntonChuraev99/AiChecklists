@@ -62,6 +62,17 @@ internal class AiChatRepositoryImpl(
 
     companion object {
         private const val TAG = "AiChatRepository"
+
+        /**
+         * Longest input (in characters, inclusive) the Layer 2 classifier accepts.
+         *
+         * Source of truth is the SERVER: `CHAT_INTENT_MAX_INPUT_LEN` in
+         * `firebase-functions/main.py`, which rejects longer text with HTTP 400. This copy only
+         * saves the round trip, so a drift is safe in both directions: too low here sends a few
+         * classifiable messages straight to Layer 3; too high and the server still answers 400,
+         * which already escalates to Layer 3. Layer 3 has its own, larger limit.
+         */
+        private const val CLASSIFIER_MAX_INPUT_LEN = 500
     }
 
     override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
@@ -105,6 +116,21 @@ internal class AiChatRepositoryImpl(
         val userId = userDataRepository.getUserData().userId
         if (userId.isBlank()) {
             logger.warning(TAG, "Layer2 skipped: userId blank — escalating to Layer3 (FreeForm)")
+            return IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+                preBuiltToolCall = null,
+            )
+        }
+
+        if (input.length > CLASSIFIER_MAX_INPUT_LEN) {
+            // The classifier would answer HTTP 400 «text too long» and we would escalate anyway —
+            // skip the doomed round trip. Not a credit refusal, so not InsufficientCredits.
+            logger.info(
+                TAG,
+                "Layer2 skipped: input ${input.length} chars > $CLASSIFIER_MAX_INPUT_LEN — escalating to Layer3 (FreeForm)",
+            )
             return IntentClassification(
                 intent = ChatIntent.FreeForm,
                 confidence = 1.0f,

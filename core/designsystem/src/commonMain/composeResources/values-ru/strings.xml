@@ -462,6 +462,9 @@
     <string name="paywall_subscribe_now">Подписаться сейчас</string>
     <string name="paywall_retry">Попробовать снова</string>
     <string name="paywall_load_error">Не удалось загрузить варианты подписки.\nПроверьте соединение и попробуйте снова.</string>
+    <string name="paywall_prices_loaded">Цены загружены. Нажмите ещё раз, чтобы продолжить.</string>
+    <string name="paywall_reload_failed_retry">Не удалось загрузить цены. Проверьте соединение и нажмите ещё раз.</string>
+    <string name="paywall_billing_unavailable">Покупки на этом устройстве сейчас недоступны.</string>
     <string name="paywall_no_payment_now">Оплата сейчас не требуется</string>
     <string name="paywall_cancel_anytime">Отмена в любое время</string>
     <string name="paywall_auto_renew_notice">Автопродление. Отмена в любое время.</string>
