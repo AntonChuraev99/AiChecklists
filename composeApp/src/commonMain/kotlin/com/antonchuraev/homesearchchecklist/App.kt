@@ -55,6 +55,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox.Inbo
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.projects.ProjectsRoute
 import com.antonchuraev.homesearchchecklist.navigation.OverviewScreen
 import com.antonchuraev.homesearchchecklist.navigation.V2ChatDockOverlay
+import com.antonchuraev.homesearchchecklist.navigation.chatDockKeepExpanded
 import com.antonchuraev.homesearchchecklist.navigation.V2Destination
 import com.antonchuraev.homesearchchecklist.navigation.V2NavigationShell
 import com.antonchuraev.homesearchchecklist.navigation.V2ShellMetrics
@@ -150,7 +151,9 @@ import aichecklists.core.designsystem.generated.resources.chat_error_offline
 import aichecklists.core.designsystem.generated.resources.chat_error_message_too_long
 import aichecklists.core.designsystem.generated.resources.chat_error_service
 import aichecklists.core.designsystem.generated.resources.chat_error_timeout
+import aichecklists.core.designsystem.generated.resources.chat_mic_hold_to_record
 import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
+import aichecklists.core.designsystem.generated.resources.chat_recording_failed
 import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_recording_cancelled
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
@@ -212,6 +215,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatScreenIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatScreenSideEffect
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.VoicePressTerminalGate
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.logVoiceRecorderError
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
@@ -919,6 +924,8 @@ fun App() {
             val sm_micPermissionDenied = stringResource(Res.string.chat_mic_permission_denied)
             val sm_voiceTooShort = stringResource(Res.string.chat_voice_too_short)
             val sm_recordingCancelled = stringResource(Res.string.chat_recording_cancelled)
+            val sm_micHoldToRecord = stringResource(Res.string.chat_mic_hold_to_record)
+            val sm_recordingFailed = stringResource(Res.string.chat_recording_failed)
             val sm_thumbUpThanks = stringResource(Res.string.chat_thumb_up_thanks)
             val sm_previewCancelled = stringResource(Res.string.chat_preview_cancelled_message)
             val sm_transcribing = stringResource(Res.string.chat_transcribing)
@@ -1007,6 +1014,8 @@ fun App() {
                     "chat_mic_permission_denied" to sm_micPermissionDenied,
                     "chat_voice_too_short" to sm_voiceTooShort,
                     "chat_recording_cancelled" to sm_recordingCancelled,
+                    "chat_mic_hold_to_record" to sm_micHoldToRecord,
+                    "chat_recording_failed" to sm_recordingFailed,
                     "chat_thumb_up_thanks" to sm_thumbUpThanks,
                     "chat_preview_cancelled_message" to sm_previewCancelled,
                     "chat_transcribing" to sm_transcribing,
@@ -1033,17 +1042,29 @@ fun App() {
             }
 
             // Sheet side-effect handler — mirrors ChatRoute logic exactly.
-            // Audio recorder for the inline dock — declared BEFORE the SideEffect collector
-            // so the RequestRecordAudioPermission handler below can call .start() directly
-            // (mirrors ChatRoute). onResult/onError feed OnVoiceRecordingStopped back to the VM.
+            // Audio recorder for the inline dock (mirrors ChatRoute). The mic gesture is the only
+            // caller of .start(); onResult/onError feed OnVoiceRecordingStopped back to the VM,
+            // one terminal callback per press (VoicePressTerminalGate).
+            val sheetVoicePressGate = remember { VoicePressTerminalGate() }
             val sheetAudioRecorder = rememberAudioRecorderLauncher(
                 onResult = { result ->
-                    chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(
-                        recordingPath = result?.filePath,
-                        mimeType = result?.mimeType ?: "audio/m4a",
-                    ))
+                    if (sheetVoicePressGate.tryDeliver()) {
+                        chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(
+                            recordingPath = result?.filePath,
+                            mimeType = result?.mimeType ?: "audio/m4a",
+                        ))
+                    } else {
+                        logger.warning("ChatVoice", "Dropped a second recorder result for one press")
+                    }
                 },
-                onError = { chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null)) },
+                onError = { errorCode ->
+                    val reason = logVoiceRecorderError(logger, errorCode)
+                    if (sheetVoicePressGate.tryDeliver()) {
+                        chatViewModel.sendIntent(
+                            ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null, cancelReason = reason)
+                        )
+                    }
+                },
             )
 
             // rememberUpdatedState, NOT the map directly: LaunchedEffect captures its lambda ONCE
@@ -1087,14 +1108,6 @@ fun App() {
                             // described the credits chip and would mislabel every out-of-credits
                             // CTA tap as an unprompted chip tap.
                             navigator.navigateToPaywall(source = effect.source)
-                        }
-                        ChatScreenSideEffect.RequestRecordAudioPermission -> {
-                            // Mic tapped on a bottom bar (MainScreen / ChecklistDetail) opens the
-                            // dock and sends OnVoiceRecordingStarted; the VM emits this side-effect.
-                            // AudioRecorderLauncher handles the permission request internally —
-                            // starting it here requests permission if needed; on denial onError
-                            // fires → OnVoiceRecordingStopped(null) → cancelled snackbar.
-                            sheetAudioRecorder.start()
                         }
                         is ChatScreenSideEffect.OpenFilePicker -> Unit // handled via trigger-flag
                     }
@@ -1157,8 +1170,7 @@ fun App() {
                 }
                 chatViewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
             }
-            // sheetAudioRecorder is declared above the SideEffect collector (needed by the
-            // RequestRecordAudioPermission handler) — do not re-declare it here.
+            // sheetAudioRecorder is declared above the SideEffect collector — do not re-declare it here.
             LaunchedEffect(chatUiState.attachmentPickerType) {
                 when (chatUiState.attachmentPickerType) {
                     AttachmentSource.Image -> sheetImagePicker.launch()
@@ -1528,7 +1540,16 @@ fun App() {
                         // pending choice / last answer). Sending disables+blurs the input (the old
                         // auto-collapse trigger); without this the dock slammed shut to Peek mid-turn
                         // and hid the ChatTypingIndicator + answer. Grabber drag-down still collapses.
-                        keepExpanded = if (itemCreateOverride != null) true else hasLastAnswer,
+                        // A hold-to-record disables+blurs the input the same way, so recording and
+                        // transcription hold the dock too (see chatDockKeepExpanded) — in the v2
+                        // shell that collapse unmounted the dock under the recording overlay.
+                        // Chat-only, like the row's own isRecording / isTranscribing below.
+                        keepExpanded = chatDockKeepExpanded(
+                            itemCreateActive = itemCreateOverride != null,
+                            hasLastAnswer = hasLastAnswer,
+                            isRecording = itemCreateOverride == null && chatUiState.isRecording,
+                            isTranscribing = itemCreateOverride == null && chatUiState.isTranscribing,
+                        ),
                         // A pending choice block (prompt + chips + escape) is taller than a one-line
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
                         // D2 adds typed object rows inside the bubble (item + list + time), so a
@@ -1712,8 +1733,9 @@ fun App() {
                                     // Item-create opens ITS picker (files staged on the new item); chat
                                     // opens the chat attachment sheet.
                                     onAttachFileClick = ic?.onAttachClick ?: { chatSheetAttachmentSheet = true },
-                                    // BUG #1 FIX: send OnVoiceRecordingStarted (flips isRecording +
-                                    // emits RequestRecordAudioPermission) like the full ChatScreen does.
+                                    // BUG #1 FIX: send OnVoiceRecordingStarted (flips isRecording) like
+                                    // the full ChatScreen does, then start the recorder — this gesture
+                                    // is its only start() caller.
                                     // The OLD inline panel only called sheetAudioRecorder.start() with NO
                                     // intent, so isRecording never flipped and the press-hold mic was a
                                     // no-op in the dock. Now the SAME press-hold works in the peek.
@@ -1721,6 +1743,7 @@ fun App() {
                                     // these chat handlers are simply never reached there.)
                                     onVoiceRecordingStarted = {
                                         chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                                        sheetVoicePressGate.onPressStarted()
                                         sheetAudioRecorder.start()
                                     },
                                     onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
@@ -1802,6 +1825,7 @@ fun App() {
                                 onAttachFileClick = { chatSheetAttachmentSheet = true },
                                 onVoiceRecordingStarted = {
                                     chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                                    sheetVoicePressGate.onPressStarted()
                                     sheetAudioRecorder.start()
                                 },
                                 onVoiceRecordingStopped = { sheetAudioRecorder.stop() },

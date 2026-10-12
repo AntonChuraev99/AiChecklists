@@ -53,7 +53,9 @@ import aichecklists.core.designsystem.generated.resources.chat_error_offline
 import aichecklists.core.designsystem.generated.resources.chat_error_message_too_long
 import aichecklists.core.designsystem.generated.resources.chat_error_service
 import aichecklists.core.designsystem.generated.resources.chat_error_timeout
+import aichecklists.core.designsystem.generated.resources.chat_mic_hold_to_record
 import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
+import aichecklists.core.designsystem.generated.resources.chat_recording_failed
 import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_recording_cancelled
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
@@ -87,7 +89,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -105,9 +109,6 @@ import org.koin.compose.viewmodel.koinViewModel
  *     to chat history. This keeps all user-facing strings out of ViewModel
  *     and bound to system locale automatically.
  *   - [ChatScreenSideEffect.NavigateBack] → calls [onBack].
- *   - [ChatScreenSideEffect.RequestRecordAudioPermission] → triggers platform
- *     permission dialog via [audioRecorderLauncher.start()]. If denied, shows
- *     a snackbar with [chat_mic_permission_denied].
  *   - [ChatScreenSideEffect.OpenFilePicker] → launches the appropriate picker
  *     (image / pdf / text via FilePicker; audio via AudioRecorder).
  *
@@ -236,6 +237,8 @@ fun ChatRoute(
     val micPermissionDeniedText = stringResource(Res.string.chat_mic_permission_denied)
     val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
     val recordingCancelledText = stringResource(Res.string.chat_recording_cancelled)
+    val micHoldToRecordText = stringResource(Res.string.chat_mic_hold_to_record)
+    val recordingFailedText = stringResource(Res.string.chat_recording_failed)
     val thumbUpThanksText = stringResource(Res.string.chat_thumb_up_thanks)
     val previewCancelledText = stringResource(Res.string.chat_preview_cancelled_message)
     // Transcription strings (STT flow)
@@ -303,6 +306,8 @@ fun ChatRoute(
             "chat_mic_permission_denied" to micPermissionDeniedText,
             "chat_voice_too_short" to voiceTooShortText,
             "chat_recording_cancelled" to recordingCancelledText,
+            "chat_mic_hold_to_record" to micHoldToRecordText,
+            "chat_recording_failed" to recordingFailedText,
             "chat_thumb_up_thanks" to thumbUpThanksText,
             "chat_preview_cancelled_message" to previewCancelledText,
             "chat_transcribing" to transcribingText,
@@ -409,19 +414,30 @@ fun ChatRoute(
     )
 
     // ── Audio recorder ───────────────────────────────────────────────────────
+    // One terminal callback per press reaches the ViewModel — see [VoicePressTerminalGate].
+    val voiceLogger = koinInject<AppLogger>()
+    val voicePressGate = remember { VoicePressTerminalGate() }
     val audioRecorder = rememberAudioRecorderLauncher(
         onResult = { result ->
-            // result == null means user cancelled or recording was too short
-            viewModel.sendIntent(
-                ChatScreenIntent.OnVoiceRecordingStopped(
-                    recordingPath = result?.filePath,
-                    mimeType = result?.mimeType ?: "audio/m4a",
+            // result == null: the user cancelled the press (slide-up or plain release with no audio)
+            if (voicePressGate.tryDeliver()) {
+                viewModel.sendIntent(
+                    ChatScreenIntent.OnVoiceRecordingStopped(
+                        recordingPath = result?.filePath,
+                        mimeType = result?.mimeType ?: "audio/m4a",
+                    )
                 )
-            )
+            } else {
+                voiceLogger.warning("ChatVoice", "Dropped a second recorder result for one press")
+            }
         },
-        onError = { _ ->
-            // Permission denied or hardware error — snackbar shown below
-            viewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null))
+        onError = { errorCode ->
+            val reason = logVoiceRecorderError(voiceLogger, errorCode)
+            if (voicePressGate.tryDeliver()) {
+                viewModel.sendIntent(
+                    ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null, cancelReason = reason)
+                )
+            }
         }
     )
 
@@ -471,14 +487,6 @@ fun ChatRoute(
                 ChatScreenSideEffect.NavigateBack -> onBack()
                 is ChatScreenSideEffect.NavigateToChecklist -> onNavigateToChecklist?.invoke(effect.checklistId)
                 is ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke(effect.source)
-                ChatScreenSideEffect.RequestRecordAudioPermission -> {
-                    // AudioRecorderLauncher handles permission check internally.
-                    // Starting the recorder here requests permission if needed;
-                    // if denied, onError fires → OnVoiceRecordingStopped(null) → snackbar
-                    // via chat_recording_cancelled path. A dedicated mic_permission_denied
-                    // snackbar appears only on permanent denial (PERMISSION_DENIED_PERMANENTLY).
-                    audioRecorder.start()
-                }
                 is ChatScreenSideEffect.OpenFilePicker -> {
                     // ViewModel sets attachmentPickerType as a trigger-flag; the
                     // LaunchedEffect(state.attachmentPickerType) above handles the launch.
@@ -509,10 +517,13 @@ fun ChatRoute(
                 AttachmentSource.Audio -> audioFilePicker.launch()
             }
         },
-        // Press-and-hold mic gesture: ChatInputRow invokes this on finger down.
-        // Direct call to audioRecorder.start() (which itself handles permission
-        // request through ActivityResult API). Previously was `null` — no-op bug.
-        onVoiceRecordingStarted = { audioRecorder.start() },
+        // Press-and-hold mic gesture: ChatInputRow invokes this on finger down. This is the ONLY
+        // caller of audioRecorder.start() (which itself handles the permission request through
+        // the ActivityResult API); ChatScreen sends OnVoiceRecordingStarted right before it.
+        onVoiceRecordingStarted = {
+            voicePressGate.onPressStarted()
+            audioRecorder.start()
+        },
         onVoiceRecordingStopped = { audioRecorder.stop() },
         onVoiceRecordingCancelled = { audioRecorder.cancel() },
     )

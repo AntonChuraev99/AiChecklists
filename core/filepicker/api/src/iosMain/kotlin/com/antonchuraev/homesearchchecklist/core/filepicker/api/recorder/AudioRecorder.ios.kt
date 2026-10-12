@@ -72,7 +72,7 @@ actual fun rememberAudioRecorderLauncher(
                     }
                     AVAudioSessionRecordPermissionDenied -> {
                         // Permission was previously denied - suggest settings
-                        currentOnError("PERMISSION_DENIED_PERMANENTLY")
+                        currentOnError(AudioRecorderErrorCodes.PERMISSION_DENIED_PERMANENTLY)
                     }
                     else -> {
                         // Undetermined - request permission
@@ -90,7 +90,7 @@ actual fun rememberAudioRecorderLauncher(
                                 }
                             } else {
                                 // User just denied - they can still change in settings
-                                currentOnError("PERMISSION_DENIED_PERMANENTLY")
+                                currentOnError(AudioRecorderErrorCodes.PERMISSION_DENIED_PERMANENTLY)
                             }
                         }
                     }

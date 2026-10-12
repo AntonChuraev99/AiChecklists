@@ -1324,6 +1324,125 @@ class ChatViewModelTest {
         assertFalse(vm.screenState.value.isTranscribing, "isTranscribing must remain false on cancel")
     }
 
+    // 31a. Mic press → recording state set, and the ViewModel asks the UI for NOTHING.
+    // Bug repro (docs/backlog/2026-10-12-chat-voice-input-broken-flow.md, defect 1 — "recording
+    // starts twice per press"): the mic gesture already calls recorder.start() itself and then sends
+    // OnVoiceRecordingStarted. If the ViewModel answers that intent with a side effect, the UI's
+    // effect handler calls recorder.start() a second time for the same press. The contract is
+    // therefore "no side effect at all" — asserted on the whole collected list, not on one effect
+    // type, so the test names no effect class and survives the offending one being deleted.
+    @Test
+    fun voiceRecordingStarted_setsRecordingState_andEmitsNoSideEffect() = runTest {
+        val vm = makeVm()
+
+        // sideEffect is a replay=0 SharedFlow — subscribe (UNDISPATCHED) BEFORE the intent, or the
+        // emission is lost and the empty-list assert below goes vacuous.
+        val effects = mutableListOf<ChatScreenSideEffect>()
+        val collector = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.collect { effects += it }
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+        // Let the ViewModel's launched emit and the collector's resumption both run.
+        testScheduler.advanceUntilIdle()
+        collector.cancel()
+
+        assertTrue(
+            vm.screenState.value.isRecording,
+            "isRecording must be true once the mic press is reported",
+        )
+        assertEquals(
+            emptyList<ChatScreenSideEffect>(),
+            effects.toList(),
+            "the gesture owns recorder.start(); the ViewModel must not ask the UI to start it again",
+        )
+    }
+
+    // 31b. Mic press → funnel start is logged exactly once.
+    @Test
+    fun voiceRecordingStarted_logsVoiceStarted() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+
+        assertEquals(1, analytics.count("ai_chat_voice_started"))
+    }
+
+    // 31c. No audio + a reason → ai_chat_voice_cancelled carries that reason (whole param map
+    // pinned) and the snackbar names the actual cause instead of a blanket "cancelled".
+    @Test
+    fun voiceRecordingStopped_nullPath_reportsReasonAndMatchingSnackbar() = runTest {
+        val expectedSnackbar = mapOf(
+            VoiceCancelReason.USER_CANCELLED to "chat_recording_cancelled",
+            VoiceCancelReason.TOO_SHORT to "chat_voice_too_short",
+            VoiceCancelReason.PERMISSION_DENIED to "chat_mic_permission_denied",
+            VoiceCancelReason.PERMISSION_DENIED_PERMANENTLY to "chat_mic_permission_denied",
+            VoiceCancelReason.RECORDER_ERROR to "chat_recording_failed",
+        )
+        expectedSnackbar.forEach { (reason, messageKey) ->
+            val analytics = FakeAnalyticsTracker()
+            val repo = FakeAiChatRepository()
+            val vm = makeVm(repo = repo, analytics = analytics)
+            val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                vm.sideEffect.first()
+            }
+
+            vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null, cancelReason = reason))
+
+            val effect = effectDeferred.await()
+            assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+            assertEquals(messageKey, effect.messageKey, "snackbar for $reason")
+            assertEquals(1, analytics.count("ai_chat_voice_cancelled"), "cancel event count for $reason")
+            assertEquals(
+                mapOf<String, Any>("reason" to reason.analyticsValue),
+                analytics.paramsOf("ai_chat_voice_cancelled"),
+                "cancel event params for $reason",
+            )
+            assertEquals(0, repo.transcribeCallCount, "no transcription for $reason")
+            assertFalse(vm.screenState.value.isRecording, "isRecording cleared for $reason")
+        }
+    }
+
+    // 31d. A null path with no reason is a plain user cancel (the pre-existing call shape).
+    @Test
+    fun voiceRecordingStopped_nullPathNoReason_reportsUserCancelled() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(null))
+
+        assertEquals(
+            mapOf<String, Any>("reason" to "user_cancelled"),
+            analytics.paramsOf("ai_chat_voice_cancelled"),
+        )
+    }
+
+    // 31e. The permission dialog swallowed the press: not a cancel (no event), but the user is
+    // told to press and hold again — never a silent skip.
+    @Test
+    fun voiceRecordingStopped_permissionJustGranted_noCancelEvent_showsHoldHint() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+        vm.sendIntent(
+            ChatScreenIntent.OnVoiceRecordingStopped(
+                recordingPath = null,
+                cancelReason = VoiceCancelReason.PERMISSION_JUST_GRANTED,
+            )
+        )
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_mic_hold_to_record", effect.messageKey)
+        assertEquals(0, analytics.count("ai_chat_voice_cancelled"))
+        assertFalse(vm.screenState.value.isRecording)
+    }
+
     // ── 32. Unknown intent → ShowAssistantMessage carries askAiForText == original input ──
     // RED: ChatMessage.askAiForText field doesn't exist yet; Unknown branch doesn't set it.
 
