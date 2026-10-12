@@ -492,6 +492,20 @@ object AnalyticsEvents {
         const val PRODUCTS_LOAD_SUCCESS = "products_load_success"
         const val PRODUCTS_LOAD_EMPTY = "products_load_empty"
         const val PRODUCTS_LOAD_FAILED = "products_load_failed"
+
+        /**
+         * The subscribe CTA was tapped on an EMPTY catalog and that tap started a catalog reload.
+         * One event per reload, emitted when it finishes, with [AnalyticsParams.OUTCOME] =
+         * [RELOAD_OUTCOME_SUCCESS] / [RELOAD_OUTCOME_FAILED] and, on failure,
+         * [AnalyticsParams.ERROR_CODE].
+         *
+         * Deliberately NOT folded into [PRODUCTS_LOAD_SUCCESS] / [PRODUCTS_LOAD_FAILED]: those fire
+         * once per paywall open and their ratio is the catalog health series. A user who taps a
+         * dead catalog many times would otherwise multiply the failure count.
+         */
+        const val PRODUCTS_RELOAD_ON_TAP = "products_reload_on_tap"
+        const val RELOAD_OUTCOME_SUCCESS = "success"
+        const val RELOAD_OUTCOME_FAILED = "failed"
         const val PURCHASE_COMPLETED = "purchase_completed"
         const val PURCHASE_CANCELLED = "purchase_cancelled"
         const val PURCHASE_FAILED = "purchase_failed"

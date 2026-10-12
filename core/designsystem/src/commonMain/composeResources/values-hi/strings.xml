@@ -585,6 +585,9 @@
     <string name="paywall_subscribe_now">अभी सब्सक्राइब करें</string>
     <string name="paywall_retry">फिर से आज़माएं</string>
     <string name="paywall_load_error">सदस्यता विकल्प लोड नहीं हो सके।\nकृपया अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
+    <string name="paywall_prices_loaded">कीमतें लोड हो गईं। जारी रखने के लिए फिर से टैप करें।</string>
+    <string name="paywall_reload_failed_retry">कीमतें लोड नहीं हो सकीं। कृपया अपना कनेक्शन जांचें और फिर से टैप करें।</string>
+    <string name="paywall_billing_unavailable">इस डिवाइस पर अभी खरीदारी उपलब्ध नहीं है।</string>
     <string name="paywall_no_payment_now">अभी कोई भुगतान नहीं</string>
     <string name="paywall_cancel_anytime">कभी भी रद्द करें</string>
     <string name="paywall_auto_renew_notice">ऑटो-रिन्यू होता है। कभी भी रद्द करें।</string>

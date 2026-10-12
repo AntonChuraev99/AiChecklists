@@ -17,7 +17,9 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigPr
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.ConversionEventHelper
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getDeviceCountry
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getPlayStoreVersion
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallErrorCode
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.isRetryableCatalogError
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallRemoteConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseAnalyticsContext
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
@@ -29,7 +31,9 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Purch
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +47,10 @@ private const val TAG = "PaywallViewModel"
 
 // How long the post-cancel reason picker lingers on the "Thanks" stage before auto-dismissing.
 private const val THANKS_DISMISS_DELAY_MS = 800L
+
+// `error_code` of a tap-triggered reload that succeeded as a request but carried no products.
+// Not a PaywallErrorCode: nothing failed, the offering is simply empty.
+private const val RELOAD_ERROR_EMPTY_CATALOG = "EMPTY_CATALOG"
 
 class PaywallViewModel(
     savedStateHandle: SavedStateHandle,
@@ -71,6 +79,10 @@ class PaywallViewModel(
     // StoreKit "userCancelled=true on a successful purchase" bug. Nullable default so pure-VM tests
     // (which never exercise the iOS path) can omit it.
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase? = null,
+    // Resolves a localized string. A seam, not a second source of copy: production always goes
+    // through Compose Resources; a plain JVM host test cannot (`Resources.getSystem not mocked`),
+    // which used to make every path that ends in a user-visible message untestable.
+    private val resolveString: suspend (StringResource) -> String = { getString(it) },
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
     private val source: String = sourceOverride
@@ -97,6 +109,16 @@ class PaywallViewModel(
      * is exactly the tap we want to mark. Never gates the purchase itself.
      */
     private var purchaseInFlight: Boolean = false
+
+    /** The running catalog load, if any — makes [loadProducts] single-flight. */
+    private var catalogLoadJob: Job? = null
+
+    /**
+     * A tap on the subscribe CTA found the catalog empty and is waiting for the load to finish.
+     * Consumed by [loadProducts] when the request returns: it decides whether the outcome is
+     * announced to the user as the answer to their tap. Main-thread only, like the rest of the VM.
+     */
+    private var tapAwaitsCatalog: Boolean = false
 
     private val _screenState = MutableStateFlow(PaywallState(source = source))
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
@@ -310,12 +332,39 @@ class PaywallViewModel(
         _screenState.update { it.copy(showCancelReasonSheet = false) }
     }
 
-    private fun loadProducts() {
-        viewModelScope.launch {
-            _screenState.update { it.copy(isLoading = true, error = null) }
-            logger?.info(TAG, "[PAYWALL] loadProducts() start — source=$source")
+    /**
+     * Loads the catalog. Single-flight: while one load runs, another is never started — impatient
+     * taps on a dead catalog must not fan out into parallel store requests.
+     *
+     * @param startedByTap the load was started by a tap on the subscribe CTA over an empty catalog
+     *   (see [purchase]). Such a reload reports itself as ONE
+     *   [AnalyticsEvents.Paywall.PRODUCTS_RELOAD_ON_TAP] and stays out of the `products_load_*`
+     *   series, which counts one load per paywall open.
+     */
+    private fun loadProducts(startedByTap: Boolean = false) {
+        if (catalogLoadJob?.isActive == true) {
+            logger?.info(TAG, "[PAYWALL] loadProducts() skipped — a catalog load is already running")
+            return
+        }
+        catalogLoadJob = viewModelScope.launch {
+            _screenState.update {
+                it.copy(
+                    isLoading = true,
+                    isReloadingCatalog = startedByTap,
+                    error = null,
+                    notice = null,
+                )
+            }
+            logger?.info(TAG, "[PAYWALL] loadProducts() start — source=$source, startedByTap=$startedByTap")
 
-            getOfferingsUseCase()
+            val result = getOfferingsUseCase()
+
+            // Read AFTER the request: a tap that landed while it was in flight is owed the same
+            // feedback as the tap that started it.
+            val tapWaiting = tapAwaitsCatalog
+            tapAwaitsCatalog = false
+
+            result
                 .onSuccess { offering ->
                     val products = offering?.products ?: emptyList()
 
@@ -338,12 +387,25 @@ class PaywallViewModel(
                     }
 
                     if (products.isEmpty()) {
-                        analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_EMPTY, buildMap {
-                            put(AnalyticsParams.SOURCE, source)
-                            put("reason", if (offering == null) "no_current_offering" else "empty_packages")
-                            analyticsContext?.toEventParams()?.let { putAll(it) }
-                        })
-                        handleEmptyProducts()
+                        val emptyReason = if (offering == null) "no_current_offering" else "empty_packages"
+                        logger?.warning(TAG, "[PAYWALL] loadProducts() returned no products — $emptyReason")
+                        if (startedByTap) {
+                            trackReloadOnTap(
+                                outcome = AnalyticsEvents.Paywall.RELOAD_OUTCOME_FAILED,
+                                errorCode = RELOAD_ERROR_EMPTY_CATALOG,
+                            )
+                        } else {
+                            analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_EMPTY, buildMap {
+                                put(AnalyticsParams.SOURCE, source)
+                                put("reason", emptyReason)
+                                analyticsContext?.toEventParams()?.let { putAll(it) }
+                            })
+                        }
+                        // An offering with nothing in it is a catalog configuration state, not a
+                        // connection problem — a tap is told so instead of "check your connection".
+                        handleEmptyProducts(
+                            if (tapWaiting) Res.string.paywall_billing_unavailable else Res.string.paywall_load_error,
+                        )
                         return@launch
                     }
 
@@ -359,17 +421,28 @@ class PaywallViewModel(
 
                     logger?.info(TAG, "[PAYWALL] loadProducts() success — ${products.size} products loaded: ${products.joinToString { it.id }}")
 
-                    // Fire products_load_success for conversion funnel tracking.
-                    analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_SUCCESS, buildMap {
-                        put(AnalyticsParams.SOURCE, source)
-                        analyticsContext?.toEventParams()?.let { putAll(it) }
-                    })
+                    if (startedByTap) {
+                        trackReloadOnTap(outcome = AnalyticsEvents.Paywall.RELOAD_OUTCOME_SUCCESS)
+                    } else {
+                        // Fire products_load_success for conversion funnel tracking.
+                        analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_SUCCESS, buildMap {
+                            put(AnalyticsParams.SOURCE, source)
+                            analyticsContext?.toEventParams()?.let { putAll(it) }
+                        })
+                    }
+
+                    // The tap that got us here bought nothing, and must not: the billing sheet may
+                    // only open for a price the paywall has already shown. Say that the prices are
+                    // here now and that the next tap continues — never a silent no-op.
+                    val notice = if (tapWaiting) resolveString(Res.string.paywall_prices_loaded) else null
 
                     _screenState.update {
                         it.copy(
                             isLoading = false,
+                            isReloadingCatalog = false,
                             products = products,
-                            selectedProductId = defaultSelected
+                            selectedProductId = defaultSelected,
+                            notice = notice,
                         )
                     }
                 }
@@ -398,17 +471,55 @@ class PaywallViewModel(
                         }
                         analyticsContext?.toEventParams()?.let { putAll(it) }
                     }
-                    analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_FAILED, params)
-                    handleEmptyProducts()
+                    val errorCode = (error as? PaywallException)?.errorCode
+                    if (startedByTap) {
+                        trackReloadOnTap(
+                            outcome = AnalyticsEvents.Paywall.RELOAD_OUTCOME_FAILED,
+                            errorCode = errorCode?.name ?: PaywallErrorCode.UNKNOWN.name,
+                            extra = params,
+                        )
+                    } else {
+                        analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_FAILED, params)
+                    }
+
+                    // A tap gets the reason, not the generic text: retrying helps with a network or
+                    // store hiccup and is pointless on a device that cannot sell at all. An error
+                    // without a code is treated as transient — the button stays usable either way.
+                    val message = when {
+                        !tapWaiting -> Res.string.paywall_load_error
+                        errorCode?.isRetryableCatalogError() ?: true -> Res.string.paywall_reload_failed_retry
+                        else -> Res.string.paywall_billing_unavailable
+                    }
+                    handleEmptyProducts(message)
                 }
         }
     }
 
-    private suspend fun handleEmptyProducts() {
-        val errorMessage = getString(Res.string.paywall_load_error)
+    private fun trackReloadOnTap(
+        outcome: String,
+        errorCode: String? = null,
+        extra: Map<String, Any> = emptyMap(),
+    ) {
+        analyticsTracker.event(
+            AnalyticsEvents.Paywall.PRODUCTS_RELOAD_ON_TAP,
+            buildMap {
+                // Diagnostics first, so the fixed keys below always win.
+                putAll(extra)
+                analyticsContext?.toEventParams()?.let { putAll(it) }
+                put(AnalyticsParams.SOURCE, source)
+                put(AnalyticsParams.SURFACE, surface)
+                put(AnalyticsParams.OUTCOME, outcome)
+                errorCode?.let { put(AnalyticsParams.ERROR_CODE, it) }
+            },
+        )
+    }
+
+    private suspend fun handleEmptyProducts(message: StringResource) {
+        val errorMessage = resolveString(message)
         _screenState.update {
             it.copy(
                 isLoading = false,
+                isReloadingCatalog = false,
                 products = emptyList(),
                 error = errorMessage
             )
@@ -471,8 +582,24 @@ class PaywallViewModel(
                     analyticsContext?.toEventParams()?.let { putAll(it) }
                 },
             )
+            if (currentState.products.isEmpty()) {
+                // The catalog never arrived (or arrived empty). Repeating the same error on every
+                // tap left the paywall dead until it was reopened. Ask for the catalog again instead; the load
+                // reports back to this tap (prices are here / why not), and a load already running
+                // is joined rather than duplicated.
+                logger?.warning(TAG, "[PAYWALL] purchase() tapped on an empty catalog — reloading it")
+                tapAwaitsCatalog = true
+                loadProducts(startedByTap = true)
+                return
+            }
+            // Catalog loaded, but nothing in it serves the selected plan.
+            logger?.warning(
+                TAG,
+                "[PAYWALL] purchase() — no product for plan=${currentState.selectedPlan.name} " +
+                    "among ${currentState.products.joinToString { it.id }}",
+            )
             viewModelScope.launch {
-                val errorMessage = getString(Res.string.paywall_load_error)
+                val errorMessage = resolveString(Res.string.paywall_load_error)
                 _screenState.update {
                     it.copy(isPurchasing = false, error = errorMessage)
                 }
@@ -486,7 +613,7 @@ class PaywallViewModel(
         purchaseInFlight = true
 
         val purchaseJob = viewModelScope.launch {
-            _screenState.update { it.copy(isPurchasing = true, error = null) }
+            _screenState.update { it.copy(isPurchasing = true, error = null, notice = null) }
 
             when (val result = purchaseProductUseCase(selectedProduct.packageId)) {
                 is PurchaseResult.Success -> {
@@ -556,7 +683,7 @@ class PaywallViewModel(
                     // Friendly localized message instead of the raw RevenueCat error
                     // (raw text preserved in the analytics event above).
                     _screenState.update {
-                        it.copy(isPurchasing = false, error = getString(Res.string.paywall_purchase_failed))
+                        it.copy(isPurchasing = false, error = resolveString(Res.string.paywall_purchase_failed))
                     }
                 }
             }
@@ -596,7 +723,7 @@ class PaywallViewModel(
                         mapOf(AnalyticsParams.SOURCE to source),
                     )
                     _screenState.update {
-                        it.copy(isRestoring = false, error = getString(Res.string.paywall_no_subscription_found))
+                        it.copy(isRestoring = false, error = resolveString(Res.string.paywall_no_subscription_found))
                     }
                 }
                 is RestoreResult.Error -> {
@@ -609,7 +736,7 @@ class PaywallViewModel(
                     // Show a friendly localized message — NOT the raw RevenueCat error
                     // (English-only, sometimes a dev string). Raw text stays in analytics above.
                     _screenState.update {
-                        it.copy(isRestoring = false, error = getString(Res.string.paywall_restore_failed))
+                        it.copy(isRestoring = false, error = resolveString(Res.string.paywall_restore_failed))
                     }
                 }
             }
@@ -619,6 +746,7 @@ class PaywallViewModel(
     private val conversionEventHelper = ConversionEventHelper(analyticsTracker, logger)
 
     private fun dismissError() {
-        _screenState.update { it.copy(error = null) }
+        // One snackbar slot on screen, two sources — dismissing it clears both.
+        _screenState.update { it.copy(error = null, notice = null) }
     }
 }

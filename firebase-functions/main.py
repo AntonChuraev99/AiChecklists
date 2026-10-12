@@ -1535,9 +1535,23 @@ def generate_checklist(request: Request):
     model_id, model_arm = resolve_experiment_model(user_id, "generate", "gemini-3.1-flash-lite", data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "generate"}
 
+    # An empty or non-JSON completion is a transient generation blip, not a property of the
+    # input — retry the SAME call ONCE before failing the request (prod: three 500s in eleven
+    # seconds for one user, all "Expecting value: line 1 column 1 (char 0)"). The final parse
+    # error is re-raised into the handler below, so the refund stays in one place per outcome.
     try:
-        response = call_gemini(prompt, input_type, input_data, model_id=model_id)
-        result = parse_gemini_json(response.text)
+        for attempt in (1, 2):
+            response = call_gemini(prompt, input_type, input_data, model_id=model_id)
+            try:
+                result = parse_gemini_json(response.text)
+                break
+            except json.JSONDecodeError:
+                if attempt == 2:
+                    raise
+                logger.warning(
+                    "generate_checklist: unparseable Gemini response for user=%s — retrying once",
+                    user_id[:8],
+                )
     except json.JSONDecodeError as e:
         logger.exception("generate_checklist: parse failed for user=%s", user_id[:8])
         refund_credits(user_id, cost, "gemini_parse_error", request_id)

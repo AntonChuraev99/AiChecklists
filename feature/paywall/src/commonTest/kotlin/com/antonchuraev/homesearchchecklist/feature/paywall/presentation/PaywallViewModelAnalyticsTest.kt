@@ -16,6 +16,9 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallErrorCode
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.isRetryableCatalogError
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallRemoteConfig
@@ -46,6 +49,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.jetbrains.compose.resources.StringResource
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -159,6 +163,15 @@ class PaywallViewModelAnalyticsTest {
         deliveredOfferingId: String = "default",
         // Non-null = catalog load fails.
         offeringsFailure: Throwable? = null,
+        // Non-null = the Nth catalog request gets the Nth entry (the last one repeats). Lets a test
+        // script "first load fails, the reload succeeds".
+        offeringsSequence: List<Result<PaywallOffering?>>? = null,
+        // > 0 keeps a catalog load in flight across the next intent.
+        offeringsDelayMs: Long = 0L,
+        // null = production resolver (Compose Resources — unresolvable in a JVM host test, see the
+        // notes on the un-advanced tests below). The reload tests pass a resolver that returns the
+        // resource KEY, so the asserted text names the string that would be shown.
+        resolveString: (suspend (StringResource) -> String)? = null,
     ): Harness {
         val tracker = RecordingAnalyticsTracker()
         val paywallRepo = FakePaywallRepository(
@@ -166,26 +179,67 @@ class PaywallViewModelAnalyticsTest {
             purchaseResult = purchaseResult,
             purchaseDelayMs = purchaseDelayMs,
             offeringsFailure = offeringsFailure,
+            offeringsSequence = offeringsSequence,
+            offeringsDelayMs = offeringsDelayMs,
         )
         val userRepo = FakeUserDataRepository()
         val remoteConfig = FakeRemoteConfigProvider(
             strings = mapOf(RemoteConfigKeys.PAYWALL_CONFIG to paywallConfigJson),
         )
         val paywallConfigUseCase = GetPaywallConfigUseCase(remoteConfig)
-        val vm = PaywallViewModel(
-            savedStateHandle = SavedStateHandle(),
-            navigator = FakeAppNavigator(),
-            getOfferingsUseCase = GetOfferingsUseCase(paywallRepo, paywallConfigUseCase),
-            getPaywallConfigUseCase = paywallConfigUseCase,
-            purchaseProductUseCase = PurchaseProductUseCase(paywallRepo, userRepo),
-            restorePurchasesUseCase = RestorePurchasesUseCase(paywallRepo, userRepo),
-            analyticsTracker = tracker,
-            remoteConfigProvider = remoteConfig,
-            sourceOverride = source,
-            aiModelExperimentTracker = FakeAiModelExperimentTracker(experimentArm),
-        )
+        val getOfferings = GetOfferingsUseCase(paywallRepo, paywallConfigUseCase)
+        val purchaseProduct = PurchaseProductUseCase(paywallRepo, userRepo)
+        val restorePurchases = RestorePurchasesUseCase(paywallRepo, userRepo)
+        val armTracker = FakeAiModelExperimentTracker(experimentArm)
+        val vm = if (resolveString == null) {
+            PaywallViewModel(
+                savedStateHandle = SavedStateHandle(),
+                navigator = FakeAppNavigator(),
+                getOfferingsUseCase = getOfferings,
+                getPaywallConfigUseCase = paywallConfigUseCase,
+                purchaseProductUseCase = purchaseProduct,
+                restorePurchasesUseCase = restorePurchases,
+                analyticsTracker = tracker,
+                remoteConfigProvider = remoteConfig,
+                sourceOverride = source,
+                aiModelExperimentTracker = armTracker,
+            )
+        } else {
+            PaywallViewModel(
+                savedStateHandle = SavedStateHandle(),
+                navigator = FakeAppNavigator(),
+                getOfferingsUseCase = getOfferings,
+                getPaywallConfigUseCase = paywallConfigUseCase,
+                purchaseProductUseCase = purchaseProduct,
+                restorePurchasesUseCase = restorePurchases,
+                analyticsTracker = tracker,
+                remoteConfigProvider = remoteConfig,
+                sourceOverride = source,
+                aiModelExperimentTracker = armTracker,
+                resolveString = resolveString,
+            )
+        }
         return Harness(vm, tracker, paywallRepo)
     }
+
+    /** Catalog-load failure as the repository reports it: a [PaywallException] with a code. */
+    private fun catalogFailure(code: PaywallErrorCode): Result<PaywallOffering?> =
+        Result.failure(PaywallException(errorCode = code, message = "catalog load failed: $code"))
+
+    /** First catalog request fails with [firstFailure]; later requests get [thenResults] in order. */
+    private fun createReloadHarness(
+        firstFailure: PaywallErrorCode,
+        thenResults: List<Result<PaywallOffering?>>,
+        offeringsDelayMs: Long = 0L,
+    ): Harness = createHarness(
+        products = emptyList(),
+        offeringsSequence = listOf(catalogFailure(firstFailure)) + thenResults,
+        offeringsDelayMs = offeringsDelayMs,
+        resolveString = { it.key },
+    )
+
+    private fun loadedOffering(): Result<PaywallOffering?> =
+        Result.success(PaywallOffering(id = "default", products = listOf(monthlyTrialProduct)))
 
     // ── Funnel entry: paywall_shown must cover EVERY paywall host ─────────────
 
@@ -560,6 +614,200 @@ class PaywallViewModelAnalyticsTest {
         )
     }
 
+    // ── A tap on an empty catalog reloads it ──────────────────────────────────
+
+    /**
+     * 🔴 RED repro. Users tap Subscribe on a catalog that failed to load, and tap again and again
+     * — every tap answered with the same error, because `purchase()` never asked for the catalog
+     * a second time. The paywall stayed dead until it was closed and reopened.
+     *
+     * The purchase must NOT start on its own once the reload succeeds: the app may not open the
+     * billing sheet for a price it has not shown yet. The next tap is the purchase.
+     */
+    @Test
+    fun purchaseTap_onCatalogThatFailedToLoad_reloadsIt_showsPrices_andDoesNotBuy() =
+        testScope.runTest {
+            val (vm, tracker, repository) = createReloadHarness(
+                PaywallErrorCode.NETWORK_ERROR,
+                listOf(loadedOffering()),
+            )
+            advanceUntilIdle() // init load fails
+            assertEquals(1, repository.requestedOfferingIds.size, "guard rail: one load so far")
+            assertTrue(vm.screenState.value.products.isEmpty(), "guard rail: the catalog is empty")
+
+            vm.onIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            assertEquals(
+                2,
+                repository.requestedOfferingIds.size,
+                "a tap on an empty catalog must ask for the catalog again — it is the only " +
+                    "action the user has left on this screen",
+            )
+            val state = vm.screenState.value
+            assertEquals(listOf(monthlyTrialProduct), state.products)
+            assertEquals(false, state.isLoading)
+            assertEquals(null, state.error, "a successful reload is not an error")
+            assertEquals(
+                "paywall_prices_loaded",
+                state.notice,
+                "the user tapped and nothing was bought — they must be told why and what to do",
+            )
+            assertEquals(
+                emptyList(),
+                repository.purchasedPackageIds,
+                "the reload must never start a purchase for a price the user has not seen",
+            )
+            val reload = tracker.events
+                .filter { it.first == AnalyticsEvents.Paywall.PRODUCTS_RELOAD_ON_TAP }
+            assertEquals(1, reload.size)
+            assertEquals(
+                AnalyticsEvents.Paywall.RELOAD_OUTCOME_SUCCESS,
+                reload.single().second[AnalyticsParams.OUTCOME],
+            )
+        }
+
+    @Test
+    fun purchaseTap_afterASuccessfulReload_buysTheNowVisibleProduct() =
+        testScope.runTest {
+            val (vm, _, repository) = createReloadHarness(
+                PaywallErrorCode.NETWORK_ERROR,
+                listOf(loadedOffering()),
+            )
+            advanceUntilIdle()
+            vm.onIntent(PaywallIntent.Purchase) // reload
+            advanceUntilIdle()
+
+            vm.onIntent(PaywallIntent.Purchase) // the real purchase
+            advanceUntilIdle()
+
+            assertEquals(listOf(monthlyTrialProduct.packageId), repository.purchasedPackageIds)
+            assertEquals(2, repository.requestedOfferingIds.size, "a loaded catalog is not reloaded")
+        }
+
+    @Test
+    fun purchaseTap_reloadFailsWithNonRetryableError_saysPurchasesUnavailable_notCheckConnection() =
+        testScope.runTest {
+            val (vm, tracker, repository) = createReloadHarness(
+                PaywallErrorCode.NETWORK_ERROR,
+                listOf(catalogFailure(PaywallErrorCode.GMS_UNAVAILABLE)),
+            )
+            advanceUntilIdle()
+
+            vm.onIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            val state = vm.screenState.value
+            assertEquals(
+                "paywall_billing_unavailable",
+                state.error,
+                "no Google Play services is not a connection problem — 'check your connection' " +
+                    "sends the user to fix the wrong thing",
+            )
+            assertEquals(false, state.isLoading, "the CTA must not be left in a loading state")
+            assertEquals(false, state.isReloadingCatalog, "a failed reload must stop the spinner too")
+            assertEquals(emptyList(), repository.purchasedPackageIds)
+            val reload = tracker.events
+                .single { it.first == AnalyticsEvents.Paywall.PRODUCTS_RELOAD_ON_TAP }
+                .second
+            assertEquals(AnalyticsEvents.Paywall.RELOAD_OUTCOME_FAILED, reload[AnalyticsParams.OUTCOME])
+            assertEquals("GMS_UNAVAILABLE", reload[AnalyticsParams.ERROR_CODE])
+        }
+
+    @Test
+    fun purchaseTap_reloadFailsWithRetryableError_asksToRetry_andTheNextTapTriesAgain() =
+        testScope.runTest {
+            val (vm, _, repository) = createReloadHarness(
+                PaywallErrorCode.NETWORK_ERROR,
+                listOf(catalogFailure(PaywallErrorCode.STORE_PROBLEM), loadedOffering()),
+            )
+            advanceUntilIdle()
+
+            vm.onIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+            assertEquals("paywall_reload_failed_retry", vm.screenState.value.error)
+
+            vm.onIntent(PaywallIntent.Purchase) // the button stays alive
+            advanceUntilIdle()
+
+            assertEquals(3, repository.requestedOfferingIds.size)
+            assertEquals(listOf(monthlyTrialProduct), vm.screenState.value.products)
+        }
+
+    @Test
+    fun purchaseTap_twiceWhileTheReloadIsRunning_startsOnlyOneReload() =
+        testScope.runTest {
+            val (vm, tracker, repository) = createReloadHarness(
+                PaywallErrorCode.NETWORK_ERROR,
+                listOf(loadedOffering()),
+                offeringsDelayMs = 50L,
+            )
+            advanceUntilIdle() // init load (delayed) fails
+
+            vm.onIntent(PaywallIntent.Purchase)
+            testScheduler.runCurrent() // the reload is now suspended inside the catalog request
+            assertEquals(true, vm.screenState.value.isLoading, "the reload must be visible")
+            assertEquals(
+                true,
+                vm.screenState.value.isReloadingCatalog,
+                "this is the flag the CTA spinner is drawn from, and what keeps the default " +
+                    "prices off the screen while a known-empty catalog is asked for again",
+            )
+            vm.onIntent(PaywallIntent.Purchase)
+            vm.onIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            assertEquals(false, vm.screenState.value.isReloadingCatalog, "the spinner must stop")
+
+            assertEquals(
+                2,
+                repository.requestedOfferingIds.size,
+                "impatient taps during a reload must not fan out into parallel catalog requests",
+            )
+            assertEquals(
+                3,
+                tracker.events.count { it.first == AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED },
+                "every tap is still counted as intent",
+            )
+            assertEquals(
+                1,
+                tracker.events.count { it.first == AnalyticsEvents.Paywall.PRODUCTS_RELOAD_ON_TAP },
+            )
+        }
+
+    @Test
+    fun purchaseTap_onLoadedCatalog_startsThePurchase_withoutReloading() =
+        testScope.runTest {
+            val (vm, tracker, repository) = createHarness(products = listOf(monthlyTrialProduct))
+            advanceUntilIdle()
+
+            vm.onIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            assertEquals(listOf(monthlyTrialProduct.packageId), repository.purchasedPackageIds)
+            assertEquals(1, repository.requestedOfferingIds.size)
+            assertEquals(
+                0,
+                tracker.events.count { it.first == AnalyticsEvents.Paywall.PRODUCTS_RELOAD_ON_TAP },
+            )
+        }
+
+    @Test
+    fun catalogErrors_areSplitIntoRetryableAndNot() {
+        val retryable = PaywallErrorCode.entries.filter { it.isRetryableCatalogError() }.toSet()
+        assertEquals(
+            setOf(
+                PaywallErrorCode.NETWORK_ERROR,
+                PaywallErrorCode.OFFLINE,
+                PaywallErrorCode.STORE_PROBLEM,
+                PaywallErrorCode.UNKNOWN_BACKEND,
+                PaywallErrorCode.BILLING_NOT_INITIALIZED,
+                PaywallErrorCode.UNKNOWN,
+            ),
+            retryable,
+        )
+    }
+
     // ── AI-model A/B attribution on the purchase event ────────────────────────
 
     @Test
@@ -643,15 +891,26 @@ class PaywallViewModelAnalyticsTest {
         private val purchaseDelayMs: Long = 0L,
         // Non-null = the catalog load fails, the state most prod paywall opens end up in.
         private val offeringsFailure: Throwable? = null,
+        // Non-null = scripted answers per request, the last one repeating. Wins over the two above.
+        private val offeringsSequence: List<Result<PaywallOffering?>>? = null,
+        private val offeringsDelayMs: Long = 0L,
     ) : PaywallRepository {
         /** Which offering ids were actually requested — proves WHEN the catalog was contacted. */
         val requestedOfferingIds = mutableListOf<String>()
+        /** Package ids a purchase was actually started for — proves a purchase did (not) begin. */
+        val purchasedPackageIds = mutableListOf<String>()
         override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(SubscriptionStatus.FREE)
         override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> {
             requestedOfferingIds.add(offeringId)
+            val requestIndex = requestedOfferingIds.size - 1
+            if (offeringsDelayMs > 0) delay(offeringsDelayMs)
+            offeringsSequence?.let { scripted ->
+                return scripted[requestIndex.coerceAtMost(scripted.lastIndex)]
+            }
             return offeringsFailure?.let { Result.failure(it) } ?: Result.success(offering)
         }
         override suspend fun purchase(packageId: String): PurchaseResult {
+            purchasedPackageIds.add(packageId)
             if (purchaseDelayMs > 0) delay(purchaseDelayMs)
             return purchaseResult
         }

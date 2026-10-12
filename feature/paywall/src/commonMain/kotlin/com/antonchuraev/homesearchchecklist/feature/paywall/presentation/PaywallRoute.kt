@@ -108,6 +108,7 @@ fun PaywallRoute(
         state        = uiState,
         isPurchasing = state.isPurchasing,
         isRestoring  = state.isRestoring,
+        isCatalogReloading = state.isReloadingCatalog,
         onPlanSelected = { viewModel.sendIntent(PaywallIntent.SelectPlan(it)) },
         onStartTrial = { viewModel.sendIntent(PaywallIntent.Purchase) },
         onClose      = {
@@ -141,7 +142,9 @@ fun PaywallRoute(
             )
             uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
         },
-        errorMessage = state.error,
+        // One snackbar slot: an error wins, otherwise the non-error notice (e.g. "prices loaded,
+        // tap again" after a tap-triggered catalog reload). DismissError clears both.
+        errorMessage = state.error ?: state.notice,
         onErrorDismiss = { viewModel.sendIntent(PaywallIntent.DismissError) },
     )
 

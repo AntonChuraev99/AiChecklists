@@ -115,4 +115,39 @@ class PaywallUiStateMapperTest {
         assertEquals(7, loaded.trialDays, "trial length comes from the product, not from the 3-day default")
         assertEquals("Save 16%", loaded.yearlySavings, "the caller-resolved badge is passed through")
     }
+
+    /**
+     * 🔴 RED repro. A tap on the subscribe CTA over an empty catalog starts a reload, and a reload
+     * is "loading with no products" — the exact state the mapper reads as "nothing known yet,
+     * assume the default offer". But here something IS known: the catalog came back empty. For the
+     * length of the request the paywall showed default prices and a free-trial promise it had just
+     * withdrawn, then dropped them again if the reload failed.
+     */
+    @Test
+    fun buildPaywallUiState_reloadOverEmptyCatalog_keepsPricesUnknownAndPromisesNoTrial() {
+        val reloading = buildPaywallUiState(
+            state = PaywallState(isLoading = true, isReloadingCatalog = true, products = emptyList()),
+            savingsLabel = null,
+        )
+
+        assertEquals("—", reloading.monthlyPrice, "a reload has no monthly price to show yet")
+        assertEquals("—", reloading.yearlyPrice, "a reload has no yearly price to show yet")
+        assertEquals("—", reloading.yearlyMonthly, "nor a per-month equivalent of it")
+        assertFalse(
+            reloading.hasFreeTrial,
+            "the catalog was empty a moment ago — a trial must not be promised again on a guess",
+        )
+
+        // Regression: the FIRST load (paywall just opened, nothing known) keeps the optimistic
+        // default offer, so the trial copy does not flash to no-trial and back on every open.
+        val firstLoad = buildPaywallUiState(
+            state = PaywallState(isLoading = true, isReloadingCatalog = false, products = emptyList()),
+            savingsLabel = null,
+        )
+        val defaults = PaywallUiState()
+        assertEquals(defaults.monthlyPrice, firstLoad.monthlyPrice)
+        assertEquals(defaults.yearlyPrice, firstLoad.yearlyPrice)
+        assertEquals(defaults.yearlyMonthly, firstLoad.yearlyMonthly)
+        assertTrue(firstLoad.hasFreeTrial)
+    }
 }

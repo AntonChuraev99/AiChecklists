@@ -601,6 +601,9 @@
     <string name="paywall_subscribe_now">Subscribe Now</string>
     <string name="paywall_retry">Try Again</string>
     <string name="paywall_load_error">Unable to load subscription options.\nPlease check your connection and try again.</string>
+    <string name="paywall_prices_loaded">Prices loaded. Tap again to continue.</string>
+    <string name="paywall_reload_failed_retry">Couldn't load prices. Check your connection and tap again.</string>
+    <string name="paywall_billing_unavailable">Purchases aren't available on this device right now.</string>
     <string name="paywall_no_payment_now">No payment due now</string>
     <string name="paywall_cancel_anytime">Cancel anytime</string>
     <string name="paywall_auto_renew_notice">Auto-renews. Cancel anytime.</string>

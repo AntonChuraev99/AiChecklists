@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,7 +96,14 @@ internal fun AttachmentFullscreenViewer(
     onDelete: (attachmentId: String) -> Unit,
     onOpenExternally: (attachmentId: String) -> Unit,
 ) {
-    if (attachments.isEmpty()) return
+    // The list can empty while the viewer is up (the only attachment was deleted, or a sync dropped
+    // it). Ask the host to close instead of leaving a silently blank, still-"open" viewer.
+    val isEmpty = attachments.isEmpty()
+    val currentOnClose by rememberUpdatedState(onClose)
+    LaunchedEffect(isEmpty) {
+        if (isEmpty) currentOnClose()
+    }
+    if (isEmpty) return
 
     val initialPage = attachments
         .indexOfFirst { it.id == initialAttachmentId }
@@ -109,12 +117,15 @@ internal fun AttachmentFullscreenViewer(
     // Per-page zoom scale, keyed by page index. Reset when page changes.
     var currentScale by remember { mutableFloatStateOf(1f) }
 
-    // Keep track of which page is "active" for zoom reset on swipe
-    LaunchedEffect(pagerState.currentPage) {
+    // pagerState.currentPage lags a shrinking list by a measure pass — never index with it raw.
+    val currentPage = clampedViewerPage(pagerState.currentPage, attachments.size) ?: return
+    val currentAttachment = attachments[currentPage]
+
+    // Reset zoom when the active page changes — by swipe, or because the attachment under the
+    // same page index was replaced by its neighbour after a delete.
+    LaunchedEffect(currentPage, currentAttachment.id) {
         currentScale = 1f
     }
-
-    val currentAttachment = attachments[pagerState.currentPage]
 
     Dialog(
         onDismissRequest = onClose,
@@ -136,9 +147,14 @@ internal fun AttachmentFullscreenViewer(
                     state = pagerState,
                     userScrollEnabled = currentScale <= 1f,
                     modifier = Modifier.fillMaxSize(),
+                    // Keyed by id so the pager holds its position on the SAME attachment when one
+                    // before it is removed. The key lambda itself can be asked for a stale index.
+                    key = { attachments.getOrNull(it)?.id ?: it },
                 ) { pageIndex ->
-                    val attachment = attachments[pageIndex]
-                    val isCurrentPage = pageIndex == pagerState.currentPage
+                    // A page composed for an index the list no longer has: draw nothing this frame,
+                    // the pager drops it on the next measure. Not a user-facing skip.
+                    val attachment = attachments.getOrNull(pageIndex) ?: return@HorizontalPager
+                    val isCurrentPage = pageIndex == currentPage
 
                     if (attachment.isImage) {
                         ZoomableImagePage(
@@ -157,7 +173,7 @@ internal fun AttachmentFullscreenViewer(
 
                 // ── TopAppBar overlaid at the top ──
                 AttachmentViewerTopBar(
-                    currentIndex = pagerState.currentPage,
+                    currentIndex = currentPage,
                     total = attachments.size,
                     currentAttachmentId = currentAttachment.id,
                     onClose = onClose,
@@ -416,6 +432,20 @@ private fun FileDetailPage(
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The valid page nearest to [page] for a list of [size] attachments, or `null` when there are none.
+ *
+ * `PagerState.currentPage` is corrected by a measure pass while the attachment list is read live, so
+ * for at least one composition after the list shrinks (delete, sync) the page points past the end.
+ * Never index the list with a pager page directly — go through this or [attachmentForPage].
+ */
+internal fun clampedViewerPage(page: Int, size: Int): Int? =
+    if (size <= 0) null else page.coerceIn(0, size - 1)
+
+/** The attachment to show for pager [page]: the nearest valid one, `null` only for an empty list. */
+internal fun attachmentForPage(attachments: List<Attachment>, page: Int): Attachment? =
+    clampedViewerPage(page, attachments.size)?.let { attachments[it] }
 
 /**
  * Formats [bytes] as a human-readable size string.
