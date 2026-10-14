@@ -21,7 +21,7 @@ MODEL_OVERRIDE_TEST_SECRET set and you must export the SAME value locally:
     python firebase-functions/tests/ai_model_eval.py                 # dry run (safe)
     python firebase-functions/tests/ai_model_eval.py --yes           # tiny subset, 2 models
     python firebase-functions/tests/ai_model_eval.py --yes --full \
-        --models gemini-2.5-flash-lite,gemini-2.5-flash,gemini-3.1-flash-lite
+        --models gemini-3.1-flash-lite,gemini-3.5-flash-lite
 
 If MODEL_OVERRIDE_TEST_SECRET is unset (locally or on the CF) the override is
 disabled and every "model" column will actually be the endpoint's prod default —
@@ -42,7 +42,7 @@ import urllib.error
 BASE = "https://us-central1-aichecklists-40230.cloudfunctions.net"
 
 # Models allowed for comparison — must be a subset of MODEL_OVERRIDE_ALLOWLIST in main.py.
-DEFAULT_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
+DEFAULT_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
 
 # Credit cost per call, mirrors the CHAT_* costs in main.py — used only for the
 # pre-run estimate so you know what a run will spend before you approve it.
