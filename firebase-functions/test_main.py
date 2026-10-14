@@ -762,6 +762,143 @@ class TestParsePushTokenRegistration:
         assert fields is None and "fcm_opt_in" in error
 
 
+class TestRegisterPushTokenActivityOnly:
+    """register_push_token without fcm_token = activity-only heartbeat: merges ONLY
+    lastActiveAt (the sole writer the promo sender's dormancy query reads), never the token."""
+
+    def _body(self, **overrides):
+        body = {"user_id": "user-1234567890", "platform": "android"}
+        body.update(overrides)
+        return body
+
+    def _call(self, main, body):
+        doc_ref = main.db.collection.return_value.document.return_value
+        doc_ref.set.reset_mock()
+        with app.test_request_context():
+            resp = main.register_push_token(make_request(body))
+        return resp, doc_ref
+
+    def test_plan_absent_token_is_activity_only(self, _import_main):
+        fields, token_registered, error = _import_main.plan_push_registration(self._body())
+        assert error is None and token_registered is False
+        assert fields == {"user_id": "user-1234567890", "mark_active": True}
+
+    def test_plan_null_token_is_activity_only(self, _import_main):
+        fields, token_registered, error = _import_main.plan_push_registration(
+            self._body(fcm_token=None))
+        assert error is None and token_registered is False
+
+    def test_plan_blank_token_still_rejected(self, _import_main):
+        fields, _, error = _import_main.plan_push_registration(self._body(fcm_token="  "))
+        assert fields is None and "fcm_token" in error
+
+    def test_plan_activity_only_validates_user_id_same_as_token_path(self, _import_main):
+        fields, _, error = _import_main.plan_push_registration(self._body(user_id="short"))
+        assert fields is None and "user_id" in error
+
+    def test_plan_activity_only_validates_platform(self, _import_main):
+        fields, _, error = _import_main.plan_push_registration(self._body(platform="ios"))
+        assert fields is None and "platform" in error
+
+    def test_plan_with_token_unchanged(self, _import_main):
+        fields, token_registered, error = _import_main.plan_push_registration(
+            self._body(fcm_token="tok"))
+        assert error is None and token_registered is True
+        assert fields["fcm_token"] == "tok" and fields["platform"] == "android"
+
+    def test_handler_without_token_merges_only_last_active(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(push_holdout=True, fcm_opt_in=True))
+        assert resp.status_code == 200
+        assert resp.get_json() == {"success": True, "token_registered": False}
+        main.db.collection.assert_called_with("users")
+        main.db.collection.return_value.document.assert_called_with("user-1234567890")
+        doc_ref.set.assert_called_once()
+        written, kwargs = doc_ref.set.call_args[0][0], doc_ref.set.call_args[1]
+        assert set(written) == {"lastActiveAt"}  # never fcmToken / pushHoldout / fcmOptIn
+        assert written["lastActiveAt"] is main.firestore.SERVER_TIMESTAMP
+        assert kwargs == {"merge": True}
+
+    def test_handler_with_token_writes_token_fields(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(fcm_token="tok"))
+        assert resp.status_code == 200
+        assert resp.get_json() == {"success": True, "token_registered": True}
+        written = doc_ref.set.call_args[0][0]
+        assert written["fcmToken"] == "tok"
+        assert set(written) == {"fcmToken", "platform", "lastActiveAt", "pushHoldout", "fcmOptIn"}
+
+    def test_handler_without_token_bad_user_id_400_no_write(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(user_id="short"))
+        assert resp.status_code == 400
+        doc_ref.set.assert_not_called()
+
+
+class TestRegisterPushTokenMarkActive:
+    """mark_active (optional bool, default true): false = background process wake (FCM
+    receipt of a promo push, WorkManager) — lastActiveAt must NOT move on either path."""
+
+    def _body(self, **overrides):
+        body = {"user_id": "user-1234567890", "platform": "android"}
+        body.update(overrides)
+        return body
+
+    def _call(self, main, body):
+        doc_ref = main.db.collection.return_value.document.return_value
+        doc_ref.set.reset_mock()
+        with app.test_request_context():
+            resp = main.register_push_token(make_request(body))
+        return resp, doc_ref
+
+    def test_plan_defaults_mark_active_true_on_both_paths(self, _import_main):
+        for body in (self._body(), self._body(fcm_token="tok")):
+            fields, _, error = _import_main.plan_push_registration(body)
+            assert error is None and fields["mark_active"] is True
+
+    def test_plan_non_bool_mark_active_rejected_on_both_paths(self, _import_main):
+        for bad in ("false", 0, 1, None):
+            for body in (self._body(mark_active=bad),
+                         self._body(fcm_token="tok", mark_active=bad)):
+                fields, _, error = _import_main.plan_push_registration(body)
+                assert fields is None and "mark_active" in error, (bad, body)
+
+    def test_handler_token_mark_active_false_skips_last_active(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(fcm_token="tok", mark_active=False))
+        assert resp.status_code == 200
+        assert resp.get_json() == {"success": True, "token_registered": True}
+        written = doc_ref.set.call_args[0][0]
+        assert set(written) == {"fcmToken", "platform", "pushHoldout", "fcmOptIn"}
+        assert doc_ref.set.call_args[1] == {"merge": True}
+
+    def test_handler_token_mark_active_true_writes_last_active(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(fcm_token="tok", mark_active=True))
+        assert resp.status_code == 200
+        written = doc_ref.set.call_args[0][0]
+        assert written["lastActiveAt"] is main.firestore.SERVER_TIMESTAMP
+
+    def test_handler_no_token_mark_active_false_is_noop_200(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(mark_active=False))
+        assert resp.status_code == 200
+        assert resp.get_json() == {"success": True, "token_registered": False}
+        doc_ref.set.assert_not_called()
+
+    def test_handler_no_token_mark_active_true_writes_last_active(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(mark_active=True))
+        assert resp.status_code == 200
+        assert doc_ref.set.call_args[0][0] == {"lastActiveAt": main.firestore.SERVER_TIMESTAMP}
+
+    def test_handler_non_bool_mark_active_400_no_write(self, _import_main):
+        main = _import_main
+        resp, doc_ref = self._call(main, self._body(fcm_token="tok", mark_active="yes"))
+        assert resp.status_code == 400
+        doc_ref.set.assert_not_called()
+
+
 # ===========================================================================
 # P0: Refill verifies subscription via RevenueCat
 # ===========================================================================

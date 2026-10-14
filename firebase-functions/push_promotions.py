@@ -127,8 +127,107 @@ def select_copy(push_type: str, arm: str, variants_json_str: str) -> tuple[str, 
     return "Your checklists are waiting", "Open Gisti to pick up where you left off."
 
 
+# The push type the dormancy upper bound and the no-reaction stop rule apply to. Other
+# types (release, winback, digest, tip, upsell) keep the pre-rule behaviour: no default
+# upper bound, no stop rule, and they never touch the no-reaction counter.
+REENGAGEMENT_PUSH_TYPE = "reengagement"
+
+# Dormancy window — the upper bound applied to a REENGAGEMENT send when the caller does NOT
+# pass ``max_inactive_days``. Without an upper bound the daily scheduler keeps re-hitting the
+# same long-gone cohort every cooldown period, forever. A caller can still opt out of the
+# bound by passing ``"max_inactive_days": null`` explicitly.
+DEFAULT_MIN_INACTIVE_DAYS = 3
+DEFAULT_MAX_INACTIVE_DAYS = 14
+
+# Stop rule (reengagement only) — after this many reengagement promos sent since the user's
+# last activity with no reaction (lastActiveAt did not move), stop until the user is active.
+MAX_PROMOS_WITHOUT_ACTIVITY = 3
+
+# User-doc field: reengagement promos delivered since the last activity. Written by the
+# sender as an absolute value (promos_since_activity + 1); read back through
+# promos_since_activity(), which treats it as 0 once lastActiveAt is newer than lastPromoSentAt.
+PROMOS_SINCE_ACTIVE_FIELD = "promosSinceActive"
+
+_MISSING = object()
+
+
+def applies_reengagement_rules(push_type: str) -> bool:
+    """True for the one push type governed by the default dormancy bound + stop rule."""
+    return push_type == REENGAGEMENT_PUSH_TYPE
+
+
+def resolve_inactivity_window(
+    data: dict, push_type: str = REENGAGEMENT_PUSH_TYPE
+) -> tuple[int, int | None]:
+    """``(min_days, max_days)`` from a send_promotions_batch body. Pure.
+
+    ``max_inactive_days`` explicitly ``null`` → ``None`` (no upper bound). ABSENT →
+    ``DEFAULT_MAX_INACTIVE_DAYS`` for reengagement, ``None`` for every other push type
+    (their pre-rule behaviour). The default never produces an error: if a reengagement
+    caller asks for ``min_inactive_days >= DEFAULT_MAX_INACTIVE_DAYS`` without a max, the
+    explicit min wins and the window is left unbounded.
+
+    Raises ``ValueError`` on non-integers, a negative min, or an EXPLICIT max <= min (an
+    empty window would silently send nothing).
+    """
+    try:
+        min_days = int(data.get("min_inactive_days", DEFAULT_MIN_INACTIVE_DAYS))
+        raw_max = data.get("max_inactive_days", _MISSING)
+        explicit_max = raw_max is not _MISSING and raw_max is not None
+        max_days: int | None = int(raw_max) if explicit_max else None
+    except (TypeError, ValueError) as e:
+        raise ValueError("min_inactive_days / max_inactive_days must be integers") from e
+    if min_days < 0:
+        raise ValueError("min_inactive_days must be >= 0")
+    if explicit_max:
+        if max_days <= min_days:
+            raise ValueError("max_inactive_days must be greater than min_inactive_days")
+    elif (raw_max is _MISSING and applies_reengagement_rules(push_type)
+          and DEFAULT_MAX_INACTIVE_DAYS > min_days):
+        max_days = DEFAULT_MAX_INACTIVE_DAYS
+    return min_days, max_days
+
+
+def promo_sent_fields(push_type: str, campaign_id: str, promos_before: int,
+                      sent_at) -> dict:
+    """User-doc fields to stamp after a promo was delivered. Pure.
+
+    Every type stamps the frequency cap (``lastPromoSentAt`` / ``lastPromoCampaignId``).
+    Only reengagement also writes the no-reaction counter, as an absolute value
+    (``promos_before + 1``, not Increment): a user active since the last send restarts at 1.
+    """
+    fields = {"lastPromoSentAt": sent_at, "lastPromoCampaignId": campaign_id}
+    if applies_reengagement_rules(push_type):
+        fields[PROMOS_SINCE_ACTIVE_FIELD] = promos_before + 1
+    return fields
+
+
+def promos_since_activity(user_data: dict) -> int:
+    """Promos delivered since the user's last activity.
+
+    The stored counter only counts while the user stays silent: if ``lastActiveAt`` is
+    newer than ``lastPromoSentAt`` the user reacted (opened the app) after the last send,
+    so the effective count is 0 — no reset write is needed from the activity path.
+    A missing / malformed counter reads as 0 (pre-rollout docs start from scratch).
+    """
+    raw = user_data.get(PROMOS_SINCE_ACTIVE_FIELD)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw < 0:
+        return 0
+    last_active = to_aware_datetime(user_data.get("lastActiveAt"))
+    last_sent = to_aware_datetime(user_data.get("lastPromoSentAt"))
+    if last_sent is None:
+        return 0
+    if last_active is not None and last_active > last_sent:
+        return 0
+    return int(raw)
+
+
 def is_eligible_for_promo(
-    user_data: dict, now: datetime, promo_cooldown_hours: float
+    user_data: dict,
+    now: datetime,
+    promo_cooldown_hours: float,
+    max_promos_without_activity: int = MAX_PROMOS_WITHOUT_ACTIVITY,
+    push_type: str = REENGAGEMENT_PUSH_TYPE,
 ) -> tuple[bool, str]:
     """Client-side audience filter for the PROMOTIONAL cohort.
 
@@ -136,7 +235,13 @@ def is_eligible_for_promo(
       * ``no_token``          — no usable ``fcmToken``
       * ``premium``           — paying user (NEVER promo: compliance + measurement)
       * ``holdout``           — retention control group (``pushHoldout == true``)
+      * ``no_reaction_stop``  — reengagement only: already got ``max_promos_without_activity``
+                                reengagement promos since the last activity with no reaction
+                                (see promos_since_activity); other push types skip this check
       * ``frequency_capped``  — a promo already went out inside the cooldown window
+
+    The dormancy window (min/max inactive days) is applied by the Firestore range query in
+    main.py, not here.
 
     NOTE — consent model is "opt-OUT via the Tips & Offers notification channel", chosen
     2026-07-03 over an explicit promoOptIn soft-ask. There is deliberately NO opt-in gate
@@ -155,6 +260,11 @@ def is_eligible_for_promo(
         return False, "holdout"
     # No opt-in gate here (consent = Tips & Offers channel opt-out; see docstring). The OS
     # drops the push if the user disabled that channel, so the server targets all token-holders.
+    # Stop rule (reengagement only) — N promos with no reaction → stop until the user is
+    # active again. Checked before the cooldown so the count of stopped users is stable.
+    if (applies_reengagement_rules(push_type)
+            and promos_since_activity(user_data) >= max_promos_without_activity):
+        return False, "no_reaction_stop"
     # Frequency cap — respect the industry ~1 promo/day ceiling (report §7).
     last_dt = to_aware_datetime(user_data.get("lastPromoSentAt"))
     if last_dt is not None:

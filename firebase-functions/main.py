@@ -1223,6 +1223,42 @@ def parse_push_token_registration(data) -> tuple[dict | None, str | None]:
     }, None
 
 
+def plan_push_registration(data) -> tuple[dict | None, bool, str | None]:
+    """Decide which register_push_token path a body takes. Pure — no Firestore.
+
+    Returns ``(fields, token_registered, error)``:
+      * ``fcm_token`` ABSENT or ``null`` → activity-only path: ``token_registered=False``,
+        ``fields={"user_id"}`` — the caller merges ONLY ``lastActiveAt`` (a device whose
+        FCM token fetch failed must still be able to mark the user active; otherwise the
+        promo sender treats an active user as dormant). ``user_id`` and ``platform`` are
+        validated exactly as on the token path.
+      * otherwise → the unchanged token path (``parse_push_token_registration``), so a
+        present-but-blank / non-string token is still a 400.
+
+    Both paths add ``fields["mark_active"]`` — optional bool, default ``True`` (clients that
+    predate the field keep marking the user active). ``False`` = a background process wake
+    (FCM receipt of a promo push, WorkManager) that must NOT move ``lastActiveAt``, else the
+    dormancy window and the reengagement stop rule never fire. Non-bool → 400.
+    """
+    mark_active = data.get("mark_active", True) if isinstance(data, dict) else True
+    if isinstance(data, dict) and data.get("fcm_token") is None:
+        probe = {**data, "fcm_token": "activity-only"}  # reuse the shared validators
+        fields, error = parse_push_token_registration(probe)
+        if error:
+            return None, False, error
+        fields = {"user_id": fields["user_id"]}
+        token_registered = False
+    else:
+        fields, error = parse_push_token_registration(data)
+        if error:
+            return None, False, error
+        token_registered = True
+    if not isinstance(mark_active, bool):
+        return None, False, "mark_active must be a boolean"
+    fields["mark_active"] = mark_active
+    return fields, token_registered, None
+
+
 @functions_framework.http
 def register_push_token(request: Request):
     """
@@ -1239,14 +1275,26 @@ def register_push_token(request: Request):
     Request body:
     {
         "user_id": "string (server-issued UUID, >=10 chars)",
-        "fcm_token": "string (non-empty FCM registration token)",
+        "fcm_token": "string | null (OPTIONAL — absent/null = activity-only heartbeat)",
         "platform": "android" | "web",
         "push_holdout": boolean (optional, default false),
-        "fcm_opt_in": boolean (optional, default false)
+        "fcm_opt_in": boolean (optional, default false),
+        "mark_active": boolean (optional, default true — false = background process wake:
+                       lastActiveAt is NOT written on either path)
     }
 
-    Response 200: { "success": true }
-    Response 400: invalid body (missing/short user_id, blank token, bad platform)
+    Response 200 (token path):    { "success": true, "token_registered": true }
+        — writes fcmToken / platform / pushHoldout / fcmOptIn, plus lastActiveAt only when
+        mark_active is true.
+    Response 200 (activity-only): { "success": true, "token_registered": false }
+        — merges ONLY lastActiveAt; fcmToken / pushHoldout / fcmOptIn / platform untouched.
+        This is the sole lastActiveAt writer, so a device whose FCM token fetch fails must
+        still be able to mark the user active (else the promo sender sees it as dormant).
+        With mark_active false there is nothing to write: same 200, no Firestore call (a
+        no-op, not a 400 — a background wake is not a client error and must not be retried
+        or logged as one).
+    Response 400: invalid body (missing/short user_id, present-but-blank token, bad
+                  platform, non-bool push_holdout / fcm_opt_in / mark_active)
 
     Idempotent: this is a merge-write, so repeated calls just refresh the token
     and lastActiveAt — never a duplicate doc, and never clobbering the credit
@@ -1284,22 +1332,41 @@ def register_push_token(request: Request):
     except Exception:
         return create_error_response("Invalid JSON body", 400)
 
-    fields, error = parse_push_token_registration(data)
+    fields, token_registered, error = plan_push_registration(data)
     if error:
         return create_error_response(error, 400)
 
+    if not token_registered:
+        # Activity-only heartbeat: merge ONLY lastActiveAt — never touch fcmToken /
+        # pushHoldout / fcmOptIn / platform, so a device without a token can't wipe the
+        # token another install of the same user registered.
+        if not fields["mark_active"]:
+            return create_success_response({"token_registered": False})  # nothing to write
+        try:
+            db.collection("users").document(fields["user_id"]).set(
+                {"lastActiveAt": firestore.SERVER_TIMESTAMP},
+                merge=True,
+            )
+            return create_success_response({"token_registered": False})
+        except Exception as e:
+            logger.exception("register_push_token: activity-only write failed (%s)",
+                             type(e).__name__)
+            return create_error_response("Failed to record activity", 500)
+
+    token_doc = {
+        "fcmToken": fields["fcm_token"],
+        "platform": fields["platform"],
+        "pushHoldout": fields["push_holdout"],
+        "fcmOptIn": fields["fcm_opt_in"],
+    }
+    if fields["mark_active"]:
+        token_doc["lastActiveAt"] = firestore.SERVER_TIMESTAMP
     try:
         db.collection("users").document(fields["user_id"]).set(
-            {
-                "fcmToken": fields["fcm_token"],
-                "platform": fields["platform"],
-                "lastActiveAt": firestore.SERVER_TIMESTAMP,
-                "pushHoldout": fields["push_holdout"],
-                "fcmOptIn": fields["fcm_opt_in"],
-            },
+            token_doc,
             merge=True,  # never clobber is_premium / ai_credits / google_uid / device_id
         )
-        return create_success_response({})
+        return create_success_response({"token_registered": True})
     except Exception as e:
         logger.exception("register_push_token: failed (%s)", type(e).__name__)
         return create_error_response("Failed to register push token", 500)
@@ -1828,7 +1895,10 @@ def send_promotions_batch(request: Request):
     Request body (all optional):
       { "push_type": "reengagement"|"winback"|"digest"|"tip"|"release"|"upsell"  (default "reengagement"),
         "min_inactive_days": int   (default 3   — dormant AT LEAST this long),
-        "max_inactive_days": int|null (default null — no lower bound; set for a window, e.g. win-back 14..30),
+        "max_inactive_days": int|null (dormant AT MOST this long; explicit null = no bound.
+                                     ABSENT → 14 for reengagement (unbounded if min >= 14),
+                                     no bound for every other push_type; e.g. win-back 14..30.
+                                     An explicit max <= min is a 400),
         "campaign_id": str         (default "{push_type}_{YYYYMMDD}"),
         "dry_run": bool            (default false — simulate: NO FCM / NO Amplitude / NO writes),
         "fcm_validate_only": bool  (default false — FCM dry_run: validates tokens, no delivery),
@@ -1861,13 +1931,18 @@ def send_promotions_batch(request: Request):
         )
 
     try:
-        min_days = int(data.get("min_inactive_days", 3))
-        max_days = data.get("max_inactive_days")
+        min_days, max_days = push_promotions.resolve_inactivity_window(data, push_type)
+    except ValueError as e:
+        logger.warning(f"send_promotions_batch: invalid inactivity window: {e}")
+        return create_error_response(
+            "min_inactive_days / max_inactive_days must be integers with max > min (max may be null)",
+            400,
+        )
+    try:
         max_users = int(data.get("max_users", 5000))
         cooldown_hours = int(data.get("promo_cooldown_hours", 20))
     except (TypeError, ValueError):
-        return create_error_response("min_inactive_days / max_inactive_days / max_users / "
-                                     "promo_cooldown_hours must be integers", 400)
+        return create_error_response("max_users / promo_cooldown_hours must be integers", 400)
 
     dry_run = bool(data.get("dry_run", False))
     fcm_validate_only = bool(data.get("fcm_validate_only", False))
@@ -1887,7 +1962,7 @@ def send_promotions_batch(request: Request):
         # (lastActiveAt) are allowed.
         base_query = db.collection("users").where(filter=FieldFilter("lastActiveAt", "<", upper))
         if max_days is not None:
-            lower = now - timedelta(days=int(max_days))
+            lower = now - timedelta(days=max_days)
             base_query = base_query.where(filter=FieldFilter("lastActiveAt", ">", lower))
         page_size = 500
         base_query = base_query.order_by("lastActiveAt").limit(page_size)
@@ -1898,6 +1973,9 @@ def send_promotions_batch(request: Request):
         # (the real Firestore read cost), not the eligible count — a large sparse dormant
         # base can't blow past the cap. Deepest-dormant first (order_by lastActiveAt asc).
         eligible = []  # list of (uid, token, arm, title, body)
+        # uid → reengagement promos already sent since the user's last activity (read at
+        # scan time); a reengagement send stores this + 1 (push_promotions.promo_sent_fields).
+        promos_before: dict[str, int] = {}
         skip_counts: dict[str, int] = {}
         scanned = 0
         last_doc = None
@@ -1909,13 +1987,15 @@ def send_promotions_batch(request: Request):
             for doc in docs:
                 scanned += 1
                 ud = doc.to_dict() or {}
-                ok, reason = push_promotions.is_eligible_for_promo(ud, now, cooldown_hours)
+                ok, reason = push_promotions.is_eligible_for_promo(
+                    ud, now, cooldown_hours, push_type=push_type)
                 if not ok:
                     skip_counts[reason] = skip_counts.get(reason, 0) + 1
                     continue
                 arm = assign_push_arm(doc.id)
                 title, body = push_promotions.select_copy(push_type, arm, variants_json)
                 eligible.append((doc.id, ud["fcmToken"], arm, title, body))
+                promos_before[doc.id] = push_promotions.promos_since_activity(ud)
                 if scanned >= max_users:
                     break
             last_doc = docs[-1]
@@ -1971,11 +2051,13 @@ def send_promotions_batch(request: Request):
                         amplitude_events.append(push_promotions.build_amplitude_event(
                             uid, push_type, campaign_id, arm, now_ms, f"{campaign_id}:{uid}"))
                         if not fcm_validate_only:
-                            # Stamp the frequency cap so the next run skips this user.
+                            # Stamp the frequency cap so the next run skips this user; a
+                            # reengagement send also bumps the no-reaction counter (stop rule).
                             batch_writer.update(
                                 db.collection("users").document(uid),
-                                {"lastPromoSentAt": firestore.SERVER_TIMESTAMP,
-                                 "lastPromoCampaignId": campaign_id},
+                                push_promotions.promo_sent_fields(
+                                    push_type, campaign_id, promos_before.get(uid, 0),
+                                    firestore.SERVER_TIMESTAMP),
                             )
                             has_writes = True
                     else:
@@ -2015,6 +2097,8 @@ def send_promotions_batch(request: Request):
             "amplitude_uploaded": amplitude_uploaded,
             "arm_breakdown": arm_breakdown,
             "skip_reasons": skip_counts,
+            "min_inactive_days": min_days,
+            "max_inactive_days": max_days,
         }
         if dry_run and eligible:
             s_uid, s_token, s_arm, s_title, s_body = eligible[0]

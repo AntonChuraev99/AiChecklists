@@ -63,8 +63,9 @@ open class GistiApplication : Application() {
         // Re-schedule active reminders (survives app updates and process death)
         rescheduleReminders()
 
-        // Register the FCM token + bump lastActiveAt for the re-engagement campaign.
-        registerPushToken()
+        // Make sure the server has this install's FCM token. No lastActiveAt here: activity is
+        // written from MainActivity's foreground only.
+        syncPushTokenOnProcessStart()
 
         // Sample the notification opt-out state once per start (Android has no channel-disable
         // callback) so we can measure opt-out drift on the promotions channel over time.
@@ -311,26 +312,28 @@ open class GistiApplication : Application() {
     }
 
     /**
-     * On app start, push the current FCM token and refresh lastActiveAt to Firestore so the
-     * re-engagement campaign always has a fresh token + recency signal for this user.
+     * On every process start, make sure the server has this install's FCM token — WITHOUT moving
+     * `lastActiveAt`. onCreate runs on every background wake (the FCM delivery of a promo, the
+     * retry worker, widget, alarms), and writing activity here made every delivered promo look
+     * answered, so the server's "pushes without a reaction" stop and dormancy window never fired.
+     * Activity is written only by MainActivity's foreground ([PushTokenRepository.touchLastActive]).
      *
-     * [PushTokenRepository.touchLastActive] already fetches the current FCM token and re-registers
-     * it (the CF `register_push_token` is the only write path and it requires a token), so this is
-     * a SINGLE call, not a bump followed by a separate registration. Registering again here would
-     * issue a second, byte-identical POST ~0.3s later — that duplicate accounted for ~48% of all
-     * backend traffic until 2026-07-25.
+     * [PushTokenRepository.syncTokenOnProcessStart] sends `mark_active = false` and only when the
+     * server has not confirmed this user/token pair yet (a token minted before `user_id` was ready,
+     * a converged `user_id`), so a background wake normally sends no request at all — and a cold
+     * foreground start does not duplicate the foreground write.
      *
-     * No-ops gracefully when the user is not signed in (the repository logs a warning) — the
-     * token is re-registered on a later start once the user authenticates. A failed token fetch
-     * (typically `FIS_AUTH_ERROR`) is NOT covered by onNewToken — a device stuck there never gets a
-     * token to rotate — so the repository hands it to the bounded [com.antonchuraev.homesearchchecklist.push.PushTokenRetryWorker] chain
-     * (5 backed-off runs, one non-fatal on exhaustion, then a 24h cooldown before a new chain).
+     * No-ops gracefully when `user_id` is not ready (the repository logs a warning). A failed token
+     * fetch (typically `FIS_AUTH_ERROR`) is NOT covered by onNewToken — a device stuck there never
+     * gets a token to rotate — so the repository hands it to the bounded
+     * [com.antonchuraev.homesearchchecklist.push.PushTokenRetryWorker] chain (one non-fatal on
+     * exhaustion, then a cooldown before a new chain).
      */
-    private fun registerPushToken() {
+    private fun syncPushTokenOnProcessStart() {
         applicationScope.launch {
             val repository: PushTokenRepository =
                 GlobalContext.getOrNull()?.getOrNull() ?: return@launch
-            repository.touchLastActive()
+            repository.syncTokenOnProcessStart()
         }
     }
 

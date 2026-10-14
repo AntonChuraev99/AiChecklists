@@ -31,6 +31,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsUtm
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
@@ -47,6 +48,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import org.koin.android.ext.android.inject
+import org.koin.core.context.GlobalContext
 import org.koin.compose.koinInject
 
 class MainActivity : ComponentActivity() {
@@ -272,9 +274,9 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Feed a foreground activity sample into the behavioral-timing histogram and the come-back gate's
-     * foreground "last seen". This Activity is the ONLY writer of both — process start is not user
-     * activity (see GistiApplication.scheduleRetentionPushes). Only affects OUR local auto-pushes;
-     * user-set reminders are unaffected.
+     * foreground "last seen", and the server-side `lastActiveAt` ([markServerActive]). This Activity
+     * is the ONLY writer of all three — process start is not user activity (see
+     * GistiApplication.scheduleRetentionPushes). User-set reminders are unaffected.
      */
     private fun recordActiveForRetentionTiming() {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -284,6 +286,25 @@ class MainActivity : ComponentActivity() {
                 .onFailure { logger.error(RETENTION_TAG, "recordActiveHour failed: ${it.message}", it) }
         }
         recordForegroundForComeback(now)
+        markServerActive()
+    }
+
+    /**
+     * Server-side `lastActiveAt` for the promo sender (dormancy window, "pushes without a
+     * reaction" stop). Written only here, from a visible foreground — process start is a background
+     * wake as often as not (the promo's own FCM delivery). Throttled inside the repository, so a
+     * resume storm sends one request. getOrNull: the binding is Android-app-only, and a test
+     * Application without it must not crash on resume.
+     */
+    private fun markServerActive() {
+        val repository: PushTokenRepository = GlobalContext.getOrNull()?.getOrNull() ?: return
+        retentionWriteScope.launch {
+            runCatching { repository.touchLastActive() }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    logger.error(PUSH_TAG, "touchLastActive failed: ${it.message}", it)
+                }
+        }
     }
 
     /**
@@ -303,6 +324,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val RETENTION_TAG = "Retention"
+        const val PUSH_TAG = "PushToken"
 
         /** Outlives any single Activity instance; the writes are tiny and fire-and-forget. */
         val retentionWriteScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

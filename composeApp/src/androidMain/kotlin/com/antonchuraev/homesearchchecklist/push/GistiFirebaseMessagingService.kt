@@ -58,7 +58,8 @@ internal class GistiFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
         serviceScope.launch {
-            repository.registerToken(token)
+            // Token rotation happens in the background: register without moving lastActiveAt.
+            repository.registerToken(token, markActive = false)
         }
     }
 
