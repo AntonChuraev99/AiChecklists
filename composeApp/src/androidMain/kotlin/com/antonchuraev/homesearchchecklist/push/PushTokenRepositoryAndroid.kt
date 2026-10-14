@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlin.concurrent.Volatile
 import kotlin.math.absoluteValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -36,6 +37,11 @@ internal class PushTokenRepositoryAndroid(
     private val userApiService: UserApiService,
     private val userDataRepository: UserDataRepository,
     private val analytics: AnalyticsTracker,
+    /**
+     * Starts the bounded token-retry chain unless a recent one exhausted
+     * ([PushTokenRetryWorker.enqueueIfDue]); injected for DI/tests. Suspend: reads the cooldown.
+     */
+    private val scheduleTokenRetry: suspend () -> Unit,
 ) : PushTokenRepository {
 
     // Set the sticky push_holdout user-property once per process (mirrors AiModelExperimentTracker).
@@ -98,10 +104,17 @@ internal class PushTokenRepositoryAndroid(
 
     /**
      * Bump `lastActiveAt` for the dormancy window. The CF `register_push_token` is the only write
-     * path and it requires a token (a blank token would clobber the stored one via merge), so we
-     * fetch the CURRENT FCM token and re-register it — this refreshes `lastActiveAt` server-side
-     * without changing the token value. If the token or user_id is unavailable we no-op; the bump
-     * is retried on the next start. (There is no token-less write under the CF model.)
+     * path and it requires a non-blank token (a token-less body is a 400), so we fetch the CURRENT
+     * FCM token and re-register it — this refreshes `lastActiveAt` server-side without changing the
+     * token value. A locally cached token is deliberately NOT re-sent instead: the sender deletes
+     * `fcmToken` on UNREGISTERED, and re-sending a cached value would resurrect a dead token.
+     *
+     * A failed fetch (in prod overwhelmingly `IOException: FIS_AUTH_ERROR`, a device-side GMS /
+     * Installations state) is a `warning` here and is handed to [PushTokenRetryWorker] via
+     * [scheduleTokenRetry]: a bounded, backed-off chain that registers the token through
+     * [registerToken] once obtained and reports ONE non-fatal if it never is — instead of one
+     * non-fatal on every app start. Until a token exists `lastActiveAt` cannot move; a token-less
+     * activity write needs a server-side endpoint change.
      */
     override suspend fun touchLastActive() {
         val userId = currentUserId()
@@ -109,16 +122,14 @@ internal class PushTokenRepositoryAndroid(
             logger.warning(TAG, "touchLastActive skipped: user_id not ready yet")
             return
         }
-        val token = runCatching { FirebaseMessaging.getInstance().token.await() }
-            .onFailure { e ->
-                // Log the cause, not just the symptom: this is the ONLY place the FCM fetch failure
-                // surfaces now that the duplicate registration in GistiApplication is gone, and a
-                // bare getOrNull() would swallow the throwable entirely.
-                logger.error(TAG, "touchLastActive: FCM token fetch failed: ${e.message}", e)
-            }
-            .getOrNull()
+        val fetch = runCatching { FirebaseMessaging.getInstance().token.await() }
+        val token = fetch.getOrNull()
         if (token.isNullOrBlank()) {
-            logger.warning(TAG, "touchLastActive skipped: FCM token unavailable — activity bump deferred to next start")
+            val failure = fetch.exceptionOrNull()
+            if (failure is CancellationException) throw failure
+            val reason = failure?.let { "${it::class.simpleName}: ${it.message}" } ?: "blank token"
+            logger.warning(TAG, "touchLastActive: FCM token unavailable ($reason) — scheduling bounded retry")
+            scheduleTokenRetry()
             return
         }
         registerToken(token)

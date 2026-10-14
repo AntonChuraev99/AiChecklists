@@ -321,8 +321,10 @@ open class GistiApplication : Application() {
      * backend traffic until 2026-07-25.
      *
      * No-ops gracefully when the user is not signed in (the repository logs a warning) — the
-     * token is re-registered on a later start once the user authenticates. Token fetch failures
-     * are non-critical: onNewToken still fires when FCM rotates the token.
+     * token is re-registered on a later start once the user authenticates. A failed token fetch
+     * (typically `FIS_AUTH_ERROR`) is NOT covered by onNewToken — a device stuck there never gets a
+     * token to rotate — so the repository hands it to the bounded [com.antonchuraev.homesearchchecklist.push.PushTokenRetryWorker] chain
+     * (5 backed-off runs, one non-fatal on exhaustion, then a 24h cooldown before a new chain).
      */
     private fun registerPushToken() {
         applicationScope.launch {

@@ -2,11 +2,12 @@
 
 _Last updated: 2026-10-14_
 
-Быстрый поиск по 81 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 82 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
 | 2026-10-14 | bug-fix | audio, permission, wasmjs, hold-to-record, AsyncStartRecorderMachine, getUserMedia, transcribe_audio | [Voice input: web permission prompt, visible transcription, honest Analyze dialogs](chat-voice-web-permission-and-transcribing-indicator-2026-10-14.md) |
+| 2026-10-14 | bug-fix | push, FIS_AUTH_ERROR, WorkManager, PushTokenRetryWorker, push_dismissed, setDeleteIntent | [Push: FCM token retry on FIS_AUTH_ERROR, dismiss tracking for local pushes](push-token-retry-and-local-push-dismiss-2026-10-14.md) |
 | 2026-10-14 | bug-fix | retention, ComebackGate, POST_NOTIFICATIONS, shouldShowRequestPermissionRationale, ActivationReminderSheet, NotificationsOffBanner | [Come-back nudge never shown + notification opt-in](retention-comeback-and-notification-optin-2026-10-14.md) |
 | 2026-10-14 | migration | gemini-3.5-flash-lite, thinking_budget, thinking_level, remote-config, chat_agent, 400 | [Gemini 3.1 → 3.5 Flash-Lite: thinking_budget=0 is a 400](gemini-3-5-flash-lite-migration-2026-10-14.md) |
 | 2026-10-12 | bug-fix | audio, permission, hold-to-record, MediaRecorder, VoicePressTerminalGate, chatDockKeepExpanded, keepExpanded, android | [Chat voice input: hold-to-record that reaches a visible result](chat-voice-hold-to-record-fix-2026-10-12.md) |
