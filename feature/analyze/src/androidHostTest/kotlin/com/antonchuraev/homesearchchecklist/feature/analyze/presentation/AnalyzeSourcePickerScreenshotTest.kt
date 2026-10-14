@@ -56,6 +56,10 @@ class AnalyzeSourcePickerScreenshotTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** The voice editor (`analyze_voiceSelected_*`) resolves its logger through `koinInject()`. */
+    @get:Rule
+    val koinRule = NoOpLoggerKoinRule()
+
     /**
      * `Locale.setDefault` is JVM-global and Gradle reuses one JVM per test task, so an unrestored RU
      * default would silently re-render every LATER test class in Russian.

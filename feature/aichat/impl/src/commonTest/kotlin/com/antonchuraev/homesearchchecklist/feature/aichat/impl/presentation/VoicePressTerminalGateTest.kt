@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderErrorCodes
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderLauncher
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -97,5 +98,70 @@ class VoicePressTerminalGateTest {
 
         assertTrue(gate.tryDeliver(), "onError(PERMISSION_GRANTED_PRESS_AGAIN) after the dialog")
         assertFalse(gate.tryDeliver())
+    }
+
+    // ── releaseOutrunsStart ──────────────────────────────────────────────────
+
+    // Release during the permission prompt: the UI drops now, and the late answer is still the
+    // press's one terminal callback.
+    @Test
+    fun releaseWhileStartPending_dropsUiNow_andLateCallbackStillPassesOnce() {
+        val gate = VoicePressTerminalGate()
+        gate.onPressStarted()
+
+        assertTrue(gate.releaseOutrunsStart(recorderRunning = false))
+        assertTrue(gate.tryDeliver(), "the prompt's answer after the release")
+        assertFalse(gate.tryDeliver())
+    }
+
+    @Test
+    fun releaseWhileRecording_leavesUiToTheTerminalCallback() {
+        val gate = VoicePressTerminalGate()
+        gate.onPressStarted()
+
+        assertFalse(gate.releaseOutrunsStart(recorderRunning = true))
+    }
+
+    // A start that already failed delivered its terminal; the release has nothing left to drop.
+    @Test
+    fun releaseAfterTerminalDelivered_isNotEarly() {
+        val gate = VoicePressTerminalGate()
+        gate.onPressStarted()
+        assertTrue(gate.tryDeliver())
+
+        assertFalse(gate.releaseOutrunsStart(recorderRunning = false))
+    }
+
+    @Test
+    fun endVoicePress_pendingStart_dropsUiBeforeStopping() {
+        val gate = VoicePressTerminalGate().apply { onPressStarted() }
+        val calls = mutableListOf<String>()
+        val recorder = AudioRecorderLauncher(
+            onStart = {},
+            onStop = { calls += "stop" },
+            onCancel = { calls += "cancel" },
+            isRecording = { false },
+        )
+
+        endVoicePress(gate, recorder, cancel = false) { calls += "release-ui" }
+        endVoicePress(gate, recorder, cancel = true) { calls += "release-ui" }
+
+        assertEquals(listOf("release-ui", "stop", "release-ui", "cancel"), calls)
+    }
+
+    @Test
+    fun endVoicePress_runningRecorder_onlyStops() {
+        val gate = VoicePressTerminalGate().apply { onPressStarted() }
+        val calls = mutableListOf<String>()
+        val recorder = AudioRecorderLauncher(
+            onStart = {},
+            onStop = { calls += "stop" },
+            onCancel = { calls += "cancel" },
+            isRecording = { true },
+        )
+
+        endVoicePress(gate, recorder, cancel = false) { calls += "release-ui" }
+
+        assertEquals(listOf("stop"), calls)
     }
 }

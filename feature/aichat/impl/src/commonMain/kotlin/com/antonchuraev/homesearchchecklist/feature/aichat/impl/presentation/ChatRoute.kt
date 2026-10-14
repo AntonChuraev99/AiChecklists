@@ -524,8 +524,16 @@ fun ChatRoute(
             voicePressGate.onPressStarted()
             audioRecorder.start()
         },
-        onVoiceRecordingStopped = { audioRecorder.stop() },
-        onVoiceRecordingCancelled = { audioRecorder.cancel() },
+        onVoiceRecordingStopped = {
+            endVoicePress(voicePressGate, audioRecorder, cancel = false) {
+                viewModel.sendIntent(ChatScreenIntent.OnVoicePressReleasedBeforeStart)
+            }
+        },
+        onVoiceRecordingCancelled = {
+            endVoicePress(voicePressGate, audioRecorder, cancel = true) {
+                viewModel.sendIntent(ChatScreenIntent.OnVoicePressReleasedBeforeStart)
+            }
+        },
     )
 }
 

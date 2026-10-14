@@ -10,12 +10,19 @@ class AudioRecorderLauncher(
     private val onStop: () -> Unit,
     private val onCancel: () -> Unit,
     val isRecording: () -> Boolean,
-    private val openSettings: () -> Unit = {}
+    /** null where the platform has no app-settings screen to open (web: site settings live in the browser). */
+    private val openSettings: (() -> Unit)? = null
 ) {
     fun start() = onStart()
     fun stop() = onStop()
     fun cancel() = onCancel()
-    fun openAppSettings() = openSettings()
+
+    /** False → [openAppSettings] would do nothing; do not offer an "Open Settings" action. */
+    val canOpenAppSettings: Boolean get() = openSettings != null
+
+    fun openAppSettings() {
+        openSettings?.invoke()
+    }
 }
 
 /**

@@ -216,6 +216,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatScreenSideEffect
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.VoicePressTerminalGate
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.endVoicePress
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.logVoiceRecorderError
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
@@ -1034,6 +1035,13 @@ fun App() {
                     }
                 },
             )
+            // Finger lifted: a release that outran a pending start (permission prompt) drops the
+            // recording UI now; the press's single terminal callback still arrives later.
+            val endSheetVoicePress: (Boolean) -> Unit = { cancel ->
+                endVoicePress(sheetVoicePressGate, sheetAudioRecorder, cancel) {
+                    chatViewModel.sendIntent(ChatScreenIntent.OnVoicePressReleasedBeforeStart)
+                }
+            }
 
             // rememberUpdatedState, NOT the map directly: LaunchedEffect captures its lambda ONCE
             // (key = chatViewModel), and Compose Resources resolve asynchronously — on the first
@@ -1714,8 +1722,8 @@ fun App() {
                                         sheetVoicePressGate.onPressStarted()
                                         sheetAudioRecorder.start()
                                     },
-                                    onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
-                                    onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
+                                    onVoiceRecordingStopped = { endSheetVoicePress(false) },
+                                    onVoiceRecordingCancelled = { endSheetVoicePress(true) },
                                     onHelpClick = { chatPanelHelpSheetOpen = true },
                                     // Item-create now supports attachments: drive the placeholder hint
                                     // from the staged-files flag; chat keeps its own pending-attachment flag.
@@ -1796,8 +1804,8 @@ fun App() {
                                     sheetVoicePressGate.onPressStarted()
                                     sheetAudioRecorder.start()
                                 },
-                                onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
-                                onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
+                                onVoiceRecordingStopped = { endSheetVoicePress(false) },
+                                onVoiceRecordingCancelled = { endSheetVoicePress(true) },
                                 onHelpClick = { chatPanelHelpSheetOpen = true },
                                 hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
                                 isEnabled = !chatUiState.isProcessing,

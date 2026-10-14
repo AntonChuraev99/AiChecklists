@@ -1358,6 +1358,42 @@ class ChatViewModelTest {
         )
     }
 
+    // 31a'. Finger lifted while the permission prompt is up: the recording UI drops at once, with
+    // no outcome of its own; the prompt's answer is still the press's single terminal outcome.
+    @Test
+    fun voicePressReleasedBeforeStart_clearsRecording_andLeavesTheOutcomeToTheTerminal() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        val effects = mutableListOf<ChatScreenSideEffect>()
+        val collector = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.collect { effects += it }
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+        vm.sendIntent(ChatScreenIntent.OnVoicePressReleasedBeforeStart)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(vm.screenState.value.isRecording, "release must stop the recording UI immediately")
+        assertEquals(emptyList<ChatScreenSideEffect>(), effects.toList(), "release is not an outcome")
+        assertEquals(0, analytics.count("ai_chat_voice_cancelled"))
+
+        vm.sendIntent(
+            ChatScreenIntent.OnVoiceRecordingStopped(
+                recordingPath = null,
+                cancelReason = VoiceCancelReason.PERMISSION_JUST_GRANTED,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+        collector.cancel()
+
+        assertEquals(
+            listOf<ChatScreenSideEffect>(ChatScreenSideEffect.ShowSnackbar("chat_mic_hold_to_record")),
+            effects.toList(),
+            "exactly one outcome per press: the terminal's snackbar",
+        )
+        assertFalse(vm.screenState.value.isRecording)
+    }
+
     // 31b. Mic press → funnel start is logged exactly once.
     @Test
     fun voiceRecordingStarted_logsVoiceStarted() = runTest {

@@ -146,6 +146,21 @@ class ChatDockVoiceHoldScreenshotTest {
         assertDockOpen(voice)
     }
 
+    /**
+     * Finger lifted while the permission prompt is still up. `endVoicePress` sends
+     * `OnVoicePressReleasedBeforeStart`, which clears `isRecording` at once (the logic is pinned by
+     * `VoicePressTerminalGateTest` / `ChatViewModelTest`); here: what the dock shows after that —
+     * no "Slide up to cancel 0:02" strip ticking on, the dock still open, the mic back.
+     */
+    @Test
+    fun voiceDock_360_light_releasedDuringPermissionPrompt() {
+        val voice = openDock()
+        startRecording(voice)
+        mutate { voice.isRecording = false }
+        composeTestRule.onRoot().captureRoboImage()
+        assertDockOpen(voice)
+    }
+
     // ── Behaviour without a frame ────────────────────────────────────────────
 
     /**

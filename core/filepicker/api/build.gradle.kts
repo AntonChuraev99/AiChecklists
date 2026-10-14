@@ -12,6 +12,7 @@ kotlin {
         namespace = "com.antonchuraev.homesearchchecklist.core.filepicker.api"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTest {}
     }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
@@ -30,6 +31,9 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(libs.kotlinx.coroutines.core)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
 
         androidMain.dependencies {

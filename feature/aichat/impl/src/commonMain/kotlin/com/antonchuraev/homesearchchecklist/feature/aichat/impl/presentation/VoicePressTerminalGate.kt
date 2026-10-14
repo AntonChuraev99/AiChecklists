@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderLauncher
 
 /**
  * Lets exactly one recorder terminal callback through per mic press.
@@ -37,6 +38,29 @@ class VoicePressTerminalGate {
         open = false
         return true
     }
+
+    /**
+     * Finger lifted: true when the release outran the recorder's start — the recorder is not
+     * running yet and this press has not had its terminal callback (a permission prompt is up).
+     * The recording UI must drop now; the terminal callback still comes later and still passes
+     * [tryDeliver] once. Does not consume the gate.
+     */
+    fun releaseOutrunsStart(recorderRunning: Boolean): Boolean = open && !recorderRunning
+}
+
+/**
+ * Ends a mic press from the gesture host: drops the recording UI at once when the start is still
+ * pending ([onReleasedBeforeStart]), then stops or cancels the recorder as before. The recorder's
+ * running state is read BEFORE stop/cancel, which reset it.
+ */
+fun endVoicePress(
+    gate: VoicePressTerminalGate,
+    recorder: AudioRecorderLauncher,
+    cancel: Boolean,
+    onReleasedBeforeStart: () -> Unit,
+) {
+    if (gate.releaseOutrunsStart(recorderRunning = recorder.isRecording())) onReleasedBeforeStart()
+    if (cancel) recorder.cancel() else recorder.stop()
 }
 
 /**

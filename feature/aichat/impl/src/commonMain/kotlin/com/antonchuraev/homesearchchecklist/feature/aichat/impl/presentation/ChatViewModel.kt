@@ -531,6 +531,12 @@ class ChatViewModel(
                 )
             }
 
+            // UI-only: the press ended before the recorder started. The terminal outcome (and its
+            // analytics + snackbar) still comes through OnVoiceRecordingStopped when the start settles.
+            ChatScreenIntent.OnVoicePressReleasedBeforeStart -> {
+                _screenState.value = _screenState.value.copy(isRecording = false)
+            }
+
             is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(
                 recordingPath = intent.recordingPath,
                 mimeType = intent.mimeType,

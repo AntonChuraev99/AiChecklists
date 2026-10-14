@@ -387,9 +387,12 @@
     <string name="analyze_voice_permission_required">Microphone permission is required</string>
     <string name="analyze_voice_permission_denied">Microphone access was denied. Please grant permission to record voice.</string>
     <string name="analyze_voice_permission_denied_settings">Microphone access is disabled. Please enable it in Settings to record voice.</string>
+    <string name="analyze_voice_permission_denied_site_settings">Allow microphone access in the site settings (the lock icon in the address bar), then try again.</string>
+    <string name="analyze_voice_try_again">Try again</string>
     <string name="analyze_voice_permission_granted">Microphone is on. Tap record to start.</string>
     <string name="analyze_voice_too_short">Recording too short. Try again.</string>
     <string name="analyze_voice_recording_failed">Couldn't record audio. Try again.</string>
+    <string name="analyze_voice_playback_failed">Couldn't play the recording. Try again.</string>
     <string name="analyze_voice_open_settings">Open Settings</string>
     <string name="analyze_error_no_recording">Record a voice message to analyze</string>
 
@@ -1508,6 +1511,7 @@
     <string name="chat_transcribing">Transcribing…</string>
     <string name="chat_transcribe_empty">Couldn't hear anything in the recording. Try again.</string>
     <string name="chat_transcribe_error">Couldn't transcribe the recording. Check connection and try again.</string>
+    <string name="chat_input_transcribing_placeholder">Recognizing speech…</string>
     <string name="chat_attachment_remove">Remove attachment</string>
     <string name="chat_attachment_source_chooser_title">Attach</string>
     <string name="chat_attachment_source_image">Image</string>

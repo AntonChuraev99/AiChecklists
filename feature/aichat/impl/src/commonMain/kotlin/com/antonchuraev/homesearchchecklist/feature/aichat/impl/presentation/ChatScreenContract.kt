@@ -396,6 +396,14 @@ sealed interface ChatScreenIntent : Intent {
     data object OnVoiceRecordingStarted : ChatScreenIntent
 
     /**
+     * The finger left the mic while the recorder's start was still pending (a permission prompt is
+     * on screen). Clears [ChatScreenState.isRecording] only, so the recording UI stops at once
+     * instead of ticking until the prompt is answered. NOT a terminal outcome: no analytics, no
+     * snackbar — the press's single [OnVoiceRecordingStopped] still arrives when the start settles.
+     */
+    data object OnVoicePressReleasedBeforeStart : ChatScreenIntent
+
+    /**
      * The recorder delivered its terminal callback for the current press.
      * ViewModel flips [ChatScreenState.isRecording] to false and, when [recordingPath]
      * is non-null, sends the file to the transcription Cloud Function
