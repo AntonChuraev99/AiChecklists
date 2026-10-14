@@ -61,8 +61,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
@@ -76,6 +78,7 @@ import aichecklists.core.designsystem.generated.resources.chat_attach_file_actio
 import aichecklists.core.designsystem.generated.resources.chat_features_help_action
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder_with_attachment
+import aichecklists.core.designsystem.generated.resources.chat_input_transcribing_placeholder
 import aichecklists.core.designsystem.generated.resources.chat_record_voice
 import aichecklists.core.designsystem.generated.resources.chat_send_action
 import aichecklists.core.designsystem.generated.resources.chat_voice_press_hold_hint
@@ -109,8 +112,9 @@ import org.jetbrains.compose.resources.stringResource
  * @param canSend                   True when text is non-blank OR pendingAttachments is non-empty.
  * @param isRecording               True while voice recording is in progress.
  * @param isTranscribing            True while audio is being sent to the transcription Cloud Function.
- *                                  Hides the mic/send button and shows a [CircularProgressIndicator]
- *                                  with a «Transcribing…» label. Input field is read-only in this state.
+ *                                  Replaces the mic/send button with a [CircularProgressIndicator] and
+ *                                  the field hint with «Recognizing speech…» (full-strength colour,
+ *                                  polite live region). Input field is read-only in this state.
  * @param onDragCancelChanged       Reports drag-up cancel state to parent for overlay label.
  * @param focusRequester            When non-null, attached to the center [TextField] so a
  *                                  caller can programmatically request focus (e.g. auto-focus
@@ -175,7 +179,13 @@ fun ChatInputRow(
     val pressHoldHint = stringResource(Res.string.chat_voice_press_hold_hint)
     val defaultPlaceholder = stringResource(Res.string.chat_input_placeholder)
     val attachmentPlaceholder = stringResource(Res.string.chat_input_placeholder_with_attachment)
+    val transcribingPlaceholder = stringResource(Res.string.chat_input_transcribing_placeholder)
+    // Transcription wins over every other hint: the cold-start `transcribe_audio` call can take tens
+    // of seconds, and a field that still says "Message Gisti" next to a lone spinner reads as frozen.
+    // The mic is only offered while the input is blank (isMic = !canSend), so the field is empty for
+    // the whole transcription and this hint is always what the user sees.
     val placeholder = when {
+        isTranscribing -> transcribingPlaceholder
         hasAttachments -> attachmentPlaceholder
         placeholderOverride != null -> placeholderOverride
         else -> defaultPlaceholder
@@ -258,8 +268,11 @@ fun ChatInputRow(
         // morph instead of a hard node swap; a matching inset Spacer animates IN so the field keeps
         // a small left gap once the button is gone. (Both wrappers live in the SAME ChatInputRow node
         // across the mode flip — that node persistence is what lets these transitions actually run.)
+        // While transcribing, help and attach are disabled anyway; they step aside (same width-collapse
+        // morph as item-create mode) so the «Recognizing speech…» status gets the room it needs —
+        // at 320dp × fontScale 1.5 it otherwise truncated to «Recogni…».
         AnimatedVisibility(
-            visible = !simpleSendOnly,
+            visible = !simpleSendOnly && !isTranscribing,
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {
@@ -272,7 +285,9 @@ fun ChatInputRow(
                     imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
                     contentDescription = helpLabel,
                     modifier = Modifier.size(AppDimens.IconSizeMd),
-                    tint = if (isEnabled && !isRecording)
+                    // Disabled while transcribing too — tinting it like an idle control is what made
+                    // the row read as "ready for input" while the recording was still uploading.
+                    tint = if (isEnabled && !isRecording && !isTranscribing)
                         MaterialTheme.colorScheme.onSurfaceVariant
                     else
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
@@ -280,7 +295,7 @@ fun ChatInputRow(
             }
         }
         AnimatedVisibility(
-            visible = simpleSendOnly,
+            visible = simpleSendOnly || isTranscribing,
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {
@@ -302,12 +317,26 @@ fun ChatInputRow(
                 // (singleLine=false / maxLines=4 below). Without this the wider RU string
                 // "Сообщение Gisti" wraps to 2 lines in the narrow weight(1f) slot. Ellipsis is a
                 // safety net only — the hint is short enough to fit; typed text still grows to 4 lines.
+                // While transcribing the hint is a STATUS, not an invitation to type: full-strength
+                // onSurface (the idle hint is the weaker onSurfaceVariant) and a polite live region so
+                // TalkBack announces it once instead of leaving a silent disabled field.
                 androidx.compose.material3.Text(
                     text = placeholder,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    color = if (isTranscribing) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    // The status may wrap to a second line at large font scales — a cut-off
+                    // «Recogni…» is not a status. The idle hint stays single-line (see above).
+                    maxLines = if (isTranscribing) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = if (isTranscribing) {
+                        Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    } else {
+                        Modifier
+                    },
                 )
             },
             singleLine = false,
@@ -350,7 +379,7 @@ fun ChatInputRow(
         // Normally animates out in item-create mode, but the item-create dock re-enables it via
         // [attachVisibleInSimpleMode] so files can be attached to the new item (help + mic still hide).
         AnimatedVisibility(
-            visible = !simpleSendOnly || attachVisibleInSimpleMode,
+            visible = (!simpleSendOnly || attachVisibleInSimpleMode) && !isTranscribing,
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {
@@ -363,7 +392,9 @@ fun ChatInputRow(
                     imageVector = Icons.Filled.AttachFile,
                     contentDescription = attachFileLabel,
                     modifier = Modifier.size(AppDimens.IconSizeMd),
-                    tint = if (isEnabled && !isRecording)
+                    // Disabled while transcribing too — tinting it like an idle control is what made
+                    // the row read as "ready for input" while the recording was still uploading.
+                    tint = if (isEnabled && !isRecording && !isTranscribing)
                         MaterialTheme.colorScheme.onSurfaceVariant
                     else
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),

@@ -371,9 +371,12 @@
     <string name="analyze_voice_permission_required">माइक्रोफ़ोन की अनुमति ज़रूरी है</string>
     <string name="analyze_voice_permission_denied">माइक्रोफ़ोन एक्सेस अस्वीकार हो गया। वॉइस रिकॉर्ड करने के लिए अनुमति दें।</string>
     <string name="analyze_voice_permission_denied_settings">माइक्रोफ़ोन एक्सेस बंद है। वॉइस रिकॉर्ड करने के लिए इसे सेटिंग्स में चालू करें।</string>
+    <string name="analyze_voice_permission_denied_site_settings">साइट सेटिंग्स (एड्रेस बार में ताले का आइकन) में माइक्रोफ़ोन एक्सेस की अनुमति दें, फिर से आज़माएं।</string>
+    <string name="analyze_voice_try_again">फिर से आज़माएं</string>
     <string name="analyze_voice_permission_granted">माइक्रोफ़ोन चालू है। शुरू करने के लिए रिकॉर्ड पर टैप करें।</string>
     <string name="analyze_voice_too_short">रिकॉर्डिंग बहुत छोटी है। फिर से आज़माएं।</string>
     <string name="analyze_voice_recording_failed">ऑडियो रिकॉर्ड नहीं हो सका। फिर से आज़माएं।</string>
+    <string name="analyze_voice_playback_failed">रिकॉर्डिंग चलाई नहीं जा सकी। फिर से आज़माएं।</string>
     <string name="analyze_voice_open_settings">सेटिंग्स खोलें</string>
     <string name="analyze_error_no_recording">विश्लेषण के लिए एक वॉइस मैसेज रिकॉर्ड करें</string>
 
@@ -1477,6 +1480,7 @@
     <string name="chat_transcribing">ट्रांसक्राइब हो रहा है…</string>
     <string name="chat_transcribe_empty">रिकॉर्डिंग में कुछ सुनाई नहीं दिया। फिर से आज़माएं।</string>
     <string name="chat_transcribe_error">रिकॉर्डिंग ट्रांसक्राइब नहीं हो सकी। कनेक्शन जांचें और फिर से आज़माएं।</string>
+    <string name="chat_input_transcribing_placeholder">आवाज़ पहचानी जा रही है…</string>
     <string name="chat_attachment_remove">अटैचमेंट हटाएं</string>
     <string name="chat_attachment_source_chooser_title">अटैच करें</string>
     <string name="chat_attachment_source_image">इमेज</string>

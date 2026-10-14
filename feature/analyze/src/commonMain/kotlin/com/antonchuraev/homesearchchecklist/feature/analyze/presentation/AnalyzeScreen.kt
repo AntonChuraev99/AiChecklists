@@ -206,18 +206,10 @@ fun AnalyzeScreenContent(
 
         // Error dialog
         screenState.error?.let { error ->
-            AlertDialog(
-                onDismissRequest = { onIntent(AnalyzeScreenIntent.OnDismissError) },
-                title = { Text(stringResource(Res.string.error)) },
-                text = { Text(error) },
-                confirmButton = {
-                    AppButtonText(
-                        text = stringResource(Res.string.ok),
-                        onClick = { onIntent(AnalyzeScreenIntent.OnDismissError) }
-                    )
-                },
-                containerColor = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.large
+            AnalyzeMessageDialog(
+                message = error,
+                onDismiss = { onIntent(AnalyzeScreenIntent.OnDismissError) },
+                title = stringResource(Res.string.error),
             )
         }
     }
@@ -497,12 +489,17 @@ private fun VoiceInputSection(
     onDeleteRecording: () -> Unit
 ) {
     var permissionDeniedPermanently by remember { mutableStateOf(false) }
+    var grantedHint by remember { mutableStateOf<String?>(null) }
+    grantedHint?.let { hint ->
+        AnalyzeMessageDialog(message = hint, onDismiss = { grantedHint = null })
+    }
 
     // Pre-fetch the permission denied string for use in callback
     val permissionDeniedMessage = stringResource(Res.string.analyze_voice_permission_denied)
     val permissionGrantedMessage = stringResource(Res.string.analyze_voice_permission_granted)
     val tooShortMessage = stringResource(Res.string.analyze_voice_too_short)
     val recordingFailedMessage = stringResource(Res.string.analyze_voice_recording_failed)
+    val playbackFailedMessage = stringResource(Res.string.analyze_voice_playback_failed)
     val logger: AppLogger = koinInject()
 
     val audioRecorderLauncher = rememberAudioRecorderLauncher(
@@ -518,11 +515,18 @@ private fun VoiceInputSection(
                     onRecordingError(permissionDeniedMessage)
                 }
                 AudioRecorderErrorCodes.PERMISSION_DENIED_PERMANENTLY -> {
+                    // The tap set isRecording = true; nothing will record, so reset it.
+                    onStopRecording()
                     permissionDeniedPermanently = true
                 }
                 // Tap-to-record normally auto-starts once the permission is granted; this code
                 // only arrives when the request state was lost under the dialog (activity recreated).
-                AudioRecorderErrorCodes.PERMISSION_GRANTED_PRESS_AGAIN -> onRecordingError(permissionGrantedMessage)
+                // It is guidance, not a failure: no "Error" dialog. Reset the recording flag via the
+                // ordinary stop intent and show the neutral hint dialog below.
+                AudioRecorderErrorCodes.PERMISSION_GRANTED_PRESS_AGAIN -> {
+                    onStopRecording()
+                    grantedHint = permissionGrantedMessage
+                }
                 AudioRecorderErrorCodes.RECORDING_TOO_SHORT -> onRecordingError(tooShortMessage)
                 else -> {
                     // Any other string is a raw recorder failure message — log it, show a localized text.
@@ -539,36 +543,12 @@ private fun VoiceInputSection(
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
         if (permissionDeniedPermanently) {
-            // Permission permanently denied - show message and settings button
-            AppCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(AppDimens.SpacingLg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Mic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text(
-                        text = stringResource(Res.string.analyze_voice_permission_denied_settings),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center
-                    )
-                    AppButton(
-                        text = stringResource(Res.string.analyze_voice_open_settings),
-                        onClick = { audioRecorderLauncher.openAppSettings() },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+            VoicePermissionBlockedCard(
+                canOpenAppSettings = audioRecorderLauncher.canOpenAppSettings,
+                onOpenAppSettings = { audioRecorderLauncher.openAppSettings() },
+                // Back to the record button: the next tap asks / re-checks the permission.
+                onTryAgain = { permissionDeniedPermanently = false },
+            )
         } else if (recordedAudioPath != null) {
             // Show recorded audio info with playback controls
             var isPlayingAudio by remember { mutableStateOf(false) }
@@ -579,7 +559,10 @@ private fun VoiceInputSection(
                 },
                 onError = { error ->
                     isPlayingAudio = false
-                    onRecordingError(error)
+                    // The player reports a raw platform message (MediaPlayer exception text, the
+                    // web "not supported" stub). Raw goes to the log only; the user sees localized text.
+                    logger.error("Analyze", "Voice playback failed: $error", IllegalStateException(error))
+                    onRecordingError(playbackFailedMessage)
                 }
             )
 
@@ -714,6 +697,83 @@ private fun VoiceInputSection(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }
+            )
+        }
+    }
+}
+
+/**
+ * The screen's one message dialog. [title] null = a hint (e.g. "Microphone is on. Tap record to
+ * start."), not a failure; the error dialog passes the "Error" title.
+ */
+@Composable
+internal fun AnalyzeMessageDialog(message: String, onDismiss: () -> Unit, title: String? = null) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = title?.let { { Text(it) } },
+        text = { Text(message) },
+        confirmButton = {
+            AppButtonText(
+                text = stringResource(Res.string.ok),
+                onClick = onDismiss,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large,
+    )
+}
+
+/**
+ * Microphone permission refused for good (Android "Don't ask again", browser "Block").
+ *
+ * "Open Settings" only where the recorder can open an app-settings screen (Android, iOS); the web
+ * has none — site permissions live behind the lock icon in the address bar, which the text names
+ * instead. "Try again" on every platform: the user may have re-allowed the microphone meanwhile,
+ * and without it the card was a dead end until the screen was left.
+ */
+@Composable
+internal fun VoicePermissionBlockedCard(
+    canOpenAppSettings: Boolean,
+    onOpenAppSettings: () -> Unit,
+    onTryAgain: () -> Unit,
+) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AppDimens.SpacingLg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Mic,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(48.dp),
+            )
+            Text(
+                text = stringResource(
+                    if (canOpenAppSettings) {
+                        Res.string.analyze_voice_permission_denied_settings
+                    } else {
+                        Res.string.analyze_voice_permission_denied_site_settings
+                    }
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            if (canOpenAppSettings) {
+                AppButton(
+                    text = stringResource(Res.string.analyze_voice_open_settings),
+                    onClick = onOpenAppSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            AppButtonSecondary(
+                text = stringResource(Res.string.analyze_voice_try_again),
+                onClick = onTryAgain,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

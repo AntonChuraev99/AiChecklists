@@ -805,17 +805,40 @@ globalThis.__audioRecordingState = {
     chunks: [],          // Array<Blob> chunks accumulated via dataavailable
     mimeType: null,      // resolved MIME for this session
     startedAtMs: 0,      // Date.now() when recording started
+    pending: false,      // a start is waiting on getUserMedia (possibly behind the permission prompt)
+    abortPending: false, // cancel() came while pending: release the stream as soon as it arrives
+};
+
+// navigator.permissions state of the microphone: 'granted' | 'prompt' | 'denied' | 'unknown'.
+// 'unknown' where the Permissions API or its 'microphone' name is missing (older Firefox/Safari).
+globalThis.__audioMicPermissionState = async () => {
+    try {
+        if (!navigator.permissions || typeof navigator.permissions.query !== 'function') return 'unknown';
+        const status = await navigator.permissions.query({ name: 'microphone' });
+        return (status && typeof status.state === 'string') ? status.state : 'unknown';
+    } catch (_) {
+        return 'unknown';
+    }
 };
 
 // Start microphone capture and begin recording.
-// Returns Promise<{ok: boolean, mimeType: string, error: string|null}>.
+// Returns Promise<{ok, mimeType, error, errorName, permissionBefore, permissionAfter, elapsedMs}>.
+// permissionBefore + elapsedMs tell the caller whether the permission prompt was on screen,
+// permissionAfter whether a NotAllowedError is a dismissed prompt or a remembered block.
 globalThis.__audioRecordingStart = () => new Promise((resolve) => {
     (async () => {
+        const state = globalThis.__audioRecordingState;
+        let permissionBefore = 'unknown';
+        let elapsedMs = 0;
         try {
-            if (globalThis.__audioRecordingState.recorder) {
-                resolve({ ok: false, mimeType: '', error: 'already recording' });
+            if (state.recorder || state.pending) {
+                resolve({ ok: false, mimeType: '', error: 'already recording', errorName: 'InvalidStateError',
+                    permissionBefore, permissionAfter: permissionBefore, elapsedMs });
                 return;
             }
+            state.pending = true;
+            state.abortPending = false;
+            permissionBefore = await globalThis.__audioMicPermissionState();
             // Probe MIME candidates — Chrome prefers webm;opus, Safari prefers mp4.
             const candidates = [
                 'audio/webm;codecs=opus',
@@ -832,37 +855,62 @@ globalThis.__audioRecordingStart = () => new Promise((resolve) => {
                     break;
                 }
             }
+            const requestedAt = Date.now();
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorderOpts = chosenMime ? { mimeType: chosenMime } : {};
-            const recorder = new MediaRecorder(stream, recorderOpts);
+            elapsedMs = Date.now() - requestedAt;
+            if (state.abortPending) {
+                // The owner went away while getUserMedia was pending: nobody will stop this session.
+                state.pending = false;
+                state.abortPending = false;
+                try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+                resolve({ ok: false, mimeType: '', error: 'start aborted', errorName: 'AbortError',
+                    permissionBefore, permissionAfter: 'granted', elapsedMs });
+                return;
+            }
             const chunks = [];
-            recorder.addEventListener('dataavailable', (e) => {
-                if (e.data && e.data.size > 0) chunks.push(e.data);
-            });
-            const state = globalThis.__audioRecordingState;
+            let recorder;
+            try {
+                const recorderOpts = chosenMime ? { mimeType: chosenMime } : {};
+                recorder = new MediaRecorder(stream, recorderOpts);
+                recorder.addEventListener('dataavailable', (e) => {
+                    if (e.data && e.data.size > 0) chunks.push(e.data);
+                });
+                recorder.start();
+            } catch (e) {
+                // The stream is ours until the session is stored — release the mic indicator
+                try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+                throw e;
+            }
             state.recorder = recorder;
             state.stream = stream;
             state.chunks = chunks;
             // recorder.mimeType is set by the browser after construction — prefer it.
             state.mimeType = recorder.mimeType || chosenMime || 'audio/webm';
             state.startedAtMs = Date.now();
-            recorder.start();
-            resolve({ ok: true, mimeType: state.mimeType, error: null });
+            state.pending = false;
+            resolve({ ok: true, mimeType: state.mimeType, error: null, errorName: '',
+                permissionBefore, permissionAfter: 'granted', elapsedMs });
         } catch (err) {
+            // NotAllowedError = user denied mic (or a remembered block), NotFoundError = no mic device.
             console.error('[AudioRecorder] start failed:', err);
-            // NotAllowedError = user denied mic, NotFoundError = no mic device.
+            state.pending = false;
+            state.abortPending = false;
+            const name = (err && err.name) ? String(err.name) : '';
             const msg = (err && err.message) ? err.message : String(err);
-            resolve({ ok: false, mimeType: '', error: msg });
+            const permissionAfter = await globalThis.__audioMicPermissionState();
+            resolve({ ok: false, mimeType: '', error: msg, errorName: name,
+                permissionBefore, permissionAfter, elapsedMs });
         }
     })();
 });
 
 // Stop recording, assemble Blob, save to staging map.
-// Returns Promise<{ok: boolean, path: string, mimeType: string, durationMs: number}>.
+// Returns Promise<{ok, path, mimeType, durationMs, tooShort, error}>.
+// tooShort: the recorder captured no data at all (stopped right after start).
 globalThis.__audioRecordingStop = () => new Promise((resolve) => {
     const state = globalThis.__audioRecordingState;
     if (!state.recorder) {
-        resolve({ ok: false, path: '', mimeType: '', durationMs: 0 });
+        resolve({ ok: false, path: '', mimeType: '', durationMs: 0, tooShort: false, error: 'no active recording' });
         return;
     }
     const recorder = state.recorder;
@@ -884,7 +932,7 @@ globalThis.__audioRecordingStop = () => new Promise((resolve) => {
         state.startedAtMs = 0;
 
         if (!chunks || chunks.length === 0) {
-            resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0 });
+            resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0, tooShort: true, error: 'no audio captured' });
             return;
         }
         const blob = new Blob(chunks, { type: mimeType });
@@ -901,12 +949,15 @@ globalThis.__audioRecordingStop = () => new Promise((resolve) => {
                 resolve({ ok: true, path: key, mimeType: mimeType, durationMs: durationMs });
             } catch (e) {
                 console.error('[AudioRecorder] blob→u8 failed:', e);
-                resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0 });
+                resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0, tooShort: false,
+                    error: 'blob read failed: ' + ((e && e.name) || '') + ' ' + ((e && e.message) || String(e)) });
             }
         };
         reader.onerror = (e) => {
             console.error('[AudioRecorder] FileReader error:', e);
-            resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0 });
+            const readerError = reader.error;
+            resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0, tooShort: false,
+                error: 'FileReader error: ' + ((readerError && readerError.name) || 'unknown') });
         };
         reader.readAsArrayBuffer(blob);
     };
@@ -922,8 +973,13 @@ globalThis.__audioRecordingStop = () => new Promise((resolve) => {
 
 // Cancel recording synchronously — releases mic without saving any bytes.
 // Returns true if a session was active and cancelled, false otherwise.
+// A start still waiting on getUserMedia is marked for abort: its stream is released on arrival.
 globalThis.__audioRecordingCancel = () => {
     const state = globalThis.__audioRecordingState;
+    if (state.pending) {
+        state.abortPending = true;
+        return true;
+    }
     if (!state.recorder) return false;
     try { state.recorder.stop(); } catch (_) {}
     if (state.stream) {
