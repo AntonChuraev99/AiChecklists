@@ -99,8 +99,9 @@ internal object PushAnalytics {
 }
 
 /**
- * Emits [AnalyticsEvents.Push.DISMISSED] when the user swipes a re-engagement notification away.
- * Wired as the notification's delete intent in [GistiFirebaseMessagingService]. A delete intent
+ * Emits [AnalyticsEvents.Push.DISMISSED] when the user swipes a push notification away. Wired as the
+ * delete intent of server pushes ([GistiFirebaseMessagingService]) and of local retention pushes
+ * (`RetentionPushReceiver`), told apart by `push_type`. A delete intent
  * only reports analytics (no Activity start), so a BroadcastReceiver is the correct home — unlike
  * the content intent, which the OS forbids from trampolining through a receiver (Android 12+).
  */

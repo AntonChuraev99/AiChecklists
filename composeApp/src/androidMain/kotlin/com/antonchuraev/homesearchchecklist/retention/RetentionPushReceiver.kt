@@ -19,6 +19,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
+import com.antonchuraev.homesearchchecklist.push.PushDismissReceiver
+import com.antonchuraev.homesearchchecklist.push.PushDisplayability
 import com.antonchuraev.homesearchchecklist.push.PushNotificationChannels
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.CancellationException
@@ -420,6 +422,7 @@ class RetentionPushReceiver : BroadcastReceiver() {
         val arm = deps.timingResolver.arm()
 
         val contentPendingIntent = buildContentPendingIntent(context, spec, arm)
+        val deletePendingIntent = buildDeletePendingIntent(context, spec, arm)
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_checkbox_checked)
@@ -429,26 +432,65 @@ class RetentionPushReceiver : BroadcastReceiver() {
             .setPriority(if (isReminders) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(contentPendingIntent)
+            .setDeleteIntent(deletePendingIntent)
             .apply { if (isReminders) setCategory(NotificationCompat.CATEGORY_REMINDER) }
             .build()
 
         context.getSystemService(NotificationManager::class.java)
             .notify(RETENTION_NOTIFICATION_ID, notification)
 
-        // "Shown" event — mirrors GistiFirebaseMessagingService.emitReceived, distinguished by push_type.
+        // "Posted" event — mirrors GistiFirebaseMessagingService.emitReceived, distinguished by
+        // push_type. notifications_enabled separates "posted" from "could reach the shade": with the
+        // app toggle off or the channel muted, notify() above is a silent no-op.
+        val showable = PushDisplayability.isShowable(context, channelId, deps.logger)
         runCatching {
             deps.analytics.eventOutOfSession(
                 AnalyticsEvents.Push.RECEIVED,
-                PushAnalytics.params(
-                    campaignId = spec.campaignId,
-                    pushType = spec.pushType,
-                    channel = spec.channelToken,
-                    audienceClass = spec.audienceClass,
-                    abExperiment = PushTimingResolver.EXPERIMENT_TIMING,
-                    abArm = arm,
+                PushDisplayability.withShowable(
+                    params = PushAnalytics.params(
+                        campaignId = spec.campaignId,
+                        pushType = spec.pushType,
+                        channel = spec.channelToken,
+                        audienceClass = spec.audienceClass,
+                        abExperiment = PushTimingResolver.EXPERIMENT_TIMING,
+                        abArm = arm,
+                    ),
+                    showable = showable,
                 ),
             )
         }.onFailure { deps.logger.warning(TAG, "shown-event emit failed: ${it.message}") }
+    }
+
+    /**
+     * Delete intent -> [PushDismissReceiver]: the same swipe-away instrumentation server pushes
+     * already have (`push_dismissed`), carrying this push's local `push_type` / `campaign_id`.
+     * Broadcast target — it only reports analytics, so the Android 12 Activity-trampoline ban does
+     * not apply. Request code = the notification id, like the content intent: a broadcast and an
+     * activity PendingIntent never match each other, and FLAG_UPDATE_CURRENT on the single retention
+     * id makes a newer push refresh the extras of the one it replaces.
+     */
+    private fun buildDeletePendingIntent(
+        context: Context,
+        spec: RetentionPushSpec,
+        arm: String,
+    ): PendingIntent {
+        val deleteIntent = Intent(context, PushDismissReceiver::class.java).apply {
+            PushAnalytics.writeExtras(
+                intent = this,
+                campaignId = spec.campaignId,
+                pushType = spec.pushType,
+                channel = spec.channelToken,
+                audienceClass = spec.audienceClass,
+                abExperiment = PushTimingResolver.EXPERIMENT_TIMING,
+                abArm = arm,
+            )
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            RETENTION_NOTIFICATION_ID,
+            deleteIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun buildContentPendingIntent(

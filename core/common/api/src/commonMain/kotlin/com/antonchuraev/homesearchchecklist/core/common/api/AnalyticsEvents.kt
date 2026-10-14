@@ -272,13 +272,23 @@ object AnalyticsEvents {
          */
         const val SENT = "push_sent"
 
-        /** Client `onMessageReceived` (our payload is data-only -> always invoked). delivery = received / sent. */
+        /**
+         * Client: FCM `onMessageReceived` (payload is data-only -> always invoked) or a LOCAL
+         * retention push being posted. delivery = received / sent. Fires even when the user cannot
+         * see the notification, so it carries [AnalyticsParams.NOTIFICATIONS_ENABLED] = app toggle on
+         * AND target channel importance != NONE (pre-O: app toggle only). "Shown" = received with
+         * `notifications_enabled = true`; events before this param existed have it unset.
+         */
         const val RECEIVED = "push_received"
 
         /** Client, on notification tap -> deep-link. open rate = opened / received. Sibling of [Reminder.NOTIFICATION_TAPPED]. */
         const val OPENED = "push_opened"
 
-        /** Client, swipe-away via `setDeleteIntent`. Notification-fatigue proxy. */
+        /**
+         * Client, swipe-away via `setDeleteIntent`. Notification-fatigue proxy. Server pushes and
+         * local retention pushes (streak_save / overdue / digest / comeback) both emit it, told
+         * apart by [AnalyticsParams.PUSH_TYPE]; local pushes emit it only from this change on.
+         */
         const val DISMISSED = "push_dismissed"
 
         /**
@@ -1230,7 +1240,9 @@ object AnalyticsParams {
     const val PUSH_HOLDOUT = "push_holdout"
     const val IS_PREMIUM = "is_premium"      // entitlement at event time — promo suppressed when true
     // push_permission_state diagnostics
-    const val NOTIFICATIONS_ENABLED = "notifications_enabled" // app-level toggle (areNotificationsEnabled)
+    // push_permission_state: app-level toggle only (areNotificationsEnabled).
+    // push_received: app toggle AND target channel importance != NONE — "could reach the shade".
+    const val NOTIFICATIONS_ENABLED = "notifications_enabled"
     const val CHANNEL_IMPORTANCE = "channel_importance"       // per-channel importance (0 = user muted this channel)
     /**
      * Push A/B experiment dimension. Two params so several experiments can run at once
