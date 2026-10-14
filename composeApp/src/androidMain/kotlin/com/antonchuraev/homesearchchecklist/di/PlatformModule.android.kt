@@ -16,11 +16,13 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePor
 import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
 import com.antonchuraev.homesearchchecklist.core.common.impl.AndroidAppLogger
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.push.PushTokenRepositoryAndroid
+import com.antonchuraev.homesearchchecklist.push.PushTokenRetryWorker
 import com.antonchuraev.homesearchchecklist.retention.PushTimingResolver
 import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
 import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
@@ -76,7 +78,23 @@ actual fun platformModule(): Module = module {
     // is server-write-only and anonymous users have no Firebase Auth). get() resolves AppLogger,
     // UserApiService, UserDataRepository, AnalyticsTracker. Resolved by GistiFirebaseMessagingService
     // (onNewToken) and GistiApplication (app-start registration) via GlobalContext.
-    single<PushTokenRepository> { PushTokenRepositoryAndroid(get(), get(), get(), get()) }
+    single<PushTokenRepository> {
+        val logger: AppLogger = get()
+        val datastore: AppDatastore = get()
+        PushTokenRepositoryAndroid(
+            logger = logger,
+            userApiService = get(),
+            userDataRepository = get(),
+            analytics = get(),
+            // Called only from the token-fetch FAILURE branch, so WorkManager is never built on a
+            // healthy cold start (WorkManagerInitializer is removed from androidx.startup in the
+            // androidApp manifest — see AppStartupWorkManagerTest). enqueueIfDue skips the enqueue
+            // for 24h after a chain exhausted (cooldown record in AppDatastore).
+            scheduleTokenRetry = {
+                PushTokenRetryWorker.enqueueIfDue(AppContextHolder.context, datastore, logger)
+            },
+        )
+    }
 
     // Google Play in-app update controller (Android-only). Observed by AppUpdateLauncher;
     // get() resolves Context (AppContextHolder.context), AppLogger and AnalyticsTracker above.
