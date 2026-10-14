@@ -49,3 +49,4 @@ backoff to attempt zero forever. The stored token is not resent — the server c
 - `composeApp/src/androidMain/kotlin/com/antonchuraev/homesearchchecklist/push/PushTokenRepositoryAndroid.kt`
 - `composeApp/src/androidMain/kotlin/com/antonchuraev/homesearchchecklist/retention/RetentionPushReceiver.kt`
 - `composeApp/src/androidMain/kotlin/com/antonchuraev/homesearchchecklist/push/PushDisplayability.kt`
+- `docs/solutions/reengagement-push-dormancy-window-and-stop-2026-10-14.md` — the server half.
