@@ -6,6 +6,7 @@ _Last updated: 2026-10-12_
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-10-14 | migration | gemini-3.5-flash-lite, thinking_budget, thinking_level, remote-config, chat_agent, 400 | [Gemini 3.1 → 3.5 Flash-Lite: thinking_budget=0 is a 400](gemini-3-5-flash-lite-migration-2026-10-14.md) |
 | 2026-10-12 | bug-fix | audio, permission, hold-to-record, MediaRecorder, VoicePressTerminalGate, chatDockKeepExpanded, keepExpanded, android | [Chat voice input: hold-to-record that reaches a visible result](chat-voice-hold-to-record-fix-2026-10-12.md) |
 | 2026-10-12 | bug-fix | paywall, revenuecat, getOfferings, reload-on-tap, HorizontalPager, IndexOutOfBounds, generate_checklist, classifier-limit | [Paywall: reload the catalog on a Buy tap, plus three production defect fixes](paywall-reload-on-tap-and-prod-defect-fixes-2026-10-12.md) |
 | 2026-09-24 | bug-fix | landing, hero-video, cloudflare-static-assets, range-request, 206, safari, run_worker_first, immutable-cache | [Landing hero video — Static Assets ignores Range behind the worker](landing-hero-video-range-206-2026-09-24.md) |
