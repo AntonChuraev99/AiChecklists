@@ -77,7 +77,8 @@ actual fun platformModule(): Module = module {
     // re-engagement campaign via the register_push_token Cloud Function (Admin SDK; the credit doc
     // is server-write-only and anonymous users have no Firebase Auth). get() resolves AppLogger,
     // UserApiService, UserDataRepository, AnalyticsTracker. Resolved by GistiFirebaseMessagingService
-    // (onNewToken) and GistiApplication (app-start registration) via GlobalContext.
+    // (onNewToken), GistiApplication (process-start token sync, no activity) and MainActivity
+    // (foreground activity write) via GlobalContext / inject.
     single<PushTokenRepository> {
         val logger: AppLogger = get()
         val datastore: AppDatastore = get()
@@ -86,6 +87,7 @@ actual fun platformModule(): Module = module {
             userApiService = get(),
             userDataRepository = get(),
             analytics = get(),
+            datastore = datastore,
             // Called only from the token-fetch FAILURE branch, so WorkManager is never built on a
             // healthy cold start (WorkManagerInitializer is removed from androidx.startup in the
             // androidApp manifest — see AppStartupWorkManagerTest). enqueueIfDue skips the enqueue

@@ -83,6 +83,9 @@ interface UserApiService {
      * @param platform "android"
      * @param pushHoldout deterministic retention control-group flag (client-owned)
      * @param fcmOptIn explicit promo opt-in
+     * @param markActive `mark_active`: true moves `lastActiveAt`. Only a visible foreground passes
+     *   true; background registrations (`onNewToken`, token retry, process start) pass false so a
+     *   process woken by the promo itself does not count as the user reacting to it.
      * @return Result.success(Unit) on a successful server write.
      *
      * Default no-op success keeps commonTest fakes compiling (only the real impl hits the network).
@@ -93,6 +96,24 @@ interface UserApiService {
         platform: String,
         pushHoldout: Boolean,
         fcmOptIn: Boolean,
+        markActive: Boolean,
+    ): Result<Unit> = Result.success(Unit)
+
+    /**
+     * Activity-only heartbeat: refresh `lastActiveAt` on `users/{userId}` WITHOUT a push token,
+     * through the same CF `register_push_token` (body sent with `fcm_token: null`). The server
+     * merges ONLY `lastActiveAt` and leaves `fcmToken` / `pushHoldout` / `fcmOptIn` / `platform`
+     * untouched, so this can never clobber a token another install of the same user registered.
+     *
+     * For a device whose FCM token fetch fails (`FIS_AUTH_ERROR`): without it the promo sender
+     * would treat an active user as dormant. Always `mark_active = true`, so call it only from a
+     * visible foreground.
+     *
+     * Default no-op success keeps commonTest fakes compiling (only the real impl hits the network).
+     */
+    suspend fun markUserActive(
+        userId: String,
+        platform: String,
     ): Result<Unit> = Result.success(Unit)
 }
 
@@ -118,15 +139,9 @@ class UserApiServiceImpl(
         private const val DEFAULT_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
     }
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-    }
-
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
-            json(json)
+            json(userApiJson)
         }
         install(HttpTimeout) {
             requestTimeoutMillis = 60_000 // 1 minute for user operations
@@ -246,38 +261,84 @@ class UserApiServiceImpl(
         platform: String,
         pushHoldout: Boolean,
         fcmOptIn: Boolean,
+        markActive: Boolean,
     ): Result<Unit> = runCatching {
-        logger.debug(TAG, "registerPushToken: userId=${userId.take(8)}..., platform=$platform, holdout=$pushHoldout")
+        logger.debug(
+            TAG,
+            "registerPushToken: userId=${userId.take(8)}..., platform=$platform, holdout=$pushHoldout, markActive=$markActive",
+        )
+        postRegisterPushToken(
+            op = "registerPushToken",
+            request = buildRegisterPushTokenRequest(userId, token, platform, markActive, pushHoldout, fcmOptIn),
+        )
+    }
 
+    override suspend fun markUserActive(
+        userId: String,
+        platform: String,
+    ): Result<Unit> = runCatching {
+        logger.debug(TAG, "markUserActive: userId=${userId.take(8)}..., platform=$platform")
+        postRegisterPushToken(
+            op = "markUserActive",
+            request = buildRegisterPushTokenRequest(userId, token = null, platform = platform, markActive = true),
+        )
+    }
+
+    private suspend fun postRegisterPushToken(op: String, request: RegisterPushTokenRequest) {
         val response: HttpResponse = httpClient.post("$baseUrl/register_push_token") {
             contentType(ContentType.Application.Json)
-            setBody(
-                RegisterPushTokenRequest(
-                    userId = userId,
-                    fcmToken = token,
-                    platform = platform,
-                    pushHoldout = pushHoldout,
-                    fcmOptIn = fcmOptIn,
-                )
-            )
+            setBody(request)
         }
 
         // Same non-2xx guard as registerUser: avoid NoTransformationFoundException
         // (crashes ddc8be1f) when the error body isn't JSON.
         if (!response.status.isSuccess()) {
             val raw = runCatching { response.bodyAsText() }.getOrNull()?.take(200)
-            logger.warning(TAG, "registerPushToken: HTTP ${response.status.value}, body=$raw")
+            logger.warning(TAG, "$op: HTTP ${response.status.value}, body=$raw")
             throw Exception("register_push_token failed: HTTP ${response.status.value}")
         }
         val responseBody = response.body<RegisterPushTokenResponseDto>()
         if (responseBody.success) {
-            logger.debug(TAG, "registerPushToken: SUCCESS")
+            logger.debug(TAG, "$op: SUCCESS, token_registered=${responseBody.tokenRegistered}")
         } else {
-            logger.error(TAG, "registerPushToken: FAILED - ${responseBody.error}")
+            logger.error(TAG, "$op: FAILED - ${responseBody.error}")
             throw Exception(responseBody.error ?: "Failed to register push token")
         }
     }
 }
+
+/** Wire config of every UserApiService request; internal so tests encode bodies exactly as sent. */
+internal val userApiJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    encodeDefaults = true
+}
+
+/**
+ * Body of CF `register_push_token`. A null [token] is the activity-only heartbeat: the server
+ * writes only `lastActiveAt`. The holdout / opt-in flags are then forced to `false` rather than
+ * null — the server ignores them on that path, but its validator still rejects a non-boolean
+ * value, and the shared Json config (`encodeDefaults = true`) would send a null as `null`.
+ *
+ * [markActive] is `mark_active` (server default true): only a visible foreground passes true. A
+ * null [token] always sends true — the activity-only write has nothing else to do, and false there
+ * would be a request that writes nothing.
+ */
+internal fun buildRegisterPushTokenRequest(
+    userId: String,
+    token: String?,
+    platform: String,
+    markActive: Boolean,
+    pushHoldout: Boolean = false,
+    fcmOptIn: Boolean = false,
+): RegisterPushTokenRequest = RegisterPushTokenRequest(
+    userId = userId,
+    fcmToken = token,
+    platform = platform,
+    pushHoldout = token != null && pushHoldout,
+    fcmOptIn = token != null && fcmOptIn,
+    markActive = token == null || markActive,
+)
 
 @Serializable
 private data class RegisterUserRequest(
@@ -330,16 +391,21 @@ private data class LinkGoogleAccountResponseDto(
 )
 
 @Serializable
-private data class RegisterPushTokenRequest(
+internal data class RegisterPushTokenRequest(
     @SerialName("user_id") val userId: String,
-    @SerialName("fcm_token") val fcmToken: String,
+    /** null = activity-only heartbeat (server writes only `lastActiveAt`). */
+    @SerialName("fcm_token") val fcmToken: String?,
     val platform: String,
     @SerialName("push_holdout") val pushHoldout: Boolean,
     @SerialName("fcm_opt_in") val fcmOptIn: Boolean,
+    /** false = register the token without moving `lastActiveAt` (background callers). */
+    @SerialName("mark_active") val markActive: Boolean,
 )
 
 @Serializable
 private data class RegisterPushTokenResponseDto(
     val success: Boolean,
     val error: String? = null,
+    /** false on the activity-only path; absent from servers older than the token-less contract. */
+    @SerialName("token_registered") val tokenRegistered: Boolean? = null,
 )

@@ -24,12 +24,14 @@ no delete intent; `push_received` fired with notifications off.
 ## Решение
 
 - `PushTokenRetryWorker` + `PushTokenRetryPolicy`: unique work `push_token_retry`, `KEEP`,
-  `NetworkType.CONNECTED`, exponential backoff, `MAX_ATTEMPTS` runs; on success the token registers by
-  the existing path. A failure logs a warning; `AppLogger.error` fires once, on exhaustion. `KEEP` does not dedupe a finished chain,
-  so exhaustion is stored in `AppDatastore` and `shouldStartChain` holds new chains for
-  `COOLDOWN_AFTER_EXHAUSTION_MS`; the start goes through `PushTokenRetryWorker.enqueueIfDue`.
-- WorkManager is built only on the failure branch, inside `runCatching`: the startup initializer
-  stays removed (`AppStartupWorkManagerTest`).
+  `NetworkType.CONNECTED`, exponential backoff, `MAX_ATTEMPTS` runs. `AppLogger.error` fires once, on
+  exhaustion; the exhaustion time in `AppDatastore` holds new chains for `COOLDOWN_AFTER_EXHAUSTION_MS`
+  (`PushTokenRetryWorker.enqueueIfDue`).
+- Without a token, the foreground sends `UserApiService.markUserActive` (`fcm_token: null`).
+- `lastActiveAt` moves only from `MainActivity.onResume` (`touchLastActive`, throttled by
+  `PushActivityPolicy`); process start, `onNewToken` and the worker send `mark_active: false` — the
+  promo's own delivery wakes the process.
+- WorkManager is built only on the failure branch (`AppStartupWorkManagerTest`).
 - `RetentionPushReceiver.showRetentionPush` sets a delete intent to the existing
   `PushDismissReceiver` with the same `push_type`; IDs and channels unchanged.
 - `PushDisplayability` computes `notifications_enabled` (app toggle and channel importance) for
@@ -39,8 +41,7 @@ no delete intent; `push_received` fired with notifications off.
 
 `KEEP`, not `REPLACE`: an affected device fails on every launch, and `REPLACE` would reset the
 backoff to attempt zero forever. The stored token is not resent — the server clears it on
-`UNREGISTERED`, and a resend would revive a dead token. Writing `lastActiveAt` without a token
-needs a server change (`register_push_token` rejects a request without `fcm_token`), left to the owner.
+`UNREGISTERED`, and a resend would revive a dead token.
 
 ## Связанные файлы
 

@@ -22,10 +22,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Retries the FCM token fetch that failed on app start, then registers the token through the
- * SAME path as `onNewToken` and app start ([PushTokenRepository.registerToken] -> CF
- * `register_push_token`), which also refreshes `lastActiveAt` server-side.
+ * SAME path as `onNewToken` ([PushTokenRepository.registerToken] -> CF `register_push_token`) with
+ * `mark_active = false`: the worker runs in the background, so it must not move `lastActiveAt`.
  *
- * Enqueued only from the failure branch of `PushTokenRepositoryAndroid.touchLastActive` (via
+ * Enqueued only from the token-fetch failure branch of `PushTokenRepositoryAndroid` (via
  * [enqueueIfDue], which honours the post-exhaustion cooldown) — never on
  * the healthy start path, so WorkManager is not built on every cold start (see the
  * `WorkManagerInitializer` removal in the androidApp manifest: a ROM without
@@ -67,7 +67,8 @@ class PushTokenRetryWorker(
         val token = fetch.getOrNull()
         if (!token.isNullOrBlank()) {
             logger?.info(TAG, "retry worker: FCM token obtained on attempt $attempt — registering")
-            repository.registerToken(token)
+            // A background worker run is not the user opening the app: no lastActiveAt write.
+            repository.registerToken(token, markActive = false)
             return Result.success()
         }
 

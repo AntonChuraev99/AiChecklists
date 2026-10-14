@@ -56,6 +56,178 @@ class TestEligibility:
 
 
 # --------------------------------------------------------------------------
+# Stop rule — MAX_PROMOS_WITHOUT_ACTIVITY promos with no reaction → stop
+# --------------------------------------------------------------------------
+def _silent(count, sent_hours_ago=80, active_days_ago=10):
+    """A user who went silent `active_days_ago` and has `count` promos since then."""
+    return {
+        **BASE,
+        "lastActiveAt": NOW - timedelta(days=active_days_ago),
+        "lastPromoSentAt": NOW - timedelta(hours=sent_hours_ago),
+        p.PROMOS_SINCE_ACTIVE_FIELD: count,
+    }
+
+
+class TestStopRule:
+    def test_constant_is_three(self):
+        assert p.MAX_PROMOS_WITHOUT_ACTIVITY == 3
+
+    def test_two_unanswered_promos_still_eligible(self):
+        assert p.is_eligible_for_promo(_silent(2), NOW, 72) == (True, "")
+
+    def test_third_unanswered_promo_stops(self):
+        assert p.is_eligible_for_promo(_silent(3), NOW, 72) == (False, "no_reaction_stop")
+
+    def test_more_than_limit_stays_stopped(self):
+        assert p.is_eligible_for_promo(_silent(7), NOW, 72) == (False, "no_reaction_stop")
+
+    def test_activity_after_last_send_resets_counter(self):
+        # User opened the app 1h after the last promo → the stored 3 no longer counts.
+        ud = _silent(3, sent_hours_ago=80)
+        ud["lastActiveAt"] = NOW - timedelta(hours=79)
+        assert p.promos_since_activity(ud) == 0
+        assert p.is_eligible_for_promo(ud, NOW, 72) == (True, "")
+
+    def test_activity_before_last_send_keeps_counter(self):
+        ud = _silent(3, sent_hours_ago=80)
+        ud["lastActiveAt"] = NOW - timedelta(hours=81)
+        assert p.promos_since_activity(ud) == 3
+
+    def test_missing_counter_reads_zero(self):
+        ud = _silent(0)
+        del ud[p.PROMOS_SINCE_ACTIVE_FIELD]
+        assert p.promos_since_activity(ud) == 0
+
+    def test_counter_without_any_send_reads_zero(self):
+        ud = {**BASE, p.PROMOS_SINCE_ACTIVE_FIELD: 5}
+        assert p.promos_since_activity(ud) == 0
+
+    def test_malformed_counter_reads_zero(self):
+        for bad in ("3", None, -1, True):
+            ud = _silent(0)
+            ud[p.PROMOS_SINCE_ACTIVE_FIELD] = bad
+            assert p.promos_since_activity(ud) == 0, bad
+
+    def test_iso_string_timestamps_supported(self):
+        ud = {**BASE, "lastActiveAt": "2026-06-20T00:00:00Z",
+              "lastPromoSentAt": "2026-06-29T00:00:00Z", p.PROMOS_SINCE_ACTIVE_FIELD: 3}
+        assert p.is_eligible_for_promo(ud, NOW, 72) == (False, "no_reaction_stop")
+
+    def test_stop_reported_before_frequency_cap(self):
+        ud = _silent(3, sent_hours_ago=2)
+        assert p.is_eligible_for_promo(ud, NOW, 72) == (False, "no_reaction_stop")
+
+    def test_premium_reported_before_stop(self):
+        ud = {**_silent(3), "is_premium": True}
+        assert p.is_eligible_for_promo(ud, NOW, 72) == (False, "premium")
+
+    def test_limit_is_a_parameter(self):
+        assert p.is_eligible_for_promo(_silent(3), NOW, 72, max_promos_without_activity=5) \
+            == (True, "")
+
+
+# --------------------------------------------------------------------------
+# resolve_inactivity_window — dormancy window 3..14 by default
+# --------------------------------------------------------------------------
+class TestInactivityWindow:
+    def test_defaults_when_absent(self):
+        assert p.resolve_inactivity_window({}) == (3, 14)
+
+    def test_scheduler_body_gets_upper_bound(self):
+        # Exactly what gisti-daily-reengagement-push sends today (no max_inactive_days).
+        body = {"push_type": "reengagement", "min_inactive_days": 3,
+                "promo_cooldown_hours": 72}
+        assert p.resolve_inactivity_window(body) == (3, 14)
+
+    def test_explicit_null_means_unbounded(self):
+        assert p.resolve_inactivity_window({"max_inactive_days": None}) == (3, None)
+
+    def test_explicit_window_respected(self):
+        assert p.resolve_inactivity_window(
+            {"min_inactive_days": 14, "max_inactive_days": 30}) == (14, 30)
+
+    def test_string_numbers_accepted(self):
+        assert p.resolve_inactivity_window(
+            {"min_inactive_days": "3", "max_inactive_days": "7"}) == (3, 7)
+
+    def test_empty_window_rejected(self):
+        import pytest
+        with pytest.raises(ValueError):
+            p.resolve_inactivity_window({"min_inactive_days": 14, "max_inactive_days": 14})
+
+    def test_min_above_default_max_never_400_when_max_absent(self):
+        # The default must never produce an error by itself: an explicit min beyond the
+        # reengagement default leaves the window unbounded instead of an empty one.
+        assert p.resolve_inactivity_window({"min_inactive_days": 20}) == (20, None)
+        assert p.resolve_inactivity_window(
+            {"min_inactive_days": 14}, "reengagement") == (14, None)
+
+    def test_non_integer_rejected(self):
+        import pytest
+        with pytest.raises(ValueError):
+            p.resolve_inactivity_window({"max_inactive_days": "abc"})
+
+    def test_reengagement_gets_default_max(self):
+        assert p.resolve_inactivity_window({}, "reengagement") == (3, 14)
+
+    def test_other_push_types_have_no_default_max(self):
+        for push_type in sorted(p.PROMO_PUSH_TYPES - {"reengagement"}):
+            assert p.resolve_inactivity_window({}, push_type) == (3, None), push_type
+
+    def test_winback_min_14_without_max_still_works(self):
+        # Worked before the dormancy bound existed; must not become a 400.
+        assert p.resolve_inactivity_window(
+            {"push_type": "winback", "min_inactive_days": 14}, "winback") == (14, None)
+
+    def test_release_without_max_is_unbounded(self):
+        assert p.resolve_inactivity_window({"push_type": "release"}, "release") == (3, None)
+
+    def test_explicit_empty_window_rejected_for_any_type(self):
+        import pytest
+        for push_type in ("reengagement", "winback", "release"):
+            with pytest.raises(ValueError):
+                p.resolve_inactivity_window(
+                    {"min_inactive_days": 30, "max_inactive_days": 14}, push_type)
+
+    def test_explicit_window_respected_for_other_types(self):
+        assert p.resolve_inactivity_window(
+            {"min_inactive_days": 14, "max_inactive_days": 30}, "winback") == (14, 30)
+
+
+# --------------------------------------------------------------------------
+# Reengagement-only scope of the stop rule + counter
+# --------------------------------------------------------------------------
+class TestReengagementScope:
+    def test_stop_rule_applies_to_reengagement(self):
+        assert p.is_eligible_for_promo(_silent(3), NOW, 72, push_type="reengagement") \
+            == (False, "no_reaction_stop")
+
+    def test_stop_rule_ignored_for_other_push_types(self):
+        for push_type in sorted(p.PROMO_PUSH_TYPES - {"reengagement"}):
+            assert p.is_eligible_for_promo(_silent(5), NOW, 72, push_type=push_type) \
+                == (True, ""), push_type
+
+    def test_other_push_types_still_frequency_capped(self):
+        ud = _silent(5, sent_hours_ago=2)
+        assert p.is_eligible_for_promo(ud, NOW, 72, push_type="release") \
+            == (False, "frequency_capped")
+
+    def test_reengagement_send_bumps_counter(self):
+        fields = p.promo_sent_fields("reengagement", "c1", 2, "TS")
+        assert fields == {"lastPromoSentAt": "TS", "lastPromoCampaignId": "c1",
+                          p.PROMOS_SINCE_ACTIVE_FIELD: 3}
+
+    def test_other_send_does_not_touch_counter(self):
+        for push_type in sorted(p.PROMO_PUSH_TYPES - {"reengagement"}):
+            fields = p.promo_sent_fields(push_type, "c1", 2, "TS")
+            assert fields == {"lastPromoSentAt": "TS", "lastPromoCampaignId": "c1"}, push_type
+
+    def test_constant_matches_scheduler_type(self):
+        assert p.REENGAGEMENT_PUSH_TYPE == "reengagement"
+        assert p.REENGAGEMENT_PUSH_TYPE in p.PROMO_PUSH_TYPES
+
+
+# --------------------------------------------------------------------------
 # to_aware_datetime
 # --------------------------------------------------------------------------
 class TestToAwareDatetime:
