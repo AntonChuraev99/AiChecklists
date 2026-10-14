@@ -904,12 +904,6 @@ class ToolCallDispatcherImpl(
     // ─── Activation funnel ────────────────────────────────────────────────────
 
     /**
-     * Notifies the [ActivationCoordinator] that an AI-path checklist was created. The coordinator
-     * owns the new-user / show-once gating, so this is a fire-and-forget hand-off from every create
-     * path. Reads the `activation_bundle_v1` RC flag here (fetch-failure default OFF, same as the RC template — see
-     * [RemoteConfigKeys.ACTIVATION_BUNDLE_V1]); never wrapped in a timeout.
-     */
-    /**
      * The single post-create hook for every checklist this dispatcher persists.
      *
      * Analytics + the activation funnel are folded into ONE call on purpose: they used to be two
@@ -938,11 +932,7 @@ class ToolCallDispatcherImpl(
     }
 
     private suspend fun notifyActivation(checklistId: Long) {
-        val activationEnabled = remoteConfigProvider.getBoolean(
-            RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
-            RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
-        )
-        activationCoordinator.onAiChecklistCreated(checklistId, activationEnabled)
+        activationCoordinator.onAiChecklistCreated(checklistId)
     }
 
     // ─── Resolution helpers ───────────────────────────────────────────────────

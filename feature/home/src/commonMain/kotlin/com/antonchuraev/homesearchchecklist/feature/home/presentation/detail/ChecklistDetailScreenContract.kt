@@ -200,6 +200,10 @@ sealed interface ChecklistDetailState : State {
         // that has no repeat schedule yet. Accept → sets a default weekly repeat via the existing
         // repeat-schedule path; dismiss → hides it. See ChecklistDetailViewModel.maybeShowRecurringNudge.
         val showRecurringNudge: Boolean = false,
+        // ── Retention: notifications-off banner (Android only) ──
+        // null = hidden. Non-null = draw NotificationsOffBanner above the items. The banner has
+        // priority over the recurring nudge: the VM never sets both (see refreshNotificationsBanner).
+        val notificationsBanner: NotificationsBannerUi? = null,
         // Per-item reminder sheet: null = closed; non-null = open for that itemId
         val itemReminderSheetFor: String? = null,
         val activeItemReminderTab: ReminderTab = ReminderTab.ONCE,
@@ -388,7 +392,28 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnReminderTabSelected(val tab: ReminderTab) : ChecklistDetailIntent
 
     // Notification permission
-    data class OnNotificationPermissionResult(val granted: Boolean) : ChecklistDetailIntent
+    /** Result of the reminder-flow permission sheet ask. [permanentlyDenied] feeds analytics only. */
+    data class OnNotificationPermissionResult(
+        val granted: Boolean,
+        val permanentlyDenied: Boolean = false,
+        /**
+         * The ask never reached the OS: app settings were opened instead. Resolves the sheet like a
+         * denial but sends NO `notification_permission_result` (nothing was requested — F5b).
+         */
+        val settingsHandoff: Boolean = false,
+    ) : ChecklistDetailIntent
+    /** The reminder-flow permission sheet launched the system dialog (analytics). */
+    data object OnNotificationPermissionRequested : ChecklistDetailIntent
+
+    // ── Notifications-off banner ──
+    /** ON_RESUME: re-read notification state. [settingsRequired] = controller.nextAction() == Settings. */
+    data class OnNotificationsStatusCheck(val settingsRequired: Boolean) : ChecklistDetailIntent
+    /** Banner CTA tapped; [action] = what NotificationPermissionController.request() did. */
+    data class OnNotificationsBannerCta(val action: NotificationPermissionAction) : ChecklistDetailIntent
+    /** System-dialog answer for an ask started from the banner. */
+    data class OnNotificationsBannerPermissionResult(val result: NotificationPermissionResult) : ChecklistDetailIntent
+    /** Banner x tapped. */
+    data object OnNotificationsBannerDismiss : ChecklistDetailIntent
     data object OnNotificationPermissionSkip : ChecklistDetailIntent
     data object OnDismissNotificationPermissionSheet : ChecklistDetailIntent
 
@@ -577,3 +602,15 @@ sealed interface ChecklistDetailIntent : Intent {
     /** Export a single item's reminder/repeat to the device calendar. */
     data class OnAddItemToCalendar(val itemId: String) : ChecklistDetailIntent
 }
+
+/**
+ * What the notifications-off banner shows. The UI picks copy from these two flags:
+ * [reminderVariant] -> notif_banner_title_reminder / notif_banner_body_reminder;
+ * [settingsRequired] -> body notif_banner_body_settings + CTA notif_cta_settings.
+ */
+data class NotificationsBannerUi(
+    /** The checklist has a one-shot reminder or a repeat rule ("your reminder won't ring"). */
+    val reminderVariant: Boolean,
+    /** The system dialog can no longer appear: CTA opens app notification settings. */
+    val settingsRequired: Boolean,
+)

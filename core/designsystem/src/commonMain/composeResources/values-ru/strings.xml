@@ -1647,4 +1647,25 @@
     <string name="due_rail_repeat_replaced">Повтор снят — у задачи может быть либо повтор, либо одна дата</string>
     <string name="due_planner_repeat_off">Выкл.</string>
     <string name="due_planner_done">Готово</string>
+    <!-- Notifications-off banner + activation reminder sheet (2026-10-14) -->
+    <string name="notif_banner_title">Уведомления выключены</string>
+    <string name="notif_banner_title_reminder">Напоминание не придёт</string>
+    <string name="notif_banner_body">Включите, чтобы не пропускать напоминания.</string>
+    <string name="notif_banner_body_reminder">Включите уведомления, чтобы оно пришло вовремя.</string>
+    <string name="notif_banner_body_settings">Разрешите уведомления для Gisti в настройках.</string>
+    <string name="notif_banner_cta">Включить</string>
+    <string name="notif_cta_settings">Открыть настройки</string>
+    <string name="notif_banner_dismiss">Скрыть подсказку об уведомлениях</string>
+    <string name="notif_granted_snackbar">Уведомления включены. Напоминания придут вовремя.</string>
+    <string name="activation_sheet_title">Напомнить про этот список?</string>
+    <string name="activation_sheet_body">Выберите время — его можно поменять потом.</string>
+    <string name="activation_sheet_today">Сегодня, %1$s</string>
+    <string name="activation_sheet_tomorrow">Завтра, %1$s</string>
+    <string name="activation_sheet_cta">Напомнить</string>
+    <string name="activation_sheet_caption_permission">Дальше разрешите уведомления — иначе напоминание не придёт.</string>
+    <string name="activation_sheet_reminder_set">Напоминание на %1$s</string>
+    <string name="activation_sheet_title_task">Напомнить про эту задачу?</string>
+    <string name="activation_sheet_today_lower">сегодня, %1$s</string>
+    <string name="activation_sheet_tomorrow_lower">завтра, %1$s</string>
+    <string name="activation_sheet_reminder_failed">Не удалось поставить напоминание. Поставьте его из списка.</string>
 </resources>

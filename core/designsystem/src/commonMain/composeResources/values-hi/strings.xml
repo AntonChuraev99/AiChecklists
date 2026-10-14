@@ -223,7 +223,7 @@
     <string name="main_create_with_ai_action">AI से बनाएं</string>
     <string name="main_create_with_ai_prefill">इसके लिए चेकलिस्ट बनाएं: </string>
     <string name="main_prompt_plan_day_query">आज मुझे क्या करना चाहिए?</string>
-    <!-- Activation hero (new-user first run, RC flag activation_bundle_v1) -->
+    <!-- Activation hero (new-user first run; unconditional since 2026-10-14) -->
     <string name="activation_hero_title">मैं आपको क्या व्यवस्थित करने में मदद करूं?</string>
     <string name="activation_hero_subtitle">कुछ भी बताएं और मैं आपके लिए चेकलिस्ट बना दूंगा। या इनमें से किसी एक से शुरू करें:</string>
     <string name="activation_hero_input_placeholder">कुछ भी बताएं — मैं चेकलिस्ट बना दूंगा</string>
@@ -1794,4 +1794,25 @@
     <string name="due_rail_repeat_replaced">दोहराव हटा दिया गया — टास्क में या तो दोहराव होगा या एक तारीख</string>
     <string name="due_planner_repeat_off">बंद</string>
     <string name="due_planner_done">हो गया</string>
+    <!-- Notifications-off banner + activation reminder sheet (2026-10-14) -->
+    <string name="notif_banner_title">सूचनाएं बंद हैं</string>
+    <string name="notif_banner_title_reminder">आपका रिमाइंडर नहीं बजेगा</string>
+    <string name="notif_banner_body">इन्हें चालू करें ताकि कोई रिमाइंडर न छूटे।</string>
+    <string name="notif_banner_body_reminder">इसे समय पर पाने के लिए सूचनाएं चालू करें।</string>
+    <string name="notif_banner_body_settings">सेटिंग्स में Gisti के लिए सूचनाएं चालू करें।</string>
+    <string name="notif_banner_cta">चालू करें</string>
+    <string name="notif_cta_settings">सेटिंग्स खोलें</string>
+    <string name="notif_banner_dismiss">सूचना सुझाव छिपाएं</string>
+    <string name="notif_granted_snackbar">सूचनाएं चालू हैं। रिमाइंडर समय पर आएंगे।</string>
+    <string name="activation_sheet_title">इस सूची के बारे में याद दिलाएं?</string>
+    <string name="activation_sheet_body">समय चुनें। आप इसे बाद में बदल सकते हैं।</string>
+    <string name="activation_sheet_today">आज, %1$s</string>
+    <string name="activation_sheet_tomorrow">कल, %1$s</string>
+    <string name="activation_sheet_cta">याद दिलाएं</string>
+    <string name="activation_sheet_caption_permission">आगे सूचनाएं चालू करें, वरना रिमाइंडर नहीं आएगा।</string>
+    <string name="activation_sheet_reminder_set">रिमाइंडर %1$s के लिए सेट है</string>
+    <string name="activation_sheet_title_task">इस काम के बारे में याद दिलाएं?</string>
+    <string name="activation_sheet_today_lower">आज, %1$s</string>
+    <string name="activation_sheet_tomorrow_lower">कल, %1$s</string>
+    <string name="activation_sheet_reminder_failed">रिमाइंडर सेट नहीं हो सका। सूची से सेट करें।</string>
 </resources>

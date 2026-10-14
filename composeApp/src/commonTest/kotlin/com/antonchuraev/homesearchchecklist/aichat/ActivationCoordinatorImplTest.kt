@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.aichat
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.ReminderTarget
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
@@ -45,9 +46,9 @@ class ActivationCoordinatorImplTest {
         val sut = coordinator(prefs, analytics)
 
         // First creation: pending → fires the event and consumes the pending flag.
-        sut.onAiChecklistCreated(checklistId = 10L, activationBundleEnabled = true)
+        sut.onAiChecklistCreated(checklistId = 10L)
         // Second creation: no longer pending → must NOT fire again.
-        sut.onAiChecklistCreated(checklistId = 11L, activationBundleEnabled = true)
+        sut.onAiChecklistCreated(checklistId = 11L)
         advanceUntilIdle()
 
         val firstAiEvents = analytics.events.count {
@@ -63,7 +64,7 @@ class ActivationCoordinatorImplTest {
         val analytics = RecordingAnalytics()
         val sut = coordinator(prefs, analytics)
 
-        sut.onAiChecklistCreated(checklistId = 10L, activationBundleEnabled = true)
+        sut.onAiChecklistCreated(checklistId = 10L)
         advanceUntilIdle()
 
         assertTrue(
@@ -72,44 +73,178 @@ class ActivationCoordinatorImplTest {
         )
     }
 
+    // The former `onAiChecklistCreated_eventFiresInBothArms_butReminderOnlyInTreatment` pinned the
+    // OFF arm of `activation_bundle_v1` (no reminder request). The flag and that arm were deleted on
+    // 2026-10-14, so its ON half lives on below and the OFF half has no code left to guard.
+
     @Test
-    fun onAiChecklistCreated_eventFiresInBothArms_butReminderOnlyInTreatment() = runTest {
-        // Control arm (flag OFF): event still fires (so the A/B can compare), but no reminder request.
-        val prefsOff = FakeActivationPrefs(pending = setOf("uid-1"))
-        val analyticsOff = RecordingAnalytics()
-        val sutOff = coordinator(prefsOff, analyticsOff)
+    fun onAiChecklistCreated_pendingNewUser_requestsReminderOptInForThatChecklist() = runTest {
+        val sut = coordinator(FakeActivationPrefs(pending = setOf("uid-1")), RecordingAnalytics())
 
-        val collectedOff = mutableListOf<Long>()
-        val jobOff = launch { sutOff.reminderOptInRequests.toList(collectedOff) }
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
         advanceUntilIdle()
-        sutOff.onAiChecklistCreated(checklistId = 10L, activationBundleEnabled = false)
+        sut.onAiChecklistCreated(checklistId = 42L)
         advanceUntilIdle()
-        jobOff.cancel()
+        job.cancel()
 
+        assertEquals(listOf(42L), collected, "the first AI checklist must request the reminder opt-in")
+    }
+
+    @Test
+    fun onUserChecklistCreated_firstManualChecklist_requestsSheet_butKeepsFirstAiEventForLater() = runTest {
+        val prefs = FakeActivationPrefs(pending = setOf("uid-1"))
+        val analytics = RecordingAnalytics()
+        val sut = coordinator(prefs, analytics)
+
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
+        advanceUntilIdle()
+        sut.onUserChecklistCreated(checklistId = 5L)
+        advanceUntilIdle()
+        sut.reportReminderOptInOutcome(granted = false)
+        sut.onAiChecklistCreated(checklistId = 6L)
+        advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(listOf(5L), collected, "sheet once, for the first (manual) checklist only")
         assertEquals(
             1,
-            analyticsOff.events.count { it.first == AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED },
-            // NB this asserts the coordinator only. Until 2026-07-26 it held here but NOT in
-            // production, because the new-user-pending marker was set exclusively in the treatment
-            // branch, so a control user never reached this call. The marker is now set for both
-            // arms (SplashViewModel.applyFirstChecklistExperiment) — SplashViewModelTest covers it.
-            "FIRST_AI_CHECKLIST_CREATED must fire in the control arm too",
+            analytics.events.count { it.first == AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED },
+            "a manual first checklist must not swallow the later first-AI event",
         )
-        assertTrue(collectedOff.isEmpty(), "control arm (flag OFF) must NOT request the reminder opt-in")
+    }
 
-        // Treatment arm (flag ON): event fires AND a reminder opt-in is requested for the checklist.
-        val prefsOn = FakeActivationPrefs(pending = setOf("uid-1"))
-        val analyticsOn = RecordingAnalytics()
-        val sutOn = coordinator(prefsOn, analyticsOn)
+    @Test
+    fun onUserChecklistCreated_twiceBeforeOutcome_requestsSheetOnce() = runTest {
+        val sut = coordinator(FakeActivationPrefs(pending = setOf("uid-1")), RecordingAnalytics())
 
-        val collectedOn = mutableListOf<Long>()
-        val jobOn = launch { sutOn.reminderOptInRequests.toList(collectedOn) }
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
         advanceUntilIdle()
-        sutOn.onAiChecklistCreated(checklistId = 42L, activationBundleEnabled = true)
+        sut.onUserChecklistCreated(checklistId = 1L)
+        sut.onUserChecklistCreated(checklistId = 2L)
         advanceUntilIdle()
-        jobOn.cancel()
+        job.cancel()
 
-        assertEquals(listOf(42L), collectedOn, "treatment arm must request the reminder opt-in for the new checklist")
+        assertEquals(listOf(1L), collected, "a double create must not queue a second sheet")
+    }
+
+    @Test
+    fun reminderOptInPending_setOnRequest_clearedOnOutcome() = runTest {
+        val sut = coordinator(FakeActivationPrefs(pending = setOf("uid-1")), RecordingAnalytics())
+        assertEquals(null, sut.reminderOptInTarget.value)
+
+        sut.onUserChecklistCreated(checklistId = 9L)
+        assertEquals(ReminderTarget.Checklist(9L), sut.reminderOptInTarget.value, "pending while the sheet is up")
+
+        sut.reportReminderOptInOutcome(granted = false)
+        assertEquals(null, sut.reminderOptInTarget.value, "cleared once resolved")
+    }
+
+    private val task = ReminderTarget.Item(checklistId = 3L, fillId = 30L, itemId = "item-1", text = "Buy milk")
+
+    @Test
+    fun firstTaskBeforeAnyChecklist_winsTheSheet_andTargetsThatItem() = runTest {
+        val sut = coordinator(FakeActivationPrefs(pending = setOf("uid-1")), RecordingAnalytics())
+
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
+        advanceUntilIdle()
+        sut.onUserTaskCreated(task)
+        assertEquals(task, sut.reminderOptInTarget.value, "the sheet must remind about THAT task")
+        sut.reportReminderOptInOutcome(granted = true)
+        sut.onUserChecklistCreated(checklistId = 4L)
+        sut.onUserTaskCreated(task.copy(itemId = "item-2"))
+        advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(listOf(3L), collected, "once per install: the later checklist and task get nothing")
+    }
+
+    @Test
+    fun firstChecklistBeforeAnyTask_winsTheSheet_taskWhileSheetUpIsIgnored() = runTest {
+        val sut = coordinator(FakeActivationPrefs(pending = setOf("uid-1")), RecordingAnalytics())
+
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
+        advanceUntilIdle()
+        sut.onUserChecklistCreated(checklistId = 8L)
+        sut.onUserTaskCreated(task) // while the sheet is still up
+        advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(listOf(8L), collected)
+        assertEquals(ReminderTarget.Checklist(8L), sut.reminderOptInTarget.value, "the task must not retarget the open sheet")
+    }
+
+    @Test
+    fun platformWithoutSystemNotifications_noRequest_noOutcomeEvent_notMarkedShown() = runTest {
+        val prefs = FakeActivationPrefs(pending = setOf("uid-1"))
+        val analytics = RecordingAnalytics()
+        val sut = ActivationCoordinatorImpl(
+            activationPrefs = prefs,
+            userDataRepository = FakeUserDataRepository("uid-1"),
+            analytics = analytics,
+            logger = NoOpLogger(),
+            supportsSystemNotifications = { false },
+        )
+
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
+        advanceUntilIdle()
+        sut.onUserChecklistCreated(checklistId = 1L)
+        sut.onUserTaskCreated(task)
+        sut.cancelReminderOptIn() // the host's defensive clear must stay silent too
+        advanceUntilIdle()
+        job.cancel()
+
+        assertTrue(collected.isEmpty(), "web / iOS must never request the sheet")
+        assertEquals(null, sut.reminderOptInTarget.value)
+        assertTrue(
+            analytics.events.none { it.first == AnalyticsEvents.Activation.REMINDER_OPTIN },
+            "no activation_reminder_optin outcome for a user who never saw the sheet",
+        )
+        assertTrue("uid-1" !in prefs.shown, "not marked shown — the user never saw it")
+    }
+
+    @Test
+    fun restoreAfterProcessDeath_holdsTheLatch_andTheTarget() = runTest {
+        // Fresh coordinator (process restarted) + the UI restored the open sheet's target.
+        val sut = coordinator(FakeActivationPrefs(pending = setOf("uid-1")), RecordingAnalytics())
+        sut.restoreReminderOptIn(task)
+        assertEquals(task, sut.reminderOptInTarget.value, "banners stay suppressed under the restored sheet")
+
+        val collected = mutableListOf<Long>()
+        val job = launch { sut.reminderOptInRequests.toList(collected) }
+        advanceUntilIdle()
+        sut.onUserChecklistCreated(checklistId = 5L) // must not queue a second sheet
+        advanceUntilIdle()
+        job.cancel()
+        assertTrue(collected.isEmpty())
+
+        sut.reportReminderOptInOutcome(granted = true)
+        assertEquals(null, sut.reminderOptInTarget.value)
+    }
+
+    @Test
+    fun taskByReturningUser_neverRequestsSheet() = runTest {
+        val sut = coordinator(FakeActivationPrefs(pending = emptySet()), RecordingAnalytics())
+        sut.onUserTaskCreated(task)
+        assertEquals(null, sut.reminderOptInTarget.value)
+    }
+
+    @Test
+    fun decideActivationStep_matrix() {
+        // returning user: nothing on any path
+        assertEquals(ActivationStep(false, false), decideActivationStep(false, false, isAiPath = true))
+        assertEquals(ActivationStep(false, false), decideActivationStep(false, false, isAiPath = false))
+        // new user, sheet not shown yet
+        assertEquals(ActivationStep(true, true), decideActivationStep(true, false, isAiPath = true))
+        assertEquals(ActivationStep(false, true), decideActivationStep(true, false, isAiPath = false))
+        // new user, sheet already shown: only the AI event may still be pending
+        assertEquals(ActivationStep(true, false), decideActivationStep(true, true, isAiPath = true))
+        assertEquals(ActivationStep(false, false), decideActivationStep(true, true, isAiPath = false))
     }
 
     @Test
@@ -122,7 +257,7 @@ class ActivationCoordinatorImplTest {
         val collected = mutableListOf<Long>()
         val job = launch { sut.reminderOptInRequests.toList(collected) }
         advanceUntilIdle()
-        sut.onAiChecklistCreated(checklistId = 7L, activationBundleEnabled = true)
+        sut.onAiChecklistCreated(checklistId = 7L)
         advanceUntilIdle()
 
         sut.reportReminderOptInOutcome(granted = true)

@@ -280,55 +280,21 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKe
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
-import com.antonchuraev.homesearchchecklist.activation.ActivationReminderSheet
+import com.antonchuraev.homesearchchecklist.activation.ActivationReminderHost
+import com.antonchuraev.homesearchchecklist.activation.ReminderTargetSaver
+import com.antonchuraev.homesearchchecklist.core.common.api.ReminderTarget
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerSession
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.antonchuraev.homesearchchecklist.activation.WidgetPromoSheet
 import com.antonchuraev.homesearchchecklist.feature.onboarding.isWidgetSupported
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.context.GlobalContext
-
-/**
- * Default trigger time for the new-user activation reminder: TODAY at 20:00 local time, or — if it
- * is already past 20:00 — TOMORROW at 09:00 local time. Returns epoch millis. Kept top-level (pure)
- * + epoch-millis in/out so it is unit-testable without a Composable scope.
- */
-internal fun nextActivationReminderTrigger(
-    nowEpochMs: Long = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-    timeZone: TimeZone = TimeZone.currentSystemDefault(),
-): Long {
-    val now = Instant.fromEpochMilliseconds(nowEpochMs)
-    val nowLocal = now.toLocalDateTime(timeZone)
-    val todayEvening = LocalDateTime(
-        year = nowLocal.year,
-        monthNumber = nowLocal.monthNumber,
-        dayOfMonth = nowLocal.dayOfMonth,
-        hour = 20,
-        minute = 0,
-    )
-    val target = if (nowLocal < todayEvening) {
-        todayEvening
-    } else {
-        val tomorrow = now.plus(1, DateTimeUnit.DAY, timeZone).toLocalDateTime(timeZone)
-        LocalDateTime(
-            year = tomorrow.year,
-            monthNumber = tomorrow.monthNumber,
-            dayOfMonth = tomorrow.dayOfMonth,
-            hour = 9,
-            minute = 0,
-        )
-    }
-    return target.toInstant(timeZone).toEpochMilliseconds()
-}
 
 /**
  * Substitutes `%1$s`, `%2$s`, … placeholders with the given args (positional).
@@ -496,6 +462,7 @@ fun App() {
 
         var showWidgetInstruction by remember { mutableStateOf(false) }
         val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase = koinInject()
+        val weeklyActivationCoordinator: ActivationCoordinator = koinInject()
         val weeklyDefaultName = stringResource(Res.string.weekly_checklist_default_name)
         LaunchedEffect(Unit) {
             navigator.events.collect { event ->
@@ -507,8 +474,12 @@ fun App() {
                     }
                     AppNavEvent.CreateWeeklyChecklistRequested -> {
                         when (val result = createWeeklyChecklistUseCase(weeklyDefaultName)) {
-                            is CreateWeeklyChecklistUseCase.Result.Created ->
+                            is CreateWeeklyChecklistUseCase.Result.Created -> {
+                                // The user's own list (Update Feed "My Week" CTA) — same funnel hook
+                                // as TemplatesViewModel's weekly path.
+                                weeklyActivationCoordinator.onUserChecklistCreated(result.checklistId)
                                 navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                            }
                             CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->
                                 navigator.navigateToPaywall(source = "weekly_mode_limit")
                         }
@@ -792,17 +763,14 @@ fun App() {
                 }
             }
 
-            // ── New-user activation bundle (RC flag activation_bundle_v1) ──────────
-            // Resolved once per composition. Read AFTER SplashViewModel awaited fetchAndActivate(),
-            // so by the time MainScreen mounts the flag is fresh. Fetch-failure default OFF (= RC template).
-            val remoteConfigProvider: RemoteConfigProvider = koinInject()
-            val activationBundleEnabled = remember {
-                remoteConfigProvider.getBoolean(
-                    RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
-                    RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
-                )
-            }
+            // ── New-user activation bundle (unconditional since 2026-10-14; RC flag deleted) ──
             val activationAnalytics: AnalyticsTracker = koinInject()
+            // Session edges for the notifications-off banner: a new session starts after >= 30 min
+            // in the background (NotificationsBannerSession). Single activity → its START/STOP are
+            // the app's foreground/background.
+            val notificationsBannerSession: NotificationsBannerSession = koinInject()
+            LifecycleEventEffect(Lifecycle.Event.ON_START) { notificationsBannerSession.onForeground() }
+            LifecycleEventEffect(Lifecycle.Event.ON_STOP) { notificationsBannerSession.onBackground() }
 
             // Hero typed input / chip → the flagship "turn anything into a checklist with AI"
             // flow: route to the Analyze screen with the topic prefilled and autoAnalyze = true,
@@ -1936,9 +1904,8 @@ fun App() {
                                 // "Choose from template" button. Creation moved to the top of
                                 // the screen; the bottom is a clean chat dock.
                                 onCreateFromTemplatesClick = { navigator.navigateToCreateChecklistScreen() },
-                                // New-user activation hero (empty MainScreen, flag ON). Typed text +
-                                // template chips drive the AI create flow via the inline dock.
-                                activationEnabled = activationBundleEnabled,
+                                // New-user activation hero (empty MainScreen). Typed text + template
+                                // chips drive the AI create flow via the inline dock.
                                 onActivationGenerate = onActivationGenerate,
                                 onActivationChipTapped = onActivationChipTapped,
                                 // v2 only (0.dp in control): MainScreen runs contentExtendsBehindNavBar,
@@ -2625,48 +2592,35 @@ fun App() {
                 }
             }
 
-            // ── Activation reminder opt-in (RC flag activation_bundle_v1) ─────────
-            // The ActivationCoordinator (driven by the AI create paths — the chat tool-call
-            // dispatcher AND the Analyze result-preview VM for the hero flow) emits the id of the
-            // new user's FIRST AI checklist. We show a one-time soft-ask; on enable→grant we
-            // schedule a default reminder for this checklist; the coordinator records the outcome
+            // ── Activation reminder opt-in (unconditional since 2026-10-14) ──────
+            // The ActivationCoordinator (fed by EVERY user create path — AI chat / Analyze / preview
+            // / onboarding and the manual + template paths) emits the id of the new user's FIRST
+            // checklist. We show a one-time "remind me" sheet; the coordinator records the outcome
             // and marks it shown so it never reappears. Singleton coordinator — same instance the
             // create paths emit on.
             val activationCoordinator: ActivationCoordinator = koinInject()
             val checklistRepository: ChecklistRepository = koinInject()
-            val reminderScheduler: ChecklistReminderScheduler = koinInject()
-            var activationReminderChecklistId by rememberSaveable { mutableStateOf<Long?>(null) }
+            // The whole TARGET is saveable, not just the checklist id: after process death the
+            // coordinator's in-memory pending target is gone, and falling back to "the checklist" would
+            // put a task's reminder on the whole Inbox list. Restored into the coordinator so the
+            // banners stay suppressed under the restored sheet too.
+            var activationReminderTarget by rememberSaveable(stateSaver = ReminderTargetSaver) {
+                mutableStateOf<ReminderTarget?>(null)
+            }
             LaunchedEffect(Unit) {
+                activationReminderTarget?.let(activationCoordinator::restoreReminderOptIn)
                 activationCoordinator.reminderOptInRequests.collect { checklistId ->
-                    activationReminderChecklistId = checklistId
+                    activationReminderTarget = activationCoordinator.reminderOptInTarget.value
+                        ?: ReminderTarget.Checklist(checklistId)
                 }
             }
-            activationReminderChecklistId?.let { reminderChecklistId ->
-                ActivationReminderSheet(
-                    onEnableGranted = {
-                        val triggerAt = nextActivationReminderTrigger()
-                        scope.launch {
-                            runCatching {
-                                checklistRepository.setReminder(reminderChecklistId, triggerAt)
-                                reminderScheduler.scheduleReminder(reminderChecklistId, triggerAt)
-                            }.onFailure { e ->
-                                logger.error("Activation", "schedule activation reminder failed: ${e.message}", e)
-                            }
-                            activationCoordinator.reportReminderOptInOutcome(granted = true)
-                        }
-                        activationReminderChecklistId = null
-                    },
-                    onSkip = {
-                        scope.launch { activationCoordinator.reportReminderOptInOutcome(granted = false) }
-                        activationReminderChecklistId = null
-                    },
-                    onDismiss = {
-                        // Dismiss (scrim/back) counts as skip — never re-ask.
-                        scope.launch { activationCoordinator.reportReminderOptInOutcome(granted = false) }
-                        activationReminderChecklistId = null
-                    },
-                )
-            }
+            // Selection, permission ask, scheduling, snackbar and the outcome report live in the host.
+            ActivationReminderHost(
+                target = activationReminderTarget,
+                snackbarHostState = snackbarHostState,
+                scope = scope,
+                onClose = { activationReminderTarget = null },
+            )
 
             // ── Widget promo (retention) ─────────────────────────────────────────
             // Promotes the home-screen widget a DISTINCT beat after the user's SECOND checklist so it
@@ -2690,12 +2644,12 @@ fun App() {
                 val checklistCount = checklistRepository.projects.first().size
                 if (checklistCount < WIDGET_PROMO_MIN_CHECKLISTS) return@LaunchedEffect
                 // Never overlap the activation reminder soft-ask (which also drives the notif ask).
-                if (activationReminderChecklistId != null) return@LaunchedEffect
+                if (activationReminderTarget != null) return@LaunchedEffect
                 appDatastore.saveBoolean(WIDGET_PROMO_SHOWN_KEY, true)
                 widgetPromoAnalytics.event(AnalyticsEvents.Widget.PROMO_SHOWN)
                 showWidgetPromo = true
             }
-            if (showWidgetPromo && activationReminderChecklistId == null) {
+            if (showWidgetPromo && activationReminderTarget == null) {
                 WidgetPromoSheet(
                     onAddWidget = {
                         scope.launch { widgetPromoAnalytics.event(AnalyticsEvents.Widget.PROMO_ACCEPTED) }

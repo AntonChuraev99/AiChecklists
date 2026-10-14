@@ -240,6 +240,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.Remind
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.formatReminderDateTime
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.notif_granted_snackbar
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
@@ -338,8 +339,16 @@ fun ChecklistDetailScreen(
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.CHECKLIST_DETAIL) }
 
     // Detect return from exact alarm settings
+    // Notifications state is re-read on every resume (the user may come back from settings, or the
+    // system dialog just closed) — never cached. This controller only answers nextAction().
+    val statusPermission = rememberNotificationPermissionController { }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.handleReturnedFromSettings()
+        viewModel.sendIntent(
+            ChecklistDetailIntent.OnNotificationsStatusCheck(
+                settingsRequired = statusPermission.nextAction() == NotificationPermissionAction.Settings,
+            ),
+        )
     }
 
     val state by viewModel.screenState.collectAsStateWithLifecycle()
@@ -665,6 +674,7 @@ private fun ChecklistDetailContent(
     val folderReminderUnavailableMsg = stringResource(Res.string.folder_reminder_unavailable)
     val calendarAppNotFoundMsg = stringResource(Res.string.calendar_app_not_found)
     val recurringNudgeSetMsg = stringResource(Res.string.recurring_nudge_set_confirmation)
+    val notificationsOnMsg = stringResource(Res.string.notif_granted_snackbar)
     LaunchedEffect(state.snackbarMessage) {
         val message = state.snackbarMessage ?: return@LaunchedEffect
         val isSmartAddHint = message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT ||
@@ -681,6 +691,7 @@ private fun ChecklistDetailContent(
             ChecklistDetailViewModel.SNACKBAR_FOLDER_REMINDER_UNAVAILABLE -> folderReminderUnavailableMsg
             ChecklistDetailViewModel.SNACKBAR_CALENDAR_APP_NOT_FOUND -> calendarAppNotFoundMsg
             ChecklistDetailViewModel.SNACKBAR_RECURRING_NUDGE_SET -> recurringNudgeSetMsg
+            ChecklistDetailViewModel.SNACKBAR_NOTIFICATIONS_ON -> notificationsOnMsg
             else -> message
         }
         smartAddHintActive.value = isSmartAddHint
@@ -1490,6 +1501,22 @@ private fun ChecklistDetailContent(
                     // count it as header slot 0. Dropping it would send the FAB scroll and every
                     // drag-and-drop write one row off.
                     Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                        // Notifications-off banner: one controller for the CTA; its dialog answer goes
+                        // back to the VM. v2 → first in the slot; v1 → after ProgressHeader (below).
+                        val bannerPermission = rememberNotificationPermissionController { result ->
+                            onIntent(ChecklistDetailIntent.OnNotificationsBannerPermissionResult(result))
+                        }
+                        val notificationsBanner: @Composable () -> Unit = {
+                            // Always composed (null = hidden) so the grant / dismiss exit animates.
+                            AnimatedNotificationsOffBanner(
+                                banner = state.notificationsBanner,
+                                onCta = {
+                                    onIntent(ChecklistDetailIntent.OnNotificationsBannerCta(bannerPermission.request()))
+                                },
+                                onDismiss = { onIntent(ChecklistDetailIntent.OnNotificationsBannerDismiss) },
+                            )
+                        }
+                        if (useInlineAddRow) notificationsBanner()
                         if (useInlineAddRow) {
                             // v2: the name and the "3 / 7" counter moved to the bar and the progress
                             // bar to the chrome above the list, so what is left of ProgressHeader
@@ -1517,7 +1544,9 @@ private fun ChecklistDetailContent(
                                 name = state.currentFolderTitle ?: state.checklist.name,
                             )
                         }
-                        if (state.showRecurringNudge) {
+                        if (!useInlineAddRow) notificationsBanner()
+                        // Banner wins the slot; the VM never sets both, this guard keeps it a hard rule.
+                        if (state.showRecurringNudge && state.notificationsBanner == null) {
                             RecurringNudgeCard(
                                 onAccept = { onIntent(ChecklistDetailIntent.OnRecurringNudgeAccepted) },
                                 onDismiss = { onIntent(ChecklistDetailIntent.OnRecurringNudgeDismissed) },
@@ -2140,11 +2169,21 @@ private fun ChecklistDetailContent(
 
     // Notification permission bottom sheet
     if (state.showNotificationPermissionSheet) {
-        val requestPermission = rememberNotificationPermissionRequester { granted ->
-            onIntent(ChecklistDetailIntent.OnNotificationPermissionResult(granted))
+        val permission = rememberNotificationPermissionController { result ->
+            onIntent(ChecklistDetailIntent.OnNotificationPermissionResult(result.granted, result.permanentlyDenied))
         }
         NotificationPermissionSheet(
-            onEnableClick = requestPermission,
+            onEnableClick = {
+                when (permission.request()) {
+                    NotificationPermissionAction.SystemDialog ->
+                        onIntent(ChecklistDetailIntent.OnNotificationPermissionRequested)
+                    // The dialog can no longer appear: app settings were opened instead. Resolve the
+                    // sheet as a (permanent) denial so the reminder sheet reopens exactly as before.
+                    NotificationPermissionAction.Settings ->
+                        onIntent(ChecklistDetailIntent.OnNotificationPermissionResult(granted = false, settingsHandoff = true))
+                    NotificationPermissionAction.AlreadyEnabled -> Unit // controller reported granted
+                }
+            },
             onSkip = { onIntent(ChecklistDetailIntent.OnNotificationPermissionSkip) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissNotificationPermissionSheet) }
         )
@@ -2415,64 +2454,22 @@ private fun ChecklistDetailContent(
  * persistence are owned by [ChecklistDetailViewModel]; this is a pure renderer.
  */
 @Composable
-private fun RecurringNudgeCard(
+internal fun RecurringNudgeCard(
     onAccept: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AppCard(
+    InlineNudgeCard(
+        icon = Icons.Outlined.Repeat,
+        title = stringResource(Res.string.recurring_nudge_title),
+        body = stringResource(Res.string.recurring_nudge_subtitle),
+        actionLabel = stringResource(Res.string.recurring_nudge_accept),
+        actionIcon = Icons.Outlined.Repeat,
+        onAction = onAccept,
+        onDismiss = onDismiss,
+        dismissLabel = stringResource(Res.string.recurring_nudge_dismiss),
         modifier = modifier,
-        contentPadding = PaddingValues(AppDimens.SpacingMd),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Repeat,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(Res.string.recurring_nudge_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(Res.string.recurring_nudge_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = stringResource(Res.string.recurring_nudge_dismiss),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            AppButtonSecondary(
-                text = stringResource(Res.string.recurring_nudge_accept),
-                onClick = onAccept,
-                icon = Icons.Outlined.Repeat,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
+    )
 }
 
 @Composable

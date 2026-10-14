@@ -240,11 +240,6 @@ rc.defaultConfig = {
     // (fixed 2026-07-26).
     onboarding: "none",
     paywall_variant: "features_v1",
-    // Mirrors the client RC template default `false`, locked on 2026-09-17 after A/B #7 closed
-    // with no effect found, and RemoteConfigDefaults.ACTIVATION_BUNDLE_V1. A failed fetch must
-    // land on the same arm as the template — a `true` here would silently enrol web users into
-    // the ON variant the console no longer serves.
-    activation_bundle_v1: false,
     // Empty on purpose — mirrors RemoteConfigDefaults.NAV_V2_ARM. Empty means "no arm assigned",
     // which the client resolves to CONTROL *without persisting it*, so a failed fetch pins web to
     // today's navigation by construction. Any non-empty value here would silently enrol web users

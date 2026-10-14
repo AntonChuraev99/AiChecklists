@@ -33,14 +33,14 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.androidx.navigation.compose)
+            // WelcomeOnboardingViewModelTest still declares a FakeRemoteConfigProvider (unused since
+            // the ViewModel lost its RC param); main code no longer reads Remote Config.
+            implementation(projects.core.remoteconfig.api)
         }
         commonMain.dependencies {
             implementation(projects.core.navigation.api)
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
-            // Welcome onboarding reads the activation_bundle_v1 flag to drive the activation funnel
-            // after creating the first AI checklist (mirrors AnalyzeResultPreviewViewModel).
-            implementation(projects.core.remoteconfig.api)
             implementation(projects.feature.updatefeed)
             implementation(projects.feature.user)
             implementation(projects.feature.paywall)

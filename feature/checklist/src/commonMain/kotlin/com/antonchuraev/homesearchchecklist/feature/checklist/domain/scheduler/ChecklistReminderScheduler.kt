@@ -66,6 +66,19 @@ interface ChecklistReminderScheduler {
     /** Returns true if the app can post notifications (always true below API 33). */
     fun hasNotificationPermission(): Boolean = true
 
+    /**
+     * True when notifications actually reach the user: runtime permission AND the app-level
+     * toggle (NotificationManagerCompat.areNotificationsEnabled on Android). Unlike
+     * [hasNotificationPermission] this is false below API 33 when the user switched them off.
+     */
+    fun areNotificationsEnabled(): Boolean = hasNotificationPermission()
+
+    /**
+     * Whether this platform delivers reminders as system notifications at all. False on web/iOS
+     * (default): the notifications banner and the activation reminder sheet are Android-only.
+     */
+    val supportsSystemNotifications: Boolean get() = false
+
     /** Returns true if the app can post full-screen-intent notifications (always true below API 34). */
     fun canUseFullScreenIntent(): Boolean = true
 

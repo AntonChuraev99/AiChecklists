@@ -130,7 +130,11 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.Ite
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ItemDetailsSheetRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NoteDialog
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionSheet
-import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.rememberNotificationPermissionRequester
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.AnimatedNotificationsOffBanner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.rememberNotificationPermissionController
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppPlanNudge
@@ -848,11 +852,21 @@ private fun InboxItemSheetHost(
     // notification permission is posted and dropped, so the user would be told a reminder is set and
     // never hear it.
     if (surface == InboxItemSheetSurface.NOTIFICATION_PERMISSION) {
-        val requestPermission = rememberNotificationPermissionRequester { granted ->
-            onIntent(InboxIntent.OnNotificationPermissionResult(granted))
+        val permission = rememberNotificationPermissionController { result ->
+            onIntent(InboxIntent.OnNotificationPermissionResult(result.granted, result.permanentlyDenied))
         }
         NotificationPermissionSheet(
-            onEnableClick = requestPermission,
+            onEnableClick = {
+                when (permission.request()) {
+                    NotificationPermissionAction.SystemDialog ->
+                        onIntent(InboxIntent.OnNotificationPermissionRequested)
+                    // Dialog no longer available: settings opened; resolve as a permanent denial so
+                    // the sheet closes with the existing "permission denied" message.
+                    NotificationPermissionAction.Settings ->
+                        onIntent(InboxIntent.OnNotificationPermissionResult(granted = false, settingsHandoff = true))
+                    NotificationPermissionAction.AlreadyEnabled -> Unit
+                }
+            },
             onSkip = { onIntent(InboxIntent.OnNotificationPermissionSkip) },
             onDismiss = { onIntent(InboxIntent.OnNotificationPermissionSkip) },
         )
@@ -1081,6 +1095,12 @@ private fun InboxContent(
     onPlanDayClick: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
+    // Notifications-off banner CTA: its dialog answer goes back through onIntent (a reply to a tap).
+    // The ON_RESUME re-read is NOT raised from here — this screen's onIntent carries user actions
+    // only (plus OnPageSelected); InboxRoute sends the lifecycle check straight to the ViewModel.
+    val bannerPermission = rememberNotificationPermissionController { result ->
+        onIntent(InboxIntent.OnNotificationsBannerPermissionResult(result))
+    }
     // pageCount is a lambda, not a snapshot: rememberPagerState re-reads it every composition, so a
     // project created or deleted while the tab is open resizes the pager without a state reset.
     //
@@ -1180,6 +1200,17 @@ private fun InboxContent(
                 pageTitles = pages.map { it.title },
                 selectedPage = pagerState.currentPage,
                 onSelectPage = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+            )
+
+            // Notifications-off banner: a fixed header ABOVE the pager, never a list item, so the
+            // pager / reorder / scroll indices are untouched. Same behaviour as checklist detail.
+            AnimatedNotificationsOffBanner(
+                banner = content.notificationsBanner,
+                onCta = { onIntent(InboxIntent.OnNotificationsBannerCta(bannerPermission.request())) },
+                onDismiss = { onIntent(InboxIntent.OnNotificationsBannerDismiss) },
+                modifier = Modifier
+                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                    .padding(bottom = AppDimens.SpacingSm),
             )
 
             HorizontalPager(

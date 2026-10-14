@@ -197,12 +197,14 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Gisti" />
 
-        <!-- Boot Completed Receiver: reschedule reminders after device reboot -->
+        <!-- Boot Completed Receiver: reschedule reminders after device reboot; on our own app update
+             (MY_PACKAGE_REPLACED — system-sent to this package only) re-arm the retention alarms. -->
         <receiver
             android:name="com.antonchuraev.homesearchchecklist.notification.BootCompletedReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

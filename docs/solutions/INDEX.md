@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-10-12_
+_Last updated: 2026-10-14_
 
-Быстрый поиск по 78 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 79 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-10-14 | bug-fix | retention, ComebackGate, POST_NOTIFICATIONS, shouldShowRequestPermissionRationale, ActivationReminderSheet, NotificationsOffBanner | [Come-back nudge never shown + notification opt-in](retention-comeback-and-notification-optin-2026-10-14.md) |
 | 2026-10-12 | bug-fix | audio, permission, hold-to-record, MediaRecorder, VoicePressTerminalGate, chatDockKeepExpanded, keepExpanded, android | [Chat voice input: hold-to-record that reaches a visible result](chat-voice-hold-to-record-fix-2026-10-12.md) |
 | 2026-10-12 | bug-fix | paywall, revenuecat, getOfferings, reload-on-tap, HorizontalPager, IndexOutOfBounds, generate_checklist, classifier-limit | [Paywall: reload the catalog on a Buy tap, plus three production defect fixes](paywall-reload-on-tap-and-prod-defect-fixes-2026-10-12.md) |
 | 2026-09-24 | bug-fix | landing, hero-video, cloudflare-static-assets, range-request, 206, safari, run_worker_first, immutable-cache | [Landing hero video — Static Assets ignores Range behind the worker](landing-hero-video-range-206-2026-09-24.md) |

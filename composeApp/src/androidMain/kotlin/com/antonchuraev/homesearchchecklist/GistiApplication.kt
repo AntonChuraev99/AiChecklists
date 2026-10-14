@@ -22,7 +22,6 @@ import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushNotificationChannels
 import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
 import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
-import java.util.Calendar
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -129,8 +128,8 @@ open class GistiApplication : Application() {
                         val first = list.minByOrNull { it.id } ?: list.first()
                         val armedAt = System.currentTimeMillis()
                         runCatching {
-                            scheduler.scheduleComeback(first.id, first.name)
-                            prefs.markComebackScheduled(first.id, armedAt)
+                            val fireAt = scheduler.scheduleComeback(first.id, first.name, armedAt)
+                            prefs.markComebackScheduled(first.id, armedAt, fireAt)
                             // Out-of-session: this collector is started from onCreate and lives for
                             // the whole process, including a process woken with no Activity. The
                             // empty→non-empty transition is usually a user creating their first
@@ -144,7 +143,7 @@ open class GistiApplication : Application() {
                                     AnalyticsParams.DELAY_HOURS to RetentionPushScheduler.COMEBACK_DELAY_HOURS,
                                 ),
                             )
-                        }.onFailure { logger?.warning("Retention", "comeback arm failed: ${it.message}") }
+                        }.onFailure { logger?.error("Retention", "comeback arm failed: ${it.message}", it) }
                         throw CancellationException("comeback armed")
                     }
                     // Non-empty first emission = existing user -> never nudge; stop observing.
@@ -155,22 +154,23 @@ open class GistiApplication : Application() {
     }
 
     /**
-     * Feed a cold-start activity sample into the behavioral-timing histogram, then (re)schedule the
-     * two retention alarms at the resolved delivery hour. All best-effort: a failure here never
-     * affects app start (or user reminders).
+     * (Re)schedule the two retention alarms at the resolved delivery hour, and re-register a
+     * still-pending come-back nudge (lost on force-stop; idempotent otherwise). All best-effort: a
+     * failure here never affects app start (or user reminders).
+     *
+     * Deliberately records NO activity sample: onCreate runs on every background process wake
+     * (FCM, widget, alarms — including the come-back alarm's own cold start, and the daily alarm,
+     * which fires AT the preferred hour and so reinforced its own hour). Activity samples and the
+     * come-back "last seen" come only from MainActivity.
      */
     private fun scheduleRetentionPushes() {
         applicationScope.launch {
             val koin = GlobalContext.getOrNull() ?: return@launch
-            try {
-                val prefs: RetentionPrefs = koin.get()
-                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                prefs.recordActiveHour(hour, System.currentTimeMillis())
-
-                val scheduler: RetentionPushScheduler = koin.get()
-                scheduler.scheduleAll()
-            } catch (e: Exception) {
-                koin.getOrNull<AppLogger>()?.warning("Retention", "schedule on start failed: ${e.message}")
+            runCatching {
+                koin.get<RetentionPushScheduler>().restoreAll(koin.get<RetentionPrefs>(), System.currentTimeMillis())
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                koin.getOrNull<AppLogger>()?.error("Retention", "schedule on start failed: ${e.message}", e)
             }
         }
     }

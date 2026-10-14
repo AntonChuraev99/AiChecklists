@@ -372,25 +372,17 @@ class SplashViewModel(
     }
 
     /**
-     * Applies the first-checklist experiment, branching on the `activation_bundle_v1` RC flag.
+     * New-user activation setup (the `activation_bundle_v1` flag and its OFF arm were deleted on
+     * 2026-10-14 — the bundle is the only path now).
      *
-     * Always sets the `first_checklist_variant` user property (so the legacy A/B cohort attribution
-     * survives in both arms). Then:
+     *  - Sets the `first_checklist_variant` user property (legacy cohort attribution survives).
+     *  - For a brand-new registration, persists the new-user-pending marker so the user's FIRST own
+     *    checklist triggers the activation funnel downstream (reminder opt-in sheet, and the AI path's
+     *    FIRST_AI_CHECKLIST_CREATED).
+     *  - NO static "Your first checklist" seed any more: a new user lands on the AI first-run hero
+     *    (classic layout, empty MainScreen) or on the system Inbox (v2 layout).
      *
-     *  - **Activation bundle ON:** SKIP the static auto-seed entirely so the new user
-     *    lands on the empty MainScreen and gets the AI first-run hero instead. For a brand-new
-     *    registration, persist the new-user-pending flag so the user's FIRST AI checklist triggers
-     *    the activation funnel (FIRST_AI_CHECKLIST_CREATED + reminder opt-in) downstream.
-     *  - **Activation bundle OFF (default since 2026-09-17):** EXACT pre-activation behavior — seed the one-time "Your first
-     *    checklist" starter template for brand-new users in the `auto_create` treatment. Fully
-     *    reversible: flipping the flag back to false restores the legacy flow with no code change.
-     *    (Since 2026-07-26 this arm ALSO gets the new-user-pending marker. That is analytics-only:
-     *    it makes FIRST_AI_CHECKLIST_CREATED reachable for control users so the two arms are
-     *    comparable at all. The reminder opt-in stays treatment-only — it is gated on the flag
-     *    value inside ActivationCoordinatorImpl, not on this marker.)
-     *
-     * Read AFTER fetchAndActivate() (see init), so the flag is fresh. The whole block is guarded so
-     * a failure here never blocks or crashes the splash flow.
+     * Guarded so a failure here never blocks or crashes the splash flow.
      */
     private suspend fun applyFirstChecklistExperiment(userData: UserData, isNewUser: Boolean) {
         runCatching {
@@ -398,58 +390,14 @@ class SplashViewModel(
             analyticsTracker.setUserProperties(mapOf("first_checklist_variant" to variant.name))
 
             val uid = userData.userId
-            val activationBundleEnabled = remoteConfigProvider.getBoolean(
-                RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
-                RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
-            )
-
-            // Marked for BOTH arms on purpose (changed 2026-07-26). The flag is what lets
-            // FIRST_AI_CHECKLIST_CREATED fire exactly once per user; while it was set only in the
-            // treatment branch, the event could never reach a control user, so its `variant` param
-            // was always "true" and a breakdown by it silently compared treatment against nothing
-            // (measured: 27 "true" / 0 "false" over 30d, while control users provably received
-            // activation_bundle_v1=false in their activated RC config).
-            //
-            // Product behavior is unchanged: the reminder opt-in stays treatment-only because it is
-            // gated separately on the flag value in ActivationCoordinatorImpl, not on this marker.
             if (isNewUser && uid.isNotBlank()) {
-                log("mark new-user-pending uid=${uid.take(8)} (activation bundle ${if (activationBundleEnabled) "ON" else "OFF"})")
+                log("mark new-user-pending uid=${uid.take(8)}")
                 activationPrefsRepository.setNewUserPending(uid)
-            }
-
-            if (activationBundleEnabled) {
-                // Treatment arm: no static seed — the AI-first activation funnel takes over.
-                return@runCatching
-            }
-
-            // Control arm: legacy static auto-create (unchanged behavior).
-            val alreadyCreated = uid.isNotBlank() && firstChecklistRepository.isFirstChecklistCreated(uid)
-            if (isNewUser && variant == FirstChecklistVariant.AUTO_CREATE && uid.isNotBlank() && !alreadyCreated) {
-                // New users have 0 checklists, so they are always under the Free tier limit (4).
-                // Splash has no UserLimits access; skipping the gate here is safe by construction.
-                log("auto-creating first checklist for new user uid=${uid.take(8)}")
-                checklistRepository.addChecklist(buildFirstChecklist())
-                firstChecklistRepository.markFirstChecklistCreated(uid)
-                analyticsTracker.event(AnalyticsEvents.Onboarding.FIRST_CHECKLIST_AUTO_CREATED, mapOf(AnalyticsParams.VARIANT to variant.name))
             }
         }.onFailure { e ->
             logger.error(TAG, "applyFirstChecklistExperiment failed: ${e.message}", e)
         }
     }
-
-    /**
-     * Builds the localized "Your first checklist" starter template (title + 3 tip items).
-     * `addChecklist` creates the default fill automatically, so no fill is built here.
-     */
-    private suspend fun buildFirstChecklist(): Checklist = Checklist(
-        name = getString(Res.string.first_checklist_title),
-        items = listOf(
-            ChecklistItem(text = getString(Res.string.first_checklist_item_1)),
-            ChecklistItem(text = getString(Res.string.first_checklist_item_2)),
-            ChecklistItem(text = getString(Res.string.first_checklist_item_3)),
-            ChecklistItem(text = getString(Res.string.first_checklist_item_4)),
-        ),
-    )
 
     private fun log(text: String){
         logger.debug(TAG , text)

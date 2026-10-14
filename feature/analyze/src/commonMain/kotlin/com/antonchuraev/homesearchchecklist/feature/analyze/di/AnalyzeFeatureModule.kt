@@ -57,7 +57,6 @@ val analyzeFeatureModule = module {
             getSubscriptionStatusUseCase = get(),
             analyticsTracker = get(),
             activationCoordinator = get(),
-            remoteConfigProvider = get(),
             aiModelExperimentTracker = get(),
         )
     }
@@ -68,8 +67,7 @@ val analyzeFeatureModule = module {
             appNavigator = get(),
             checklistRepository = get(),
             analyticsTracker = get(),
-            activationCoordinator = get(),
-            remoteConfigProvider = get()
+            activationCoordinator = get()
         )
     }
 }

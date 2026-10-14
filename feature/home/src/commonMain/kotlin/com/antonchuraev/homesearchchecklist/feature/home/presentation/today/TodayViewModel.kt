@@ -41,6 +41,8 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.obs
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.resolveDueOutcome
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withImportantToggled
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.withPreset
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.ReminderTarget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -138,6 +140,9 @@ class TodayViewModel(
      * typing "tomorrow" quietly does nothing on one tab and works on the other.
      */
     private val smartDateParser: SmartDateParser,
+    // First capture of a new user opens the once-per-install reminder sheet for that task. Defaulted
+    // for hand-built test VMs; viewModelOf passes the app singleton.
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
 ) : AppViewModel<TodayScreenState, TodayIntent, TodaySideEffect>() {
 
     /** Stable snapshot of "now" at VM creation (epoch millis). */
@@ -409,6 +414,10 @@ class TodayViewModel(
                 }
                 dueOutcome.repeatFirstTriggerAt?.let { at ->
                     reminderScheduler.scheduleItemRepeat(inboxId, fill.id, fillItem.id, at)
+                }
+                // Same rule as the Inbox quick-add: no time staged -> the task may open the sheet.
+                if (dueOutcome.reminderAt == null && dueOutcome.repeatFirstTriggerAt == null) {
+                    activationCoordinator.onUserTaskCreated(ReminderTarget.Item(inboxId, fill.id, fillItem.id, text))
                 }
                 inboxId
             }.onSuccess { inboxId ->

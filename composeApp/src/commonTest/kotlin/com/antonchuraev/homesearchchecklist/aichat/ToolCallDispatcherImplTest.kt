@@ -236,7 +236,8 @@ private object UnusedAttachmentStorage : AttachmentStoragePort {
 private object NoOpActivationCoordinator : ActivationCoordinator {
     override val reminderOptInRequests: kotlinx.coroutines.flow.SharedFlow<Long> =
         kotlinx.coroutines.flow.MutableSharedFlow()
-    override suspend fun onAiChecklistCreated(checklistId: Long, activationBundleEnabled: Boolean) = Unit
+    override suspend fun onAiChecklistCreated(checklistId: Long) = Unit
+    override suspend fun onUserChecklistCreated(checklistId: Long) = Unit
     override suspend fun reportReminderOptInOutcome(granted: Boolean) = Unit
 }
 

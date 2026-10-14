@@ -11,9 +11,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiFailureReason
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
@@ -51,7 +48,6 @@ class AnalyzeViewModel(
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
     private val analyticsTracker: AnalyticsTracker,
     private val activationCoordinator: ActivationCoordinator,
-    private val remoteConfigProvider: RemoteConfigProvider,
     // Best-effort AI-model A/B attribution — nullable so pure-VM tests can omit it. Shared with the
     // chat + create flows so the sticky arm user-property and DataStore-persisted arm stay unified.
     private val aiModelExperimentTracker: AiModelExperimentTracker? = null,
@@ -425,14 +421,13 @@ class AnalyzeViewModel(
                         "has_folders" to result.hasFolders
                     )
                 )
-                // Only the activation hero (autoAnalyze) drives the funnel; the coordinator gates it
-                // to new users / show-once. Mirrors AnalyzeResultPreviewViewModel's confirm path.
+                // The coordinator gates both calls to new users / show-once. Only the activation hero
+                // (autoAnalyze) counts as the "first AI checklist" event; any other Analyze create still
+                // counts as the user's first checklist for the reminder opt-in sheet.
                 if (autoAnalyze) {
-                    val activationEnabled = remoteConfigProvider.getBoolean(
-                        RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
-                        RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
-                    )
-                    activationCoordinator.onAiChecklistCreated(checklist.id, activationEnabled)
+                    activationCoordinator.onAiChecklistCreated(checklist.id)
+                } else {
+                    activationCoordinator.onUserChecklistCreated(checklist.id)
                 }
                 // Keep the loader visible until navigation: clearBackStack replaces this screen with
                 // the checklist detail directly, so resetting isAnalyzing here would flash the Analyze

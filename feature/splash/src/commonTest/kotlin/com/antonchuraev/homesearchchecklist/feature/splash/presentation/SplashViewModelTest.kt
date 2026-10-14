@@ -115,7 +115,7 @@ class SplashViewModelTest {
         paywallConfigured: Boolean = true,
         // Legacy first-checklist A/B tests assert the CONTROL arm (static auto-create), so the
         // activation bundle defaults OFF here. The activation tests pass an RC fake with it ON.
-        remoteConfig: RemoteConfigProvider = NoOpRemoteConfigProvider(activationBundleEnabled = false),
+        remoteConfig: RemoteConfigProvider = NoOpRemoteConfigProvider(),
         navigator: AppNavigator = NoOpNavigator(),
     ): SplashViewModel {
         fakeUserData.currentUser = UserData(userId = userId, isOnboardingPassed = isOnboardingPassed)
@@ -501,40 +501,9 @@ class SplashViewModelTest {
         )
     }
 
-    /**
-     * New user in the AUTO_CREATE treatment who hasn't been seeded: the ViewModel
-     * enters the auto-create branch and reaches the per-uid seed gate for this uid.
-     *
-     * NOTE: we deliberately assert the seed-gate *read* rather than the final
-     * `addChecklist`. The starter checklist is built via `buildFirstChecklist()`,
-     * which loads localized strings through Compose Resources (`getString`) — that
-     * path touches `android.content.res.Resources` and is "not mocked" in the JVM
-     * host-test environment (it throws and the `runCatching` guard swallows it).
-     * The seed-gate read runs *before* the resource call, so it is the deepest
-     * deterministic observable of the auto-create decision at this layer. The
-     * end-to-end creation is covered on-device, not here.
-     */
-    @Test
-    fun applyFirstChecklistExperiment_newUserAutoCreateNotSeeded_entersCreateBranch() = testScope.runTest {
-        // Blank userId routes through ensureUserRegistered with isNewUser=true.
-        fakeUserData.nextRegistration = RegistrationData(
-            userData = UserData(userId = "new-uuid", isOnboardingPassed = true),
-            isNewUser = true,
-        )
-
-        createViewModel(userId = "", isOnboardingPassed = true)
-        advanceUntilIdle()
-
-        assertTrue(
-            fakeFirstChecklist.seedCheckedUids.contains("new-uuid"),
-            "new user in AUTO_CREATE must consult the per-uid seed gate before creating"
-        )
-        assertEquals(
-            GetFirstChecklistVariantUseCase.FirstChecklistVariant.AUTO_CREATE.name,
-            fakeAnalytics.firstChecklistVariantProperty,
-            "the AUTO_CREATE cohort property must be recorded for the new user"
-        )
-    }
+    // Removed 2026-10-14: `applyFirstChecklistExperiment_newUserAutoCreateNotSeeded_entersCreateBranch`
+    // asserted the static-seed branch, deleted together with `activation_bundle_v1`. Its cohort-property
+    // half is covered by `applyFirstChecklistExperiment_anyUser_setsVariantUserProperty`.
 
     /**
      * New user in AUTO_CREATE who was ALREADY seeded (e.g. deleted the starter
@@ -586,7 +555,7 @@ class SplashViewModelTest {
     }
 
     // ============================================================
-    // Activation bundle (activation_bundle_v1) — auto-create gating
+    // Activation bundle (unconditional since 2026-10-14) — no seed, pending marker
     // ============================================================
 
     /**
@@ -595,17 +564,13 @@ class SplashViewModelTest {
      * the first AI checklist later triggers the activation funnel.
      */
     @Test
-    fun applyFirstChecklistExperiment_activationOn_newUser_skipsAutoCreate_marksPending() = testScope.runTest {
+    fun applyFirstChecklistExperiment_newUser_noStaticSeed_marksPending() = testScope.runTest {
         fakeUserData.nextRegistration = RegistrationData(
             userData = UserData(userId = "new-uuid", isOnboardingPassed = true),
             isNewUser = true,
         )
 
-        createViewModel(
-            userId = "",
-            isOnboardingPassed = true,
-            remoteConfig = NoOpRemoteConfigProvider(activationBundleEnabled = true),
-        )
+        createViewModel(userId = "", isOnboardingPassed = true)
         advanceUntilIdle()
 
         assertTrue(
@@ -622,46 +587,9 @@ class SplashViewModelTest {
         )
     }
 
-    /**
-     * Activation bundle OFF (control arm): the legacy product behavior is intact — a brand-new user
-     * in the AUTO_CREATE treatment still enters the static auto-create branch (consults the per-uid
-     * seed gate). Proves the flag remains a clean reversible switch for what the USER sees.
-     *
-     * ⚠️ Changed 2026-07-26: the control arm is now ALSO marked new-user-pending. This assertion
-     * previously required the opposite, which locked the measurement defect in place as if it were
-     * intended: the marker is the gate for FIRST_AI_CHECKLIST_CREATED, so withholding it from the
-     * control arm made that event unreachable for control users and its `variant` param
-     * tautologically "true" (measured 27 "true" / 0 "false" over 30d, while control devices
-     * provably received activation_bundle_v1=false). Marking both arms is analytics-only — the
-     * reminder opt-in stays treatment-only, gated on the flag value in ActivationCoordinatorImpl.
-     */
-    @Test
-    fun applyFirstChecklistExperiment_activationOff_newUser_performsLegacyAutoCreate() = testScope.runTest {
-        fakeUserData.nextRegistration = RegistrationData(
-            userData = UserData(userId = "new-uuid", isOnboardingPassed = true),
-            isNewUser = true,
-        )
-
-        createViewModel(
-            userId = "",
-            isOnboardingPassed = true,
-            remoteConfig = NoOpRemoteConfigProvider(activationBundleEnabled = false),
-        )
-        advanceUntilIdle()
-
-        // Same observable as the legacy auto-create test: the seed gate is consulted before the
-        // (resource-touching) buildFirstChecklist() call, which is the deepest deterministic signal.
-        assertTrue(
-            fakeFirstChecklist.seedCheckedUids.contains("new-uuid"),
-            "activation bundle OFF must enter the legacy auto-create branch (consult the seed gate)",
-        )
-        assertTrue(
-            fakeActivationPrefs.pendingUids.contains("new-uuid"),
-            "activation bundle OFF must ALSO mark new-user-pending — otherwise " +
-                "FIRST_AI_CHECKLIST_CREATED can never fire for a control user and the arms " +
-                "cannot be compared at all",
-        )
-    }
+    // Removed 2026-10-14: `applyFirstChecklistExperiment_activationOff_newUser_performsLegacyAutoCreate`
+    // pinned the OFF arm (static seed), deleted together with `activation_bundle_v1`. Its
+    // pending-marker half lives on in the test above, which now runs on the only code path.
 
     // ============================================================
     // Test doubles
@@ -936,13 +864,10 @@ class SplashViewModelTest {
         override fun event(name: String, params: Map<String, Any>) {}
     }
 
-    private class NoOpRemoteConfigProvider(
-        private val activationBundleEnabled: Boolean = false,
-    ) : RemoteConfigProvider {
+    private class NoOpRemoteConfigProvider : RemoteConfigProvider {
         override suspend fun fetchAndActivate(): Boolean = true
         override fun getString(key: String, defaultValue: String): String = defaultValue
-        override fun getBoolean(key: String, defaultValue: Boolean): Boolean =
-            if (key == RemoteConfigKeys.ACTIVATION_BUNDLE_V1) activationBundleEnabled else defaultValue
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
         override fun getLong(key: String, defaultValue: Long): Long = defaultValue
     }
 
