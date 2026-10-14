@@ -89,7 +89,6 @@ class AnalyzeResultPreviewViewModelTest {
             checklistRepository = repo,
             analyticsTracker = NoOpAnalyticsTracker(),
             activationCoordinator = NoOpActivationCoordinator(),
-            remoteConfigProvider = NoOpRemoteConfigProvider(),
         )
 
     // ── Fix 1: suggested name → title ─────────────────────────────────────────
@@ -277,7 +276,8 @@ class AnalyzeResultPreviewViewModelTest {
     private class NoOpActivationCoordinator : ActivationCoordinator {
         private val _requests = MutableSharedFlow<Long>()
         override val reminderOptInRequests: SharedFlow<Long> = _requests.asSharedFlow()
-        override suspend fun onAiChecklistCreated(checklistId: Long, activationBundleEnabled: Boolean) {}
+        override suspend fun onAiChecklistCreated(checklistId: Long) {}
+        override suspend fun onUserChecklistCreated(checklistId: Long) {}
         override suspend fun reportReminderOptInOutcome(granted: Boolean) {}
     }
 

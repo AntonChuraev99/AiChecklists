@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePor
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import org.koin.dsl.module
 
 /**
@@ -28,6 +29,10 @@ val aiChatDispatcherModule = module {
             userDataRepository = get(),
             analytics = get(),
             logger = get(),
+            // Read per call (cheap getter): the sheet is Android-only, see ActivationCoordinatorImpl.
+            supportsSystemNotifications = {
+                get<ChecklistReminderScheduler>().supportsSystemNotifications
+            },
         )
     }
     single<ToolCallDispatcher> {

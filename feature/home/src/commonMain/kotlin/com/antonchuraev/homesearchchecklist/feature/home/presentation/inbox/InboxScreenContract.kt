@@ -234,6 +234,11 @@ sealed interface InboxScreenState : State {
          * cannot know, because it does not know which page is on screen.
          */
         val planNudgeDismissed: Boolean = false,
+        /**
+         * Notifications-off banner (Android only), null = hidden. Rendered as a fixed header above
+         * the pager list — never as a list item, so reorder / scroll indices are untouched.
+         */
+        val notificationsBanner: com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationsBannerUi? = null,
     ) : InboxScreenState {
 
         /** Whether one more attachment fits on an item that already has [currentCount] of them. */
@@ -373,7 +378,27 @@ sealed interface InboxIntent : Intent {
     data object OnCustomPickerDismiss : InboxIntent
 
     // ─── Item sheet: notification permission ──────────────────────────────────
-    data class OnNotificationPermissionResult(val granted: Boolean) : InboxIntent
+    data class OnNotificationPermissionResult(
+        val granted: Boolean,
+        val permanentlyDenied: Boolean = false,
+        /**
+         * The ask never reached the OS: app settings were opened instead. Resolves the sheet like a
+         * denial but sends NO `notification_permission_result` (nothing was requested — F5b).
+         */
+        val settingsHandoff: Boolean = false,
+    ) : InboxIntent
+    // ─── Notifications-off banner (same contract as ChecklistDetailIntent) ───
+    data class OnNotificationsStatusCheck(val settingsRequired: Boolean) : InboxIntent
+    data class OnNotificationsBannerCta(
+        val action: com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionAction,
+    ) : InboxIntent
+    data class OnNotificationsBannerPermissionResult(
+        val result: com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionResult,
+    ) : InboxIntent
+    data object OnNotificationsBannerDismiss : InboxIntent
+
+    /** The system dialog was launched from the inbox permission sheet (analytics). */
+    data object OnNotificationPermissionRequested : InboxIntent
     data object OnNotificationPermissionSkip : InboxIntent
 
     // ─── Item sheet: attachments ──────────────────────────────────────────────

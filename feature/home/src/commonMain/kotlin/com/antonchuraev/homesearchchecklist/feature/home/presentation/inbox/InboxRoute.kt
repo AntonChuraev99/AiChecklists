@@ -9,6 +9,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionAction
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.rememberNotificationPermissionController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.CreditsChipSource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -89,6 +93,18 @@ fun InboxRoute(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val attachmentOpener: AttachmentOpener = koinInject()
+
+    // Notifications state is re-read on every resume (back from settings / the system dialog).
+    // Sent to the ViewModel directly, NOT through InboxScreen's onIntent: that channel carries user
+    // actions, and a host treats any non-OnPageSelected intent as one (InboxAddTaskRowTest pins it).
+    val notificationPermission = rememberNotificationPermissionController { }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.sendIntent(
+            InboxIntent.OnNotificationsStatusCheck(
+                settingsRequired = notificationPermission.nextAction() == NotificationPermissionAction.Settings,
+            ),
+        )
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffect.collect { effect ->

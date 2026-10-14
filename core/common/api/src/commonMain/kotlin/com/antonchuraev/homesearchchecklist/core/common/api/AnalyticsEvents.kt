@@ -330,13 +330,19 @@ object AnalyticsEvents {
         /** Come-back alarm ARMED after the first checklist. Params: [AnalyticsParams.CHECKLIST_ID], [AnalyticsParams.DELAY_HOURS]. */
         const val COMEBACK_SCHEDULED = "retention_comeback_scheduled"
 
-        /** Come-back alarm actually FIRED and deps resolved (broadcast received on a WARM process),
-         *  emitted before any gate. Splits scheduled -> fired -> (shown | skipped). A large
-         *  scheduled-minus-fired gap ⇒ the alarm fired cold (see Crashlytics "comeback dropped") or
-         *  never fired (OEM/Doze). */
+        /** A still-pending come-back alarm FIRED and deps resolved (warm or cold process), emitted
+         *  before any gate. Splits scheduled -> fired -> (shown | skipped | rescheduled). A
+         *  rescheduled come-back fires again, so count USERS, not events. A large
+         *  scheduled-minus-fired gap ⇒ uninstall before the fire, a lost alarm, a binding failure
+         *  (Crashlytics "comeback dropped") or the out-of-session event never uploaded. */
         const val COMEBACK_FIRED = "retention_comeback_fired"
 
-        /** Come-back alarm fired but nothing shown. Param: [AnalyticsParams.REASON] = permission_off | no_checklist | already_active | frequency_cap. */
+        /** Come-back alarm fired but the user was on screen within the quiet period, so it was moved
+         *  to lastForeground + delay (one-shot stays pending). Param: [AnalyticsParams.DELAY_HOURS]
+         *  = hours until the new fire (rounded down). */
+        const val COMEBACK_RESCHEDULED = "retention_comeback_rescheduled"
+
+        /** Come-back alarm fired but nothing shown (one-shot consumed). Param: [AnalyticsParams.REASON] = permission_off | no_checklist | no_unchecked | already_active | frequency_cap. */
         const val COMEBACK_SKIPPED = "retention_comeback_skipped"
 
         /** Recurring-list nudge surfaced (offer to make a list repeat). Param: [AnalyticsParams.SOURCE] = create | detail | first_run. */
@@ -634,15 +640,12 @@ object AnalyticsEvents {
     }
 
     /**
-     * New-user activation bundle (behind RC flag `activation_bundle_v1`).
-     *
-     * These events ALWAYS fire (even when the flag is OFF) so the later A/B test can
-     * compare both arms — except [FIRST_RUN_SHOWN], which is only meaningful when the
-     * hero is actually rendered (flag ON). Every event carries [AnalyticsParams.VARIANT]
-     * = the flag value ("true"/"false") so funnels are filterable by arm.
+     * New-user activation bundle — unconditional since 2026-10-14 (the RC flag
+     * `activation_bundle_v1` and its OFF arm were deleted). Historical events carry
+     * [AnalyticsParams.VARIANT] = the flag value of the time; after the cut it is pinned to "true".
      */
     object Activation {
-        /** The activation hero (prompt + chips) was shown on the empty MainScreen. Flag ON only. */
+        /** The activation hero (prompt + chips) was shown on the empty MainScreen. */
         const val FIRST_RUN_SHOWN = "activation_first_run_shown"
 
         /** A hero template chip was tapped. Param: [AnalyticsParams.CHIP_KEY] = chip id (e.g. "trip"). */
@@ -652,8 +655,9 @@ object AnalyticsEvents {
          * A new user's FIRST checklist was created through the AI path (chat create / preview-
          * confirmed / attachment). Distinct from [Checklist.CREATED] — fires at most once per user.
          *
-         * Carries [AnalyticsParams.VARIANT] = the `activation_bundle_v1` value, and since the
-         * 2026-07-26 fix it genuinely fires in BOTH arms.
+         * Carries [AnalyticsParams.VARIANT]: the `activation_bundle_v1` value until the flag was
+         * deleted (2026-10-14), pinned to "true" after. Between 2026-07-26 and that cut it genuinely
+         * fired in BOTH arms.
          *
          * ⚠️ **Do not compare `variant` across the 2026-07-26 cut.** Before that date the emit was
          * unreachable for control users: it is guarded by the per-UID new-user-pending marker, and
@@ -667,6 +671,33 @@ object AnalyticsEvents {
 
         /** The one-time reminder opt-in was resolved. Param: [AnalyticsParams.OUTCOME] = "granted" | "skipped". */
         const val REMINDER_OPTIN = "activation_reminder_optin"
+    }
+
+    /**
+     * POST_NOTIFICATIONS ask funnel (added 2026-10-14 — before that no event recorded the OS answer).
+     * Both carry [AnalyticsParams.SOURCE] = one of [NotificationPermissionSource]. [RESULT] also
+     * carries [AnalyticsParams.GRANTED] and [AnalyticsParams.PERMANENTLY_DENIED] (booleans).
+     * [REQUESTED] fires only when the system dialog is actually launched — the settings hand-off is
+     * [NotificationsBanner.CTA] with action "settings", not a request.
+     */
+    object NotificationPermission {
+        const val REQUESTED = "notification_permission_requested"
+        const val RESULT = "notification_permission_result"
+    }
+
+    /**
+     * "Notifications are off" banner (Android only) on checklist detail AND the v2 Inbox. Every event
+     * carries [AnalyticsParams.SCREEN] = "checklist" | "inbox".
+     */
+    object NotificationsBanner {
+        /** Banner rendered — at most once per (app session, screen). */
+        const val SHOWN = "notif_banner_shown"
+
+        /** × tapped. Param [AnalyticsParams.DISMISS_COUNT] = persisted count AFTER this dismiss. */
+        const val DISMISSED = "notif_banner_dismissed"
+
+        /** CTA tapped. Param [AnalyticsParams.ACTION] = "system_dialog" | "settings". */
+        const val CTA = "notif_banner_cta"
     }
 
     // ─── Settings ────────────────────────────────────────────────────────────
@@ -845,8 +876,39 @@ object AnalyticsEvents {
  * are wire format. Reuse a key across events so a single GA4/Amplitude property
  * carries one consistent meaning (e.g. `source` everywhere = "what triggered this").
  */
+/** Wire values of [AnalyticsParams.SOURCE] for [AnalyticsEvents.NotificationPermission]. */
+object NotificationPermissionSource {
+    const val ACTIVATION_SHEET = "activation_sheet"
+    const val BANNER = "banner"
+    const val CHECKLIST_REMINDER = "checklist_reminder"
+    const val ITEM_REMINDER = "item_reminder"
+    const val INBOX = "inbox"
+    const val ONBOARDING = "onboarding"
+}
+
+/** Fires [AnalyticsEvents.NotificationPermission.REQUESTED] with its one param. */
+fun AnalyticsTracker.notificationPermissionRequested(source: String) =
+    event(AnalyticsEvents.NotificationPermission.REQUESTED, mapOf(AnalyticsParams.SOURCE to source))
+
+/** Fires [AnalyticsEvents.NotificationPermission.RESULT] — one shape for every ask site. */
+fun AnalyticsTracker.notificationPermissionResult(source: String, granted: Boolean, permanentlyDenied: Boolean) =
+    event(
+        AnalyticsEvents.NotificationPermission.RESULT,
+        mapOf(
+            AnalyticsParams.SOURCE to source,
+            AnalyticsParams.GRANTED to granted,
+            AnalyticsParams.PERMANENTLY_DENIED to permanentlyDenied,
+        ),
+    )
+
 object AnalyticsParams {
     const val SOURCE = "source"
+    const val GRANTED = "granted"
+    const val PERMANENTLY_DENIED = "permanently_denied"
+    const val DISMISS_COUNT = "dismiss_count"
+    /** Surface of the notifications-off banner: "checklist" | "inbox". */
+    const val SCREEN = "screen"
+    const val ACTION = "action"
     const val LANGUAGE = "language"
     const val TRIGGER_EVENT = "trigger_event"
     const val SCORE = "score"
@@ -1138,7 +1200,7 @@ object AnalyticsParams {
     const val CHIP_KEY = "chip_key"
 
     // Retention come-back nudge — how far ahead the one-shot alarm was armed (diagnostics on
-    // retention_comeback_scheduled; pairs with [AnalyticsEvents.Retention.COMEBACK_SKIPPED] reason).
+    // retention_comeback_scheduled, and how far it was moved on retention_comeback_rescheduled).
     const val DELAY_HOURS = "delay_hours"
 
     // Generic error diagnostics (login_failed etc.): code = stable type/class id, message = human text.

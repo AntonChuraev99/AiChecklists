@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.notif_granted_snackbar
 import aichecklists.core.designsystem.generated.resources.attachment_deleted_snackbar
 import aichecklists.core.designsystem.generated.resources.attachment_load_error
 import aichecklists.core.designsystem.generated.resources.attachment_premium_limit_reached_snackbar
@@ -67,6 +68,15 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.res
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.NotificationPermissionSource
+import com.antonchuraev.homesearchchecklist.core.common.api.ReminderTarget
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationsBannerUi
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerController
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerSession
+import com.antonchuraev.homesearchchecklist.core.common.api.notificationPermissionRequested
+import com.antonchuraev.homesearchchecklist.core.common.api.notificationPermissionResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -137,6 +147,12 @@ class InboxViewModel(
      */
     private val smartDateParser: SmartDateParser,
     private val logger: AppLogger,
+    // Notifications-off banner + the once-per-install reminder opt-in. All three are defaulted so the
+    // hand-built VMs in tests need no wiring; HomeFeatureModule's explicit viewModel{} passes the app singletons.
+    private val datastore: AppDatastore? = null,
+    private val notificationsBannerSession: NotificationsBannerSession =
+        NotificationsBannerSession { Clock.System.now().toEpochMilliseconds() },
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
 ) : AppViewModel<InboxScreenState, InboxIntent, InboxSideEffect>() {
 
     /**
@@ -261,6 +277,25 @@ class InboxViewModel(
      * them, and the plan-nudge snooze. Combined here so the sorted/filtered pages, the sheet and the
      * nudge share one source.
      */
+    /**
+     * Same controller as the checklist detail banner: shared session + persisted dismiss count, so a
+     * dismiss on one surface counts for both. Null when no datastore is wired (tests) = never shown.
+     */
+    private val notificationsBanner: NotificationsBannerController? = datastore?.let { store ->
+        NotificationsBannerController(
+            scope = viewModelScope,
+            screen = NotificationsBannerController.SCREEN_INBOX,
+            reminderScheduler = reminderScheduler,
+            datastore = store,
+            session = notificationsBannerSession,
+            activationCoordinator = activationCoordinator,
+            analytics = analytics,
+            onTurnedOn = { emitMessage(Res.string.notif_granted_snackbar) },
+        ).also { it.start(reminderVariant = { false }) }
+    }
+    private val notificationsBannerFlow: StateFlow<NotificationsBannerUi?> =
+        notificationsBanner?.banner ?: MutableStateFlow<NotificationsBannerUi?>(null)
+
     private val displayState = combine(
         displayPrefs.observeDisplayOptions(),
         _displayOptionsOpen,
@@ -302,8 +337,9 @@ class InboxViewModel(
         // Paired so the whole state still fits typed `combine`'s five-source ceiling; the sheet and
         // the limits that gate two of its rows belong to one interaction, so pairing costs no clarity.
         combine(_itemSheet, _userLimits) { sheet, limits -> sheet to limits },
-        _listMenu,
-    ) { list, selected, (draft, due), (itemSheet, userLimits), listMenu ->
+        // Paired with the banner to stay within the five-source ceiling.
+        combine(_listMenu, notificationsBannerFlow) { menu, banner -> menu to banner },
+    ) { list, selected, (draft, due), (itemSheet, userLimits), (listMenu, notificationsBanner) ->
         val (pages, display, loadError, nowMillis) = list
         val displayOptions = display.options
         val displayOptionsOpen = display.sheetOpen
@@ -353,6 +389,7 @@ class InboxViewModel(
                 // A snooze, not a permanent hide: the window reopens on its own, and because `now`
                 // ticks every minute it reopens within a minute of expiring rather than on the next
                 // cold start.
+                notificationsBanner = notificationsBanner,
                 planNudgeDismissed = display.planNudgeDismissedAt > 0L &&
                     nowMillis - display.planNudgeDismissedAt < PLAN_NUDGE_SNOOZE_MILLIS,
             )
@@ -361,6 +398,7 @@ class InboxViewModel(
 
     init {
         bootstrap()
+        viewModelScope.launch { notificationsBanner?.refresh() }
         observeUserLimits()
         observeClock()
         // Below the properties it reads — [_draft] is initialised in declaration order, and a
@@ -620,7 +658,21 @@ class InboxViewModel(
             InboxIntent.OnCustomPickerDismiss -> _itemSheet.update { it.copy(customPicker = null) }
 
             // ── Item sheet: notification permission ──────────────────────────────────────
+            is InboxIntent.OnNotificationsStatusCheck -> notificationsBanner?.onStatusCheck(intent.settingsRequired)
+            is InboxIntent.OnNotificationsBannerCta -> notificationsBanner?.onCta(intent.action)
+            is InboxIntent.OnNotificationsBannerPermissionResult -> notificationsBanner?.onPermissionResult(intent.result)
+            InboxIntent.OnNotificationsBannerDismiss -> notificationsBanner?.onDismiss()
+            InboxIntent.OnNotificationPermissionRequested ->
+                analytics.notificationPermissionRequested(NotificationPermissionSource.INBOX)
             is InboxIntent.OnNotificationPermissionResult -> {
+                if (!intent.settingsHandoff) {
+                    analytics.notificationPermissionResult(
+                        source = NotificationPermissionSource.INBOX,
+                        granted = intent.granted,
+                        permanentlyDenied = intent.permanentlyDenied,
+                    )
+                }
+                if (intent.granted) notificationsBanner?.onGrantedElsewhere()
                 _itemSheet.update { it.copy(notificationPermissionOpen = false) }
                 if (!intent.granted) {
                     // Not a silent close: without the permission every alarm this sheet schedules is
@@ -891,6 +943,13 @@ class InboxViewModel(
                 }
                 dueOutcome.repeatFirstTriggerAt?.let { at ->
                     reminderScheduler.scheduleItemRepeat(page.checklistId, fill.id, fillItem.id, at)
+                }
+                // A new user's first capture opens the once-per-install "remind me" sheet for THIS
+                // task — unless the dock already gave it a time (the user answered that question).
+                if (dueOutcome.reminderAt == null && dueOutcome.repeatFirstTriggerAt == null) {
+                    activationCoordinator.onUserTaskCreated(
+                        ReminderTarget.Item(page.checklistId, fill.id, fillItem.id, text),
+                    )
                 }
             }.onSuccess {
                 _draft.value = _draft.value.cleared()

@@ -52,6 +52,12 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.NotificationPermissionSource
+import com.antonchuraev.homesearchchecklist.core.common.api.notificationPermissionRequested
+import com.antonchuraev.homesearchchecklist.core.common.api.notificationPermissionResult
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerSession
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerController
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.*
 
@@ -74,7 +80,38 @@ class ChecklistDetailViewModel(
     // ViewModel that started it — see [confirmFolderDelete], which pops its own entry (and so
     // cancels viewModelScope) before the delete is persisted.
     private val appScope: CoroutineScope,
+    // Process-wide session flags of the notifications-off banner (Koin singleton; App.kt feeds it
+    // the foreground/background edges). Defaulted so hand-built VMs in tests need no wiring.
+    private val notificationsBannerSession: NotificationsBannerSession =
+        NotificationsBannerSession { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    // While the one-time reminder opt-in sheet is pending the banner stays hidden (and unreported):
+    // it would sit under the modal sheet asking the same question.
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
+
+    /** First content emission evaluates the banner once; later emissions only re-check the nudge. */
+    private var notificationsBannerEvaluated = false
+
+    /** Shared notifications-off banner behaviour (same class drives the v2 Inbox banner). */
+    private val notificationsBanner = NotificationsBannerController(
+        scope = viewModelScope,
+        screen = NotificationsBannerController.SCREEN_CHECKLIST,
+        reminderScheduler = reminderScheduler,
+        datastore = datastore,
+        session = notificationsBannerSession,
+        activationCoordinator = activationCoordinator,
+        analytics = analyticsTracker,
+        onTurnedOn = { updateContentState { it.copy(snackbarMessage = SNACKBAR_NOTIFICATIONS_ON) } },
+    )
+
+    /**
+     * The one-time reminder sheet is up (or about to be): the recurring nudge must not spend its
+     * show-once pref on a card drawn under the modal scrim — it gets its turn on a later visit.
+     */
+    private fun activationSheetPending(): Boolean = activationCoordinator.reminderOptInTarget.value != null
+
+    /** Source of the reminder-flow permission ask in flight, captured at request time. */
+    private var reminderPermissionSource: String? = null
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
     override val screenState: StateFlow<ChecklistDetailState> = _screenState.asStateFlow()
@@ -241,7 +278,30 @@ class ChecklistDetailViewModel(
             )
         }
 
-        maybeShowRecurringNudge(checklist, sortedFill)
+        // Banner first, nudge after it in the SAME coroutine: the nudge's show-once pref must only be
+        // spent when the card is actually drawn, and the banner wins the slot.
+        if (!notificationsBannerEvaluated) {
+            notificationsBannerEvaluated = true
+            notificationsBanner.start(reminderVariant = {
+                (_screenState.value as? ChecklistDetailState.Content)?.checklist
+                    ?.let { it.reminderAt != null || it.repeatRule != null } == true
+            })
+            // Mirror the controller into UiState. Banner wins the slot: a nudge already on screen
+            // yields (its pref is already spent — it simply is not drawn twice).
+            viewModelScope.launch {
+                notificationsBanner.banner.collect { banner ->
+                    updateContentState {
+                        it.copy(notificationsBanner = banner, showRecurringNudge = it.showRecurringNudge && banner == null)
+                    }
+                }
+            }
+            viewModelScope.launch {
+                val bannerVisible = notificationsBanner.refresh()
+                if (!bannerVisible && !activationSheetPending()) maybeShowRecurringNudge(checklist, sortedFill)
+            }
+        } else if (notificationsBanner.banner.value == null && !activationSheetPending()) {
+            maybeShowRecurringNudge(checklist, sortedFill)
+        }
     }
 
     /**
@@ -481,7 +541,12 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDeleteCompletedItems -> deleteCompletedItems()
 
             // Notification permission
-            is ChecklistDetailIntent.OnNotificationPermissionResult -> handleNotificationPermissionResult()
+            is ChecklistDetailIntent.OnNotificationPermissionResult -> handleNotificationPermissionResult(intent)
+            ChecklistDetailIntent.OnNotificationPermissionRequested -> handleNotificationPermissionRequested()
+            is ChecklistDetailIntent.OnNotificationsStatusCheck -> notificationsBanner.onStatusCheck(intent.settingsRequired)
+            is ChecklistDetailIntent.OnNotificationsBannerCta -> notificationsBanner.onCta(intent.action)
+            is ChecklistDetailIntent.OnNotificationsBannerPermissionResult -> notificationsBanner.onPermissionResult(intent.result)
+            ChecklistDetailIntent.OnNotificationsBannerDismiss -> notificationsBanner.onDismiss()
             ChecklistDetailIntent.OnNotificationPermissionSkip -> handleNotificationPermissionSkip()
             ChecklistDetailIntent.OnDismissNotificationPermissionSheet -> handleNotificationPermissionSkip()
 
@@ -2343,7 +2408,29 @@ class ChecklistDetailViewModel(
         }
     }
 
-    private fun handleNotificationPermissionResult() {
+    private fun currentPermissionSource(): String =
+        if ((_screenState.value as? ChecklistDetailState.Content)?.itemReminderSheetFor != null) {
+            NotificationPermissionSource.ITEM_REMINDER
+        } else {
+            NotificationPermissionSource.CHECKLIST_REMINDER
+        }
+
+    private fun handleNotificationPermissionRequested() {
+        val source = currentPermissionSource()
+        reminderPermissionSource = source
+        analyticsTracker.notificationPermissionRequested(source)
+    }
+
+    private fun handleNotificationPermissionResult(intent: ChecklistDetailIntent.OnNotificationPermissionResult) {
+        if (!intent.settingsHandoff) {
+            analyticsTracker.notificationPermissionResult(
+                source = reminderPermissionSource ?: currentPermissionSource(),
+                granted = intent.granted,
+                permanentlyDenied = intent.permanentlyDenied,
+            )
+        }
+        reminderPermissionSource = null
+        if (intent.granted) notificationsBanner.onGrantedElsewhere()
         reopenReminderSheetAfterPermission()
     }
 
@@ -3550,6 +3637,7 @@ class ChecklistDetailViewModel(
 
         const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
         const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
+        const val SNACKBAR_NOTIFICATIONS_ON = "notifications_on"
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
         /** Device-global suppress flag for the full-screen-intent instruction sheet ("don't show again"). */
         const val PREF_FSI_DONT_SHOW = "fsi_dont_show"

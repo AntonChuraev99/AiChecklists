@@ -172,6 +172,12 @@ class ReminderScheduler(
             }
     }
 
+    override fun areNotificationsEnabled(): Boolean =
+        hasNotificationPermission() &&
+            androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    override val supportsSystemNotifications: Boolean get() = true
+
     override fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(

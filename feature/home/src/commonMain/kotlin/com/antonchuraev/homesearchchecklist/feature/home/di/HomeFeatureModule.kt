@@ -23,7 +23,16 @@ val homeFeatureModule = module {
     // in App.kt's
     // entryProvider (a route with no matching entry hard-crashes NavDisplay after a process death
     // that outlives an arm flip), and it simply never resolves in the control arm.
-    viewModelOf(::InboxViewModel)
+    // Explicit, not viewModelOf: the three trailing banner/activation collaborators are defaulted for
+    // hand-built test VMs, and a nullable `datastore` must be passed, not left to constructor-DSL magic.
+    viewModel {
+        InboxViewModel(
+            get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+            datastore = get(),
+            notificationsBannerSession = get(),
+            activationCoordinator = get(),
+        )
+    }
     // v2 Projects tab. Registered unconditionally for the same reason as InboxViewModel: the entry
     // is always present in App.kt's entryProvider, and it simply never resolves on the classic layout.
     viewModelOf(::ProjectsViewModel)
@@ -31,7 +40,18 @@ val homeFeatureModule = module {
     viewModel { (checklistId: Long, currentFolderId: String?) ->
         // Last get() = the app-wide CoroutineScope (core:common:impl) — confirmFolderDelete needs a
         // scope that outlives this entry, because it pops itself before the delete is persisted.
-        ChecklistDetailViewModel(checklistId, currentFolderId, get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
+        ChecklistDetailViewModel(
+            checklistId, currentFolderId, get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+            notificationsBannerSession = get(),
+            activationCoordinator = get(),
+        )
+    }
+    // One per process: session flags of the notifications-off banner. App.kt drives its
+    // foreground/background edges; the activation sheet suppresses the banner through it.
+    single {
+        com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerSession {
+            kotlin.time.Clock.System.now().toEpochMilliseconds()
+        }
     }
     viewModel { (fillId: Long) ->
         FillDetailViewModel(fillId, get(), get(), get())

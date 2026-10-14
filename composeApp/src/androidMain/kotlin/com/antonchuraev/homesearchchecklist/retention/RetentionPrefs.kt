@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.first
  * On-device state for the LOCAL retention-push system (behavioral timing + frequency cap).
  *
  * Two independent concerns, both intentionally lightweight (no dedicated tracking pipeline — the
- * activity histogram is fed only by cheap app-open / foreground signals):
+ * activity histogram is fed only by visible-Activity foreground signals, never by process start):
  *
  *  1. **Most-active-hour histogram** — a 24-slot counter stored as a CSV string. [recordActiveHour]
  *     bumps the current-hour slot (debounced to at most once per [RECORD_DEBOUNCE_MS] so a resume
@@ -31,6 +31,10 @@ class RetentionPrefs(
      * Record that the user was active in the current [hour] (0..23). Debounced: a call within
      * [RECORD_DEBOUNCE_MS] of the previous recorded sample is ignored, so many rapid foregrounds
      * (billing sheet round-trips, quick app switches) count once, not dozens of times.
+     *
+     * Foreground-only, like [recordForeground]: a background process start (e.g. the daily
+     * retention alarm itself, which fires AT the preferred hour) used to be counted too, so the
+     * histogram reinforced its own delivery hour instead of measuring when the user is around.
      */
     suspend fun recordActiveHour(hour: Int, nowMs: Long) {
         if (hour !in 0..23) return
@@ -99,17 +103,33 @@ class RetentionPrefs(
      */
     suspend fun isComebackPending(): Boolean = comebackState() == COMEBACK_STATE_SCHEDULED
 
-    /** Record the come-back alarm as armed/pending for [checklistId] at [armedAtMs]. */
-    suspend fun markComebackScheduled(checklistId: Long, armedAtMs: Long) {
+    /**
+     * Record the come-back alarm as armed/pending for [checklistId] at [armedAtMs], due at [fireAtMs].
+     * [armedAtMs] never moves afterwards — it anchors the reschedule window; [fireAtMs] does.
+     */
+    suspend fun markComebackScheduled(checklistId: Long, armedAtMs: Long, fireAtMs: Long) {
         dataStore.saveString(KEY_COMEBACK_CHECKLIST_ID, checklistId.toString())
         dataStore.saveString(KEY_COMEBACK_ARMED_AT, armedAtMs.toString())
+        dataStore.saveString(KEY_COMEBACK_FIRE_AT, fireAtMs.toString())
         dataStore.saveString(KEY_COMEBACK_STATE, COMEBACK_STATE_SCHEDULED)
     }
 
-    /** Mark the come-back alarm as fired/consumed so a later boot never re-arms it. */
+    /** The pending come-back was moved to [fireAtMs] (user seen recently). Stays pending. */
+    suspend fun markComebackRescheduled(fireAtMs: Long) {
+        dataStore.saveString(KEY_COMEBACK_FIRE_AT, fireAtMs.toString())
+    }
+
+    /** Mark the come-back alarm as fired/consumed so a later boot or app start never re-arms it. */
     suspend fun markComebackFired() {
         dataStore.saveString(KEY_COMEBACK_STATE, COMEBACK_STATE_FIRED)
     }
+
+    /**
+     * When the pending come-back is due (epoch ms), or 0 if unknown — state armed by a build that
+     * predates this key; callers then fall back to `armedAt + delay`.
+     */
+    suspend fun comebackFireAt(): Long =
+        dataStore.observeString(KEY_COMEBACK_FIRE_AT, "").first().toLongOrNull() ?: 0L
 
     /** The target checklist id captured when the come-back was armed, or null if never armed. */
     suspend fun comebackChecklistId(): Long? =
@@ -119,13 +139,25 @@ class RetentionPrefs(
     suspend fun comebackArmedAt(): Long =
         dataStore.observeString(KEY_COMEBACK_ARMED_AT, "").first().toLongOrNull() ?: 0L
 
+    // ─── Foreground "last seen" (come-back gate) ───
+
     /**
-     * Last recorded foreground/activity sample (epoch ms), or 0 if none yet. Fed by
-     * [recordActiveHour]; the come-back honest signal compares it against [comebackArmedAt] to skip
-     * nudging a user who already returned on their own after the alarm was armed.
+     * Record that the app is on screen right now. MUST be called only from a visible Activity
+     * (resume / stop) — never from `Application.onCreate` or a receiver: those run on every
+     * background process wake (FCM, widget, alarms, boot), and a background wake is not the user
+     * coming back. Undebounced on purpose: the come-back gate needs the latest value, not a sample.
      */
-    suspend fun lastActiveMs(): Long =
-        dataStore.observeString(KEY_LAST_ACTIVE_MS, "").first().toLongOrNull() ?: 0L
+    suspend fun recordForeground(nowMs: Long) {
+        dataStore.saveString(KEY_LAST_FOREGROUND_MS, nowMs.toString())
+    }
+
+    /**
+     * Last time the app was actually on screen (epoch ms), or 0 if never recorded. A separate key
+     * from the histogram debounce timestamp, which builds before this fix also wrote from background
+     * process starts — reusing it would carry that pollution over.
+     */
+    suspend fun lastForegroundMs(): Long =
+        dataStore.observeString(KEY_LAST_FOREGROUND_MS, "").first().toLongOrNull() ?: 0L
 
     private suspend fun comebackState(): String =
         dataStore.observeString(KEY_COMEBACK_STATE, COMEBACK_STATE_NONE).first()
@@ -140,6 +172,8 @@ class RetentionPrefs(
         const val KEY_COMEBACK_STATE = "retention_comeback_state"
         const val KEY_COMEBACK_CHECKLIST_ID = "retention_comeback_checklist_id"
         const val KEY_COMEBACK_ARMED_AT = "retention_comeback_armed_at"
+        const val KEY_COMEBACK_FIRE_AT = "retention_comeback_fire_at"
+        const val KEY_LAST_FOREGROUND_MS = "retention_last_foreground_ms"
         const val COMEBACK_STATE_NONE = ""
         const val COMEBACK_STATE_SCHEDULED = "scheduled"
         const val COMEBACK_STATE_FIRED = "fired"

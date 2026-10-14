@@ -9,9 +9,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -37,7 +34,6 @@ class WelcomeOnboardingViewModel(
     private val checklistRepository: ChecklistRepository,
     private val analyzeRepository: AnalyzeRepository,
     private val activationCoordinator: ActivationCoordinator,
-    private val remoteConfigProvider: RemoteConfigProvider,
     private val analyticsTracker: AnalyticsTracker,
     private val logger: AppLogger,
     private val isDebugBuild: Boolean = false,
@@ -231,13 +227,8 @@ class WelcomeOnboardingViewModel(
 
             // Reproduce the Analyze-preview confirm's activation side effects (we skipped the preview):
             // fire FIRST_AI_CHECKLIST_CREATED + drive the reminder opt-in via the coordinator. It owns
-            // the new-user / show-once gating, so this is safe to always call. Read the RC flag the same
-            // way AnalyzeResultPreviewViewModel does.
-            val activationEnabled = remoteConfigProvider.getBoolean(
-                RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
-                RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
-            )
-            activationCoordinator.onAiChecklistCreated(checklist.id, activationEnabled)
+            // the new-user / show-once gating, so this is safe to always call.
+            activationCoordinator.onAiChecklistCreated(checklist.id)
 
             // checklist_created=true: unlike the old hand-off (where the Analyze funnel fired its own
             // event on confirm), this branch now creates the checklist itself.

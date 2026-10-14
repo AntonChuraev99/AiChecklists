@@ -38,7 +38,6 @@ val onboardingFeatureModule = module {
             checklistRepository = get(),
             analyzeRepository = get(),
             activationCoordinator = get(),
-            remoteConfigProvider = get(),
             analyticsTracker = get(),
             logger = get(),
             isDebugBuild = get(named("isDebugBuild")),

@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
@@ -69,6 +70,9 @@ class CreateChecklistViewModel(
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val reminderScheduler: ChecklistReminderScheduler,
     private val logger: AppLogger,
+    // Feeds the one-time reminder opt-in sheet after a new user's first checklist. Defaulted so
+    // tests / previews that build the VM by hand need no coordinator; Koin passes the singleton.
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
     /**
      * v2 nav arm ("Projects"): render and behave as the redesigned project form.
      *
@@ -802,7 +806,8 @@ class CreateChecklistViewModel(
      * there is no snackbar. The control arm must NOT get this: its landing screen is part of the
      * baseline the experiment measures against.
      */
-    private fun landOnCreatedProject(checklistId: Long) {
+    private suspend fun landOnCreatedProject(checklistId: Long) {
+        activationCoordinator.onUserChecklistCreated(checklistId)
         if (useProjectForm) {
             appNavigator.navigateToChecklistDetail(checklistId = checklistId, clearBackStack = true)
         } else {

@@ -24,7 +24,7 @@ project: gisti-checklists
 | Key | Layer | Locked value |
 |---|---|---|
 | `onboarding` | client RC | `ai_welcome` (Web → `none`) — the only significant result |
-| `activation_bundle_v1` | client RC | `false` |
+| `activation_bundle_v1` | client RC | `false` — superseded 2026-10-14: bundle always on, flag deleted |
 | `paywall_config` | client RC | `{"currentOffer":"monthAndYear"}` — keeps the 3-day trial |
 | `paywall_variant` | client RC | `features_v1` |
 | `ai_model_*` (5 flows) | server RC | `gemini-3.1-flash-lite` |
@@ -32,7 +32,7 @@ project: gisti-checklists
 
 Applied 2026-09-17: client template v20 → v21, server v3 → v4 with its percentage conditions removed (source: RC server template v3). `OnboardingABC` is stopped in the console.
 
-Code fallbacks aligned: `RemoteConfigDefaults.ACTIVATION_BUNDLE_V1` is false, `PaywallRemoteConfig.DEFAULT_OFFER` is the `monthAndYear` offering, `init.js.template` turns the bundle off, and every model default in `main.py` is the locked model. The control arm label on the RC-failure path stays — it means Remote Config did not decide.
+Code fallbacks aligned: `PaywallRemoteConfig.DEFAULT_OFFER` is the `monthAndYear` offering, and every model default in `main.py` is the locked model. The control arm label on the RC-failure path stays — it means Remote Config did not decide.
 
 ## Why this way
 

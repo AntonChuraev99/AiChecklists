@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.templates
 
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AiEntryDestination
 import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
@@ -32,6 +33,9 @@ class TemplatesViewModel(
     private val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
+    // Feeds the one-time reminder opt-in sheet after a new user's first checklist. Defaulted so
+    // tests / previews that build the VM by hand need no coordinator; Koin passes the singleton.
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
 ) : AppViewModel<TemplatesScreenState, TemplatesScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(TemplatesScreenState())
@@ -177,6 +181,7 @@ class TemplatesViewModel(
                     it.copy(isCreating = false, showPreviewDialog = false, selectedTemplate = null)
                 }
 
+                activationCoordinator.onUserChecklistCreated(checklistId)
                 // Navigate to the created checklist, clearing back stack
                 appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
             } catch (e: Exception) {
@@ -195,6 +200,7 @@ class TemplatesViewModel(
                     analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
                         AnalyticsParams.SOURCE to ChecklistSource.WEEKLY.wire,
                     ))
+                    activationCoordinator.onUserChecklistCreated(result.checklistId)
                     appNavigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
                 }
                 CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->

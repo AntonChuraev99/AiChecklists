@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.create.domain.usecase
 
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
@@ -25,6 +26,8 @@ class CreateChecklistFromGalleryTemplateUseCase(
     private val firestoreSyncDataSource: FirestoreSyncDataSource,
     private val checklistRepository: ChecklistRepository,
     private val logger: AppLogger,
+    // Defaulted for hand-built instances in tests; Koin's factoryOf passes the app singleton.
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
 ) {
     sealed interface Result {
         data class Created(val checklistId: Long) : Result
@@ -118,6 +121,9 @@ class CreateChecklistFromGalleryTemplateUseCase(
                 }
             }
 
+            // The user's own checklist (they followed the gallery link) — feeds the one-time
+            // reminder opt-in sheet. Never throws: the coordinator logs and swallows its own errors.
+            activationCoordinator.onUserChecklistCreated(checklistId)
             Result.Created(checklistId)
         }.getOrElse { e ->
             // runCatching catches Throwable, which includes CancellationException — swallowing it

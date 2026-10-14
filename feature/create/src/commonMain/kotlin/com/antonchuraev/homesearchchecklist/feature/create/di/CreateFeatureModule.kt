@@ -36,6 +36,7 @@ val createFeatureModule = module {
             getUserLimitsUseCase = get(),
             reminderScheduler = get(),
             logger = get(),
+            activationCoordinator = get(),
             // The nav arm, forwarded by CreateChecklistScreen. Absent (older call sites / previews)
             // means the CONTROL arm, whose form must stay exactly what it was before the redesign.
             useProjectForm = params.getOrNull<Boolean>() ?: false,

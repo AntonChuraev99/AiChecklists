@@ -46,8 +46,11 @@ import java.util.Locale
  * emitted here as [AnalyticsEvents.Push.RECEIVED]; the local-exclusive `push_type` values
  * ([AnalyticsEvents.LocalPushType]) keep this separable from server pushes in the shared funnel.
  *
- * Cold-process safe: every dependency resolves through `GlobalContext.getOrNull()`; if Koin has not
- * started (a push alarm woke a cold process) the handler logs and no-ops instead of crashing.
+ * Cold process: an alarm that wakes a dead process runs `Application.onCreate` first, which starts
+ * Koin synchronously — so a cold fire resolves its dependencies like a warm one and is handled in
+ * full. `GlobalContext.getOrNull()` + `runCatching` in [resolveDeps] only guard against a binding
+ * that throws; that case logs (and, for the come-back, leaves a Crashlytics breadcrumb) instead of
+ * crashing.
  */
 class RetentionPushReceiver : BroadcastReceiver() {
 
@@ -124,16 +127,20 @@ class RetentionPushReceiver : BroadcastReceiver() {
 
     /**
      * The D0->D1 come-back nudge (one-shot). Unlike daily/digest it has NO recurring/overdue
-     * precondition — it only requires that the FIRST checklist still exists, still has open items,
-     * and the user has not returned on their own since the alarm was armed. This is the whole point:
-     * it covers the day-1 leak the other three structurally cannot reach.
+     * precondition — it only requires a checklist with open items and a user who has been away for
+     * the full quiet period. This is the whole point: it covers the day-1 leak the other three
+     * structurally cannot reach.
      *
-     * The alarm marks itself FIRED first (so a later boot never re-arms it), then runs the honest
-     * gates, emitting [AnalyticsEvents.Retention.COMEBACK_SKIPPED] with a precise reason on any skip.
+     * Flow: a stale alarm (state no longer pending) is ignored; otherwise [ComebackGate.decide]
+     * either RESCHEDULES (user on screen recently — the one-shot stays pending, see
+     * [AnalyticsEvents.Retention.COMEBACK_RESCHEDULED]) or reaches a final decision, at which point
+     * the one-shot is consumed BEFORE the remaining gates (frequency cap, target) so a crash after
+     * showing can never re-show it. Every final skip emits [AnalyticsEvents.Retention.COMEBACK_SKIPPED]
+     * with a precise reason.
      *
      * Debug force path: a manual `am broadcast ... --ez $EXTRA_COMEBACK_FORCE true` (honored ONLY on
-     * debuggable builds) bypasses every gate and shows for the newest checklist, so the nudge can be
-     * exercised on demand without a fresh install or a 22h wait.
+     * debuggable builds) bypasses the pending/foreground/permission/cap gates and shows for the
+     * newest checklist with open items, without touching the one-shot state.
      */
     private fun handleComeback(context: Context, intent: Intent) {
         val pendingResult = goAsync()
@@ -141,43 +148,59 @@ class RetentionPushReceiver : BroadcastReceiver() {
             try {
                 val deps = resolveDeps()
                 if (deps == null) {
-                    // Cold-process silent-drop made VISIBLE. The alarm fired but Koin wasn't bound,
-                    // so the nudge can't run. This used to return with ZERO signal — the prime suspect
-                    // for scheduled(20) -> ~0 deliveries. Crashlytics is Koin-free, so record it there;
-                    // scheduled - COMEBACK_FIRED - <this> = alarm-miss becomes computable.
-                    runCatching { FirebaseCrashlytics.getInstance().log("comeback dropped: deps_not_ready (cold process)") }
-                    android.util.Log.w(TAG, "comeback: dropped — deps not ready (cold process)")
+                    // Koin is started synchronously in Application.onCreate, so this is reached only
+                    // if a binding threw (resolveDeps logs the reason). Crashlytics is Koin-free, so
+                    // record it there; scheduled - COMEBACK_FIRED - <this> = alarm-miss is computable.
+                    runCatching { FirebaseCrashlytics.getInstance().log("comeback dropped: deps_not_ready") }
+                    android.util.Log.w(TAG, "comeback: dropped — deps not ready")
                     return@launch
                 }
-                // Fire-side signal (warm path) — emitted before any gate so the funnel is complete.
-                // Out-of-session throughout this receiver: an AlarmManager broadcast wakes the
-                // process with no Activity, so a plain event would mint a phantom session_start.
+                val force = AppBuildConfig.isDebug && intent.getBooleanExtra(EXTRA_COMEBACK_FORCE, false)
+
+                // A consumed come-back can still have a stale alarm behind it (app-start re-arm racing
+                // this very broadcast). It is not a fire — no event, no nudge.
+                if (!force && !deps.prefs.isComebackPending()) {
+                    deps.logger.debug(TAG, "comeback: alarm for an already consumed one-shot — ignored")
+                    return@launch
+                }
+
+                // Fire-side signal — emitted before any gate so the funnel is complete. Out-of-session
+                // throughout this receiver: an AlarmManager broadcast wakes the process with no
+                // Activity, so a plain event would mint a phantom session_start. NOTE: a rescheduled
+                // come-back fires again, so count USERS (not events) for scheduled -> fired.
                 runCatching { deps.analytics.eventOutOfSession(AnalyticsEvents.Retention.COMEBACK_FIRED) }
                     .onFailure { deps.logger.warning(TAG, "comeback fired-event emit failed: ${it.message}") }
 
-                val force = AppBuildConfig.isDebug && intent.getBooleanExtra(EXTRA_COMEBACK_FORCE, false)
-
-                // One-shot: consume it now so a reboot can never re-arm a fired come-back.
-                if (!force) deps.prefs.markComebackFired()
-
-                if (!force && !notificationsEnabled(context)) {
-                    emitSkipped(deps, REASON_PERMISSION_OFF)
-                    return@launch
-                }
-
-                // Honest signal: the user already came back on their own after we armed — no nudge.
                 if (!force) {
-                    val armedAt = deps.prefs.comebackArmedAt()
-                    val lastActive = deps.prefs.lastActiveMs()
-                    if (armedAt > 0L && lastActive > armedAt) {
-                        emitSkipped(deps, REASON_ALREADY_ACTIVE)
-                        return@launch
+                    val now = System.currentTimeMillis()
+                    val decision = ComebackGate.decide(
+                        nowMs = now,
+                        armedAtMs = deps.prefs.comebackArmedAt(),
+                        lastForegroundMs = deps.prefs.lastForegroundMs(),
+                        notificationsEnabled = notificationsEnabled(context),
+                        delayMs = deps.scheduler.comebackDelayMs(),
+                        maxWindowMs = deps.scheduler.comebackMaxWindowMs(),
+                    )
+                    when (decision) {
+                        is ComebackGate.Decision.Reschedule -> {
+                            reschedule(deps, intent, decision.atMs, now)
+                            return@launch
+                        }
+                        is ComebackGate.Decision.Skip -> {
+                            deps.prefs.markComebackFired()
+                            emitSkipped(deps, decision.reason)
+                            return@launch
+                        }
+                        ComebackGate.Decision.Show -> {
+                            // Final decision reached — consume the one-shot before showing.
+                            deps.prefs.markComebackFired()
+                        }
                     }
                 }
 
                 val dateKey = todayKey()
                 if (!force && !deps.prefs.canShowOn(dateKey)) {
-                    emitSkipped(deps, REASON_FREQUENCY_CAP)
+                    emitSkipped(deps, ComebackGate.REASON_FREQUENCY_CAP)
                     return@launch
                 }
 
@@ -195,33 +218,55 @@ class RetentionPushReceiver : BroadcastReceiver() {
         }
     }
 
+    /** Move the pending come-back to [atMs]; the one-shot stays pending (not consumed). */
+    private suspend fun reschedule(deps: Deps, intent: Intent, atMs: Long, nowMs: Long) {
+        val checklistId = intent.getLongExtra(EXTRA_COMEBACK_CHECKLIST_ID, -1L).takeIf { it > 0L }
+            ?: deps.prefs.comebackChecklistId()
+            ?: 0L
+        val name = intent.getStringExtra(EXTRA_COMEBACK_CHECKLIST_NAME).orEmpty()
+        deps.scheduler.rescheduleComebackTo(atMs, checklistId, name)
+        deps.prefs.markComebackRescheduled(atMs)
+        val delayHours = ((atMs - nowMs) / HOUR_MS).toInt()
+        deps.logger.debug(TAG, "comeback: user seen recently — rescheduled in ${atMs - nowMs} ms")
+        runCatching {
+            deps.analytics.eventOutOfSession(
+                AnalyticsEvents.Retention.COMEBACK_RESCHEDULED,
+                mapOf(AnalyticsParams.DELAY_HOURS to delayHours),
+            )
+        }.onFailure { deps.logger.warning(TAG, "comeback rescheduled-event emit failed: ${it.message}") }
+    }
+
     /**
-     * Resolve the come-back target: the checklist id captured at arm time (intent extra), or — on a
-     * debug force run with no id — the newest checklist. Shows only if it still exists and still has
-     * unchecked items; otherwise emits the precise skip reason and returns null.
+     * Resolve the come-back target via [ComebackGate.pickTarget]: the checklist captured at arm time
+     * (intent extra) if it still has open items, else the most recently updated project with open
+     * items; on a debug force run with no id the newest checklist is preferred. Emits the precise
+     * skip reason and returns null when nothing qualifies.
      */
     private suspend fun findComeback(deps: Deps, intent: Intent, force: Boolean): RetentionPushSpec? {
         val extraId = intent.getLongExtra(EXTRA_COMEBACK_CHECKLIST_ID, -1L).takeIf { it > 0L }
-        // `projects`: the force path picks `maxByOrNull { it.id }`, which would ALWAYS be the
-        // freshly auto-created system Inbox in the v2 arm — a push about a list the user never made.
+        // `projects`, never `checklists`: the system Inbox (v2 arm) is excluded — it would otherwise
+        // win the force path's `max id` and the fallback, i.e. a push about a list the user never made.
         val checklists = deps.repository.projects.first()
-        val target = when {
-            extraId != null -> checklists.firstOrNull { it.id == extraId }
-            force -> checklists.maxByOrNull { it.id }
-            else -> null
+        val candidates = checklists.map { checklist ->
+            val fill = deps.repository.getDefaultFillOneShot(checklist.id)
+            ComebackGate.Candidate(
+                id = checklist.id,
+                uncheckedCount = fill?.let { uncheckedCount(it) } ?: 0,
+                updatedAtMs = fill?.updatedAt ?: 0L,
+            )
         }
-        if (target == null) {
-            emitSkipped(deps, REASON_NO_CHECKLIST)
-            return null
+        val pick = when (val result = ComebackGate.pickTarget(extraId, candidates, force)) {
+            is ComebackGate.TargetPick.Skip -> {
+                emitSkipped(deps, result.reason)
+                return null
+            }
+            is ComebackGate.TargetPick.Target -> result
         }
-        val fill = deps.repository.getDefaultFillOneShot(target.id)
-        val unchecked = fill?.let { uncheckedCount(it) } ?: 0
-        if (unchecked <= 0) {
-            emitSkipped(deps, REASON_NO_UNCHECKED)
-            return null
-        }
+        val target = checklists.first { it.id == pick.id }
+        val unchecked = pick.uncheckedCount
         val context = deps.appContext
-        val name = target.name.ifBlank { intent.getStringExtra(EXTRA_COMEBACK_CHECKLIST_NAME).orEmpty() }
+        val armedName = if (target.id == extraId) intent.getStringExtra(EXTRA_COMEBACK_CHECKLIST_NAME).orEmpty() else ""
+        val name = target.name.ifBlank { armedName }
         return RetentionPushSpec(
             pushType = AnalyticsEvents.LocalPushType.COMEBACK,
             channelToken = PushNotificationChannels.DATA_CHANNEL_REMINDERS,
@@ -513,12 +558,9 @@ class RetentionPushReceiver : BroadcastReceiver() {
         private const val CAMPAIGN_DIGEST = "local_weekly_digest"
         private const val CAMPAIGN_COMEBACK = "local_comeback"
 
-        // COMEBACK_SKIPPED reasons (wire values — keep in sync with AnalyticsEvents.Retention doc).
-        private const val REASON_PERMISSION_OFF = "permission_off"
-        private const val REASON_NO_CHECKLIST = "no_checklist"
-        private const val REASON_ALREADY_ACTIVE = "already_active"
-        private const val REASON_FREQUENCY_CAP = "frequency_cap"
-        private const val REASON_NO_UNCHECKED = "no_unchecked"
+        // COMEBACK_SKIPPED reasons live in ComebackGate (wire values).
+
+        private const val HOUR_MS = 60 * 60 * 1000L
 
         private const val ONE_DAY_MS = 24 * 60 * 60 * 1000L
 

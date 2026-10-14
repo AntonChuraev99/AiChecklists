@@ -53,14 +53,9 @@ object RemoteConfigKeys {
     // user-set reminders always fire at the time the user chose.
     const val PUSH_TIMING_ARM = "push_timing_arm"
 
-    // New-user activation bundle master switch (boolean). Default OFF since 2026-09-17 (see
-    // RemoteConfigDefaults.ACTIVATION_BUNDLE_V1). When ON:
-    //   - SKIP the static first-checklist auto-seed so the user lands on the AI first-run hero,
-    //   - render the activation hero (prompt + chips) on the empty MainScreen,
-    //   - show the one-time reminder opt-in after the new user's first AI checklist.
-    // When OFF: the EXACT pre-activation behavior (static auto-create + first_checklist_variant
-    // A/B + plain EmptyState). Remotely toggleable so the whole bundle can be A/B-tested later.
-    const val ACTIVATION_BUNDLE_V1 = "activation_bundle_v1"
+    // NOTE: `activation_bundle_v1` was removed on 2026-10-14 — the new-user activation bundle (no
+    // static seed, AI first-run hero, reminder opt-in after the first checklist) is the only code
+    // path now. The console parameter is the owner's to delete; no client reads it.
 
     // NOTE: `nav_v2_arm` was removed on 2026-08-04. Which navigation shell renders is a persisted
     // USER SETTING now (Settings -> "Classic layout"), resolved by NavExperimentResolver, and Remote
@@ -135,12 +130,4 @@ object RemoteConfigDefaults {
     // client namespace, so adding it to the *server* template would silently do nothing; and
     // (2) attach a condition for the split. Until then, treat any timing comparison as invalid.
     const val PUSH_TIMING_ARM = "behavioral"
-
-    // Activation bundle OFF by default — matches the Firebase Console client-template parameter
-    // `activation_bundle_v1 = false`, locked by the owner on 2026-09-17 after A/B #7 expired
-    // (2026-09-16) with no significant effect. This fallback MUST equal that template value:
-    // otherwise a failed Remote Config fetch silently enrolls the user into the ON variant, which
-    // prod no longer serves. Change both together. The read MUST NOT be wrapped in a withTimeout
-    // (SplashViewModel already reactively awaits fetchAndActivate() before reading flags).
-    const val ACTIVATION_BUNDLE_V1 = false
 }

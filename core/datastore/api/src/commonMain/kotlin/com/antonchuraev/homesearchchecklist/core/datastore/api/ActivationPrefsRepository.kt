@@ -1,7 +1,8 @@
 package com.antonchuraev.homesearchchecklist.core.datastore.api
 
 /**
- * Persisted, per-UID state for the new-user activation bundle (RC flag `activation_bundle_v1`).
+ * Persisted, per-UID state for the new-user activation bundle (unconditional since 2026-10-14;
+ * the former RC flag `activation_bundle_v1` was deleted).
  *
  * Two independent one-time flags:
  *  - **new-user-pending** — set once at splash for a brand-new registration. It marks the

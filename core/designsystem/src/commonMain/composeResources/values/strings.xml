@@ -223,7 +223,7 @@
     <string name="main_create_with_ai_action">Create with AI</string>
     <string name="main_create_with_ai_prefill">Create a checklist for </string>
     <string name="main_prompt_plan_day_query">What should I do today?</string>
-    <!-- Activation hero (new-user first run, RC flag activation_bundle_v1) -->
+    <!-- Activation hero (new-user first run; unconditional since 2026-10-14) -->
     <string name="activation_hero_title">What can I help you organize?</string>
     <string name="activation_hero_subtitle">Describe anything and I'll build a checklist for you. Or start from one of these:</string>
     <string name="activation_hero_input_placeholder">Describe anything — I'll build a checklist</string>
@@ -1952,4 +1952,25 @@
          rule. Multi-step configuration must not vanish silently. -->
     <string name="due_rail_repeat_replaced">Repeat removed — a task can have a repeat or a single date</string>
     <string name="due_planner_done">Done</string>
+    <!-- Notifications-off banner + activation reminder sheet (2026-10-14) -->
+    <string name="notif_banner_title">Notifications are off</string>
+    <string name="notif_banner_title_reminder">Your reminder won't ring</string>
+    <string name="notif_banner_body">Turn them on so you don't miss reminders.</string>
+    <string name="notif_banner_body_reminder">Turn on notifications to get it on time.</string>
+    <string name="notif_banner_body_settings">Allow notifications for Gisti in Settings.</string>
+    <string name="notif_banner_cta">Turn on</string>
+    <string name="notif_cta_settings">Open settings</string>
+    <string name="notif_banner_dismiss">Hide notifications tip</string>
+    <string name="notif_granted_snackbar">Notifications on. Reminders will ring on time.</string>
+    <string name="activation_sheet_title">Remind you about this list?</string>
+    <string name="activation_sheet_body">Pick a time. You can change it later.</string>
+    <string name="activation_sheet_today">Today, %1$s</string>
+    <string name="activation_sheet_tomorrow">Tomorrow, %1$s</string>
+    <string name="activation_sheet_cta">Remind me</string>
+    <string name="activation_sheet_caption_permission">Next, allow notifications so it can ring.</string>
+    <string name="activation_sheet_reminder_set">Reminder set for %1$s</string>
+    <string name="activation_sheet_title_task">Remind you about this task?</string>
+    <string name="activation_sheet_today_lower">today, %1$s</string>
+    <string name="activation_sheet_tomorrow_lower">tomorrow, %1$s</string>
+    <string name="activation_sheet_reminder_failed">Couldn't set the reminder. Set it from the list instead.</string>
 </resources>

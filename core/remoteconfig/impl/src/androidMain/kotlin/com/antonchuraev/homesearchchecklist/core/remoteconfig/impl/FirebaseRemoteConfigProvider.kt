@@ -59,7 +59,6 @@ class FirebaseRemoteConfigProvider(
         RemoteConfigKeys.PAYWALL_VARIANT to RemoteConfigDefaults.PAYWALL_VARIANT,
         RemoteConfigKeys.PAYWALL_DEFAULT_PLAN to RemoteConfigDefaults.PAYWALL_DEFAULT_PLAN,
         RemoteConfigKeys.PAYWALL_CONFIG to RemoteConfigDefaults.PAYWALL_CONFIG,
-        RemoteConfigKeys.ACTIVATION_BUNDLE_V1 to RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
         RemoteConfigKeys.PUSH_TIMING_ARM to RemoteConfigDefaults.PUSH_TIMING_ARM,
     )
 

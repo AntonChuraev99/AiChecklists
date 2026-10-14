@@ -166,12 +166,6 @@ fun MainScreen(
      *  When non-null, a "+" action appears in the top bar and a "New list" chip
      *  is prepended to the prompt chips. Wired in App.kt NavHost. */
     onCreateFromTemplatesClick: (() -> Unit)? = null,
-    /**
-     * New-user activation bundle (RC flag `activation_bundle_v1`). When true AND the checklist
-     * list is empty, the AI first-run hero replaces the plain empty state. App.kt resolves the
-     * flag and passes it here.
-     */
-    activationEnabled: Boolean = false,
     /** Hero typed input → App.kt opens the inline dock and sends the AI create prompt. */
     onActivationGenerate: ((String) -> Unit)? = null,
     /** Hero template chip tapped → (chipKey for analytics, resolved prompt). App.kt fires the
@@ -493,7 +487,6 @@ fun MainScreen(
                         onDismissSyncBanner = {
                             viewModel.sendIntent(MainScreenIntent.OnDismissSyncBanner)
                         },
-                        activationEnabled = activationEnabled,
                         onActivationGenerate = { prompt -> onActivationGenerate?.invoke(prompt) },
                         onActivationChipTapped = { key, prompt -> onActivationChipTapped?.invoke(key, prompt) },
                         contentBottomPadding = contentBottomPadding,

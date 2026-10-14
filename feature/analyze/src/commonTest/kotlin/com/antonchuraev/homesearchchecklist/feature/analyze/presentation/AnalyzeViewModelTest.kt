@@ -132,7 +132,6 @@ class AnalyzeViewModelTest {
         getSubscriptionStatusUseCase = GetSubscriptionStatusUseCase(fakePaywallRepository),
         analyticsTracker = fakeAnalyticsTracker,
         activationCoordinator = fakeActivationCoordinator,
-        remoteConfigProvider = fakeRemoteConfigProvider,
     )
 
     // ── v2 entry points: a door must arrive ON its material, and must be attributable ────────────
@@ -582,15 +581,17 @@ class AnalyzeViewModelTest {
     /** Records the checklist id handed to the activation funnel (or null if never called). */
     private class RecordingActivationCoordinator : ActivationCoordinator {
         var lastChecklistId: Long? = null
-        var lastBundleEnabled: Boolean? = null
+        var lastUserChecklistId: Long? = null
 
         override val reminderOptInRequests: SharedFlow<Long> = MutableSharedFlow()
 
-        override suspend fun onAiChecklistCreated(checklistId: Long, activationBundleEnabled: Boolean) {
+        override suspend fun onAiChecklistCreated(checklistId: Long) {
             lastChecklistId = checklistId
-            lastBundleEnabled = activationBundleEnabled
         }
 
+        override suspend fun onUserChecklistCreated(checklistId: Long) {
+            lastUserChecklistId = checklistId
+        }
         override suspend fun reportReminderOptInOutcome(granted: Boolean) {}
     }
 

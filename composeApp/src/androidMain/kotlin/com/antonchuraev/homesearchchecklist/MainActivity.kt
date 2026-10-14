@@ -30,6 +30,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsUtm
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
@@ -39,7 +40,10 @@ import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
 import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import org.koin.android.ext.android.inject
@@ -50,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private val appNavigator: AppNavigator by inject()
     private val analyticsTracker: AnalyticsTracker by inject()
     private val retentionPrefs: RetentionPrefs by inject()
+    private val logger: AppLogger by inject()
     private val pendingGalleryDeepLink: PendingGalleryDeepLink by inject()
     private val debugMenuDetector = if (AppBuildConfig.isDebug) {
         DebugMenuDetector { appNavigator.navigateToDebugMenu() }
@@ -253,20 +258,54 @@ class MainActivity : ComponentActivity() {
         }
 
         // Behavioral-timing signal: record a foreground as an activity sample (debounced inside
-        // RetentionPrefs to at most once per 15 min). Best-effort — never blocks resume.
+        // RetentionPrefs to at most once per 15 min) + the come-back "last seen". Best-effort —
+        // never blocks resume.
         recordActiveForRetentionTiming()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // "Last seen" = when the user LEFT, not when they arrived: a long first session must push
+        // the come-back quiet period past its end, not past its start.
+        recordForegroundForComeback(System.currentTimeMillis())
+    }
+
     /**
-     * Feed a warm-foreground activity sample into the behavioral-timing histogram. Only affects the
-     * delivery hour of OUR local auto-pushes; user-set reminders are unaffected. Debounced in prefs.
+     * Feed a foreground activity sample into the behavioral-timing histogram and the come-back gate's
+     * foreground "last seen". This Activity is the ONLY writer of both — process start is not user
+     * activity (see GistiApplication.scheduleRetentionPushes). Only affects OUR local auto-pushes;
+     * user-set reminders are unaffected.
      */
     private fun recordActiveForRetentionTiming() {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val now = System.currentTimeMillis()
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching { retentionPrefs.recordActiveHour(hour, now) }
+                .onFailure { logger.error(RETENTION_TAG, "recordActiveHour failed: ${it.message}", it) }
         }
+        recordForegroundForComeback(now)
+    }
+
+    /**
+     * Process-scoped, NOT [lifecycleScope]: on a back-exit ON_DESTROY follows onStop immediately and
+     * would cancel the write before it lands, leaving "last seen" at the resume time. The DataStore
+     * write stays off the main thread.
+     */
+    private fun recordForegroundForComeback(nowMs: Long) {
+        retentionWriteScope.launch {
+            runCatching { retentionPrefs.recordForeground(nowMs) }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    logger.error(RETENTION_TAG, "recordForeground failed: ${it.message}", it)
+                }
+        }
+    }
+
+    private companion object {
+        const val RETENTION_TAG = "Retention"
+
+        /** Outlives any single Activity instance; the writes are tiny and fire-and-forget. */
+        val retentionWriteScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     override fun onNewIntent(intent: Intent) {

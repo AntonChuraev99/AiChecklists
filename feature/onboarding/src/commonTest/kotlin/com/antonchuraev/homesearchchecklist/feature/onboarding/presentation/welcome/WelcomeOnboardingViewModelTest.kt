@@ -100,7 +100,6 @@ class WelcomeOnboardingViewModelTest {
         checklistRepository = fakeChecklistRepository,
         analyzeRepository = fakeAnalyzeRepository,
         activationCoordinator = fakeActivationCoordinator,
-        remoteConfigProvider = fakeRemoteConfigProvider,
         analyticsTracker = fakeAnalyticsTracker,
         logger = NoOpLogger(),
         isDebugBuild = true,
@@ -671,15 +670,17 @@ class WelcomeOnboardingViewModelTest {
     /** Records the checklist id handed to the activation funnel (or null if never called). */
     private class RecordingActivationCoordinator : ActivationCoordinator {
         var lastChecklistId: Long? = null
-        var lastBundleEnabled: Boolean? = null
+        var lastUserChecklistId: Long? = null
 
         override val reminderOptInRequests: SharedFlow<Long> = MutableSharedFlow()
 
-        override suspend fun onAiChecklistCreated(checklistId: Long, activationBundleEnabled: Boolean) {
+        override suspend fun onAiChecklistCreated(checklistId: Long) {
             lastChecklistId = checklistId
-            lastBundleEnabled = activationBundleEnabled
         }
 
+        override suspend fun onUserChecklistCreated(checklistId: Long) {
+            lastUserChecklistId = checklistId
+        }
         override suspend fun reportReminderOptInOutcome(granted: Boolean) {}
     }
 

@@ -9,9 +9,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResultHolder
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -33,8 +30,7 @@ class AnalyzeResultPreviewViewModel(
     private val appNavigator: AppNavigator,
     private val checklistRepository: ChecklistRepository,
     private val analyticsTracker: AnalyticsTracker,
-    private val activationCoordinator: ActivationCoordinator,
-    private val remoteConfigProvider: RemoteConfigProvider
+    private val activationCoordinator: ActivationCoordinator
 ) : AppViewModel<AnalyzeResultPreviewScreenState, AnalyzeResultPreviewScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(AnalyzeResultPreviewScreenState())
@@ -279,11 +275,11 @@ class AnalyzeResultPreviewViewModel(
                     // so FIRST_AI_CHECKLIST_CREATED + the reminder opt-in still fire — the chat
                     // dispatcher used to be the only create path that did this.
                     if (fromActivation) {
-                        val activationEnabled = remoteConfigProvider.getBoolean(
-                            RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
-                            RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
-                        )
-                        activationCoordinator.onAiChecklistCreated(checklistId, activationEnabled)
+                        activationCoordinator.onAiChecklistCreated(checklistId)
+                    } else {
+                        // Not the hero, but still the user's own checklist — feeds the one-time
+                        // reminder opt-in sheet (the coordinator gates it to a new user's first).
+                        activationCoordinator.onUserChecklistCreated(checklistId)
                     }
                     _screenState.update { it.copy(isCreating = false) }
                     AnalyzeResultHolder.clear()

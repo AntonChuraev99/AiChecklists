@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.preview
 
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
@@ -26,6 +27,9 @@ class TemplatePreviewViewModel(
     private val templatesRepository: TemplatesRepository,
     private val checklistRepository: ChecklistRepository,
     private val analyticsTracker: AnalyticsTracker,
+    // Feeds the one-time reminder opt-in sheet after a new user's first checklist. Defaulted so
+    // tests / previews that build the VM by hand need no coordinator; Koin passes the singleton.
+    private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
 ) : AppViewModel<TemplatePreviewScreenState, TemplatePreviewScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(TemplatePreviewScreenState())
@@ -157,6 +161,7 @@ class TemplatePreviewViewModel(
 
                 _screenState.update { it.copy(isCreating = false) }
 
+                activationCoordinator.onUserChecklistCreated(checklistId)
                 appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
             } catch (e: Exception) {
                 _screenState.update {

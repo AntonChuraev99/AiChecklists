@@ -56,25 +56,50 @@ class RetentionPushScheduler(
     // ─── D0->D1 come-back nudge (ONE-SHOT; no recurring/overdue precondition) ───
 
     /**
-     * Arm the one-shot come-back alarm ~[COMEBACK_DELAY_HOURS]h from now, keyed to [checklistId]
-     * (the user's first checklist). NOT rescheduled — it fires exactly once. On debug builds the
-     * delay collapses to [COMEBACK_DEBUG_DELAY_MS] so the nudge can be exercised without waiting a
-     * day. [checklistName] is carried as a fallback label; the receiver re-resolves the live name.
+     * Arm the one-shot come-back alarm ~[COMEBACK_DELAY_HOURS]h from [nowMs], keyed to [checklistId]
+     * (the user's first checklist). It shows at most once; the receiver may move it later (user seen
+     * recently, see [ComebackGate]) but never re-arms it once consumed. On debug builds the delay
+     * collapses to [COMEBACK_DEBUG_DELAY_MS] so the nudge can be exercised without waiting a day.
+     * [checklistName] is carried as a fallback label; the receiver re-resolves the live name.
+     *
+     * @return the fire instant, to be persisted via [RetentionPrefs.markComebackScheduled].
      */
-    fun scheduleComeback(checklistId: Long, checklistName: String) {
-        val delay = comebackDelayMs()
-        scheduleAlarm(System.currentTimeMillis() + delay, comebackPendingIntent(checklistId, checklistName))
+    fun scheduleComeback(checklistId: Long, checklistName: String, nowMs: Long): Long {
+        val fireAt = nowMs + comebackDelayMs()
+        scheduleAlarm(fireAt, comebackPendingIntent(checklistId, checklistName))
+        return fireAt
+    }
+
+    /** Move the pending come-back to [atMs] (same request code — replaces the previous alarm). */
+    fun rescheduleComebackTo(atMs: Long, checklistId: Long, checklistName: String) {
+        scheduleAlarm(atMs, comebackPendingIntent(checklistId, checklistName))
     }
 
     /**
-     * Re-arm the come-back alarm after a reboot at its ORIGINAL fire instant ([armedAtMs] + delay).
-     * If that instant has already passed while the device was off, fire shortly instead
-     * ([COMEBACK_REARM_MIN_BUFFER_MS]). Only called by boot recovery for a still-pending come-back.
+     * Re-register a still-PENDING come-back at its persisted fire instant — or [COMEBACK_REARM_MIN_BUFFER_MS]
+     * from now if that already passed (device off, app force-stopped, alarm otherwise lost).
+     * Idempotent (same request code + FLAG_UPDATE_CURRENT), so it is safe on every app start, boot
+     * and package replace. A consumed come-back is never re-armed. Returns the trigger time, or null
+     * when nothing was pending.
      */
-    fun rescheduleComebackAt(armedAtMs: Long, checklistId: Long, checklistName: String) {
-        val originalTrigger = armedAtMs + comebackDelayMs()
-        val safeTrigger = maxOf(originalTrigger, System.currentTimeMillis() + COMEBACK_REARM_MIN_BUFFER_MS)
-        scheduleAlarm(safeTrigger, comebackPendingIntent(checklistId, checklistName))
+    suspend fun rearmPendingComeback(prefs: RetentionPrefs, nowMs: Long): Long? {
+        if (!prefs.isComebackPending()) return null
+        val checklistId = prefs.comebackChecklistId() ?: return null
+        val persistedFireAt = prefs.comebackFireAt()
+        val dueAt = if (persistedFireAt > 0L) persistedFireAt else prefs.comebackArmedAt() + comebackDelayMs()
+        val trigger = maxOf(dueAt, nowMs + COMEBACK_REARM_MIN_BUFFER_MS)
+        scheduleAlarm(trigger, comebackPendingIntent(checklistId, ""))
+        return trigger
+    }
+
+    /**
+     * The single "restore every LOCAL retention alarm" entry point for app start, boot and package
+     * replace: daily + digest via [scheduleAll], then a still-pending come-back via
+     * [rearmPendingComeback]. Idempotent.
+     */
+    suspend fun restoreAll(prefs: RetentionPrefs, nowMs: Long) {
+        scheduleAll()
+        rearmPendingComeback(prefs, nowMs)
     }
 
     /** Cancel a pending come-back alarm (PendingIntent equality ignores extras — id/name irrelevant). */
@@ -82,8 +107,13 @@ class RetentionPushScheduler(
         alarmManager.cancel(comebackPendingIntent(0L, ""))
     }
 
-    private fun comebackDelayMs(): Long =
+    /** Quiet period before the nudge: [COMEBACK_DELAY_MS] release, [COMEBACK_DEBUG_DELAY_MS] debug. */
+    fun comebackDelayMs(): Long =
         if (AppBuildConfig.isDebug) COMEBACK_DEBUG_DELAY_MS else COMEBACK_DELAY_MS
+
+    /** Latest a reschedule may land after arming; past it the user counts as retained. */
+    fun comebackMaxWindowMs(): Long =
+        if (AppBuildConfig.isDebug) COMEBACK_DEBUG_MAX_WINDOW_MS else COMEBACK_MAX_WINDOW_MS
 
     private fun comebackPendingIntent(checklistId: Long, checklistName: String): PendingIntent {
         val intent = Intent(context, RetentionPushReceiver::class.java).apply {
@@ -180,7 +210,13 @@ class RetentionPushScheduler(
         /** Debug-only collapsed delay so the nudge is testable without waiting a day (20s). */
         const val COMEBACK_DEBUG_DELAY_MS = 20_000L
 
-        /** If the original come-back instant already passed during a reboot, fire this soon after. */
+        /** If the persisted come-back instant already passed (reboot, lost alarm), fire this soon after. */
         const val COMEBACK_REARM_MIN_BUFFER_MS = 60_000L
+
+        /** A reschedule never lands later than this after arming (D0->D3); past it -> already_active. */
+        const val COMEBACK_MAX_WINDOW_MS = 72 * 60L * 60L * 1000L
+
+        /** Debug counterpart of [COMEBACK_MAX_WINDOW_MS]: ~3x the collapsed debug delay. */
+        const val COMEBACK_DEBUG_MAX_WINDOW_MS = 60_000L
     }
 }

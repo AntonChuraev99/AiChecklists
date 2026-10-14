@@ -91,10 +91,8 @@ fun MainScreenContent(
     onReorderChecklists: (List<Long>) -> Unit = {},
     onSignInClick: () -> Unit = {},
     onDismissSyncBanner: () -> Unit = {},
-    // Activation bundle (RC flag activation_bundle_v1): when true AND the list is empty, the empty
-    // state is replaced by the AI first-run hero (prompt + template chips). When false the plain
-    // EmptyState is shown (legacy behavior). Wired from App.kt.
-    activationEnabled: Boolean = false,
+    // An empty list shows the AI first-run hero (prompt + template chips) — the activation bundle
+    // is unconditional since 2026-10-14. The manual path stays on the top-bar "+".
     // Typed hero input → send as an AI create prompt (App.kt opens the dock + prefills/sends).
     onActivationGenerate: (String) -> Unit = {},
     // Hero template chip tapped → (chipKey for analytics, resolved prompt to send).
@@ -118,7 +116,6 @@ fun MainScreenContent(
             onReorderChecklists = onReorderChecklists,
             onSignInClick = onSignInClick,
             onDismissSyncBanner = onDismissSyncBanner,
-            activationEnabled = activationEnabled,
             onActivationGenerate = onActivationGenerate,
             onActivationChipTapped = onActivationChipTapped,
             contentBottomPadding = contentBottomPadding,
@@ -129,7 +126,6 @@ fun MainScreenContent(
             onChecklistClick = onChecklistClick,
             onAddChecklistClick = onAddChecklistClick,
             onPremiumBannerClick = onPremiumBannerClick,
-            activationEnabled = activationEnabled,
             onActivationGenerate = onActivationGenerate,
             onActivationChipTapped = onActivationChipTapped,
             contentBottomPadding = contentBottomPadding,
@@ -154,7 +150,6 @@ private fun MainScreenContentLazyColumn(
     onReorderChecklists: (List<Long>) -> Unit,
     onSignInClick: () -> Unit = {},
     onDismissSyncBanner: () -> Unit = {},
-    activationEnabled: Boolean = false,
     onActivationGenerate: (String) -> Unit = {},
     onActivationChipTapped: (String, String) -> Unit = { _, _ -> },
     contentBottomPadding: Dp = AppDimens.SpacingXxl,
@@ -230,24 +225,10 @@ private fun MainScreenContentLazyColumn(
                     modifier = Modifier.fillParentMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (activationEnabled) {
-                        ActivationHero(
-                            onGenerate = onActivationGenerate,
-                            onChipTapped = onActivationChipTapped,
-                        )
-                    } else {
-                        EmptyState(
-                            icon = Icons.Outlined.Checklist,
-                            title = stringResource(Res.string.main_empty_title),
-                            description = stringResource(Res.string.main_empty_description),
-                            action = {
-                                AppButton(
-                                    text = stringResource(Res.string.main_empty_cta),
-                                    onClick = onAddChecklistClick,
-                                )
-                            }
-                        )
-                    }
+                    ActivationHero(
+                        onGenerate = onActivationGenerate,
+                        onChipTapped = onActivationChipTapped,
+                    )
                 }
             }
         } else {
@@ -345,7 +326,6 @@ private fun MainScreenContentLazyGrid(
     onChecklistClick: (ChecklistWithProgress) -> Unit,
     onAddChecklistClick: () -> Unit,
     onPremiumBannerClick: () -> Unit,
-    activationEnabled: Boolean = false,
     onActivationGenerate: (String) -> Unit = {},
     onActivationChipTapped: (String, String) -> Unit = { _, _ -> },
     contentBottomPadding: Dp = AppDimens.SpacingXxl,
@@ -356,24 +336,10 @@ private fun MainScreenContentLazyGrid(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            if (activationEnabled) {
-                ActivationHero(
-                    onGenerate = onActivationGenerate,
-                    onChipTapped = onActivationChipTapped,
-                )
-            } else {
-                EmptyState(
-                    icon = Icons.Outlined.Checklist,
-                    title = stringResource(Res.string.main_empty_title),
-                    description = stringResource(Res.string.main_empty_description),
-                    action = {
-                        AppButton(
-                            text = stringResource(Res.string.main_empty_cta),
-                            onClick = onAddChecklistClick,
-                        )
-                    }
-                )
-            }
+            ActivationHero(
+                onGenerate = onActivationGenerate,
+                onChipTapped = onActivationChipTapped,
+            )
         }
         return
     }
@@ -464,15 +430,15 @@ private data class ActivationChip(
 )
 
 /**
- * New-user AI first-run hero — replaces the plain [EmptyState] on the empty MainScreen when the
- * `activation_bundle_v1` bundle is ON. Shows a short prompt, a free-text input ("Describe anything
+ * New-user AI first-run hero — is the empty MainScreen state (the plain
+ * EmptyState it used to replace was deleted with the `activation_bundle_v1` flag, 2026-10-14). Shows a short prompt, a free-text input ("Describe anything
  * — I'll build a checklist"), a primary "Build my checklist" action, and a curated row of template
  * chips. Typed text and chips both flow up to the host (App.kt), which routes to the Analyze screen
  * with autoAnalyze = true so the AI GENERATES the checklist items and the user lands on the result
  * preview (AI-generated items → edit → Create) — the flagship "turn anything into a checklist" flow.
  *
- * Fires [AnalyticsEvents.Activation.FIRST_RUN_SHOWN] once on first composition (this branch only
- * renders under the treatment arm). Chip taps are reported by the host via [onChipTapped].
+ * Fires [AnalyticsEvents.Activation.FIRST_RUN_SHOWN] once on first composition (once per composition of
+ * an empty list). Chip taps are reported by the host via [onChipTapped].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
