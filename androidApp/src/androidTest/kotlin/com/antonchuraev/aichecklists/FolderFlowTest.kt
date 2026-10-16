@@ -2,7 +2,9 @@ package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -21,7 +23,7 @@ import org.junit.Test
  *  1. Enable folders via the overflow (⋮) menu toggle.
  *  2. Create a folder ("New Folder") — it appears as a [FolderCard] at the root level.
  *  3. Drill into the folder (tap) — the folder name becomes the on-screen header; folder is empty.
- *  4. Add an item inside the folder via Smart Add (toolbar "+").
+ *  4. Add an item inside the folder via Smart Add (bottom capture plate → QuickCaptureDock).
  *  5. Navigate back (top-bar up) to the root — the folder card shows aggregate progress "0/1".
  *  6. Rename the folder via long-press → folder actions sheet → Rename → dialog.
  *  7. Delete the folder via long-press → folder actions sheet → Delete folder → confirm.
@@ -35,9 +37,9 @@ import org.junit.Test
  *                       be the in-list ProgressHeader; the v2 detail screen moved the name into the
  *                       bar and left only a progress line in its place). Same text, new carrier.
  *  - Top-bar up:        contentDescription "Back"
- *  - Smart Add commit:  IME Done on the "Add a task" field (detail_inline_add_placeholder). NOT the
- *                       "Add item" contentDescription: the FAB and the inline row's send button
- *                       share it, so it matches two nodes.
+ *  - Smart Add:         tap the resting capture plate "Add a task" (detail_inline_add_placeholder)
+ *                       → type into the QuickCaptureDock field ("I want to…") → IME Done. NOT the
+ *                       dock's "+" (contentDescription "Add item", not a unique selector).
  *
  * The default folder name AND the "New Folder" menu item share the same string ("New Folder"),
  * so the helpers are careful about WHEN each is on screen: the menu item is only present while the
@@ -121,27 +123,36 @@ class FolderFlowTest : BaseUiTest() {
 
     /**
      * Add an item inside the current (folder) level via Smart Add.
-     * Types into the always-present inline add row ("Add a task") and commits with IME Done.
      *
-     * No "+" tap first: the inline row is a PERMANENT affordance at the end of the v2 list, so the
-     * FAB only scrolls to it and focuses it — it is a convenience, not the way in. Tapping it here
-     * would also be ambiguous, because the FAB and the row's own send button share the "Add item"
-     * contentDescription.
+     * Redesign B: "Add a task" is no longer an inline field — it is the resting capture plate at the
+     * bottom (`DetailCapturePlate`, ONE clickable node labelled "Add a task"). Tapping it opens the
+     * shared `QuickCaptureDock`, whose field (placeholder `item_create_input_placeholder`, "I want
+     * to…") focuses itself on mount. The text is committed with IME Done
+     * (`AddItemInputField.keyboardActions.onDone` → `OnAddItemWithParse`), the same write path the
+     * dock's "+" runs. The "+" is not tapped: its "Add item" contentDescription is not unique enough
+     * to be a stable selector across screens.
      */
     private fun smartAddItem(text: String) {
-        // Inline add row, placeholder "Add a task" (detail_inline_add_placeholder).
+        // Resting plate: one button named "Add a task" (detail_inline_add_placeholder).
+        val restingPlate = hasText("Add a task") and hasClickAction()
         waitUntil(3000) {
-            composeTestRule.onAllNodesWithText("Add a task")
+            composeTestRule.onAllNodes(restingPlate)
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule
-            .onNode(hasText("Add a task"))
-            .performTextInput(text)
+        composeTestRule.onNode(restingPlate).performClick()
         waitForIdle()
-        // Commit via IME Done (InlineAddItemInput.keyboardActions.onDone) — avoids the duplicate
-        // "Add item" contentDescription shared by the FAB and the input's commit button.
+
+        // Active plate: the QuickCaptureDock's editable field (placeholder "I want to…").
+        val captureField = hasSetTextAction() and hasText("I want to", substring = true)
+        waitUntil(3000) {
+            composeTestRule.onAllNodes(captureField)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(captureField).performTextInput(text)
+        waitForIdle()
+        // Commit via IME Done on the same (now non-empty) field.
         composeTestRule
-            .onNode(hasText(text))
+            .onNode(hasSetTextAction() and hasText(text))
             .performImeAction()
         waitForIdle()
     }

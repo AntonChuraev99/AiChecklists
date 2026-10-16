@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,6 +16,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -90,6 +92,12 @@ object AppItemMetaChipDefaults {
      * equal size the two glyphs read as two chips crammed together.
      */
     val TrailingIconSize: Dp = 12.dp
+
+    /** Default inner padding: 8dp sides, 4dp top/bottom (~22dp tall with a 14dp icon). */
+    val ContentPadding: PaddingValues = PaddingValues(
+        horizontal = AppDimens.SpacingSm,
+        vertical = AppDimens.SpacingXs,
+    )
 }
 
 /**
@@ -135,6 +143,9 @@ object AppItemMetaChipDefaults {
  * @param labelStyle     Overrides [AppTextStyles.metaLabel]. [AppDueChip] uses
  *                       [AppTextStyles.monoTime] so a ticking clock does not resize the chip.
  * @param labelOverflow  How the label truncates once it hits the width cap.
+ * @param shape          Chip outline; the 6dp tag shape by default, a pill for the compact due chip.
+ * @param contentPadding Inner padding; [AppItemMetaChipDefaults.ContentPadding] by default.
+ * @param iconSize       Leading icon size; [AppItemMetaChipDefaults.IconSize] by default.
  */
 @Composable
 fun AppItemMetaChip(
@@ -148,25 +159,25 @@ fun AppItemMetaChip(
     trailingIcon: ImageVector? = null,
     labelStyle: TextStyle? = null,
     labelOverflow: TextOverflow = TextOverflow.Ellipsis,
+    shape: Shape = MaterialTheme.shapes.extraSmall,
+    contentPadding: PaddingValues = AppItemMetaChipDefaults.ContentPadding,
+    iconSize: Dp = AppItemMetaChipDefaults.IconSize,
 ) {
     Surface(
-        shape = MaterialTheme.shapes.extraSmall,
+        shape = shape,
         color = containerColor,
         border = border,
         modifier = modifier.widthIn(max = maxWidth),
     ) {
         Row(
-            modifier = Modifier.padding(
-                horizontal = AppDimens.SpacingSm,
-                vertical = AppDimens.SpacingXs,
-            ),
+            modifier = Modifier.padding(contentPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null, // decorative — label is the semantic content
-                modifier = Modifier.size(AppItemMetaChipDefaults.IconSize),
+                modifier = Modifier.size(iconSize),
                 tint = contentColor,
             )
             Text(

@@ -543,6 +543,79 @@ class ChecklistDetailSmartAddTest {
         assertEquals(false, state.itemCreateImportant, "important chip must reset after add")
     }
 
+    // v2 capture plate (redesign B, DESIGN_SPEC_B §4): BACK / scrim dismiss closes the mode but keeps
+    // the typed draft and chip selections; reopening shows them again (the Inbox dock's behaviour).
+    @Test
+    fun itemCreate_dismissKeepsDraft_reopenRestoresIt() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateImportantToggled)
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("buy coffee filters"))
+        advanceTimeBy(201)
+
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateDismissed)
+        val closed = contentState(vm)
+        assertEquals(false, closed.itemCreateMode, "dismiss must close the mode")
+        assertEquals("buy coffee filters", closed.pendingItemInput, "dismiss must keep the draft")
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        val reopened = contentState(vm)
+        assertTrue(reopened.itemCreateMode)
+        assertEquals("buy coffee filters", reopened.pendingItemInput, "reopen must show the kept draft")
+        assertEquals(true, reopened.itemCreateImportant, "reopen must keep chip selections")
+        assertNull(repository.lastUpdatedFill, "dismiss must not write an item")
+    }
+
+    // The explicit close (v1 dock collapse) still discards the draft — unchanged behaviour.
+    @Test
+    fun itemCreate_explicitClose_stillClearsDraft() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("buy coffee filters"))
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+
+        assertEquals("", contentState(vm).pendingItemInput)
+    }
+
+    // A kept draft belongs to its target column: reopening on another Weekly day starts clean.
+    @Test
+    fun itemCreate_dismissedDraft_notCarriedToOtherWeekday() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(targetWeekday = 1))
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("gym"))
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateDismissed)
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(targetWeekday = 3))
+
+        val state = contentState(vm)
+        assertEquals("", state.pendingItemInput)
+        assertEquals(3, state.itemCreateTargetWeekday)
+    }
+
+    // A file staged for day X must not ride along onto day Y's task after a dismiss.
+    @Test
+    fun itemCreate_dismissedAttachment_notCarriedToOtherWeekday() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(targetWeekday = 1))
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateAttachmentPicked("/tmp/a.pdf", "a.pdf", "application/pdf"))
+        assertEquals(1, contentState(vm).itemCreatePendingAttachments.size, "precondition: file staged")
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateDismissed)
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(targetWeekday = 3))
+
+        assertTrue(
+            contentState(vm).itemCreatePendingAttachments.isEmpty(),
+            "another Weekly day must start without the previous day's staged files",
+        )
+    }
+
     // Weekly view: the dock add must pin the new item to its target weekday on BOTH the fill and the
     // template, otherwise WeeklyChecklistDetailContent (which filters by weekday 1..7) never shows it.
     @Test

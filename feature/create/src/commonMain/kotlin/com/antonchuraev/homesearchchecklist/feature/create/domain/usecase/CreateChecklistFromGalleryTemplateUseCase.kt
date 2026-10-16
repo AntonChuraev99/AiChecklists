@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.Firestor
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryTemplateSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filterNotNull
@@ -75,6 +76,7 @@ class CreateChecklistFromGalleryTemplateUseCase(
             val checklist = Checklist(
                 name = template.title,
                 items = templateItems,
+                separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
             )
             val checklistId = checklistRepository.addChecklist(checklist)
 

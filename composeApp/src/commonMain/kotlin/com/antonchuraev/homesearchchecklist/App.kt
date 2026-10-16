@@ -217,6 +217,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.VoicePressTerminalGate
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.endVoicePress
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.VoiceEntryDecision
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.shouldCancelVoiceOnBackground
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.shouldCancelVoiceWhenDockGone
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.voiceEntryDecision
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.logVoiceRecorderError
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
@@ -1042,6 +1046,14 @@ fun App() {
                     chatViewModel.sendIntent(ChatScreenIntent.OnVoicePressReleasedBeforeStart)
                 }
             }
+            // The ONE start of a dock recording, shared by the input rows' press-and-hold mic and the
+            // v2 Ask pill's mic (tap-to-start). Flips isRecording first, then opens the press gate and
+            // starts the recorder, which owns the permission request.
+            val startSheetVoicePress: () -> Unit = {
+                chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                sheetVoicePressGate.onPressStarted()
+                sheetAudioRecorder.start()
+            }
 
             // rememberUpdatedState, NOT the map directly: LaunchedEffect captures its lambda ONCE
             // (key = chatViewModel), and Compose Resources resolve asynchronously — on the first
@@ -1247,6 +1259,26 @@ fun App() {
             // exactly one place to keep in sync instead of one per call site.
             LaunchedEffect(v2ChatDockOpen) {
                 if (!v2ChatDockOpen) v2ChatDockClosing = false
+                // Same single place for the dock's recording: a tap-started one (the Ask pill's mic)
+                // has no finger whose release would end it, so the dock leaving — by ANY path — must
+                // cancel it, or the microphone keeps running behind a closed dock. The cancel comes
+                // back as an ordinary terminal callback → "Recording cancelled" snackbar.
+                if (shouldCancelVoiceWhenDockGone(v2ChatDockOpen, chatUiState.isRecording)) {
+                    endSheetVoicePress(true)
+                }
+            }
+            // Backgrounded mid-recording with the dock up: nobody can tap stop, and Android silences
+            // a background microphone anyway. Only a recorder that is really capturing — a start
+            // still behind the permission dialog must survive it (see shouldCancelVoiceOnBackground).
+            LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+                if (shouldCancelVoiceOnBackground(
+                        dockOpen = v2ChatDockOpen,
+                        recordingInViewModel = chatUiState.isRecording,
+                        recorderCapturing = sheetAudioRecorder.isRecording(),
+                    )
+                ) {
+                    endSheetVoicePress(true)
+                }
             }
             // The Inbox capture dock. Held HERE, not inside the Inbox screen, for one reason: the
             // FABs are shell chrome drawn above the screen, so they have to hide while the dock is
@@ -1257,6 +1289,43 @@ fun App() {
             // the screen reacts to a CHANGE of key, so a flag would have to be reset by the receiver
             // and a second tap on the same tab would emit the same value and do nothing.
             var v2InboxHomeSignal by remember { mutableIntStateOf(0) }
+
+            // The v2 Ask pill's mic: open the chat dock ALREADY RECORDING. Pass it to
+            // V2NavigationShell as `onOpenChatVoice`.
+            //
+            // Tap-to-start, tap-to-stop: the pill cannot hold a finger down, so the recording is ended
+            // by the dock's own mic, which already treats a tap during a recording as "finish & save".
+            //
+            // The recorder starts HERE, inside the tap, not through a signal the dock picks up after
+            // it mounts. The recorder lives in this scope already (the dock only renders isRecording),
+            // and on the web getUserMedia should run as close to the user gesture as possible — a
+            // hop through composition would put at least a frame between them. Calling it directly
+            // also makes it one-shot by construction: a lambda cannot re-fire on recomposition the
+            // way a Boolean key would.
+            //
+            // Analytics: the same event the FAB/pill emits, told apart by `source`; the dock's
+            // ai_chat_opened (source="dock") and VOICE_STARTED follow on their usual paths.
+            val openChatInVoice: () -> Unit = {
+                analyticsTracker.event(
+                    AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                    mapOf(AnalyticsParams.SOURCE to "pill_mic"),
+                )
+                // Same context reset and capture-dock close as the pill's plain tap (onOpenChat).
+                chatSheetContextId = null
+                chatSheetContextLabel = null
+                v2CreateDockOpen = false
+                v2ChatDockOpen = true
+                when (chatUiState.voiceEntryDecision()) {
+                    VoiceEntryDecision.StartRecording -> startSheetVoicePress()
+                    // Not silent: the dock opens onto the reason (recording / "Transcribing…" in the
+                    // input, or the pending question's chips).
+                    VoiceEntryDecision.OpenOnly -> logger.info(
+                        "ChatVoice",
+                        "Pill mic opened the dock without recording: recording=${chatUiState.isRecording} " +
+                            "transcribing=${chatUiState.isTranscribing} question=${chatUiState.pendingChoice != null}",
+                    )
+                }
+            }
 
             /**
              * Checklist the Inbox pager is settled on, held HERE rather than inside the Inbox entry.
@@ -1602,7 +1671,7 @@ fun App() {
                                                 onRetry = lastAssistantMessage.retryText?.let { text ->
                                                     { chatViewModel.sendIntent(ChatScreenIntent.OnRetryClick(text)) }
                                                 },
-                                                showSenderLabel = true,
+                                                showAvatar = true,
                                             )
                                             Spacer(Modifier.height(AppDimens.SpacingSm))
                                         }
@@ -1645,7 +1714,7 @@ fun App() {
                                             onRetry = lastAssistantMessage.retryText?.let { text ->
                                                 { chatViewModel.sendIntent(ChatScreenIntent.OnRetryClick(text)) }
                                             },
-                                            showSenderLabel = true,
+                                            showAvatar = true,
                                         )
                                     }
                                 }
@@ -1717,11 +1786,7 @@ fun App() {
                                     // no-op in the dock. Now the SAME press-hold works in the peek.
                                     // (In item-create the mic/attach are hidden and Send replaces them, so
                                     // these chat handlers are simply never reached there.)
-                                    onVoiceRecordingStarted = {
-                                        chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
-                                        sheetVoicePressGate.onPressStarted()
-                                        sheetAudioRecorder.start()
-                                    },
+                                    onVoiceRecordingStarted = startSheetVoicePress,
                                     onVoiceRecordingStopped = { endSheetVoicePress(false) },
                                     onVoiceRecordingCancelled = { endSheetVoicePress(true) },
                                     onHelpClick = { chatPanelHelpSheetOpen = true },
@@ -1799,11 +1864,7 @@ fun App() {
                                 onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
                                 onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
                                 onAttachFileClick = { chatSheetAttachmentSheet = true },
-                                onVoiceRecordingStarted = {
-                                    chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
-                                    sheetVoicePressGate.onPressStarted()
-                                    sheetAudioRecorder.start()
-                                },
+                                onVoiceRecordingStarted = startSheetVoicePress,
                                 onVoiceRecordingStopped = { endSheetVoicePress(false) },
                                 onVoiceRecordingCancelled = { endSheetVoicePress(true) },
                                 onHelpClick = { chatPanelHelpSheetOpen = true },
@@ -2359,6 +2420,7 @@ fun App() {
                 showV2Shell -> V2NavigationShell(
                     selectedTab = v2SelectedTab,
                     onNavigate = v2OnNavigate,
+                    onOpenChatVoice = openChatInVoice,
                     onOpenChat = {
                         // Tagged "fab" so it stays distinguishable from the detail screen's top-bar
                         // action, which emits the same event with source="detail_toolbar". Two very

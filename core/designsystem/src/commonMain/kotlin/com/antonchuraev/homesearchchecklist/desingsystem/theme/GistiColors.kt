@@ -28,10 +28,13 @@ import androidx.compose.ui.graphics.Color
 object GistiColors {
 
     // ── AI gradient endpoints (light vs dark per design spec) ──
-    private val AiFromLight = Color(0xFF2196F3)
-    private val AiToLight = Color(0xFF5C6BC0)
-    private val AiFromDark = Color(0xFF3E8DF0)
-    private val AiToDark = Color(0xFF6E7CE2)
+    // Redesign B (2026-10-16): one step deeper so the WHITE glyph/label on the gradient clears AA.
+    // Light: white on start 3.12 → 4.67:1, on end 4.86 → 5.96:1 (was #2196F3 → #5C6BC0).
+    // Dark:  white on start 3.35 → 4.84:1, on end 3.72 → 5.34:1 (was #3E8DF0 → #6E7CE2).
+    private val AiFromLight = Color(0xFF1A73D9)
+    private val AiToLight = Color(0xFF4F5BB8)
+    private val AiFromDark = Color(0xFF2A6FD6)
+    private val AiToDark = Color(0xFF5562C4)
 
     /** Diagonal AI sheen for sparkle tiles, "Create/Fill with AI" buttons, the FAB. */
     val aiGradient: Brush
@@ -51,10 +54,16 @@ object GistiColors {
         @Composable @ReadOnlyComposable
         get() = if (LocalIsDarkTheme.current) AiToDark else AiToLight
 
-    // ── Priority star gold ──
+    // ── Priority star amber ──
+    /**
+     * Priority star glyph. Redesign B makes the inline star a SOLE-channel indicator on the grouped
+     * task row (the priority bar is not drawn there), so the light value is the same darkened amber
+     * as [priorityIndicator]: `#A86400` is 4.61:1 on the cream card (the old `#F4A923` was 1.96:1).
+     * Dark keeps `#F5B544`.
+     */
     val star: Color
         @Composable @ReadOnlyComposable
-        get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFF4A923)
+        get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFA86400)
 
     /**
      * Priority indicator when the shape carrying it is the ONLY channel — the 3dp bar along a task
@@ -63,14 +72,15 @@ object GistiColors {
      * [star] is tuned as a *glyph* colour: a star icon reads at 16dp because its silhouette carries
      * the meaning, and the surrounding text says the rest. A 3dp bar has no silhouette and no label —
      * it is a non-text UI element that must clear WCAG 1.4.11 (3:1) on its own, and `#F4A923` gives
-     * only ~2:1 against the white card. Darkening the light value to `#C67C00` buys ~3.5:1 while
-     * staying the same hue, so the bar and the star still read as one signal.
+     * only ~2:1 against the white card. Redesign B (2026-10-16) takes the light value to `#A86400`
+     * (4.61:1 on the cream card, was `#C67C00` at 3.29:1) — the SAME value as [star]: one signal,
+     * one colour. It also rings the round checkbox of an important task.
      *
-     * Dark keeps [star] unchanged: `#F5B544` on the `#1A1C20` card is already far past the bar.
+     * Dark keeps [star] unchanged: `#F5B544` on the warm dark card is already far past the bar.
      */
     val priorityIndicator: Color
         @Composable @ReadOnlyComposable
-        get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFC67C00)
+        get() = if (LocalIsDarkTheme.current) Color(0xFFF5B544) else Color(0xFFA86400)
 
     // ── Bottom-chrome tone ──
     /**
@@ -121,13 +131,15 @@ object GistiColors {
         Color(0xFF34202A),
         Color(0xFF332B16),
     )
+    // Redesign B (2026-10-16): darkened so the monogram (which is TEXT) clears AA on its own tint —
+    // 5.03–6.10:1, was 2.16–4.16:1. Same six hues in the same order.
     private val tintContentLight = listOf(
-        Color(0xFF2E9E5B),
-        Color(0xFF2196F3),
-        Color(0xFFE8833A),
-        Color(0xFF7E5BD0),
-        Color(0xFFD24B7E),
-        Color(0xFFD9A21E),
+        Color(0xFF1D6B40),
+        Color(0xFF1565C0),
+        Color(0xFFA04A12),
+        Color(0xFF6340B5),
+        Color(0xFFA52F5C),
+        Color(0xFF7E5800),
     )
     private val tintContentDark = listOf(
         Color(0xFF7FD3A2),
@@ -152,6 +164,26 @@ object GistiColors {
     fun avatarContent(key: Long): Color {
         val list = if (LocalIsDarkTheme.current) tintContentDark else tintContentLight
         return list[paletteIndex(key, list.size)]
+    }
+
+    /**
+     * Palette tint by POSITION (0 green · 1 blue · 2 peach · 3 lilac · 4 pink · 5 amber), for UI that
+     * needs a specific hue rather than one derived from a checklist id — e.g. the Inbox section-header
+     * icon tiles. [index] wraps with `mod`, so any Int is safe.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun paletteTint(index: Int): Color {
+        val list = if (LocalIsDarkTheme.current) tintsDark else tintsLight
+        return list[index.mod(list.size)]
+    }
+
+    /** Content colour (icon / monogram) matching [paletteTint] for the same [index]. */
+    @Composable
+    @ReadOnlyComposable
+    fun paletteContent(index: Int): Color {
+        val list = if (LocalIsDarkTheme.current) tintContentDark else tintContentLight
+        return list[index.mod(list.size)]
     }
 
     /** Pure, testable index mapping — same checklist id always maps to the same hue. */

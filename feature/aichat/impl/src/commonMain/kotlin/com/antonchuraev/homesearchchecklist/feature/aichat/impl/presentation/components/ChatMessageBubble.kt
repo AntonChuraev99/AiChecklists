@@ -1,18 +1,19 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -31,54 +32,105 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_ask_ai_fallback
-import aichecklists.core.designsystem.generated.resources.chat_assistant_label
-import aichecklists.core.designsystem.generated.resources.chat_feedback_open
 import aichecklists.core.designsystem.generated.resources.chat_message_copy
+import aichecklists.core.designsystem.generated.resources.chat_message_show_actions
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_down
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_up
 import aichecklists.core.designsystem.generated.resources.chat_open_checklist
 import aichecklists.core.designsystem.generated.resources.chat_paywall_cta_credits
 import aichecklists.core.designsystem.generated.resources.chat_retry
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.SparkleTile
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Renders a single chat message bubble — Material 3 chat pattern.
+ * Geometry of the assistant "avatar beside the bubble" layout (redesign B §2.9), shared by every
+ * assistant-side turn — [ChatMessageBubble], [AiChoiceResponse], [ChatTypingIndicator] — so the
+ * bubbles of one run line up on one start edge whether or not they carry the avatar.
+ */
+internal object ChatAvatarLayout {
+    /** The sparkle avatar's diameter. */
+    val AvatarSize: Dp = 28.dp
+
+    /** Avatar → bubble gap. */
+    val Gap: Dp = 8.dp
+
+    /** Start inset of every assistant bubble: avatar slot + gap (36dp). */
+    val Slot: Dp = AvatarSize + Gap
+}
+
+/** Assistant bubble: 20/20/20 with the [AppShapeTokens.ChatBubbleTail] at the bottom-start (by the avatar). */
+internal val AssistantBubbleShape: Shape = RoundedCornerShape(
+    topStart = 20.dp,
+    topEnd = 20.dp,
+    bottomEnd = 20.dp,
+    bottomStart = AppShapeTokens.ChatBubbleTail,
+)
+
+/** User bubble: 20/20/20 with the tail at the bottom-end. */
+private val UserBubbleShape: Shape = RoundedCornerShape(
+    topStart = 20.dp,
+    topEnd = 20.dp,
+    bottomEnd = AppShapeTokens.ChatBubbleTail,
+    bottomStart = 20.dp,
+)
+
+/**
+ * The 28dp gradient sparkle avatar beside an assistant turn, or an equal-width spacer when this turn
+ * is not the last of its run (so the bubbles of one run share a start edge). Decorative — the bubble
+ * text is what the turn says.
+ */
+@Composable
+internal fun AssistantAvatarSlot(showAvatar: Boolean, modifier: Modifier = Modifier) {
+    if (showAvatar) {
+        SparkleTile(
+            size = ChatAvatarLayout.AvatarSize,
+            cornerRadius = ChatAvatarLayout.AvatarSize / 2,
+            modifier = modifier,
+        )
+    } else {
+        Spacer(modifier = modifier.width(ChatAvatarLayout.AvatarSize))
+    }
+}
+
+/**
+ * Renders a single chat message bubble — redesign B "Soft & tactile" (§2.9).
  *
- * Layout (from AI Chat M3 design):
- * - **User (sent)** — right-aligned, `primaryContainer` background, 20-20-4-20 corners
- *   (tail on bottom-right). Max width 320dp (~78% of phone).
- * - **Assistant (received)** — left-aligned, [AppChatColors.raised] background + a soft 1dp
- *   [AppChatColors.contentOutline] hairline (both plane-relative — the same bubble renders on the
- *   page and inside the bottom chrome), 20-20-20-4 corners (tail on bottom-left). Optional
- *   [AiSenderLabel] above the bubble (24dp avatar + "AI-ассистент"). Max width 340dp (~82%).
+ * - **User (sent)** — right-aligned, `primaryContainer` fill, corners 20/20/8/20 (tail bottom-end).
+ *   Max width 320dp. The cost badge sits under it.
+ * - **Assistant (received)** — no sender label. `Row(Bottom)`: a 28dp sparkle avatar (only on the
+ *   LAST message of a consecutive assistant run — [showAvatar]; otherwise a 28dp spacer keeps the
+ *   column aligned) + 8dp + the bubble. Bubble = [AppChatColors.raised] + a 1dp
+ *   [AppChatColors.contentOutline] hairline (plane-relative — the same bubble renders on the page and
+ *   inside the bottom chrome), corners 20/20/20/8 (tail bottom-start). Max width 300dp.
+ *   The action chips — Open checklist · Ask AI · Retry — and the Become Pro CTA render INSIDE the
+ *   bubble under the text.
  *
- * Below assistant bubbles: an icon action row [Copy] [ThumbUp] [ThumbDown], then a
- * wrap-content chip row of the actionable buttons — [Open checklist] (when the message
- * carries a `linkedChecklistId`), [Ask AI] (Unknown-intent dead-end), [Retry]
- * (recoverable error) — and finally the [Become Pro] CTA. All of these are real
- * [AiChoiceChip] buttons (not bare clickable text) and hug their content width.
+ * Feedback row (Copy · 👍 · 👎, 44dp targets) under an assistant bubble is shown only for the
+ * latest assistant reply ([isLatestAssistant]) or when the user revealed it on an older reply by
+ * tapping the bubble ([actionsRevealed], toggled through [onToggleActions]). Long-press stays text
+ * selection ([SelectionContainer]).
  *
- * Typography: bodyLarge (16sp, lineHeight 24, letterSpacing 0.5) — M3 chat spec.
- * Text inside every bubble is wrapped in [SelectionContainer] for native long-press
- * copy across platforms.
- *
- * @param showSenderLabel If true and the role is Assistant, render the avatar +
- *                        "AI-ассистент" label above the bubble. Pass `false` for
- *                        the static welcome bubble where the label adds noise.
- * @param onPaywallCta Invoked by the "Become Pro" CTA shown under an out-of-credits reply.
- *                     Pass null (or leave the message's `paywallCtaCredits` null) to hide it.
- * @param onRetry Invoked by the "Retry" chip on a recoverable-error reply. Pass null (or leave
- *               the message's `retryText` null) to hide it — it re-sends `message.retryText`.
+ * @param showAvatar        Assistant only: draw the avatar (last message of a run). False → spacer.
+ * @param isLatestAssistant Assistant only: this is the newest assistant reply → feedback row always.
+ *                          Defaults to true so single-message hosts (the dock peek) keep the row.
+ * @param actionsRevealed   Assistant only: the user tapped this older reply to show its actions.
+ * @param onToggleActions   Assistant only: tap on an older bubble toggles [actionsRevealed]. Null →
+ *                          the bubble is not clickable.
+ * @param onPaywallCta Invoked by the "Become Pro" CTA shown inside an out-of-credits reply.
+ * @param onRetry Invoked by the "Retry" chip on a recoverable-error reply (re-sends `retryText`).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -91,257 +143,234 @@ fun ChatMessageBubble(
     onAskAiFallback: (() -> Unit)? = null,
     onPaywallCta: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
-    showSenderLabel: Boolean = false,
+    showAvatar: Boolean = false,
+    isLatestAssistant: Boolean = true,
+    actionsRevealed: Boolean = false,
+    onToggleActions: (() -> Unit)? = null,
 ) {
-    val isUser = message.role == ChatRole.User
-    val clipboardManager = LocalClipboardManager.current
+    if (message.role == ChatRole.User) {
+        UserBubble(message = message, modifier = modifier)
+    } else {
+        AssistantBubble(
+            message = message,
+            modifier = modifier,
+            onFeedbackClick = onFeedbackClick,
+            onThumbUpClick = onThumbUpClick,
+            onOpenChecklist = onOpenChecklist,
+            onAskAiFallback = onAskAiFallback,
+            onPaywallCta = onPaywallCta,
+            onRetry = onRetry,
+            showAvatar = showAvatar,
+            showActions = isLatestAssistant || actionsRevealed,
+            onToggleActions = if (isLatestAssistant) null else onToggleActions,
+        )
+    }
+}
 
+@Composable
+private fun UserBubble(message: ChatMessage, modifier: Modifier) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        horizontalArrangement = Arrangement.End,
     ) {
         Column(
-            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+            horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
         ) {
-            // AI sender label — 24dp avatar + "AI-ассистент" (M3 chat pattern from design).
-            // Welcome bubble passes showSenderLabel=false to keep the static greeting clean.
-            if (!isUser && showSenderLabel) {
-                AiSenderLabel()
-            }
-
+            // User (sent) keeps the `primaryContainer` accent fill — it reads as "my message", and it
+            // is deliberately NOT plane-relative: it differs from the assistant bubble by hue and
+            // alignment as well as by tone, so it is legible on either plane as it is.
             Surface(
-                shape = if (isUser) {
-                    RoundedCornerShape(
-                        topStart = 20.dp,
-                        topEnd = 20.dp,
-                        bottomEnd = 4.dp,
-                        bottomStart = 20.dp,
-                    )
-                } else {
-                    RoundedCornerShape(
-                        topStart = 20.dp,
-                        topEnd = 20.dp,
-                        bottomEnd = 20.dp,
-                        bottomStart = 4.dp,
-                    )
-                },
-                // User (sent) keeps the `primaryContainer` accent fill — it reads as "my message",
-                // and it is deliberately NOT plane-relative: it differs from the assistant bubble by
-                // hue and alignment as well as by tone, so it is legible on either plane as it is.
-                //
-                // Assistant (received) is plane-relative: the SAME bubble renders on the page (full
-                // ChatScreen) and inside the bottom chrome (dock / overlay), and the old fixed
-                // `surfaceContainerLowest` sat ΔL* −6.2 BELOW the dark chrome — a hole punched in the
-                // dock. The hairline stays SOFT (`outlineVariant`): a bubble is content, not a
-                // target, and it already carries a tonal step. See AppChatColors.
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    AppChatColors.raised()
-                },
-                border = if (isUser) {
-                    null
-                } else {
-                    BorderStroke(1.dp, AppChatColors.contentOutline())
-                },
-                modifier = Modifier.widthIn(max = if (isUser) 320.dp else 340.dp),
+                shape = UserBubbleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.widthIn(max = 320.dp),
             ) {
-                if (isUser) {
-                    // User bubble: attachments above text (M3 chat media-inset pattern).
-                    Column(
-                        modifier = Modifier.padding(vertical = 10.dp),
-                    ) {
-                        if (message.attachments.isNotEmpty()) {
-                            MessageAttachmentRow(
-                                attachments = message.attachments,
-                                modifier = Modifier.padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    bottom = AppDimens.SpacingXs,
-                                ),
-                            )
-                        }
-                        if (message.content.isNotBlank()) {
-                            SelectionContainer {
-                                Text(
-                                    text = message.content,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    SelectionContainer {
-                        ChatMarkdownText(
-                            markdown = message.content,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                // Attachments above text (M3 chat media-inset pattern).
+                Column(modifier = Modifier.padding(vertical = 10.dp)) {
+                    if (message.attachments.isNotEmpty()) {
+                        MessageAttachmentRow(
+                            attachments = message.attachments,
                             modifier = Modifier.padding(
-                                horizontal = 16.dp,
-                                vertical = 12.dp,
+                                start = 16.dp,
+                                end = 16.dp,
+                                bottom = AppDimens.SpacingXs,
                             ),
                         )
+                    }
+                    if (message.content.isNotBlank()) {
+                        SelectionContainer {
+                            Text(
+                                text = message.content,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
                     }
                 }
             }
 
             // Cost badge: shown only for user messages where credits were actually deducted (> 0).
-            if (isUser && message.costCredits > 0) {
+            if (message.costCredits > 0) {
                 InlineCostBadge(cost = message.costCredits)
             }
-
-            // Icon action row for assistant messages (M3 chat actions): Copy · ThumbUp · ThumbDown.
-            // ThumbUp = analytics-only fire-and-forget (no sheet). ThumbDown = opens feedback sheet.
-            if (!isUser && (onFeedbackClick != null || onThumbUpClick != null)) {
-                // offset(x = -6.dp) — Compose equivalent of CSS `marginLeft: -6` (from design).
-                // Visually aligns the first action button with the bubble's text left edge,
-                // compensating for the 32dp IconButton hit-area. NOTE: must use offset, not
-                // padding — padding throws IllegalArgumentException on negative values.
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(0.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.offset(x = (-6).dp),
-                ) {
-                    MessageActionButton(
-                        icon = Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(Res.string.chat_message_copy),
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(message.content))
-                        },
-                    )
-                    // ThumbUp = fire-and-forget analytics (handled by ViewModel via OnThumbUpClick).
-                    if (onThumbUpClick != null) {
-                        MessageActionButton(
-                            icon = Icons.Outlined.ThumbUp,
-                            contentDescription = stringResource(Res.string.chat_message_thumb_up),
-                            onClick = { onThumbUpClick(message) },
-                        )
-                    }
-                    // ThumbDown = opens the feedback sheet (optional free-form text + submit).
-                    if (onFeedbackClick != null) {
-                        MessageActionButton(
-                            icon = Icons.Outlined.ThumbDown,
-                            contentDescription = stringResource(Res.string.chat_message_thumb_down),
-                            onClick = { onFeedbackClick(message) },
-                        )
-                    }
-                }
-            }
-
-            // Action chips — real, obviously-tappable buttons (NOT bare clickable text, the audit
-            // fix): Open checklist · Ask AI · Retry. Each is an [AiChoiceChip] that hugs its content,
-            // laid out in a wrap-content FlowRow so several fit one row and spill only when needed.
-            // These moved out of the 32dp icon row above (a 40dp chip cannot align with 32dp icons)
-            // into their own row, tightly spaced.
-            val showRetry = message.retryText != null && onRetry != null
-            if (!isUser && (onOpenChecklist != null || onAskAiFallback != null || showRetry)) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-                ) {
-                    if (onOpenChecklist != null) {
-                        AiChoiceChip(
-                            label = stringResource(Res.string.chat_open_checklist),
-                            role = ChoiceRole.Default,
-                            onClick = onOpenChecklist,
-                            leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
-                            maxLines = 1,
-                        )
-                    }
-                    // "Ask AI" — shown only when the message carries askAiForText (Unknown-intent
-                    // dead-end). Tapping escalates the original text to Layer 3 (3 credits), an
-                    // explicit user opt-in — credits are never auto-burned.
-                    if (onAskAiFallback != null) {
-                        AiChoiceChip(
-                            label = stringResource(Res.string.chat_ask_ai_fallback),
-                            role = ChoiceRole.Default,
-                            onClick = onAskAiFallback,
-                            leadingIcon = Icons.Outlined.AutoAwesome,
-                            maxLines = 1,
-                        )
-                    }
-                    // "Retry" — shown on a recoverable-error reply (offline / service / timeout, F1).
-                    // Re-sends message.retryText through the normal send pipeline.
-                    if (showRetry) {
-                        AiChoiceChip(
-                            label = stringResource(Res.string.chat_retry),
-                            role = ChoiceRole.Default,
-                            onClick = onRetry,
-                            leadingIcon = Icons.Outlined.Refresh,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-
-            // "Become Pro" CTA — shown only on an out-of-credits reply (the message carries the
-            // Premium daily allowance to advertise). A real filled (Primary) chip now, its own row:
-            // the label is a full sentence, so maxLines=2 keeps a long localisation (RU ~20% longer)
-            // wrapping instead of clipping, and widthIn caps it on wide screens.
-            val ctaCredits = message.paywallCtaCredits
-            if (!isUser && ctaCredits != null && onPaywallCta != null) {
-                AiChoiceChip(
-                    label = stringResource(Res.string.chat_paywall_cta_credits, ctaCredits.toString()),
-                    role = ChoiceRole.Primary,
-                    onClick = onPaywallCta,
-                    leadingIcon = Icons.Outlined.WorkspacePremium,
-                    maxLines = 2,
-                    modifier = Modifier.widthIn(max = 340.dp),
-                )
-            }
         }
     }
 }
 
-/**
- * AI sender label — 24dp circle avatar (`primaryContainer` background, sparkle icon
- * in `primary`) + "AI-ассистент" labelSmall. Sits directly above the assistant bubble.
- *
- * `internal` so [AiChoiceResponse] can reuse the exact same label above its prompt bubble
- * (the choice block is a styled assistant turn) — do not duplicate it.
- */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AiSenderLabel(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.padding(start = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .padding(0.dp),
-            contentAlignment = Alignment.Center,
+private fun AssistantBubble(
+    message: ChatMessage,
+    modifier: Modifier,
+    onFeedbackClick: ((ChatMessage) -> Unit)?,
+    onThumbUpClick: ((ChatMessage) -> Unit)?,
+    onOpenChecklist: (() -> Unit)?,
+    onAskAiFallback: (() -> Unit)?,
+    onPaywallCta: (() -> Unit)?,
+    onRetry: (() -> Unit)?,
+    showAvatar: Boolean,
+    showActions: Boolean,
+    onToggleActions: (() -> Unit)?,
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val showRetry = message.retryText != null && onRetry != null
+    val ctaCredits = message.paywallCtaCredits
+    val showCta = ctaCredits != null && onPaywallCta != null
+    val hasChips = onOpenChecklist != null || onAskAiFallback != null || showRetry || showCta
+    val showActionsLabel = stringResource(Res.string.chat_message_show_actions)
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
         ) {
+            AssistantAvatarSlot(showAvatar = showAvatar)
+            Spacer(modifier = Modifier.width(ChatAvatarLayout.Gap))
+            // Plane-relative fill + SOFT hairline: a bubble is content, not a target, and the same
+            // bubble renders on the page (full ChatScreen) and inside the bottom chrome (dock /
+            // overlay). See AppChatColors.
             Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(24.dp),
+                shape = AssistantBubbleShape,
+                color = AppChatColors.raised(),
+                border = BorderStroke(1.dp, AppChatColors.contentOutline()),
+                modifier = Modifier
+                    .widthIn(max = 300.dp)
+                    .then(
+                        if (onToggleActions != null) {
+                            Modifier.clickable(
+                                onClickLabel = showActionsLabel,
+                                onClick = onToggleActions,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp),
+                // Hug the content (B mock): the markdown paragraphs fill their max width, so without
+                // an intrinsic cap a one-line reply with a chip stretched the bubble to 300dp.
+                Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+                    SelectionContainer {
+                        ChatMarkdownText(
+                            markdown = message.content,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    }
+                    // Action chips INSIDE the bubble (B §2.9): real AiChoiceChip buttons that hug
+                    // their content, in a wrapping FlowRow. The CTA label is a full sentence, so
+                    // maxLines = 2 lets a long localisation wrap instead of clipping.
+                    if (hasChips) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                        ) {
+                            if (onOpenChecklist != null) {
+                                AiChoiceChip(
+                                    label = stringResource(Res.string.chat_open_checklist),
+                                    role = ChoiceRole.Default,
+                                    onClick = onOpenChecklist,
+                                    leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                                    maxLines = 1,
+                                )
+                            }
+                            // "Ask AI" — Unknown-intent dead-end. Tapping escalates the original text
+                            // to Layer 3 (3 credits), an explicit opt-in — credits are never auto-burned.
+                            if (onAskAiFallback != null) {
+                                AiChoiceChip(
+                                    label = stringResource(Res.string.chat_ask_ai_fallback),
+                                    role = ChoiceRole.Default,
+                                    onClick = onAskAiFallback,
+                                    leadingIcon = Icons.Outlined.AutoAwesome,
+                                    maxLines = 1,
+                                )
+                            }
+                            // "Retry" — recoverable-error reply (offline / service / timeout, F1).
+                            if (showRetry) {
+                                AiChoiceChip(
+                                    label = stringResource(Res.string.chat_retry),
+                                    role = ChoiceRole.Default,
+                                    onClick = onRetry,
+                                    leadingIcon = Icons.Outlined.Refresh,
+                                    maxLines = 1,
+                                )
+                            }
+                            // "Become Pro" — out-of-credits reply (Premium daily allowance from RC).
+                            if (showCta) {
+                                AiChoiceChip(
+                                    label = stringResource(
+                                        Res.string.chat_paywall_cta_credits,
+                                        ctaCredits.toString(),
+                                    ),
+                                    role = ChoiceRole.Primary,
+                                    onClick = onPaywallCta,
+                                    leadingIcon = Icons.Outlined.WorkspacePremium,
+                                    maxLines = 2,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Feedback row: Copy · ThumbUp · ThumbDown. ThumbUp = fire-and-forget analytics; ThumbDown
+        // opens the feedback sheet. Start-aligned with the bubble text: the avatar slot (36) minus
+        // 6dp — offset, not padding, keeps the 44dp targets' own inset doing the rest.
+        if (showActions && (onFeedbackClick != null || onThumbUpClick != null)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = ChatAvatarLayout.Slot - 6.dp),
+            ) {
+                MessageActionButton(
+                    icon = Icons.Outlined.ContentCopy,
+                    contentDescription = stringResource(Res.string.chat_message_copy),
+                    onClick = { clipboardManager.setText(AnnotatedString(message.content)) },
+                )
+                if (onThumbUpClick != null) {
+                    MessageActionButton(
+                        icon = Icons.Outlined.ThumbUp,
+                        contentDescription = stringResource(Res.string.chat_message_thumb_up),
+                        onClick = { onThumbUpClick(message) },
+                    )
+                }
+                if (onFeedbackClick != null) {
+                    MessageActionButton(
+                        icon = Icons.Outlined.ThumbDown,
+                        contentDescription = stringResource(Res.string.chat_message_thumb_down),
+                        onClick = { onFeedbackClick(message) },
                     )
                 }
             }
         }
-        Text(
-            text = stringResource(Res.string.chat_assistant_label),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
 /**
- * Icon-only button for the action row under assistant bubbles. 32dp tap target,
- * 18dp icon, `onSurfaceVariant` tint. Matches the M3 chat action-row spec.
+ * Icon-only button for the action row under assistant bubbles. 44dp tap target (B §2.9, was 32 —
+ * a11y), 18dp icon, `onSurfaceVariant` tint.
  */
 @Composable
 private fun MessageActionButton(
@@ -352,7 +381,7 @@ private fun MessageActionButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier.size(32.dp),
+        modifier = modifier.size(44.dp),
     ) {
         Icon(
             imageVector = icon,

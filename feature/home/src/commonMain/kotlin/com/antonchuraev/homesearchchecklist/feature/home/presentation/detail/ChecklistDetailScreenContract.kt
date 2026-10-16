@@ -457,6 +457,12 @@ sealed interface ChecklistDetailIntent : Intent {
     /** Exit item-create mode (dock collapsed/dismissed): clears the input + all chip selections. */
     data object OnDockItemCreateClosed : ChecklistDetailIntent
     /**
+     * v2 capture plate dismissed by BACK or a scrim tap: closes the mode but KEEPS the draft (text,
+     * Smart-Add parse, chip selections, staged attachments), so the next [OnDockItemCreateOpened] for
+     * the same target shows it again — the Inbox capture dock's behaviour. Only Send clears the draft.
+     */
+    data object OnItemCreateDismissed : ChecklistDetailIntent
+    /**
      * Toggle a reminder preset chip for the new item (single-select among reminder chips). Tapping the
      * already-active preset again clears the reminder. [ItemCreateReminderPreset.CUSTOM] is never sent
      * here — it is set by the date/time picker; only ONE_HOUR / TOMORROW_MORNING / TONIGHT come through.

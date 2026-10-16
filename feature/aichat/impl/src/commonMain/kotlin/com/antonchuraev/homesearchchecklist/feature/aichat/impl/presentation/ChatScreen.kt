@@ -6,8 +6,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,6 +41,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputLeading
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
@@ -53,7 +67,6 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -69,16 +82,16 @@ import kotlinx.datetime.toLocalDateTime
  *
  * Layout (top → bottom):
  * ```
- * ChatHeader (TopAppBar)
- * ChatPricingRow ("≈ 0–3 credits per query" + help icon)
+ * ChatHeader (TopAppBar: back · avatar · "Gisti" / subtitle · settings)
  * ───────────────────────────────────────────────────────
  * LazyColumn (messages, weight=1f)
  *   ↳ ChatMessageBubble per message
  *   ↳ AiChoiceResponse (if state.pendingChoice != null, as last sticky item)
  * ───────────────────────────────────────────────────────
- * ChatRecordingOverlay (AnimatedVisibility, above chip strip)
- * ChatAttachmentChipStrip (AnimatedVisibility, above input)
- * ChatInputRow (pinned to bottom, above IME)
+ * ChatRecordingOverlay (AnimatedVisibility, above the plate)
+ * bottom-chrome plate (SheetTop, owns the nav-bar inset):
+ *   ChatAttachmentChipStrip (AnimatedVisibility, above input)
+ *   ChatInputRow (leading = credits chip → pricing sheet; pinned above IME)
  * ```
  *
  * When [state.showPricingSheet] is true, [AiChatPricingHelpSheet] is overlaid.
@@ -146,13 +159,18 @@ fun ChatScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
         containerColor = MaterialTheme.colorScheme.surface,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // The bottom inset is owned by the input plate (it paints the bottom chrome down through the
+        // system-nav zone, B §3.3), so the scaffold only pads top + sides. The snackbar host pads the
+        // nav bar itself, since the scaffold no longer reserves it.
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets
+            .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        snackbarHost = {
+            SnackbarHost(snackbarHostState, modifier = Modifier.navigationBarsPadding())
+        },
         topBar = {
             ChatHeader(
-                creditBalance = state.creditBalance,
                 onSettingsClick = { onIntent(ChatScreenIntent.OnSettingsClick) },
                 onBackClick = { onIntent(ChatScreenIntent.OnBackClick) },
-                onCreditsClick = onNavigateToPaywall,
                 onMenuClick = if (drawerState != null) {
                     { scope.launch { drawerState.open() } }
                 } else null,
@@ -196,10 +214,18 @@ fun ChatScreen(
     if (state.showPricingSheet) {
         AiChatPricingHelpSheet(
             onDismiss = { onIntent(ChatScreenIntent.OnHelpDismiss) },
+            // The old header credits chip's paywall route, now one hop further (chip → sheet → Get
+            // more). Same host callback ⇒ same paywall source tag, the funnel series continues.
+            onGetMoreClick = onNavigateToPaywall?.let { navigate ->
+                {
+                    onIntent(ChatScreenIntent.OnHelpDismiss)
+                    navigate()
+                }
+            },
         )
     }
 
-    // Features sheet overlay — opens from the "?" icon in the input row leading
+    // Features sheet overlay — opens from the Settings sheet's "How to use AI Chat" row
     if (state.showFeaturesSheet) {
         AiChatFeaturesHelpSheet(
             onDismiss = { onIntent(ChatScreenIntent.OnFeaturesHelpDismiss) },
@@ -223,6 +249,10 @@ fun ChatScreen(
             onResponseLanguageClick = { onIntent(ChatScreenIntent.OnResponseLanguageClick) },
             defaultChecklistName = state.defaultChecklistName,
             onResetDefaultChecklist = { onIntent(ChatScreenIntent.OnResetDefaultChecklist) },
+            onFeaturesHelpClick = {
+                onIntent(ChatScreenIntent.OnSettingsDismiss)
+                onIntent(ChatScreenIntent.OnFeaturesHelpClick)
+            },
         )
     }
 
@@ -302,11 +332,8 @@ fun ChatContent(
         modifier = modifier
             .imePadding(),
     ) {
-        // Pricing info band — sits directly below the TopAppBar / sheet header,
-        // above the message list.
-        ChatPricingRow(
-            onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
-        )
+        // (The "≈ 0–3 credits · Why?" pricing band is gone — B §3.3: the credits chip in the input
+        // opens the same pricing sheet.)
 
         // Body — occupies all remaining vertical space. [ChatBody] shows the localized empty-state
         // (greeting + suggestion cards that PREFILL the composer) while the conversation is empty and
@@ -328,6 +355,50 @@ fun ChatContent(
             isDragCancel = isDragCancel,
         )
 
+        // Input plate (B §3.3, the mock's bottom chrome): the cool chrome tone with the 28dp
+        // SheetTop corners, painted down through the system-nav zone. It owns the nav-bar inset; the
+        // keyboard inset is already consumed by the root Column's imePadding, so with the keyboard up
+        // navigationBarsPadding adds nothing (no double inset). The plate PROVIDES the chat tone, so
+        // the pill / chips inside resolve to their bottom-chrome values (AppChatColors).
+        // While a QUESTION is pending the input is hidden (see ChatInputPlateContent); with nothing
+        // to hold, an empty plate would read as a stray sliver of chrome — only the nav-bar inset stays.
+        val plateHasContent = state.pendingChoice == null || state.pendingChoice.isPostAction ||
+            state.pendingAttachments.isNotEmpty()
+        if (!plateHasContent) {
+            Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        } else CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.BottomChrome) {
+            Surface(
+                color = AppSurface.bottomChrome(),
+                shape = AppShapeTokens.SheetTop,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.navigationBarsPadding().padding(top = AppDimens.SpacingXs)) {
+                    ChatInputPlateContent(
+                        state = state,
+                        onIntent = onIntent,
+                        onDragCancelChanged = onDragCancelChanged,
+                        onAttachmentSourceSheet = onAttachmentSourceSheet,
+                        onVoiceRecordingStarted = onVoiceRecordingStarted,
+                        onVoiceRecordingStopped = onVoiceRecordingStopped,
+                        onVoiceRecordingCancelled = onVoiceRecordingCancelled,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Attachment chips + the input row, inside ChatContent's bottom-chrome plate. */
+@Composable
+private fun ChatInputPlateContent(
+    state: ChatScreenState,
+    onIntent: (ChatScreenIntent) -> Unit,
+    onDragCancelChanged: (Boolean) -> Unit,
+    onAttachmentSourceSheet: () -> Unit,
+    onVoiceRecordingStarted: (() -> Unit)?,
+    onVoiceRecordingStopped: (() -> Unit)?,
+    onVoiceRecordingCancelled: (() -> Unit)?,
+) {
         // Pending attachment chips
         ChatAttachmentChipStrip(
             attachments = state.pendingAttachments,
@@ -356,6 +427,12 @@ fun ChatContent(
                 onVoiceRecordingCancelled = {
                     onVoiceRecordingCancelled?.invoke()
                 },
+                // B §2.10: the credits chip replaces the "?" here (features help moved to Settings).
+                // It opens the pricing sheet — the same intent the removed "Why?" band fired.
+                leading = ChatInputLeading.Credits(
+                    balance = state.creditBalance,
+                    onClick = { onIntent(ChatScreenIntent.OnHelpClick) },
+                ),
                 onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
                 hasAttachments = state.pendingAttachments.isNotEmpty(),
                 isEnabled = !state.isProcessing,
@@ -365,7 +442,6 @@ fun ChatContent(
                 onDragCancelChanged = onDragCancelChanged,
             )
         }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +488,22 @@ fun ChatMessageList(
         }
     }
 
+    // B §2.9 — UI-local, derived from the message list (no new state):
+    //  - avatar only on the LAST assistant message of a consecutive assistant run; a trailing
+    //    assistant block rendered after the messages (typing indicator, or a pending choice WITH a
+    //    prompt bubble) carries the run's avatar itself, so the last message then goes without;
+    //  - feedback row always on the newest assistant reply, on older ones only after a tap
+    //    (`revealedActionsFor`, one reply at a time).
+    val trailingAssistantBlock = (state.isProcessing && state.pendingChoice == null) ||
+        state.pendingChoice?.choice?.prompt?.isNotBlank() == true
+    val avatarMessageIds = remember(state.messages, trailingAssistantBlock) {
+        assistantRunTailIds(state.messages, trailingAssistantBlock)
+    }
+    val latestAssistantId = remember(state.messages) {
+        state.messages.lastOrNull { it.role == ChatRole.Assistant }?.id
+    }
+    var revealedActionsFor by remember { mutableStateOf<String?>(null) }
+
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
@@ -451,6 +543,7 @@ fun ChatMessageList(
             items = state.messages.asReversed(),
             key = { it.id },
         ) { message ->
+            val isAssistant = message.role == ChatRole.Assistant
             ChatMessageBubble(
                 message = message,
                 onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
@@ -467,7 +560,12 @@ fun ChatMessageList(
                 onRetry = message.retryText?.let { text ->
                     { onIntent(ChatScreenIntent.OnRetryClick(text)) }
                 },
-                showSenderLabel = message.role == ChatRole.Assistant,
+                showAvatar = isAssistant && message.id in avatarMessageIds,
+                isLatestAssistant = isAssistant && message.id == latestAssistantId,
+                actionsRevealed = revealedActionsFor == message.id,
+                onToggleActions = {
+                    revealedActionsFor = if (revealedActionsFor == message.id) null else message.id
+                },
             )
         }
 
@@ -476,6 +574,24 @@ fun ChatMessageList(
                 com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
             }
         }
+    }
+}
+
+/**
+ * Ids of the assistant messages that close a consecutive assistant run — the ones that carry the
+ * avatar (B §2.9). A message closes its run when the next-newer message is not an assistant one, or
+ * when it is the newest message and no assistant block ([trailingAssistantBlock]: typing indicator /
+ * prompt-carrying choice) renders after it.
+ */
+internal fun assistantRunTailIds(
+    messages: List<ChatMessage>,
+    trailingAssistantBlock: Boolean,
+): Set<String> = buildSet {
+    messages.forEachIndexed { index, message ->
+        if (message.role != ChatRole.Assistant) return@forEachIndexed
+        val next = messages.getOrNull(index + 1)
+        val closesRun = if (next == null) !trailingAssistantBlock else next.role != ChatRole.Assistant
+        if (closesRun) add(message.id)
     }
 }
 

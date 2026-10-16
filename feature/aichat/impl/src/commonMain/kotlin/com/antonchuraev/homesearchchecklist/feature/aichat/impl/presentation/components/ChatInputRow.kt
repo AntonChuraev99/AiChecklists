@@ -10,7 +10,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -75,6 +80,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_attach_file_action
+import aichecklists.core.designsystem.generated.resources.chat_credits_label
+import aichecklists.core.designsystem.generated.resources.chat_pricing_caption_action
 import aichecklists.core.designsystem.generated.resources.chat_features_help_action
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder_with_attachment
@@ -169,6 +176,13 @@ fun ChatInputRow(
      * false (the full AI-chat row already shows attach). Defaults to false.
      */
     attachVisibleInSimpleMode: Boolean = false,
+    /**
+     * What sits in the leading slot. [ChatInputLeading.Help] (default) = the "?" features-help button
+     * wired to [onHelpClick] — the dock hosts keep it. [ChatInputLeading.Credits] = the redesign-B
+     * credits chip (full ChatScreen): balance in a pill that opens the pricing sheet. Both hide while
+     * [simpleSendOnly] or [isTranscribing], with the same width-collapse morph.
+     */
+    leading: ChatInputLeading = ChatInputLeading.Help,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -276,22 +290,31 @@ fun ChatInputRow(
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {
-            IconButton(
-                onClick = onHelpClick,
-                enabled = isEnabled && !isRecording && !isTranscribing,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
-                    contentDescription = helpLabel,
-                    modifier = Modifier.size(AppDimens.IconSizeMd),
-                    // Disabled while transcribing too — tinting it like an idle control is what made
-                    // the row read as "ready for input" while the recording was still uploading.
-                    tint = if (isEnabled && !isRecording && !isTranscribing)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            when (leading) {
+                // Not gated on isEnabled (= "not processing"): reading the pricing sheet while an
+                // answer is on its way conflicts with nothing, and a greyed balance read as an error.
+                is ChatInputLeading.Credits -> CreditsLeadingChip(
+                    balance = leading.balance,
+                    onClick = leading.onClick,
+                    enabled = !isRecording && !isTranscribing,
                 )
+                ChatInputLeading.Help -> IconButton(
+                    onClick = onHelpClick,
+                    enabled = isEnabled && !isRecording && !isTranscribing,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                        contentDescription = helpLabel,
+                        modifier = Modifier.size(AppDimens.IconSizeMd),
+                        // Disabled while transcribing too — tinting it like an idle control is what made
+                        // the row read as "ready for input" while the recording was still uploading.
+                        tint = if (isEnabled && !isRecording && !isTranscribing)
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    )
+                }
             }
         }
         AnimatedVisibility(
@@ -589,6 +612,73 @@ fun ChatInputRow(
         }  // end Row
         }  // end Surface
     }  // end Column
+}
+
+/** Content of [ChatInputRow]'s leading slot (redesign B §2.10). */
+sealed interface ChatInputLeading {
+    /** The "?" features-help button (today's default; the dock hosts keep it). */
+    data object Help : ChatInputLeading
+
+    /** The credits chip: [balance] in a pill; [onClick] opens the pricing sheet. */
+    data class Credits(val balance: Int, val onClick: () -> Unit) : ChatInputLeading
+}
+
+/**
+ * Credits chip in the input's leading slot: a 32dp `primaryContainer` pill (sparkle 16dp in
+ * `primary` + the balance in `labelLarge` Bold `onPrimaryContainer`) inside a 48dp target. Grows with
+ * the text at large font scales (`heightIn`, never a fixed height).
+ *
+ * Semantics: ONE button whose name is the full `chat_credits_label` ("80 credits left · ≈ 0–3") and
+ * whose click label is `chat_pricing_caption_action` ("Why?") — the bare digit is not announced.
+ */
+@Composable
+private fun CreditsLeadingChip(
+    balance: Int,
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    val description = stringResource(Res.string.chat_credits_label, balance)
+    val clickLabel = stringResource(Res.string.chat_pricing_caption_action)
+    val contentAlpha = if (enabled) 1f else 0.38f
+    Box(
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .clip(CircleShape)
+            .clickable(
+                enabled = enabled,
+                onClickLabel = clickLabel,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = description }
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .heightIn(min = 32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .clearAndSetSemantics {},
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = balance.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = contentAlpha),
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 /**

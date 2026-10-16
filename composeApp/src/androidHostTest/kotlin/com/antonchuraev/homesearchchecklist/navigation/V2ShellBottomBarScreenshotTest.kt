@@ -151,6 +151,9 @@ class V2ShellBottomBarScreenshotTest {
                         barVisible = barVisible,
                         captureOpen = captureOpen,
                         overlayContent = null,
+                        // Non-null so the pill's mic is drawn — the production shape once the host
+                        // wires the voice entry (redesign B, owner decision 2026-10-16).
+                        onOpenChatVoice = {},
                         content = {
                             InboxStub(captureOpen = captureOpen, listUnderBar = listUnderBar)
                         },
@@ -194,6 +197,14 @@ class V2ShellBottomBarScreenshotTest {
 
     @Test
     fun compactBar_360dp_light() = shoot("w360dp-h640dp")
+
+    /** Redesign B mock size: the plate (Ask pill + 4 tabs) against the owner-approved B frame. */
+    @Test
+    fun compactBar_360x660_dark() = shoot("w360dp-h660dp", dark = true)
+
+    @Test
+    fun compactBar_412dp_light_hi_fontScale15() =
+        shoot("hi-rIN-w412dp-h891dp", fontScale = 1.5f, locale = Locale("hi", "IN"))
 
     /** Medium: the rail, deliberately untouched by the bottom chrome — a rail has no bottom edge. */
     @Test

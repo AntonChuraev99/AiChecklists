@@ -28,8 +28,13 @@ object AppDensity {
      */
     val RowMinHeightComfortable: Dp = 60.dp
 
-    /** "Compact" display setting: single-line rows, no meta row. */
-    val RowMinHeightCompact: Dp = 44.dp
+    /**
+     * "Compact" display setting: single-line rows, no meta row.
+     *
+     * 48dp since redesign B (2026-10-16), was 44dp: the row is itself a touch target (the 30% check
+     * zone spans its full height), and 44 failed the 48dp minimum.
+     */
+    val RowMinHeightCompact: Dp = 48.dp
 
     /** Rows on a detail screen, which carry a checkbox plus richer trailing affordances. */
     val RowMinHeightDetail: Dp = 64.dp
@@ -79,4 +84,27 @@ object AppDensity {
      * the title, lines the marker up vertically down the list, and leaves the trailing edge free.
      */
     val PriorityBarWidth: Dp = 3.dp
+
+    // ── Grouped section (redesign B) — rows living inside one `groupSegment` container ──
+
+    /** Row inset inside a group, from the group edge to the checkbox. Cards used [RowPaddingHorizontal]. */
+    val GroupRowPaddingHorizontal: Dp = 16.dp
+
+    /** Checkbox → text gap inside a group row. */
+    val GroupRowGap: Dp = 12.dp
+
+    /** Visual diameter of `AppRoundCheckbox`. */
+    val RoundCheckboxSize: Dp = 22.dp
+
+    /** Layout box `AppRoundCheckbox` is laid out in — the ring is centred in it. */
+    val RoundCheckboxBox: Dp = 24.dp
+
+    /**
+     * Start inset of the divider between two rows of a group: it starts under the TEXT, not under the
+     * checkbox. Derived, never a literal, so a padding change moves the divider with it.
+     */
+    val GroupDividerInsetStart: Dp = GroupRowPaddingHorizontal + RoundCheckboxBox + GroupRowGap
+
+    /** Vertical gap between two consecutive groups when no section header sits between them. */
+    val GroupSpacing: Dp = 8.dp
 }

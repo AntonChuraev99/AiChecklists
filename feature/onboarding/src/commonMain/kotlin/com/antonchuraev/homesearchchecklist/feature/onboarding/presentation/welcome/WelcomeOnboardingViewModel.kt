@@ -13,6 +13,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import aichecklists.core.designsystem.generated.resources.Res
@@ -173,7 +174,11 @@ class WelcomeOnboardingViewModel(
             // and the interactive onboarding), so the starter items show up checked-off-able on the
             // detail screen we land on next.
             val checklistId = checklistRepository.addChecklist(
-                Checklist(name = action.name, items = action.items),
+                Checklist(
+                    name = action.name,
+                    items = action.items,
+                    separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
+                ),
             )
             trackCompleted(checklistCreated = true)
             completeOnboardingUseCase()

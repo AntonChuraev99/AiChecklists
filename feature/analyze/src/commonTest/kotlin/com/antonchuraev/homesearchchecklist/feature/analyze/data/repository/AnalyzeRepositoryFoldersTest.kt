@@ -85,6 +85,18 @@ class AnalyzeRepositoryFoldersTest {
     }
 
     @Test
+    fun createChecklistFromResult_newChecklist_separatesCompletedByDefault() = runTest {
+        val captor = CapturingChecklistRepository()
+
+        repo(captor).createChecklistFromResult(
+            "Groceries",
+            AnalyzeResult(suggestedItems = listOf(ChecklistItem(text = "Milk")), hasFolders = false),
+        )
+
+        assertTrue(assertNotNull(captor.lastAddedChecklist).separateCompleted)
+    }
+
+    @Test
     fun createChecklistFromResult_withoutFolders_keepsFlatAndDisablesFolders() = runTest {
         val items = listOf(
             ChecklistItem(text = "Milk"),

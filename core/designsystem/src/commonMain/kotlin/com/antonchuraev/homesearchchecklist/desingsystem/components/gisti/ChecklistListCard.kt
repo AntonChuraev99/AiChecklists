@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.checklist_card_no_items
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -25,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Rich list-card for a checklist entry on the Home screen.
@@ -155,7 +158,7 @@ fun ChecklistListCard(
                     )
                 } else {
                     Text(
-                        text = "No items yet",
+                        text = stringResource(Res.string.checklist_card_no_items),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

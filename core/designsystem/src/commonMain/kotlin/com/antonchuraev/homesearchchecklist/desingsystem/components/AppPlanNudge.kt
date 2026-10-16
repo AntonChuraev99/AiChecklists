@@ -7,27 +7,12 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.SparkleTile
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import org.jetbrains.compose.resources.stringResource
 
 /** Sizing and the motion contract for [AppPlanNudge]. */
@@ -35,15 +20,6 @@ object AppPlanNudgeDefaults {
 
     /** Minimum row height. A minimum, never a fixed height — ru/hi and large font scales need room. */
     val MinHeight: Dp = 56.dp
-
-    /** The AI mark. Small enough to sit inside the row's rhythm rather than head it. */
-    val TileSize: Dp = 24.dp
-
-    /** Corner radius of [TileSize]'s tile, keeping the proportion `SparkleTile` uses at 28dp. */
-    val TileCorner: Dp = 8.dp
-
-    /** Trailing chevron. */
-    val ChevronSize: Dp = 24.dp
 
     /**
      * How the nudge appears: a fade and **nothing else**.
@@ -62,6 +38,10 @@ object AppPlanNudgeDefaults {
 /**
  * An invitation to sit down and plan the day with Gisti.
  *
+ * Since redesign B (2026-10-16) this is a thin preset over [AppAiInviteRow] — the one anatomy for
+ * every AI invite row — with the canonical copy and the [AiInviteStyle.Recessed] style by default.
+ * Inside a grouped Inbox section the host passes [AiInviteStyle.GroupRow] and applies the segment.
+ *
  * ## Why there is no number on it
  * The obvious design — "7 tasks without a date" — was rejected. A debt counter grows faster than a
  * person clears it, so within a week it becomes a standing reproach that they learn not to see, and
@@ -70,9 +50,9 @@ object AppPlanNudgeDefaults {
  * with a reminder goes up **and** the number of tasks created does not go down"*, and a counter
  * trades the second half away for the first.
  *
- * So the nudge says what is on offer, never how far behind you are. If the figure is genuinely
- * needed for the business, its place is the Overview screen, where a summary is the genre and it
- * does not greet the user on every capture.
+ * So the nudge says what is on offer, never how far behind you are. (The Inbox SECTION headers carry
+ * counts since the owner's 2026-10-16 decision for redesign B; that decision covers the headers, not
+ * this nudge.)
  *
  * ## Placement
  * At the **tail** of the undated section, never at the top. At the top it reads as a heading, and a
@@ -89,15 +69,15 @@ object AppPlanNudgeDefaults {
  * ```
  *
  * ## Accessibility
- * The whole row is one button ([Surface] with `onClick` merges its children), so a screen reader
- * announces "Plan your day with Gisti, One task at a time, button" and the chevron stays decorative.
- * The click also lives on the `Surface` rather than on a `Modifier.clickable` passed in from
- * outside, which is what keeps the ripple clipped to the 16dp corners.
+ * The whole row is one button (the [AppAiInviteRow] `Surface` merges its children), so a screen
+ * reader announces "Plan your day with Gisti, One task at a time, button" and the chevron stays
+ * decorative.
  *
  * @param onClick Opens the daily review.
  * @param modifier Optional external modifier.
  * @param title Overridable for a variant of the invitation; defaults to the canonical copy.
  * @param subtitle As [title].
+ * @param style Container style; [AiInviteStyle.GroupRow] when the host draws a `groupSegment`.
  */
 @Composable
 fun AppPlanNudge(
@@ -105,44 +85,13 @@ fun AppPlanNudge(
     modifier: Modifier = Modifier,
     title: String = stringResource(Res.string.plan_nudge_title),
     subtitle: String = stringResource(Res.string.plan_nudge_subtitle),
+    style: AiInviteStyle = AiInviteStyle.Recessed,
 ) {
-    Surface(
+    AppAiInviteRow(
+        title = title,
+        subtitle = subtitle,
         onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = AppSurface.recessed(),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        style = style,
         modifier = modifier.heightIn(min = AppPlanNudgeDefaults.MinHeight),
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                horizontal = AppDimens.SpacingLg,
-                vertical = AppDimens.SpacingMd,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-        ) {
-            SparkleTile(
-                size = AppPlanNudgeDefaults.TileSize,
-                cornerRadius = AppPlanNudgeDefaults.TileCorner,
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null, // decorative — the row itself is the button
-                modifier = Modifier.size(AppPlanNudgeDefaults.ChevronSize),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    )
 }

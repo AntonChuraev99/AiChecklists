@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.create.domain.usecase
 
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,7 @@ class CreateWeeklyChecklistUseCase(
             name = name,
             items = emptyList(),
             viewMode = ChecklistViewMode.Weekly,
+            separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
         )
         val checklistId = checklistRepository.addChecklist(checklist)
         return Result.Created(checklistId)

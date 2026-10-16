@@ -1,100 +1,108 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.back
+import aichecklists.core.designsystem.generated.resources.chat_header_subtitle
+import aichecklists.core.designsystem.generated.resources.chat_header_title
 import aichecklists.core.designsystem.generated.resources.chat_settings_open
-import aichecklists.core.designsystem.generated.resources.chat_title
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
+import aichecklists.core.designsystem.generated.resources.today_open_menu
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSoftIconButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.SparkleTile
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Top app bar for the AI Chat screen.
+ * Top bar of the full-screen AI Chat — redesign B "Soft & tactile" (§3.3).
  *
- * ## Layout
  * ```
- * [menu/back]      AI Chat      [✨ N | Get More]  [⚙]
+ * (←)  [✦]  Gisti                  (⚙)
+ *           Your checklist helper
  * ```
+ * Back (or the drawer menu when [onMenuClick] is set) and settings are [AppSoftIconButton]s. The
+ * avatar is the 36dp gradient [SparkleTile] circle — the same mark the assistant replies carry.
  *
- * Credit chip stays visible in the bar for at-a-glance balance + Get-More CTA when
- * the user hits zero. The gear icon opens the settings sheet for the Deep Thinking
- * toggle (and richer credit info). Pricing caption (`≈ 0–3 credits per query`) is
- * rendered in [ChatPricingRow] below this bar.
+ * The credits chip is NOT here any more: it moved into the input row (`ChatInputLeading.Credits`),
+ * which opens the pricing sheet → "Get more" → paywall (same paywall source as the old chip).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatHeader(
-    creditBalance: Int,
     onSettingsClick: () -> Unit,
     onBackClick: () -> Unit,
-    isPremium: Boolean = false,
-    onCreditsClick: (() -> Unit)? = null,
     onMenuClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    // M3 Small TopAppBar — title is LEFT-aligned (sits directly to the right of the
-    // navigation icon). The center-aligned variant places the title in the middle of
-    // the bar, which doesn't match the requested layout.
     TopAppBar(
+        // Small TopAppBar = 64dp tall, which is the B header height.
         modifier = modifier,
         title = {
-            Text(
-                text = stringResource(Res.string.chat_title),
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                softWrap = false,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SparkleTile(size = 36.dp, cornerRadius = 18.dp)
+                Column {
+                    Text(
+                        text = stringResource(Res.string.chat_header_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = stringResource(Res.string.chat_header_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         },
         navigationIcon = {
             if (onMenuClick != null) {
-                IconButton(onClick = onMenuClick) {
-                    Icon(
-                        imageVector = Icons.Outlined.Menu,
-                        contentDescription = "Open menu",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                AppSoftIconButton(
+                    icon = Icons.Outlined.Menu,
+                    contentDescription = stringResource(Res.string.today_open_menu),
+                    onClick = onMenuClick,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
             } else {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
-                        contentDescription = stringResource(Res.string.back),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
+                AppSoftIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(Res.string.back),
+                    onClick = onBackClick,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
             }
         },
         actions = {
-            AppCreditsChip(
-                credits = creditBalance,
-                isPremium = isPremium,
-                onClick = onCreditsClick,
+            AppSoftIconButton(
+                icon = Icons.Outlined.Settings,
+                contentDescription = stringResource(Res.string.chat_settings_open),
+                onClick = onSettingsClick,
                 modifier = Modifier.padding(end = 4.dp),
             )
-            IconButton(onClick = onSettingsClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(Res.string.chat_settings_open),
-                    // onSurfaceVariant per AI Chat M3 design — lower-emphasis trailing action.
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,

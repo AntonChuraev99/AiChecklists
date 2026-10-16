@@ -120,6 +120,9 @@ class ChatInputTranscribingScreenshotTest {
         onVoiceRecordingCancelled = {},
         canSend = false,
         isTranscribing = isTranscribing,
+        // The full ChatScreen's leading slot since redesign B (§2.10): the credits chip, which
+        // steps aside while transcribing exactly as the "?" did.
+        leading = ChatInputLeading.Credits(balance = 80, onClick = {}),
     )
 
     private companion object {

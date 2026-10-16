@@ -77,8 +77,8 @@ class AiChatVariantsScreenshotTest {
 
     @Test
     fun variant_empty_welcome() = capture {
-        // showSenderLabel = false: the static greeting carries no avatar/label (welcome case).
-        ChatMessageBubble(message = welcomeMessage, showSenderLabel = false)
+        // showAvatar = false: a non-closing turn of a run — the 28dp spacer keeps the start edge.
+        ChatMessageBubble(message = welcomeMessage, showAvatar = false)
     }
 
     @Test
@@ -88,7 +88,7 @@ class AiChatVariantsScreenshotTest {
             message = plainAnswerMessage,
             onFeedbackClick = {},
             onThumbUpClick = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -106,7 +106,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onOpenChecklist = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -118,7 +118,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onAskAiFallback = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -130,7 +130,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onPaywallCta = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -143,7 +143,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onRetry = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 

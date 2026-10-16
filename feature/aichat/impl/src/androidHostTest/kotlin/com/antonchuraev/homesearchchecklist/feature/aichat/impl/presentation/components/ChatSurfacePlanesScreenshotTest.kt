@@ -213,7 +213,7 @@ class ChatSurfacePlanesScreenshotTest {
                         ChatDayDivider()
                         ChatMessageBubble(
                             message = ChatMessage(id = "a4", role = ChatRole.Assistant, content = copy.aiCode, timestamp = 0L),
-                            showSenderLabel = true,
+                            showAvatar = true,
                         )
                         ChatMessageBubble(
                             message = ChatMessage(
@@ -405,7 +405,7 @@ class ChatSurfacePlanesScreenshotTest {
                 ChatDayDivider()
                 ChatMessageBubble(
                     message = ChatMessage(id = "a1", role = ChatRole.Assistant, content = copy.aiLong, timestamp = 0L),
-                    showSenderLabel = true,
+                    showAvatar = true,
                 )
                 ChatMessageBubble(message = ChatMessage(id = "a2", role = ChatRole.Assistant, content = copy.aiShort, timestamp = 0L))
                 ChatMessageBubble(

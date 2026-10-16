@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-10-14_
+_Last updated: 2026-10-16_
 
 Быстрый поиск по 83 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-10-16 | decision | redesign, soft-tactile, design-tokens, ask-pill, voice-entry, separateCompleted, grouped-list | [Redesign B "Soft & tactile" for Inbox, detail and AI chat](../decisions/2026-10-16-redesign-b-soft-tactile.md) |
 | 2026-10-14 | bug-fix | push, send_promotions_batch, reengagement, mark_active, lastActiveAt, no_reaction_stop | [Re-engagement push: dormancy window, no-reaction stop, foreground-only activity](reengagement-push-dormancy-window-and-stop-2026-10-14.md) |
 | 2026-10-14 | bug-fix | audio, permission, wasmjs, hold-to-record, AsyncStartRecorderMachine, getUserMedia, transcribe_audio | [Voice input: web permission prompt, visible transcription, honest Analyze dialogs](chat-voice-web-permission-and-transcribing-indicator-2026-10-14.md) |
 | 2026-10-14 | bug-fix | push, FIS_AUTH_ERROR, WorkManager, PushTokenRetryWorker, push_dismissed, setDeleteIntent | [Push: FCM token retry on FIS_AUTH_ERROR, dismiss tracking for local pushes](push-token-retry-and-local-push-dismiss-2026-10-14.md) |

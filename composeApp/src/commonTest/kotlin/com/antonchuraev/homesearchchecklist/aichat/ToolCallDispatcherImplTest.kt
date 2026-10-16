@@ -1202,6 +1202,28 @@ class ToolCallDispatcherImplTest {
         )
     }
 
+    /** Both chat create paths write a checklist that separates completed items (redesign B default). */
+    @Test
+    fun createChecklist_bothChatCreatePaths_separateCompletedByDefault() = runTest {
+        val repo = repoWithProjects(0)
+        val dispatcher = buildDispatcher(
+            repo,
+            premium = true,
+            remoteConfig = ConfigurableRemoteConfig(maxChecklistsFree = 5L),
+            analyzer = RecordingAnalyzer(),
+        )
+
+        val fromName = assertIs<DispatchOutcome.Success>(
+            dispatcher.dispatch(ToolCall.CreateChecklist(name = "Trip", initialItems = listOf("Passport"))),
+        )
+        val fromFile = assertIs<DispatchOutcome.Success>(
+            dispatcher.dispatch(ToolCall.CreateChecklistFromAttachment(attachments = listOf(photoAttachment))),
+        )
+
+        assertTrue(repo.checklist(assertNotNull(fromName.linkedChecklistId)).separateCompleted)
+        assertTrue(repo.checklist(assertNotNull(fromFile.linkedChecklistId)).separateCompleted)
+    }
+
     /**
      * The gate stays, and it stays IN FRONT of the Cloud Function: a paywall shown after the AI
      * call has already burned the user's credits for a checklist they never got.

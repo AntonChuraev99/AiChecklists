@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
@@ -78,7 +79,8 @@ data class CreateChecklistState(
     /** Confirmation for the destructive Weekly switch (it drops every task already typed). */
     val weeklySwitchConfirmOpen: Boolean = false,
     val foldersEnabled: Boolean = false,
-    val separateCompleted: Boolean = false,
+    // Create mode starts with the new-checklist default; edit mode overwrites it from the loaded row.
+    val separateCompleted: Boolean = NEW_CHECKLIST_SEPARATE_COMPLETED,
     val autoDeleteCompleted: Boolean = false,
 
     // ── Reminder (DESIGN_SPEC §2.1 / §2.5) ──────────────────────────────────────────────────────

@@ -26,6 +26,18 @@ internal fun generateEntityId(prefix: String = ""): String =
     "$prefix${currentTimeMillis()}_${Random.nextLong(0, Long.MAX_VALUE)}"
 
 /**
+ * [Checklist.separateCompleted] for a checklist the user creates NOW (redesign B, owner decision
+ * 2026-10-16): completed items go to their own collapsible "Completed" section by default.
+ *
+ * Deliberately NOT the constructor default, which stays `false`. That default is also what every
+ * decode path hands an OLD row or document that predates the field — Room column default, the
+ * kotlinx sync payload, the Android Firestore map (`toChecklistSyncData`), wasmJs Firestore, the MCP
+ * server. Flipping it would silently re-style every existing list on its next read. Creation sites
+ * pass this value explicitly instead; a per-list choice already stored is never touched.
+ */
+const val NEW_CHECKLIST_SEPARATE_COMPLETED: Boolean = true
+
+/**
  * Checklist template - defines the items to check
  */
 @Serializable

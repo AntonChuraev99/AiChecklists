@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -77,9 +78,8 @@ import org.jetbrains.compose.resources.stringResource
  *
  * Structure (NOT an AppCard — this is a styled dialogue turn, not a form):
  * ```
- * AiSenderLabel          (reused from ChatMessageBubble)
- * ┌──────────────────┐   prompt bubble: AppChatColors.raised() + 1dp contentOutline()
- * │  prompt          │   shape 20-20-20-4 (tail bottom-left), ChatMarkdownText
+ * (avatar) ┌──────────────────┐   prompt bubble beside the 28dp avatar (B §2.9, no label):
+ *          │  prompt          │   AppChatColors.raised() + 1dp contentOutline(), 20-20-20-8
  * │  object rows     │   D2: the typed object of the action (item / list / time / …)
  * └──────────────────┘
  * [x] Remember choice    only on the which-list picker for an add
@@ -136,16 +136,14 @@ fun AiChoiceResponse(
             // above (persisted as a message), so render ONLY the chips — no label, no bubble.
             // Non-blank prompt → Phase-1 write-intent / batch: label + prompt bubble + chips.
             if (choice.prompt.isNotBlank()) {
-                AiSenderLabel()
-
+                // B §2.9: no sender label — the avatar sits BESIDE the prompt bubble (this block is
+                // always the newest assistant turn, so it is the last of its run and carries it).
+                Row(verticalAlignment = Alignment.Bottom) {
+                AssistantAvatarSlot(showAvatar = true)
+                Spacer(modifier = Modifier.width(ChatAvatarLayout.Gap))
                 // Prompt bubble — assistant-style tonal bubble (mirrors ChatMessageBubble received side).
                 Surface(
-                    shape = RoundedCornerShape(
-                        topStart = 20.dp,
-                        topEnd = 20.dp,
-                        bottomEnd = 20.dp,
-                        bottomStart = 4.dp,
-                    ),
+                    shape = AssistantBubbleShape,
                     // The SAME pair as ChatMessageBubble's received side, and it has to be: this
                     // bubble and an assistant answer are the same thing said two ways, and they are
                     // routinely one above the other in one frame. Plane-relative — a fixed
@@ -186,7 +184,15 @@ fun AiChoiceResponse(
                         }
                     }
                 }
+                }  // end avatar Row
             }
+
+            // Everything the user acts on (memory toggle, chips, edit field) shares the bubble's start
+            // edge — the avatar slot — so the turn reads as one column beside the avatar.
+            Column(
+                modifier = Modifier.padding(start = ChatAvatarLayout.Slot),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+            ) {
 
             // Memory of choice — between the bubble and the chips, never inside either.
             if (pending.showMemoryToggle && !isEditing) {
@@ -239,6 +245,7 @@ fun AiChoiceResponse(
                     }
                 }
             }
+            }  // end avatar-slot Column
         }
     }
 }

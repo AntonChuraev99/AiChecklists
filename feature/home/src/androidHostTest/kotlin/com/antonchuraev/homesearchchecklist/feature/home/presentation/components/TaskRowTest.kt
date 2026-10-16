@@ -2,12 +2,18 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.component
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.due_tomorrow
+import aichecklists.core.designsystem.generated.resources.item_priority_action
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -204,12 +210,87 @@ class TaskRowTest {
         assertEquals(true, toggledTo, "the leading edge is still part of the checkbox zone")
     }
 
+    // ── Grouped container (redesign B) ───────────────────────────────────────
+
+    /**
+     * The grouped row draws a visual-only round checkbox, so the 30% zone must carry the checkbox
+     * semantics itself — otherwise TalkBack reads an unlabelled tap target where a checkbox was.
+     */
+    @Test
+    fun groupedRow_checkZoneIsAnnouncedAsACheckboxWithItsState() {
+        composeTestRule.setContent {
+            RowUnderTest(item = task(checked = true), compact = false, grouped = true)
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNode(
+            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox) and
+                SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On),
+        ).assertExists()
+    }
+
+    /** The 30/70 split is unchanged in the grouped container, at both ends. */
+    @Test
+    fun groupedRow_keepsThe30_70Split() {
+        var toggledTo: Boolean? = null
+        var detailsOpened = 0
+        composeTestRule.setContent {
+            RowUnderTest(
+                item = task(priority = 1, reminderAt = tomorrowMorning),
+                compact = false,
+                grouped = true,
+                onCheckedChange = { toggledTo = it },
+                onDetailsClick = { detailsOpened++ },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onRoot().performTouchInput { click(Offset(LeadingEdgeProbePx, height / 2f)) }
+        composeTestRule.waitForIdle()
+        assertEquals(true, toggledTo, "the leading edge of a grouped row toggles the checkbox")
+        assertEquals(0, detailsOpened, "the check zone must not open the sheet")
+
+        composeTestRule.onRoot().performTouchInput { click(Offset(width * RightZoneProbe, height / 2f)) }
+        composeTestRule.waitForIdle()
+        assertEquals(1, detailsOpened, "the right 70% of a grouped row opens the sheet")
+    }
+
+    /**
+     * Grouped drops the leading priority bar, so priority must still reach a non-colour channel:
+     * the inline star, named with the sheet's own "Important" label.
+     */
+    @Test
+    fun groupedRow_importantTask_showsTheNamedStar() {
+        var important = ""
+        composeTestRule.setContent {
+            important = stringResource(Res.string.item_priority_action)
+            RowUnderTest(item = task(priority = 1), compact = false, grouped = true)
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(important, useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun groupedRow_ordinaryTask_hasNoStar() {
+        var important = ""
+        composeTestRule.setContent {
+            important = stringResource(Res.string.item_priority_action)
+            RowUnderTest(item = task(), compact = false, grouped = true)
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(important, useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
     @Composable
     private fun RowUnderTest(
         item: ChecklistFillItem,
         compact: Boolean,
         onCheckedChange: (Boolean) -> Unit = {},
         onDetailsClick: () -> Unit = {},
+        grouped: Boolean = false,
     ) {
         AppTheme(darkTheme = false) {
             TaskRow(
@@ -219,6 +300,7 @@ class TaskRowTest {
                 onDetailsClick = onDetailsClick,
                 modifier = Modifier.fillMaxWidth(),
                 nowMillis = now,
+                container = if (grouped) RowContainer.Grouped else RowContainer.Card,
             )
         }
     }

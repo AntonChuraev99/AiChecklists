@@ -186,6 +186,12 @@ object AppSurface {
      * [docked] to satisfy the bottom chrome would move all of them.
      *
      * ## The measurements this encodes
+     * ⚠️ **Pre-B tables.** The rows below were measured against the "variant D" cream page `#FBFAF8`
+     * and the cool dark page `#121317`. Redesign B (2026-10-16) moved the page to sand `#F4EFE7` /
+     * warm dark `#161412` and kept the chrome frozen: chrome ↔ page is now ΔL\* −4.9 in light (was
+     * −8.6) and +4.2 in dark, so the 28dp `SheetTop` corners carry more of the edge. Do not "fix"
+     * that with a shadow or a chrome re-tune — both are rejected decisions (see below).
+     *
      * Contrast RATIO is close to useless for judging two near-black or two near-white surfaces — the
      * WCAG formula compresses the whole dark ramp into a hair's breadth. The number that matches what
      * an eye sees is **ΔL\*** (CIE lightness), so both are quoted and ΔL\* is the one that decides.
@@ -470,8 +476,14 @@ object AppSurface {
     @ReadOnlyComposable
     fun bottomChromeShoulder(): Color = ground()
 
-    /** Idle destination content, light theme. */
-    private const val BOTTOM_CHROME_IDLE_ALPHA_LIGHT = 0.82f
+    /**
+     * Idle destination content, light theme.
+     *
+     * Redesign B (2026-10-16): 0.82 → 0.92. The warmer `onSurfaceVariant` `#5B554C` at 0.82 on the
+     * frozen chrome `#DCE2EC` blends to 3.87:1 and fails AA; at 0.92 it is ≈4.75:1. The "4.50 : 1 at
+     * 0.82" figure in [onBottomChrome]'s KDoc is the pre-B palette.
+     */
+    private const val BOTTOM_CHROME_IDLE_ALPHA_LIGHT = 0.92f
 
     /** Idle destination content, dark theme — one notch lower; dark contrast reads hotter. */
     private const val BOTTOM_CHROME_IDLE_ALPHA_DARK = 0.75f

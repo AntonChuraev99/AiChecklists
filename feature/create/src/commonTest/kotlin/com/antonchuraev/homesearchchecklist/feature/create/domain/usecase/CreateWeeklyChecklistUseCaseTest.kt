@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class CreateWeeklyChecklistUseCaseTest {
 
@@ -175,5 +176,14 @@ class CreateWeeklyChecklistUseCaseTest {
 
         assertIs<CreateWeeklyChecklistUseCase.Result.RequiresUpgrade>(result)
         assertEquals(0, repository.addedChecklists.size)
+    }
+
+    @Test
+    fun invoke_newWeeklyChecklist_separatesCompletedByDefault() = runTest {
+        val (useCase, repository) = buildUseCase(weeklyCount = 0, isPremium = false)
+
+        useCase("Week")
+
+        assertTrue(repository.addedChecklists.single().separateCompleted)
     }
 }

@@ -13,8 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.OfflineBolt
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Toll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,22 +39,28 @@ import aichecklists.core.designsystem.generated.resources.chat_pricing_layer2_ti
 import aichecklists.core.designsystem.generated.resources.chat_pricing_layer3_detail
 import aichecklists.core.designsystem.generated.resources.chat_pricing_layer3_title
 import aichecklists.core.designsystem.generated.resources.chat_pricing_sheet_title
+import aichecklists.core.designsystem.generated.resources.chat_settings_get_more
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Pricing help bottom sheet explaining the 3-tier credit system.
+ * Pricing help bottom sheet explaining what a chat answer costs.
  *
- * - Layer 1 (Local): free — device-side intent routing
- * - Layer 2 (Classifier): 1 credit — gemini-flash-lite for ambiguous commands
+ * - Lead row: every answer goes to AI and costs 0–3 credits. (It used to promise "standard commands
+ *   free, processed on your device" — that local Layer 1 is disconnected, see rule `ai-chat`, so the
+ *   row must not promise a free on-device path.)
+ * - Layer 2 (Classifier): 1 credit — commands
  * - Layer 3 (FullChat): 3 credits — full AI reasoning for open questions
  *
- * Opens when the user taps the "?" icon in [ChatHeader].
+ * Opens from the credits chip in the chat input (redesign B §2.10).
  * Dismissed via drag, scrim tap, or the "Got it" button.
  *
  * @param onDismiss  Called when the sheet should be hidden (update state to showPricingSheet=false).
+ * @param onGetMoreClick When non-null, renders a secondary "Get more" button above "Got it" that
+ *                   routes to the paywall (the old header chip's job).
  * @param sheetState Optional [SheetState]; callers can pass a custom state for animation control.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +68,7 @@ import org.jetbrains.compose.resources.stringResource
 fun AiChatPricingHelpSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    onGetMoreClick: (() -> Unit)? = null,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
 ) {
     ModalBottomSheet(
@@ -85,7 +92,7 @@ fun AiChatPricingHelpSheet(
             Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
 
             PricingRow(
-                icon = Icons.Outlined.OfflineBolt,
+                icon = Icons.Outlined.Toll,
                 iconTint = MaterialTheme.colorScheme.tertiary,
                 titleRes = Res.string.chat_pricing_layer1_title,
                 detailRes = Res.string.chat_pricing_layer1_detail,
@@ -117,6 +124,17 @@ fun AiChatPricingHelpSheet(
             )
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+
+            // The paywall hop the header credits chip used to make directly (B §2.10): chip →
+            // this sheet → "Get more". Same paywall source as before (the host's onNavigateToPaywall).
+            if (onGetMoreClick != null) {
+                AppButtonSecondary(
+                    text = stringResource(Res.string.chat_settings_get_more),
+                    onClick = onGetMoreClick,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            }
 
             AppButton(
                 text = stringResource(Res.string.chat_pricing_got_it),

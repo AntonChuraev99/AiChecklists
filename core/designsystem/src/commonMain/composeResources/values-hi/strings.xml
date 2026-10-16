@@ -1365,10 +1365,10 @@
 
     <!-- AI Chat Pricing Help Sheet -->
     <string name="chat_pricing_sheet_title">AI चैट क्रेडिट कैसे चार्ज करता है</string>
-    <string name="chat_pricing_layer1_title">स्टैंडर्ड कमांड — फ्री</string>
-    <string name="chat_pricing_layer1_detail">जोड़ें, खोजें, हटाएं, पूरा मार्क करें, सरल रिमाइंडर। आपके डिवाइस पर ही प्रोसेस, कोई क्रेडिट नहीं।</string>
-    <string name="chat_pricing_layer2_title">स्मार्ट कमांड — 1 क्रेडिट</string>
-    <string name="chat_pricing_layer2_detail">बल्क ऑपरेशन या अस्पष्ट शब्द। AI हमें ठीक-ठीक समझने में मदद करता है कि आपका मतलब क्या है।</string>
+    <string name="chat_pricing_layer1_title">हर जवाब — 0–3 क्रेडिट</string>
+    <string name="chat_pricing_layer1_detail">हर संदेश क्लाउड में AI प्रोसेस करता है। कीमत अनुरोध पर निर्भर करती है:</string>
+    <string name="chat_pricing_layer2_title">कमांड — 1 क्रेडिट</string>
+    <string name="chat_pricing_layer2_detail">जोड़ें, खोजें, हटाएं, पूरा मार्क करें, रिमाइंडर, एक साथ कई बदलाव।</string>
     <string name="chat_pricing_layer3_title">खुले सवाल — 3 क्रेडिट</string>
     <string name="chat_pricing_layer3_detail">«इस हफ़्ते मुझे क्या करना चाहिए?», प्लानिंग, सारांश। पूरी AI सोच-समझ।</string>
     <string name="chat_pricing_apply_note">राइट एक्शन (जोड़ना / हटाना / सेट करना) हमेशा एक प्रीव्यू दिखाते हैं। क्रेडिट तब कटते हैं जब हम समझ लेते हैं कि आपका मतलब क्या था, तब नहीं जब आप Apply दबाते हैं।</string>
@@ -1819,4 +1819,13 @@
     <string name="activation_sheet_today_lower">आज, %1$s</string>
     <string name="activation_sheet_tomorrow_lower">कल, %1$s</string>
     <string name="activation_sheet_reminder_failed">रिमाइंडर सेट नहीं हो सका। सूची से सेट करें।</string>
+    <!-- Redesign B "Soft & tactile" (2026-10-16) -->
+    <string name="nav_ask_pill_label">Gisti से पूछें या टास्क जोड़ें</string>
+    <string name="inbox_header_date">%1$s, %3$d %2$s</string>
+    <string name="detail_header_progress">%1$d बाकी · %3$d में से %2$d पूरे</string>
+    <string name="detail_ask_about_list">इस सूची के बारे में Gisti से पूछें</string>
+    <string name="chat_header_title">Gisti</string>
+    <string name="chat_header_subtitle">आपका चेकलिस्ट सहायक</string>
+    <string name="chat_message_show_actions">कार्रवाइयाँ दिखाएँ</string>
+    <string name="checklist_card_no_items">अभी कोई आइटम नहीं</string>
 </resources>

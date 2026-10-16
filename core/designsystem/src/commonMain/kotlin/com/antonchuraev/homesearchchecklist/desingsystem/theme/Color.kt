@@ -64,31 +64,43 @@ private val NeutralVariant80 = Color(0xFFCAC4D0)
 private val NeutralVariant90 = Color(0xFFE7E0EC)
 
 // ---------------------------------------------------------------------------
-// Gisti "variant D" warm surfaces (light) — replaces the M3 violet-leaning
-// neutrals with a calm cream/beige tint so the app reads "warm & alive" instead
-// of cold-clinical. Same tone (luminance) as the originals → contrast preserved.
-// New named vals (not mutating the shared Neutral* set) keep the dark scheme intact.
+// Redesign B "Soft & tactile" (2026-10-16) — sand neutral ramp, light.
+// A warm sand page with cream cards one tonal step above it; the hairline
+// (`outlineVariant`) carries the card edge. Replaces the "variant D" cream page
+// (#FBFAF8) + white card (#FFFFFF). Brand roles (primary/secondary/tertiary/error)
+// are untouched. Measured: onSurface on page 14.0:1, onSurfaceVariant ≥ 5.78:1 on
+// page / card / recessed / sheet, outline (checkbox ring) 4.15:1 on page and
+// 4.67:1 on card, primary on page 5.02:1. Card vs page ΔL* +4.7.
 // ---------------------------------------------------------------------------
-private val WarmSurface     = Color(0xFFFBFAF8) // app surface/background — warm cream
-private val WarmCardWhite    = Color(0xFFFFFFFF) // cards — pure white (surfaceContainerLowest)
-private val WarmContainerLow = Color(0xFFF6F5F2) // cardAlt
-private val WarmContainer    = Color(0xFFF1F0ED) // neutral chips
-private val WarmContainerHigh = Color(0xFFECEAE6) // progress track / pressed
-private val WarmContainerHighest = Color(0xFFE6E4DF)
-private val WarmSurfaceDim   = Color(0xFFDEDCD6)
-private val WarmSurfaceVariant = Color(0xFFEDEBE6)
-private val WarmOutlineVariant = Color(0xFFE2E0DB) // soft card borders / dividers
+private val SandSurface          = Color(0xFFF4EFE7) // background / surface / surfaceBright — sand page
+private val SandCard             = Color(0xFFFFFDF9) // surfaceContainerLowest — cream card / group
+private val SandContainerLow     = Color(0xFFF9F5EF) // sheet / modal
+private val SandContainer        = Color(0xFFEFE9DF) // recessed: chips, fills, ring track
+private val SandContainerHigh    = Color(0xFFEAE3D8) // track / pressed
+private val SandContainerHighest = Color(0xFFE4DCD0)
+private val SandSurfaceDim       = Color(0xFFDDD5C8)
+private val SandSurfaceVariant   = Color(0xFFECE5DA)
+private val SandOutlineVariant   = Color(0xFFE6DED1) // hairlines: card / group edges, dividers
+private val SandOutline          = Color(0xFF7A7266) // control borders, checkbox ring
+private val SandInk              = Color(0xFF24211C) // onBackground / onSurface
+private val SandInkVariant       = Color(0xFF5B554C) // onSurfaceVariant
 
-// Cool-neutral charcoals (dark) — de-violeted to match the design's neutral
-// near-black surfaces (#0F1115 family) instead of the M3 purple-leaning Neutral6.
-private val CoolDark4  = Color(0xFF0D0E11)
-private val CoolDark6  = Color(0xFF121317) // dark surface/background
-private val CoolDark10 = Color(0xFF1A1C20)
-private val CoolDark12 = Color(0xFF1E2025)
-private val CoolDark17 = Color(0xFF26282E)
-private val CoolDark22 = Color(0xFF2D2F35)
-private val CoolDark24 = Color(0xFF303239)
-private val CoolDarkOutlineVariant = Color(0xFF2C2F36)
+// Warm darks — the same ramp shifted off the cool blue-black (#121317 family)
+// to a warm near-black. Dark ladder only runs UP (card is lighter than page).
+// Measured: onSurface on page 15.1:1, onSurfaceVariant ≥ 7.95:1, outline 4.63:1,
+// card vs page ΔL* +5.5.
+private val WarmDark4    = Color(0xFF100E0C) // surfaceContainerLowest
+private val WarmDark6    = Color(0xFF161412) // background / surface / surfaceDim
+private val WarmDark10   = Color(0xFF221F1B) // surfaceContainerLow — card in dark
+private val WarmDark12   = Color(0xFF26231F) // surfaceContainer
+private val WarmDark17   = Color(0xFF2D2924) // surfaceContainerHigh — recessed in dark
+private val WarmDark22   = Color(0xFF35302A) // surfaceContainerHighest
+private val WarmDark24   = Color(0xFF3A3530) // surfaceBright
+private val WarmDarkOutlineVariant = Color(0xFF37322B)
+private val WarmDarkOutline        = Color(0xFF8F877C)
+private val WarmDarkInk            = Color(0xFFEEE8E0)
+private val WarmDarkInkVariant     = Color(0xFFC8BFB3)
+private val WarmDarkSurfaceVariant = Color(0xFF4A443C)
 
 // ---------------------------------------------------------------------------
 // Legacy named colors (kept for backward compat / raw usage in Color.kt only)
@@ -146,25 +158,25 @@ val LightColorScheme = lightColorScheme(
     onError = White,
     errorContainer = Red90,
     onErrorContainer = Red10,
-    background = WarmSurface,
-    onBackground = Neutral10,
-    surface = WarmSurface,
-    onSurface = Neutral10,
-    surfaceVariant = WarmSurfaceVariant,
-    onSurfaceVariant = NeutralVariant30,
-    surfaceContainerLowest = WarmCardWhite,
-    surfaceContainerLow = WarmContainerLow,
-    surfaceContainer = WarmContainer,
-    surfaceContainerHigh = WarmContainerHigh,
-    surfaceContainerHighest = WarmContainerHighest,
+    background = SandSurface,
+    onBackground = SandInk,
+    surface = SandSurface,
+    onSurface = SandInk,
+    surfaceVariant = SandSurfaceVariant,
+    onSurfaceVariant = SandInkVariant,
+    surfaceContainerLowest = SandCard,
+    surfaceContainerLow = SandContainerLow,
+    surfaceContainer = SandContainer,
+    surfaceContainerHigh = SandContainerHigh,
+    surfaceContainerHighest = SandContainerHighest,
     inverseSurface = Neutral20,
     inverseOnSurface = Neutral95,
     inversePrimary = Blue80,
-    outline = NeutralVariant50,
-    outlineVariant = WarmOutlineVariant,
+    outline = SandOutline,
+    outlineVariant = SandOutlineVariant,
     scrim = Color.Black,
-    surfaceBright = WarmSurface,
-    surfaceDim = WarmSurfaceDim
+    surfaceBright = SandSurface,
+    surfaceDim = SandSurfaceDim
 )
 
 // ---------------------------------------------------------------------------
@@ -193,24 +205,24 @@ val DarkColorScheme = darkColorScheme(
     onError = Red10,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = CoolDark6,
-    onBackground = Neutral90,
-    surface = CoolDark6,
-    onSurface = Neutral90,
-    surfaceVariant = NeutralVariant30,
-    onSurfaceVariant = NeutralVariant80,
-    surfaceContainerLowest = CoolDark4,
-    surfaceContainerLow = CoolDark10,
-    surfaceContainer = CoolDark12,
-    surfaceContainerHigh = CoolDark17,
-    surfaceContainerHighest = CoolDark22,
+    background = WarmDark6,
+    onBackground = WarmDarkInk,
+    surface = WarmDark6,
+    onSurface = WarmDarkInk,
+    surfaceVariant = WarmDarkSurfaceVariant,
+    onSurfaceVariant = WarmDarkInkVariant,
+    surfaceContainerLowest = WarmDark4,
+    surfaceContainerLow = WarmDark10,
+    surfaceContainer = WarmDark12,
+    surfaceContainerHigh = WarmDark17,
+    surfaceContainerHighest = WarmDark22,
     inverseSurface = Neutral90,
     inverseOnSurface = Neutral20,
     inversePrimary = Blue40,
-    outline = NeutralVariant60,
-    outlineVariant = CoolDarkOutlineVariant,
+    outline = WarmDarkOutline,
+    outlineVariant = WarmDarkOutlineVariant,
     scrim = Color.Black,
-    surfaceBright = CoolDark24,
-    surfaceDim = CoolDark6
+    surfaceBright = WarmDark24,
+    surfaceDim = WarmDark6
 )
 
