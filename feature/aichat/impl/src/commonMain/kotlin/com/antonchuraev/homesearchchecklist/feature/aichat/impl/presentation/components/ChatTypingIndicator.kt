@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +43,8 @@ import org.jetbrains.compose.resources.stringResource
  * - Bubble uses [AppChatColors.raised] + a soft [AppChatColors.contentOutline] hairline — the SAME
  *   pair as [ChatMessageBubble]'s assistant side, because the real answer replaces this block in
  *   place and any drift would show as the bubble changing colour the moment the text arrives
- * - Asymmetric tail corner: bottomStart=4dp (matches assistant bubble shape)
+ * - Same shape as the assistant bubble ([AssistantBubbleShape], 8dp tail bottom-start), with the
+ *   28dp avatar beside it (B §2.9)
  * - 3 dots, 6dp diameter, 4dp gap between them
  * - Alpha animation: 0.3f → 1.0f, staggered 200ms between dots
  * - Animation period: 900ms total, repeating with RESTART
@@ -54,22 +56,24 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ChatTypingIndicator(
     modifier: Modifier = Modifier,
+    showAvatar: Boolean = true,
 ) {
     val a11yLabel = stringResource(Res.string.chat_typing_indicator_a11y)
 
+    // B §2.9: the indicator is the newest assistant turn, so it carries the avatar beside the bubble.
     Row(
         modifier = modifier
             .fillMaxWidth()
             .semantics { contentDescription = a11yLabel },
         horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Bottom,
     ) {
+        AssistantAvatarSlot(showAvatar = showAvatar)
+        androidx.compose.foundation.layout.Spacer(
+            modifier = Modifier.width(ChatAvatarLayout.Gap),
+        )
         Surface(
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomEnd = 16.dp,
-                bottomStart = 4.dp,
-            ),
+            shape = AssistantBubbleShape,
             // Same pair as ChatMessageBubble's received bubble, and it has to STAY the same pair:
             // this block is the placeholder that the real answer replaces in place, so any drift
             // shows up as the bubble changing colour the moment the text arrives. Content, not a

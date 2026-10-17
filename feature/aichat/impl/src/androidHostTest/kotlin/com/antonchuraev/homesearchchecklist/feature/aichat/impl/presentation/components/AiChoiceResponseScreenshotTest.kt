@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
@@ -300,6 +301,7 @@ private fun whichListPending(names: List<String>, metas: List<String>? = null): 
             meta = metas?.getOrNull(index),
             role = ChoiceRole.Default,
             action = ChoiceAction.Execute(ToolCall.AddItem(checklistHint = name, itemText = "молоко")),
+            seedId = index + 1L,
         )
     }
     val escape = ChoiceOption(
@@ -313,6 +315,7 @@ private fun whichListPending(names: List<String>, metas: List<String>? = null): 
             prompt = "В какой список?",
             options = options,
             escape = escape,
+            kind = ChoiceKind.PickList,
         ),
     )
 }

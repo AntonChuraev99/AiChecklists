@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
@@ -15,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Rout
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowEmphasis
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
@@ -718,5 +720,120 @@ class ChatObjectRowsTest {
             metas,
             "distinct counts already disambiguate — appending a date to every chip is noise; got $metas",
         )
+    }
+
+    // ── 11. Redesign B pass 2 — header tile kind + destination colour seed ───
+
+    /**
+     * The which-list rows render a dot in each list's avatar colour, seeded by the list id. The seed
+     * must be the id of the list the chip DISPATCHES to — a seed copied from a neighbour would paint
+     * "Shopping" in "Work"'s colour — and an unresolvable candidate carries none (list-icon fallback).
+     */
+    @Test
+    fun whichListChoice_kindIsPickList_andEachCandidateSeedsWithItsOwnListId() = runTest {
+        val rig = buildVmRig(
+            classification = addClassification(itemText = "молоко", checklistHint = "покупки"),
+            checklists = listOf(
+                seedList(id = 7L, name = "Покупки", itemCount = 12, updatedAt = 1_700_000_000_000L),
+                seedList(id = 9L, name = "Работа", itemCount = 3, updatedAt = 1_800_000_000_000L),
+            ),
+            dispatchOutcome = DispatchOutcome.AmbiguousMatch(listOf("Покупки", "Призрак")),
+        )
+
+        rig.send("добавь молоко в покупки")
+
+        val state = rig.viewModel.screenState.value
+        assertEquals(ChoiceKind.PickList, state.pendingChoice?.choice?.kind)
+        state.candidateOptions().forEach { chip ->
+            val targetId = ((chip.action as ChoiceAction.Execute).toolCall as ToolCall.AddItem).checklistId
+            assertEquals(targetId, chip.seedId, "chip '${chip.label}' must seed its colour with the list it targets")
+        }
+        assertEquals(7L, state.candidateOptions().single { it.label == "Покупки" }.seedId)
+        assertNull(
+            state.candidateOptions().single { it.label == "Призрак" }.seedId,
+            "an unresolvable list has no colour of its own — null, never a borrowed seed",
+        )
+        assertNull(state.pendingChoice?.choice?.escape?.seedId, "the escape chip is not a destination")
+    }
+
+    /** A single write-intent question carries the tile of its tool call (pure mapping: ChoiceKindMapperTest). */
+    @Test
+    fun writeChoice_setItemReminder_kindIsReminder_andOptionsCarryNoSeed() = runTest {
+        val rig = buildVmRig(
+            classification = classificationFor(
+                intent = ChatIntent.SetReminder,
+                toolCall = ToolCall.SetItemReminder(checklistHint = "Покупки", itemText = "масло", at = 1L),
+            ),
+            lists = listOf("Покупки", "Работа"),
+        )
+
+        rig.send("напомни купить масло")
+
+        val choice = rig.viewModel.screenState.value.pendingChoice?.choice
+        assertNotNull(choice)
+        assertEquals(ChoiceKind.Reminder, choice.kind)
+        assertTrue(choice.options.all { it.seedId == null }, "Set / Edit chips are actions, not destinations")
+    }
+
+    @Test
+    fun agentBatch_kindIsBatch() = runTest {
+        val rig = buildAgentBatchRig(
+            toolCalls = listOf(
+                addItemCall(id = "call_1", checklist = "Покупки", item = "молоко"),
+                addItemCall(id = "call_2", checklist = "Покупки", item = "хлеб"),
+            ),
+        )
+
+        rig.send("добавь молоко и хлеб в покупки")
+
+        assertEquals(ChoiceKind.Batch, rig.viewModel.screenState.value.pendingChoice?.choice?.kind)
+    }
+
+    /**
+     * The post-add move picker lists every OTHER project; each target row must seed with that
+     * project's id. The post-action strip before it has no header, so it stays kind-less.
+     */
+    @Test
+    fun moveTargets_kindIsMove_andEachTargetSeedsWithItsProjectId() = runTest {
+        val handle = UndoHandle.AddedItem(
+            checklistId = 1L,
+            checklistName = "Покупки",
+            fillId = 11L,
+            fillItemId = "fill_new",
+            templateItemId = "tpl_new",
+            itemText = "Молоко",
+        )
+        val rig = buildVmRig(
+            classification = addClassification(itemText = "Молоко", checklistHint = "Покупки"),
+            checklists = listOf(
+                seedList(id = 1L, name = "Покупки"),
+                seedList(id = 5L, name = "Работа"),
+                seedList(id = 8L, name = "Дом"),
+            ),
+            dispatchOutcome = DispatchOutcome.Success(
+                messageKey = "chat_dispatch_added_to",
+                args = listOf("Молоко", "Покупки"),
+                linkedChecklistId = 1L,
+                undo = handle,
+            ),
+        )
+        collectEffects(rig, testDispatcher)
+        rig.send("добавь молоко в покупки")
+
+        val strip = rig.viewModel.screenState.value.pendingChoice?.choice
+        assertNotNull(strip)
+        assertNull(strip.kind, "the post-action strip has a blank prompt and no header tile")
+
+        rig.viewModel.sendIntent(
+            ChatScreenIntent.OnChoiceSelected(
+                rig.viewModel.screenState.value.optionIdFor { it is ChoiceAction.MoveToList },
+            ),
+        )
+
+        val picker = rig.viewModel.screenState.value.pendingChoice?.choice
+        assertNotNull(picker)
+        assertEquals(ChoiceKind.Move, picker.kind)
+        val seedsByTarget = picker.options.associate { (it.action as ChoiceAction.MoveTo).targetName to it.seedId }
+        assertEquals(mapOf("Работа" to 5L, "Дом" to 8L), seedsByTarget)
     }
 }

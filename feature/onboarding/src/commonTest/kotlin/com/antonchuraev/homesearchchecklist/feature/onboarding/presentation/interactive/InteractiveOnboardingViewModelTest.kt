@@ -1096,7 +1096,7 @@ class InteractiveOnboardingViewModelTest {
     @Test
     fun toggleAutoDeleteCompleted_disablesSeparateCompleted() = runTest {
         val vm = createViewModelAtCustomize()
-        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+        // separateCompleted is ON by default for new checklists (redesign B).
         assertTrue(vm.screenState.value.separateCompleted)
 
         vm.onIntent(InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted)
@@ -1108,12 +1108,32 @@ class InteractiveOnboardingViewModelTest {
     @Test
     fun toggleSeparateCompletedOff_doesNotReenableAutoDelete() = runTest {
         val vm = createViewModelAtCustomize()
-        // Both are false initially. Turn separate on, then off.
-        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+        // Separate is ON by default, auto-delete OFF. Turn separate off.
         vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
 
         assertFalse(vm.screenState.value.separateCompleted)
         assertFalse(vm.screenState.value.autoDeleteCompleted)
+    }
+
+    @Test
+    fun onSaveChecklist_untouchedToggle_savesSeparateCompleted() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(assertNotNull(fakeChecklistRepository.lastAddedChecklist).separateCompleted)
+    }
+
+    @Test
+    fun onSaveChecklist_toggleTurnedOff_savesSeparateCompletedFalse() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(assertNotNull(fakeChecklistRepository.lastAddedChecklist).separateCompleted)
     }
 
     // --- Test doubles ---

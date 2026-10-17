@@ -60,6 +60,12 @@ fun AppTextField(
      * is `VisualTransformation.None`, i.e. every existing call site renders byte-for-byte as before.
      */
     highlightRange: IntRange? = null,
+    /**
+     * Draw no outline in ANY state. For a field embedded in a container that carries the boundary and
+     * the focus ring itself — today only the capture dock's composer card (`AddItemFieldStyle.Embedded`).
+     * False (the default) keeps every existing call site byte-identical.
+     */
+    borderless: Boolean = false,
 ) {
     val effectiveTrailingIcon: @Composable (() -> Unit)? = when {
         showClearButton && value.isNotEmpty() -> {
@@ -119,13 +125,24 @@ fun AppTextField(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         shape = MaterialTheme.shapes.small,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            errorBorderColor = MaterialTheme.colorScheme.error,
-            focusedLabelColor = MaterialTheme.colorScheme.primary,
-            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        colors = if (borderless) {
+            OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                disabledBorderColor = Color.Transparent,
+                errorBorderColor = Color.Transparent,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     )
 }
 

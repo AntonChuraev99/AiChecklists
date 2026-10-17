@@ -12,7 +12,9 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -34,8 +36,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.HorizontalDivider
@@ -48,13 +52,20 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -62,8 +73,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.due_planner_done
@@ -77,7 +90,6 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiSchedule
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
@@ -153,9 +165,9 @@ private val DueCellCornerOuter = 16.dp
  *
  * Thicker than [AppDimens.DividerThickness] on purpose: it is now the only cell in the plate carrying
  * a line at all, so it has to read as a state rather than as a leftover border. Colour is never the
- * only channel — `GistiSchedule.activeContainer` changes the fill underneath it in the same step.
+ * only channel — `primaryContainer` changes the fill underneath it in the same step.
  */
-private val DueCellSelectedRing = 1.5.dp
+private val DueCellSelectedRing = 2.dp
 
 /**
  * Inner horizontal padding of a rail chip's label.
@@ -449,11 +461,11 @@ private val EdgeFadeWidth = 24.dp
  *
  * Two visual states, and which one applies depends on [hasDate] ALONE:
  *
- * | `hasDate` | `expanded` | fill | border | trailing |
- * |---|---|---|---|---|
- * | false | false | [AppChatColors.raised] | [AppChatColors.controlOutline] | chevron down |
- * | false | true  | [AppChatColors.raised] | [AppChatColors.controlOutline] | chevron up |
- * | true  | any   | [GistiSchedule.activeContainer] | `primary` | `×` |
+ * | `hasDate` | `expanded` | fill (no border, redesign B pass 2) | glyphs |
+ * |---|---|---|---|
+ * | false | false | [AppChatColors.chipFill] | Event · chevron down |
+ * | false | true  | [AppChatColors.chipFill] | Event · chevron up |
+ * | true  | any   | `primaryContainer` | Alarm (`primary`) · `×` |
  *
  * ⚠️ The accent used to include `expanded`, so an open panel painted the chip blue whether or not
  * anything was set. Blue means "this is the answer" everywhere else in this component — on a chip
@@ -480,86 +492,147 @@ private fun DueLeadChip(
 ) {
     // `hasDate` ALONE — see the table above. An open panel is a state, not an answer.
     val accented = hasDate
-    // GistiSchedule's ACTIVE tone specifically, not `colors(state)`. The other tones are wrong here
-    // for one reason each: `Later` and `Someday` resolve to `AppSurface.recessed()`, which is a step
-    // DOWN from the page and lands within ~2 L* of this dock's own chrome — the applied chip would
-    // dissolve into the dock in the one place the answer has to be readable — and `Overdue` cannot
-    // occur on a draft, whose date is by construction in the future. Active is the one tone that is
-    // a real step off BOTH planes in BOTH themes (#E3F0FC on light, #0F3B66 on dark).
-    val container = if (accented) GistiSchedule.activeContainer else AppChatColors.raised()
-    val content = if (accented) GistiSchedule.activeContent else MaterialTheme.colorScheme.onSurface
-    val border = if (accented) MaterialTheme.colorScheme.primary else AppChatColors.controlOutline()
+    // Redesign B pass 2: the answer is `primaryContainer` (the same applied-chip role the rest of B
+    // uses) and the empty chip is the borderless soft fill. Both are a real step off the composer
+    // card the rail now lives in, in both themes — see [AppChatColors.chipFill].
+    val container = if (accented) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        AppChatColors.chipFill()
+    }
+    val labelColor = if (accented) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val glyphColor = if (accented) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     val stateLabel = if (expanded) expandedStateLabel else collapsedStateLabel
 
-    Surface(
-        shape = AppShapeTokens.Pill,
-        color = container,
-        border = BorderStroke(AppDimens.DividerThickness, border),
-        // heightIn, never height: `Modifier.height` pins min AND max, which clips Devanagari matras
-        // and any label past fontScale 1.3, and — the reason it is called out here — silently defeats
-        // every 48dp minimum below it. That is the live a11y defect this project already fixed once
-        // on the 38dp preset chips.
-        modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
+    // 48dp of TARGET, a ~32dp pill of PAINT. The two halves keep their full-height hit boxes (the
+    // `×` is asserted as a 48dp square), while the fill and the ripples are cut to a band centred in
+    // them — the soft chip of spec B pass 2 without giving back the a11y floor. heightIn, never
+    // height: `Modifier.height` pins min AND max, which clips Devanagari matras and any label past
+    // fontScale 1.3, and silently defeats every 48dp minimum below it.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .heightIn(min = AppDimens.MinTouchTarget)
+            .background(container, CenteredBandShape(roundStart = true, roundEnd = true)),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-                modifier = Modifier
-                    .heightIn(min = AppDimens.MinTouchTarget)
-                    .clickable(role = Role.Button, onClick = onClick)
-                    // The expander half, and the only place the open/closed state is announced. A
-                    // `Role.Button` with no state description tells a screen-reader user what they
-                    // can do and never what happened when they did it.
-                    .semantics { stateDescription = stateLabel }
-                    .padding(
-                        start = ChipLabelPadding,
-                        // The `×` half brings its own 48dp of width; a full label padding before it
-                        // would push the chip past a third of the rail on a 320dp dock.
-                        end = if (hasDate) AppDimens.SpacingSm else ChipLabelPadding,
-                    ),
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (accented) FontWeight.SemiBold else FontWeight.Medium,
-                    color = content,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+            modifier = Modifier
+                .heightIn(min = AppDimens.MinTouchTarget)
+                .clip(CenteredBandShape(roundStart = true, roundEnd = !hasDate))
+                .clickable(role = Role.Button, onClick = onClick)
+                // The expander half, and the only place the open/closed state is announced. A
+                // `Role.Button` with no state description tells a screen-reader user what they
+                // can do and never what happened when they did it.
+                .semantics { stateDescription = stateLabel }
+                .padding(
+                    start = LeadChipPaddingStart,
+                    // The `×` half brings its own 48dp of width; a full label padding before it
+                    // would push the chip past a third of the rail on a 320dp dock.
+                    end = if (hasDate) 0.dp else LeadChipPaddingEnd,
+                ),
+        ) {
+            Icon(
+                // Decorative: the label beside it is the name. Event = "pick a when", Alarm = "a
+                // when is set" — the glyph changes with the state, so colour is not the only channel.
+                imageVector = if (accented) Icons.Outlined.Alarm else Icons.Outlined.Event,
+                contentDescription = null,
+                tint = glyphColor,
+                modifier = Modifier.size(LeadChipIconSize),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = labelColor,
+            )
+            if (!hasDate) {
+                Icon(
+                    // Decorative: the chevron restates `stateDescription`, which is already on
+                    // this node. A description here would have TalkBack say "collapsed" twice.
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = glyphColor,
+                    modifier = Modifier.size(LeadChipIconSize),
                 )
-                if (!hasDate) {
-                    Icon(
-                        // Decorative: the chevron restates `stateDescription`, which is already on
-                        // this node. A description here would have TalkBack say "collapsed" twice.
-                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = null,
-                        tint = content,
-                        modifier = Modifier.size(DueIconSize),
-                    )
-                }
-            }
-            if (hasDate) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        // A full square target, not the glyph's 16dp. sizeIn rather than size for
-                        // the same reason as above — it may grow with the chip, never shrink.
-                        .sizeIn(
-                            minWidth = AppDimens.MinTouchTarget,
-                            minHeight = AppDimens.MinTouchTarget,
-                        )
-                        .clickable(role = Role.Button, onClick = onClear)
-                        // The ONLY label this half has: it holds a glyph, so without a description
-                        // it is announced as an unnamed button.
-                        .semantics { contentDescription = clearDateLabel },
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = null,
-                        tint = content,
-                        modifier = Modifier.size(DueIconSize),
-                    )
-                }
             }
         }
+        if (hasDate) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    // A full square target, not the glyph's 18dp. sizeIn rather than size for
+                    // the same reason as above — it may grow with the chip, never shrink.
+                    .sizeIn(
+                        minWidth = AppDimens.MinTouchTarget,
+                        minHeight = AppDimens.MinTouchTarget,
+                    )
+                    .clip(CenteredBandShape(roundStart = false, roundEnd = true))
+                    .clickable(role = Role.Button, onClick = onClear)
+                    // The ONLY label this half has: it holds a glyph, so without a description
+                    // it is announced as an unnamed button.
+                    .semantics { contentDescription = clearDateLabel },
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = null,
+                    tint = labelColor,
+                    modifier = Modifier.size(LeadChipIconSize),
+                )
+            }
+        }
+    }
+}
+
+/** Visible height of a soft rail chip inside its 48dp target (spec B pass 2: 32 visual / 48 target). */
+private val SoftChipVisualHeight = 32.dp
+
+/** Lead chip insets and glyphs (spec B pass 2, §1.1: padding start 10 / end 8, icons 18). */
+private val LeadChipPaddingStart = 10.dp
+private val LeadChipPaddingEnd = AppDimens.SpacingSm
+private val LeadChipIconSize = 18.dp
+
+/**
+ * A pill-shaped band centred vertically in a taller box: the painted chip inside a 48dp target.
+ *
+ * The band is [SoftChipVisualHeight] at rest and grows with the box once the content outgrows it
+ * (large font scale), keeping 8dp of the target above and below. [roundStart] / [roundEnd] let the
+ * two halves of the lead chip each clip their ripple to their own end of one shared pill; they follow
+ * the layout direction, so the rounded side stays the outer one in RTL.
+ */
+private class CenteredBandShape(
+    private val roundStart: Boolean,
+    private val roundEnd: Boolean,
+) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val minBand = with(density) { SoftChipVisualHeight.toPx() }
+        val margin = with(density) { ((AppDimens.MinTouchTarget - SoftChipVisualHeight) / 2).toPx() }
+        val band = maxOf(minOf(minBand, size.height), size.height - 2 * margin)
+        val top = (size.height - band) / 2f
+        val radius = CornerRadius(band / 2f)
+        val roundLeft = if (layoutDirection == LayoutDirection.Ltr) roundStart else roundEnd
+        val roundRight = if (layoutDirection == LayoutDirection.Ltr) roundEnd else roundStart
+        return Outline.Rounded(
+            RoundRect(
+                left = 0f,
+                top = top,
+                right = size.width,
+                bottom = top + band,
+                topLeftCornerRadius = if (roundLeft) radius else CornerRadius.Zero,
+                bottomLeftCornerRadius = if (roundLeft) radius else CornerRadius.Zero,
+                topRightCornerRadius = if (roundRight) radius else CornerRadius.Zero,
+                bottomRightCornerRadius = if (roundRight) radius else CornerRadius.Zero,
+            ),
+        )
     }
 }
 
@@ -573,34 +646,32 @@ private fun DueLeadChip(
  */
 @Composable
 private fun DuePresetPill(label: String, onClick: () -> Unit) {
+    // Redesign B pass 2: a borderless soft chip — `chipFill()` (recessed) on the composer card,
+    // 32dp of paint inside the 48dp target `Surface(onClick)` reserves on its own
+    // (`minimumInteractiveComponentSize`). The scroll and its edge fade carry the overflow, so the
+    // label gets the full 12dp of padding the spec asks for.
     Surface(
         onClick = onClick,
         shape = AppShapeTokens.Pill,
-        color = AppChatColors.raised(),
-        border = BorderStroke(AppDimens.DividerThickness, AppChatColors.controlOutline()),
-        modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
+        color = AppChatColors.chipFill(),
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            // SpacingSm, one step tighter than the lead chip's [ChipLabelPadding] — and identical to
-            // the source pills below, whose shape and height these already share. Measured: at 12dp
-            // the three-preset English rail still needed 355dp of a 344dp row at 360dp / fontScale
-            // 1.0 and wrapped; at 8dp it lands on one line with room to spare, which is the state
-            // the approved mock shows.
-            modifier = Modifier.padding(horizontal = AppDimens.SpacingSm),
+            modifier = Modifier
+                // heightIn, never height — see [DueLeadChip].
+                .heightIn(min = SoftChipVisualHeight)
+                .padding(horizontal = ChipLabelPadding),
         ) {
             Text(
                 text = label,
-                // labelMedium, one step under the lead chip's labelLarge. Two things fall out of
-                // that: the ANSWER stays typographically louder than the offers around it, and
-                // these pills match the source pills sitting 60dp below them in the same dock —
-                // same height, same corner, same type — instead of reading as a fifth kind of
-                // button. It is also what buys the width the row needs to stay on one line.
-                style = MaterialTheme.typography.labelMedium,
+                // labelLarge at Medium weight: the ANSWER (lead chip) stays louder by weight
+                // (SemiBold) and by its fill, not by a smaller type size the offers would be hard
+                // to read in.
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
-                // No maxLines and no ellipsis. A truncated preset is a preset nobody taps, and the
-                // row can afford the height because it wraps instead of scrolling.
+                // No maxLines and no ellipsis. A truncated preset is a preset nobody taps; the row
+                // scrolls instead.
             )
         }
     }
@@ -678,106 +749,132 @@ fun DuePlannerPanel(
         enter = expandVertically(animationSpec = sizeSpec) + fadeIn(animationSpec = alphaSpec),
         exit = shrinkVertically(animationSpec = sizeSpec) + fadeOut(animationSpec = alphaSpec),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = horizontalPadding, vertical = AppDimens.SpacingSm),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            // ── Zone A: the preset PLATE ────────────────────────────────────────────────────────
-            // Six slots in rows of three: the five dated offers, then "Pick date". Built as one list
-            // and chunked rather than as two hand-written rows, so a set of a different size still
-            // produces a grid instead of an off-by-one.
-            //
-            // Its own Column, with the 2dp gutter, nested inside the panel's 8dp one: the plate is a
-            // single object here, and the two settings rows and Done are the zones beside it.
-            val slots: List<DuePlannerSlot> =
-                cells.map { DuePlannerSlot.Preset(it) } + DuePlannerSlot.PickDate
-            val rows = slots.chunked(DuePlannerColumns)
-            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs)) {
-                rows.forEachIndexed { rowIndex, group ->
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
-                        // IntrinsicSize.Min, so every cell in a row is as tall as the tallest one in
-                        // it. Without it a wrapped label ("След. неделя" at fontScale 1.3 on a 320dp
-                        // dock) leaves one cell taller than its row-mates — peers at two different
-                        // heights, the same defect the source-pill grid's equal-column rule prevents.
-                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    ) {
-                        group.forEachIndexed { columnIndex, slot ->
-                            // From the SLOT INDEX, never from "is this the last child": a short final
-                            // row keeps its `Spacer(weight(1f))` padding, so the last CELL of that row
-                            // is not the plate's bottom-right corner and must not be rounded like one.
-                            val shape = duePlannerCellShape(
-                                rowIndex = rowIndex,
-                                columnIndex = columnIndex,
-                                rowCount = rows.size,
-                            )
-                            when (slot) {
-                                is DuePlannerSlot.Preset -> DuePlannerCell(
-                                    label = slot.cell.label,
-                                    secondaryLabel = slot.cell.timeLabel,
-                                    icon = null,
-                                    selected = slot.cell.id == selectedPreset,
-                                    shape = shape,
-                                    onClick = { onPresetClick(slot.cell.id) },
+        // Columns from the WIDTH, not a constant (spec B pass 2, risk 2): inside the composer card the
+        // grid is narrower than the old full-width panel, and at 320dp × fontScale 1.5 "Tomorrow" no
+        // longer fits a third of it. Pure layout — the slots, their order and their callbacks do not
+        // change with the column count.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val innerWidth = maxWidth - horizontalPadding * 2
+            val fontScale = LocalDensity.current.fontScale
+            val columns = if (innerWidth < DuePlannerCellMinWidth * DuePlannerColumns * fontScale) {
+                DuePlannerColumnsNarrow
+            } else {
+                DuePlannerColumns
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = AppDimens.SpacingSm),
+            ) {
+                // ── Zone A: the preset PLATE ────────────────────────────────────────────────────────
+                // The five dated offers, then "Pick date", in rows of [columns]. Built as one list and
+                // chunked rather than as hand-written rows, so a set of a different size (or a narrower
+                // window) still produces a grid instead of an off-by-one.
+                val slots: List<DuePlannerSlot> =
+                    cells.map { DuePlannerSlot.Preset(it) } + DuePlannerSlot.PickDate
+                val rows = slots.chunked(columns)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                ) {
+                    rows.forEachIndexed { rowIndex, group ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
+                            // IntrinsicSize.Min, so every cell in a row is as tall as the tallest one in
+                            // it. Without it a wrapped label ("След. неделя" at fontScale 1.3 on a 320dp
+                            // dock) leaves one cell taller than its row-mates — peers at two different
+                            // heights, the same defect the source-pill grid's equal-column rule prevents.
+                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                        ) {
+                            group.forEachIndexed { columnIndex, slot ->
+                                // From the SLOT INDEX, never from "is this the last child": a short final
+                                // row keeps its `Spacer(weight(1f))` padding, so the last CELL of that row
+                                // is not the plate's bottom-right corner and must not be rounded like one.
+                                val shape = duePlannerCellShape(
+                                    rowIndex = rowIndex,
+                                    columnIndex = columnIndex,
+                                    rowCount = rows.size,
+                                    columnCount = columns,
                                 )
+                                when (slot) {
+                                    is DuePlannerSlot.Preset -> DuePlannerCell(
+                                        label = slot.cell.label,
+                                        secondaryLabel = slot.cell.timeLabel,
+                                        icon = null,
+                                        selected = slot.cell.id == selectedPreset,
+                                        shape = shape,
+                                        onClick = { onPresetClick(slot.cell.id) },
+                                    )
 
-                                DuePlannerSlot.PickDate -> DuePlannerCell(
-                                    label = pickDateLabel,
-                                    secondaryLabel = null,
-                                    icon = Icons.Outlined.CalendarMonth,
-                                    // Not a member of the preset set: this cell opens a picker rather
-                                    // than producing a value, so it never carries the current answer.
-                                    selected = null,
-                                    shape = shape,
-                                    onClick = onPickDateClick,
-                                )
+                                    DuePlannerSlot.PickDate -> DuePlannerCell(
+                                        label = pickDateLabel,
+                                        secondaryLabel = null,
+                                        icon = Icons.Outlined.CalendarMonth,
+                                        // Not a member of the preset set: this cell opens a picker rather
+                                        // than producing a value, so it never carries the current answer.
+                                        selected = null,
+                                        shape = shape,
+                                        onClick = onPickDateClick,
+                                    )
+                                }
                             }
+                            // Pad a short final row so its cells keep the width of their peers above
+                            // instead of stretching. Unreachable with the five presets shipped today;
+                            // here because the grid takes its cells as a parameter.
+                            repeat(columns - group.size) { Spacer(Modifier.weight(1f)) }
                         }
-                        // Pad a short final row so its cells keep the width of their peers above
-                        // instead of stretching. Unreachable with the five presets shipped today;
-                        // here because the grid takes its cells as a parameter.
-                        repeat(DuePlannerColumns - group.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
-            }
 
-            // ── Zone B: Time and Repeat, as ONE settings card ───────────────────────────────────
-            DuePlannerSettingsCard(
-                timeLabel = timeLabel,
-                timeValue = timeValueLabel,
-                repeatLabel = repeatLabel,
-                repeatValue = repeatValueLabel,
-                onTimeClick = onTimeClick,
-                onRepeatClick = onRepeatClick,
-            )
-
-            // ── Zone C: Done ────────────────────────────────────────────────────────────────────
-            // Its own row, trailing-aligned, and a TEXT button. Done dismisses the panel; the action
-            // that commits the task is the `+` in the field ~40dp below it, which is filled `primary`.
-            // Two filled blue buttons that close to each other give the dock two primary actions and
-            // make the louder one the one that only closes a panel.
-            //
-            // The old `Row(Bottom) { FlowRow(weight(1f)) { two chips } Done }` went away with the
-            // chips, and with it the wrap-at-fontScale-1.5 hazard that construction existed to
-            // survive: nothing shares this row now.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                AppButtonText(
-                    text = doneLabel,
-                    onClick = onDoneClick,
-                    modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
+                // ── Zone B: Time and Repeat, as rows ON the card ────────────────────────────────────
+                Spacer(Modifier.height(AppDimens.SpacingSm))
+                DuePlannerSettingsCard(
+                    timeLabel = timeLabel,
+                    timeValue = timeValueLabel,
+                    repeatLabel = repeatLabel,
+                    repeatValue = repeatValueLabel,
+                    onTimeClick = onTimeClick,
+                    onRepeatClick = onRepeatClick,
+                    rowInset = horizontalPadding + AppDimens.SpacingSm,
                 )
+
+                // ── Zone C: Done ────────────────────────────────────────────────────────────────────
+                // Its own row, trailing-aligned, and a TEXT button. Done dismisses the panel; the action
+                // that commits the task is the `+` in the field ~40dp below it, which is filled `primary`.
+                // Two filled blue buttons that close to each other give the dock two primary actions and
+                // make the louder one the one that only closes a panel.
+                //
+                // The old `Row(Bottom) { FlowRow(weight(1f)) { two chips } Done }` went away with the
+                // chips, and with it the wrap-at-fontScale-1.5 hazard that construction existed to
+                // survive: nothing shares this row now.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = horizontalPadding, bottom = AppDimens.SpacingXs),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    AppButtonText(
+                        text = doneLabel,
+                        onClick = onDoneClick,
+                        modifier = Modifier.heightIn(min = AppDimens.MinTouchTarget),
+                    )
+                }
             }
         }
     }
 }
 
-/** Columns in the planner grid. Three, so six offers fit two rows on a 320dp dock. */
+/** Columns in the planner grid when they fit: six offers in two rows. */
 private const val DuePlannerColumns = 3
+
+/** Columns when three do not fit (narrow card and/or large font): six offers in three rows. */
+private const val DuePlannerColumnsNarrow = 2
+
+/**
+ * The width a planner cell needs at fontScale 1.0 to hold its longest English label on one line —
+ * the spec's rule is `columns = if (innerWidth < 3 × 96dp × fontScale) 2 else 3`.
+ */
+private val DuePlannerCellMinWidth = 96.dp
 
 /** What occupies one cell of the planner grid: a dated offer, or the door to the picker. */
 private sealed interface DuePlannerSlot {
@@ -814,8 +911,18 @@ private fun RowScope.DuePlannerCell(
     // assigned, not to this parameter. The compiler stays silent and the state never reaches TalkBack.
     val isSelected = selected
     val isFilled = selected == true
-    val container = if (isFilled) GistiSchedule.activeContainer else AppChatColors.raised()
-    val labelColor = if (isFilled) GistiSchedule.activeContent else MaterialTheme.colorScheme.onSurface
+    // Redesign B pass 2: soft `chipFill()` cells on the composer card, the applied one in the same
+    // `primaryContainer` the lead chip uses for the answer.
+    val container = if (isFilled) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        AppChatColors.chipFill()
+    }
+    val labelColor = if (isFilled) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
 
     Surface(
         onClick = onClick,
@@ -888,11 +995,12 @@ private fun duePlannerCellShape(
     rowIndex: Int,
     columnIndex: Int,
     rowCount: Int,
+    columnCount: Int,
 ): RoundedCornerShape {
     val firstRow = rowIndex == 0
     val lastRow = rowIndex == rowCount - 1
     val firstColumn = columnIndex == 0
-    val lastColumn = columnIndex == DuePlannerColumns - 1
+    val lastColumn = columnIndex == columnCount - 1
     fun corner(outer: Boolean) = if (outer) DueCellCornerOuter else DueCellCornerInner
     return RoundedCornerShape(
         topStart = corner(firstRow && firstColumn),
@@ -933,38 +1041,42 @@ private fun DuePlannerSettingsCard(
     repeatValue: String,
     onTimeClick: () -> Unit,
     onRepeatClick: () -> Unit,
+    rowInset: Dp,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = AppChatColors.raised(),
-        border = BorderStroke(AppDimens.DividerThickness, AppChatColors.contentOutline()),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            DuePlannerSettingRow(
-                icon = Icons.Outlined.Schedule,
-                label = timeLabel,
-                value = timeValue,
-                onClick = onTimeClick,
-            )
-            // Indented past the icon column, so the divider separates the two ROWS instead of cutting
-            // the card in half across its leading edge. Expressed as the icon's own width plus the
-            // gap and the padding before it rather than as a 46dp literal, so it follows all three.
-            HorizontalDivider(
-                thickness = AppDimens.DividerThickness,
-                color = AppChatColors.contentOutline(),
-                modifier = Modifier.padding(
-                    start = AppDimens.SpacingMd + DueSettingIconSize + AppDimens.SpacingMd,
-                ),
-            )
-            DuePlannerSettingRow(
-                icon = Icons.Outlined.Repeat,
-                label = repeatLabel,
-                value = repeatValue,
-                // Live from an empty draft — a repeat replaces the date rather than needing one.
-                onClick = onRepeatClick,
-            )
-        }
+    // Redesign B pass 2: NO container of its own. The planner now lives inside the composer card,
+    // which already is the group — a card inside a card is the "decorative frame" this system avoids.
+    // The rows sit on the card, a full-width hairline separates them from the grid, and an inset one
+    // separates the two rows (the Inbox group grammar).
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HorizontalDivider(
+            thickness = AppDimens.DividerThickness,
+            color = AppChatColors.contentOutline(),
+        )
+        DuePlannerSettingRow(
+            icon = Icons.Outlined.Schedule,
+            label = timeLabel,
+            value = timeValue,
+            onClick = onTimeClick,
+            horizontalPadding = rowInset,
+        )
+        // Indented past the icon column, so the divider separates the two ROWS instead of cutting
+        // the card in half across its leading edge. Expressed as the row inset plus the icon's own
+        // width plus the gap rather than as a literal, so it follows all three (48dp in the dock).
+        HorizontalDivider(
+            thickness = AppDimens.DividerThickness,
+            color = AppChatColors.contentOutline(),
+            modifier = Modifier.padding(
+                start = rowInset + DueSettingIconSize + AppDimens.SpacingMd,
+            ),
+        )
+        DuePlannerSettingRow(
+            icon = Icons.Outlined.Repeat,
+            label = repeatLabel,
+            value = repeatValue,
+            // Live from an empty draft — a repeat replaces the date rather than needing one.
+            onClick = onRepeatClick,
+            horizontalPadding = rowInset,
+        )
     }
 }
 
@@ -975,6 +1087,7 @@ private fun DuePlannerSettingRow(
     label: String,
     value: String,
     onClick: () -> Unit,
+    horizontalPadding: Dp,
 ) {
     val valueColor = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
@@ -986,7 +1099,7 @@ private fun DuePlannerSettingRow(
             // `heightIn`, never `height`: the RU and HI labels grow, and a fixed height pins the max
             // as well as the min — the exact defect this project already fixed once in this file.
             .heightIn(min = AppDimens.MinTouchTarget)
-            .padding(horizontal = AppDimens.SpacingMd, vertical = AppDimens.SpacingSm),
+            .padding(horizontal = horizontalPadding, vertical = AppDimens.SpacingSm),
     ) {
         Icon(
             // Decorative — the label beside it is the row's accessible name, and `clickable` merges

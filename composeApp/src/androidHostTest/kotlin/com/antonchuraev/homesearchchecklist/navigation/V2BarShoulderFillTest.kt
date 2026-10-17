@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSectionStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
@@ -669,6 +670,7 @@ class V2BarShoulderFillTest {
                         SourceRowSection(
                             title = stringResource(Res.string.capture_dock_ai_entry_title),
                             onSelect = {},
+                            style = SourceRowSectionStyle.Dock,
                         )
                     },
                 )

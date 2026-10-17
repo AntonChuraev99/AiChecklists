@@ -23,6 +23,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
@@ -1175,6 +1176,7 @@ class ChatViewModel(
                     options = options,
                     escape = escape,
                     objectRows = buildObjectRows(toolCall),
+                    kind = toolCall.choiceKind(),
                 ),
             ),
             isProcessing = false,
@@ -1391,6 +1393,9 @@ class ChatViewModel(
                 meta = metas[index],
                 role = ChoiceRole.Default,
                 action = ChoiceAction.Execute(tc),
+                // Null for a candidate the repository could not resolve — the row falls back to
+                // the list icon rather than borrowing a neighbour's colour.
+                seedId = candidate.id,
             )
         }
         val escape = ChoiceOption(
@@ -1423,6 +1428,7 @@ class ChatViewModel(
                     // "Which list?" must still say WHAT is going into it — without these rows the
                     // user picks a destination for an unnamed thing.
                     objectRows = buildObjectRows(sourceToolCall),
+                    kind = ChoiceKind.PickList,
                 ),
                 showMemoryToggle = isAdd,
                 // Never pre-checked — see PendingChoice.rememberChoice.
@@ -1702,8 +1708,7 @@ class ChatViewModel(
         viewModelScope.launch {
             runCatching {
                 val candidates = checklistRepository.projects.first()
-                    .map { it.name }
-                    .filter { !it.equals(handle.checklistName, ignoreCase = true) }
+                    .filter { !it.name.equals(handle.checklistName, ignoreCase = true) }
                 if (candidates.isEmpty()) {
                     // Nowhere to move it — say so and keep the chips (silent skip FORBIDDEN).
                     _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_move_no_other_lists"))
@@ -1713,12 +1718,13 @@ class ChatViewModel(
                 // count out loud instead of silently dropping them — an invisible 7th list reads as
                 // "the app lost my list", and the user has no way to know the picker is partial.
                 val names = candidates.take(MAX_CHOICE_OPTIONS)
-                val options = names.mapIndexed { index, name ->
+                val options = names.mapIndexed { index, list ->
                     ChoiceOption(
                         id = "$CHOICE_MOVE_PREFIX$index",
-                        label = name,
+                        label = list.name,
                         role = ChoiceRole.Default,
-                        action = ChoiceAction.MoveTo(handle, name),
+                        action = ChoiceAction.MoveTo(handle, list.name),
+                        seedId = list.id,
                     )
                 }
                 val prompt = if (candidates.size > names.size) {
@@ -1741,6 +1747,7 @@ class ChatViewModel(
                                 role = ChoiceRole.Escape,
                                 action = ChoiceAction.Dismiss,
                             ),
+                            kind = ChoiceKind.Move,
                         ),
                     ),
                 )
@@ -2740,6 +2747,7 @@ class ChatViewModel(
                                 role = ChoiceRole.Escape,
                                 action = ChoiceAction.Dismiss,
                             ),
+                            kind = ChoiceKind.Batch,
                         )
                         _screenState.value = _screenState.value.copy(
                             isProcessing = false,

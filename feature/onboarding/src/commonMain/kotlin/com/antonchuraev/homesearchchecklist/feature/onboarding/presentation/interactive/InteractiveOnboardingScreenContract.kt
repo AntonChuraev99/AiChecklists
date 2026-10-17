@@ -19,6 +19,7 @@ import aichecklists.core.designsystem.generated.resources.onboarding_interactive
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_minimalist_desc
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
@@ -35,7 +36,7 @@ data class InteractiveOnboardingState(
     val selectedTemplate: ChecklistTemplate? = null,
     val customizedItems: List<CustomizableItem> = emptyList(),
     val checklistName: String = "",
-    val separateCompleted: Boolean = false,
+    val separateCompleted: Boolean = NEW_CHECKLIST_SEPARATE_COMPLETED,
     val autoDeleteCompleted: Boolean = false,
     val isCreatingChecklist: Boolean = false,
     val checklistCreated: Boolean = false,

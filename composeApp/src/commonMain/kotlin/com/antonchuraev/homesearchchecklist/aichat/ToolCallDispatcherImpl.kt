@@ -27,6 +27,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -373,6 +374,7 @@ class ToolCallDispatcherImpl(
             id = 0L,
             name = toolCall.name,
             items = items,
+            separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
         )
         val newChecklistId = checklistRepository.addChecklist(newChecklist)
         onChecklistCreated(newChecklistId, ChecklistSource.CHAT, items.size)
@@ -520,7 +522,12 @@ class ToolCallDispatcherImpl(
                     .trim()
                     .ifBlank { primary.fileName }
 
-                val newChecklist = Checklist(id = 0L, name = checklistName, items = items)
+                val newChecklist = Checklist(
+                    id = 0L,
+                    name = checklistName,
+                    items = items,
+                    separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
+                )
                 val newId = checklistRepository.addChecklist(newChecklist)
                 onChecklistCreated(newId, ChecklistSource.ATTACHMENT, items.size)
                 logger.info(TAG, "CreateChecklistFromAttachment: created checklist '$checklistName' id=$newId items=${items.size}")

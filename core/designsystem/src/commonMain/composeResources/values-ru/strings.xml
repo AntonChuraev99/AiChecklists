@@ -1230,10 +1230,10 @@
 
     <!-- AI-чат: pricing bottom sheet -->
     <string name="chat_pricing_sheet_title">Как AI-чат списывает кредиты</string>
-    <string name="chat_pricing_layer1_title">Стандартные команды — бесплатно</string>
-    <string name="chat_pricing_layer1_detail">Добавить, найти, удалить, отметить, простые напоминания. Обрабатываем на устройстве, без кредитов.</string>
-    <string name="chat_pricing_layer2_title">Умные команды — 1 кредит</string>
-    <string name="chat_pricing_layer2_detail">Массовые операции и неоднозначные формулировки. AI помогает точно понять, что вы имели в виду.</string>
+    <string name="chat_pricing_layer1_title">Каждый ответ — 0–3 кредита</string>
+    <string name="chat_pricing_layer1_detail">Каждое сообщение обрабатывает AI в облаке. Цена зависит от запроса:</string>
+    <string name="chat_pricing_layer2_title">Команды — 1 кредит</string>
+    <string name="chat_pricing_layer2_detail">Добавить, найти, удалить, отметить, напоминания, массовые изменения.</string>
     <string name="chat_pricing_layer3_title">Открытые вопросы — 3 кредита</string>
     <string name="chat_pricing_layer3_detail">«Что мне сделать на неделе?», планирование, итоги. Полное AI-рассуждение.</string>
     <string name="chat_pricing_apply_note">Действия на запись (добавить / удалить / поставить) всегда показывают предпросмотр. Кредиты списываются когда мы поняли запрос, а не при подтверждении.</string>
@@ -1672,4 +1672,13 @@
     <string name="activation_sheet_today_lower">сегодня, %1$s</string>
     <string name="activation_sheet_tomorrow_lower">завтра, %1$s</string>
     <string name="activation_sheet_reminder_failed">Не удалось поставить напоминание. Поставьте его из списка.</string>
+    <!-- Redesign B "Soft & tactile" (2026-10-16) -->
+    <string name="nav_ask_pill_label">Спросите Gisti или добавьте задачу</string>
+    <string name="inbox_header_date">%1$s, %3$d %2$s</string>
+    <string name="detail_header_progress">Осталось %1$d · готово %2$d из %3$d</string>
+    <string name="detail_ask_about_list">Спросить Gisti об этом списке</string>
+    <string name="chat_header_title">Gisti</string>
+    <string name="chat_header_subtitle">Ваш помощник по чек-листам</string>
+    <string name="chat_message_show_actions">Показать действия</string>
+    <string name="checklist_card_no_items">Пока нет пунктов</string>
 </resources>

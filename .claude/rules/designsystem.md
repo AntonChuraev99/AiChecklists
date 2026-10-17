@@ -6,11 +6,13 @@ paths:
   - "**/*Dialog*.kt"
 ---
 
-# Design System — Minimal & Clean (white bg, blue accents)
+# Design System — "Soft & tactile" (warm paper bg, cream cards, brand blue)
 
 Located in `core/designsystem/`. Always use design system components instead of raw Material3 when available (e.g. `AppSwitch` not `Switch`).
 
-**Colors (`theme/Color.kt`):** Primary Blue `#2196F3`; Background/Surface White `#FFFFFF`; Text Primary Gray900 `#212121`; Text Secondary Gray600 `#757575`; Outline Gray300 `#E0E0E0`.
+**Colors (`theme/Color.kt`, redesign B 2026-10-16):** brand blue `#2196F3` (accent/icon) with `primary` role `#1565C0`; light page `#F4EFE7` (warm sand), card `#FFFDF9`; dark page `#161412`, dark card `#221F1B`. Bottom chrome stays cool (`GistiColors.chrome` `#DCE2EC` / `#191D25`). Never hardcode a hex in a screen — read `MaterialTheme.colorScheme` / `GistiColors` / `AppSurface`; the source of truth is `Color.kt`, this line is only orientation.
+
+**Grouped lists (B):** section rows sit in ONE rounded group (`Modifier.groupSegment(position)` + `GroupPosition`, `AppShapeTokens.Group` 24dp) with inset dividers, round checkboxes (`AppRoundCheckbox`), section headers via `AppSectionHeader`. Do not wrap each row in its own outlined card.
 
 **Spacing (`theme/Dimens.kt`):** `AppDimens` — `SpacingXs` 4dp, `SpacingSm` 8dp, `SpacingMd` 12dp, `SpacingLg` 16dp, `SpacingXl` 24dp, `SpacingXxl` 32dp.
 
@@ -22,7 +24,7 @@ Located in `core/designsystem/`. Always use design system components instead of 
 - Composing multiple widgets into a reusable pattern → descriptive name in `components/` (`EmptyState`, `AddItemInputField`).
 - Feature illustration → descriptive name in `illustrations/` (`CreateViaAiIllustration`).
 
-**Components:** `AppButton`/`AppButtonSecondary`/`AppButtonText`/`AppButtonDestructive`; `AppCard` (12dp corners, 2dp elevation); `AppSwitch` (visible unchecked track = outlineVariant); `AppTextField` (outlined + keyboard options); `EmptyState`; `AddItemInputField`; `AppScaffold` (auto-handles system insets).
+**Components:** `AppButton`/`AppButtonSecondary`/`AppButtonText`/`AppButtonDestructive`; `AppCard` (flat tonal container, 1px `outlineVariant` hairline, no shadow, `AppShapes.medium` 16dp); `AppSwitch` (visible unchecked track = outlineVariant); `AppTextField` (outlined + keyboard options); `EmptyState`; `AddItemInputField`; `AppScaffold` (auto-handles system insets).
 
 **System insets (edge-to-edge) — MANDATORY.** Screens **with** `AppScaffold`: automatic via `WindowInsets`, nothing to do. Screens **without** `AppScaffold` (`OnboardingScreen`, `PaywallScreen`, `SplashScreen`) MUST add:
 

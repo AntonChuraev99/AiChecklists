@@ -1,16 +1,21 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Link
@@ -41,6 +46,9 @@ import aichecklists.core.designsystem.generated.resources.analyze_source_voice
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -55,7 +63,29 @@ import kotlin.math.roundToInt
  *
  * The icon is decorative — the visible [label] right next to it is what a screen reader announces.
  */
-data class SourcePillEntry<T>(val value: T, val icon: ImageVector, val label: String)
+data class SourcePillEntry<T>(
+    val value: T,
+    val icon: ImageVector,
+    val label: String,
+    /**
+     * Index into `GistiColors.paletteTint` / `paletteContent` for the tinted icon disc the pill wears
+     * on the BOTTOM CHROME (redesign B pass 2). Null = plain glyph. On the page plane the pill keeps
+     * its plain glyph either way, so the Inbox empty state and the Analyze picker do not change.
+     */
+    val tint: Int? = null,
+)
+
+/** Where a [SourceRowSection] is mounted — decides the heading's weight, nothing else. */
+enum class SourceRowSectionStyle {
+    /** On the page (the Inbox empty state): the row IS the screen's offer, a `titleSmall` heading. */
+    Page,
+
+    /**
+     * In the capture dock, under the composer card: the row is the ALTERNATIVE to the task being
+     * typed, so its heading is a quiet `labelMedium` `onSurfaceVariant` line (spec B pass 2, §1.1).
+     */
+    Dock,
+}
 
 /**
  * [SourceRow] under the heading that says what the four pills are FOR.
@@ -94,20 +124,37 @@ fun SourceRowSection(
     title: String,
     onSelect: (AnalyzeInputKind) -> Unit,
     modifier: Modifier = Modifier,
+    style: SourceRowSectionStyle = SourceRowSectionStyle.Page,
 ) {
     Column(modifier = modifier) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            // `onSurface`, like the pills' own labels: this section is mounted on the page AND on the
-            // bottom chrome, and those two are the same content role in both themes — see
-            // AppChatColors, which only re-plans FILLS across planes, never ink.
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
-        )
+        when (style) {
+            SourceRowSectionStyle.Page -> Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                // `onSurface`, like the pills' own labels: this section is the page's own offer.
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
+            )
+            // Spec B pass 2: labelMedium onSurfaceVariant, padding 4/2/4/6 — a caption for the row,
+            // not a second headline competing with the composer card above it.
+            SourceRowSectionStyle.Dock -> Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    start = AppDimens.SpacingXs,
+                    top = AppDimens.SpacingXxs,
+                    end = AppDimens.SpacingXs,
+                    bottom = DockHeadingBottomGap,
+                ),
+            )
+        }
         SourceRow(onSelect = onSelect)
     }
 }
+
+/** Heading → pills gap in the dock style (spec: 6dp; the pills' 2dp touch margin adds the rest). */
+private val DockHeadingBottomGap = 4.dp
 
 /**
  * The "turn content into a checklist" entry row: four named materials, each opening the Analyze
@@ -159,11 +206,13 @@ fun SourceRow(
                 AnalyzeInputKind.PHOTO,
                 Icons.Outlined.PhotoCamera,
                 stringResource(Res.string.analyze_source_photo),
+                tint = SourceTintPhoto,
             ),
             SourcePillEntry(
                 AnalyzeInputKind.PDF,
                 Icons.Outlined.AttachFile,
                 stringResource(Res.string.analyze_source_pdf),
+                tint = SourceTintPdf,
             ),
             SourcePillEntry(
                 AnalyzeInputKind.WEB_LINK,
@@ -172,11 +221,13 @@ fun SourceRow(
                 // decides whether four fit abreast on a 360dp window — and "Web Link", the long form
                 // this replaced, measured just over the line and dropped the whole row to a 2x2 grid.
                 stringResource(Res.string.analyze_source_link_short),
+                tint = SourceTintLink,
             ),
             SourcePillEntry(
                 AnalyzeInputKind.VOICE,
                 Icons.Outlined.Mic,
                 stringResource(Res.string.analyze_source_voice),
+                tint = SourceTintVoice,
             ),
         ),
         onSelect = onSelect,
@@ -233,8 +284,15 @@ fun <T> SourcePillGrid(
     modifier: Modifier = Modifier,
     selected: T? = null,
 ) {
+    // 6dp between the borderless dock pills on the chrome (spec B pass 2), 8dp between the outlined
+    // page pills. The fit ladder below reads this one number, so the rung decision follows it.
+    val gap = if (LocalChatSurfaceTone.current == ChatSurfaceTone.BottomChrome) {
+        SoftPillGridGap
+    } else {
+        AppDimens.SpacingSm
+    }
     SubcomposeLayout(modifier = modifier.fillMaxWidth()) { constraints ->
-        val gapPx = AppDimens.SpacingSm.roundToPx()
+        val gapPx = gap.roundToPx()
 
         // Probe pass: measure the pills at their NATURAL width (unbounded constraints) to learn how
         // much the widest label actually needs, here, in this locale, at this font scale. N equal
@@ -293,10 +351,12 @@ fun <T> SourcePillGrid(
             // One Column for every rung, not a branch per shape: with a single row the Column
             // measures identically to the bare Row it replaced, and a single code path cannot grow
             // an arrangement that skips the fit check.
-            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+            // On the chrome the 44dp pills already carry 2dp of target above and below, so a 2dp row
+            // gap shows the same 6dp of air the columns get.
+            Column(verticalArrangement = Arrangement.spacedBy(if (gap == SoftPillGridGap) 2.dp else gap)) {
                 entries.chunked(perRow).forEach { group ->
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         group.forEachIndexed { column, entry ->
@@ -423,6 +483,28 @@ fun <T> SourcePill(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    // Redesign B pass 2 — on the BOTTOM CHROME (the capture dock) the pill is a borderless cream
+    // capsule with a tinted icon disc; its fill (`bottomChromeRaised`, +ΔL* off the cool chrome in both
+    // themes) carries the boundary alone. On the page plane nothing changes: the Inbox empty state and
+    // the Analyze picker keep the outlined pill and the plain glyph.
+    val onChrome = LocalChatSurfaceTone.current == ChatSurfaceTone.BottomChrome
+    val disc = entry.tint.takeIf { onChrome && !isFilled }
+
+    if (onChrome) {
+        SoftChromePill(
+            entry = entry,
+            onSelect = onSelect,
+            modifier = modifier,
+            isFilled = isFilled,
+            isSelected = isSelected,
+            accessibleName = accessibleName,
+            labelColor = labelColor,
+            iconTint = iconTint,
+            disc = disc,
+            trailing = trailing,
+        )
+        return
+    }
 
     Surface(
         // Plane-relative, and outlined as well as filled. This row's two hosts sit on DIFFERENT
@@ -517,4 +599,119 @@ fun <T> SourcePill(
     }
 }
 
+/**
+ * [SourcePill] as it is drawn on the bottom chrome (redesign B pass 2): 44dp of cream capsule inside
+ * a 48dp target, no border, and — for a door that names a palette slot — a 24dp tinted disc holding a
+ * 14dp glyph. Same click, same semantics, same no-truncation contract as the page pill; a selected
+ * pill still fills `primary` and drops the disc, so selection never changes the pill's geometry
+ * beyond the disc's own fixed 24dp (the probe measures the idle pill, disc included).
+ */
+@Composable
+private fun <T> SoftChromePill(
+    entry: SourcePillEntry<T>,
+    onSelect: (T) -> Unit,
+    modifier: Modifier,
+    isFilled: Boolean,
+    isSelected: Boolean?,
+    accessibleName: String?,
+    labelColor: androidx.compose.ui.graphics.Color,
+    iconTint: androidx.compose.ui.graphics.Color,
+    disc: Int?,
+    trailing: ImageVector?,
+) {
+    Surface(
+        color = if (isFilled) MaterialTheme.colorScheme.primary else AppChatColors.raised(),
+        shape = RoundedCornerShape(percent = 50),
+        modifier = modifier
+            // The 48dp TARGET first, then the 44dp body inside it.
+            .minimumInteractiveComponentSize()
+            .heightIn(min = SoftPillVisualHeight)
+            .clickable(role = Role.Button) { onSelect(entry.value) }
+            .semantics {
+                if (isSelected != null) this.selected = isSelected
+                if (accessibleName != null) this.contentDescription = accessibleName
+            },
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            // Measured so the four English doors stay four abreast inside the 336dp a 360dp dock
+            // leaves them (labelLarge with 8/8/12 insets dropped the row to 2×2 — +52dp of plate).
+            modifier = Modifier.padding(
+                start = SoftPillPaddingStart,
+                end = SoftPillPaddingEnd,
+                top = AppDimens.SpacingXxs,
+                bottom = AppDimens.SpacingXxs,
+            ),
+        ) {
+            if (disc != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(SourceDiscSize)
+                        .background(GistiColors.paletteTint(disc), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = entry.icon,
+                        contentDescription = null,
+                        tint = GistiColors.paletteContent(disc),
+                        modifier = Modifier.size(SourceDiscIconSize),
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = entry.icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.width(SourceIconSize).heightIn(min = SourceIconSize),
+                )
+            }
+            Spacer(Modifier.width(SoftPillGap))
+            Text(
+                text = entry.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = labelColor,
+                textAlign = TextAlign.Center,
+                // No maxLines/ellipsis — see [SourcePill]: a label that cannot fit moves the grid down
+                // a rung, it never truncates.
+            )
+            if (trailing != null) {
+                Spacer(Modifier.width(AppDimens.SpacingXs))
+                Icon(
+                    imageVector = trailing,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.width(SourceIconSize).heightIn(min = SourceIconSize),
+                )
+            }
+        }
+    }
+}
+
 private val SourceIconSize = 18.dp
+
+/** The dock pill's visible body inside its 48dp target (spec B pass 2: 44 visual / 48 target). */
+private val SoftPillVisualHeight = 44.dp
+
+/** Insets of the dock pill around its disc and label. */
+private val SoftPillPaddingStart = 6.dp
+private val SoftPillPaddingEnd = 8.dp
+private val SoftPillGap = 6.dp
+
+/** Column gap of the pill grid on the chrome. */
+private val SoftPillGridGap = 6.dp
+
+/**
+ * Tinted icon disc of a dock source pill and the glyph inside it. The spec says 24 / 14; 20 is
+ * measured: with a 24dp disc the widest English pill ("Photo") needed ~80dp against the 79.5dp a
+ * quarter of a 360dp dock leaves, so the row dropped to 2×2 and the plate grew by ~50dp — the
+ * height the composer card exists to keep. The canvas frames draw the disc at about this size too.
+ */
+private val SourceDiscSize = 20.dp
+private val SourceDiscIconSize = 14.dp
+
+/** Palette slots of the four doors on the chrome (spec B pass 2, §1.1): 0 green · 1 blue · 2 peach · 3 lilac. */
+private const val SourceTintPhoto = 2
+private const val SourceTintPdf = 3
+private const val SourceTintLink = 1
+private const val SourceTintVoice = 0

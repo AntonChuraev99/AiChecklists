@@ -15,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -255,12 +256,14 @@ class AnalyzeResultPreviewViewModel(
                         Checklist(
                             name = state.checklistName,
                             items = state.structuredItems,
-                            foldersEnabled = true
+                            foldersEnabled = true,
+                            separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
                         )
                     } else {
                         Checklist(
                             name = state.checklistName,
-                            items = state.editableItems.map { ChecklistItem(text = it, checked = false) }
+                            items = state.editableItems.map { ChecklistItem(text = it, checked = false) },
+                            separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
                         )
                     }
 

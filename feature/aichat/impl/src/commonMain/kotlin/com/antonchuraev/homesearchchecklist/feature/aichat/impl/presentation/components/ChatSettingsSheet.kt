@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -24,7 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.chat_features_help_action
 import aichecklists.core.designsystem.generated.resources.chat_settings_balance_label
 import aichecklists.core.designsystem.generated.resources.chat_settings_deep_thinking_subtitle
 import aichecklists.core.designsystem.generated.resources.chat_settings_deep_thinking_title
@@ -62,6 +66,8 @@ import org.jetbrains.compose.resources.stringResource
  * @param defaultChecklistName Name of the list the user asked the chat to remember, or null when
  *                            the chat still asks every time. Non-null renders the reset row.
  * @param onResetDefaultChecklist Clears the remembered default ("Ask me every time").
+ * @param onFeaturesHelpClick When non-null, renders the "How to use AI Chat" row after Response
+ *                            language (the full ChatScreen's features help since redesign B).
  * @param onDismiss           Called when the sheet should close.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,6 +85,7 @@ fun ChatSettingsSheet(
     onResponseLanguageClick: () -> Unit = {},
     defaultChecklistName: String? = null,
     onResetDefaultChecklist: () -> Unit = {},
+    onFeaturesHelpClick: (() -> Unit)? = null,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
 ) {
     ModalBottomSheet(
@@ -201,6 +208,38 @@ fun ChatSettingsSheet(
                         text = responseLanguageValueLabel,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // "How to use AI Chat" — the features help that used to sit behind the "?" in the full
+            // ChatScreen's input row (that slot now holds the credits chip, B §2.10). Same drill-in row
+            // shape as Response language. The dock hosts still have their own "?".
+            if (onFeaturesHelpClick != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable(role = Role.Button, onClick = onFeaturesHelpClick)
+                        .padding(vertical = AppDimens.SpacingXs),
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = stringResource(Res.string.chat_features_help_action),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,

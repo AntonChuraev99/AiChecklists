@@ -323,7 +323,9 @@ class SourceRowScreenshotTest {
             onAdd = {},
             placeholder = "Add a task…",
             highlightRange = highlightRange,
-            aboveInput = {
+            // Inside the composer card with the card's 8dp inset — the hosts' mount since redesign B
+            // pass 2.
+            attributes = {
                 DueRailRow(
                     leadLabel = stringResource(Res.string.due_rail_no_date),
                     hasDate = false,
@@ -332,6 +334,7 @@ class SourceRowScreenshotTest {
                     onLeadClick = {},
                     onClearDate = {},
                     onPresetClick = {},
+                    horizontalPadding = AppDimens.SpacingSm,
                 )
             },
             // The Important toggle, exactly where both hosts mount it since 2026-09-03: the field's
@@ -346,6 +349,7 @@ class SourceRowScreenshotTest {
                     // type scale and the two gaps, and a literal keeps the fixture readable.
                     title = "Or create a checklist from:",
                     onSelect = {},
+                    style = SourceRowSectionStyle.Dock,
                 )
             },
         )

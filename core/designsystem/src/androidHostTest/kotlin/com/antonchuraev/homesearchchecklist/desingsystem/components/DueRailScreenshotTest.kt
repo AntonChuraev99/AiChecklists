@@ -392,13 +392,19 @@ class DueRailScreenshotTest {
             bounds.left >= root.left,
         )
 
-        // In the INPUT row, not in the rail: strictly below the lead chip. Read off that chip's own
-        // box rather than off a constant, so a font scale cannot move the ruler out from under it.
+        // In the INPUT row, not in the rail: in a different row from the lead chip. Read off that
+        // chip's own box rather than off a constant, so a font scale cannot move the ruler out from
+        // under it.
+        //
+        // ABOVE the rail since redesign B pass 2 (it was "below" while the rail sat above the
+        // field): the composer card puts the text row first and the rail under its divider, so the
+        // input row — and the toggle in it — now ends where the rail begins. Same claim, the rows'
+        // order is what the spec changed.
         val leadChip = composeTestRule.onNodeWithText(leadLabel).getUnclippedBoundsInRoot()
         assertTrue(
-            "the toggle must sit BELOW the due rail — it is part of the input row now " +
-                "(toggle top=${bounds.top}, rail bottom=${leadChip.bottom})",
-            bounds.top >= leadChip.bottom,
+            "the toggle must sit in the input row, ABOVE the due rail inside the composer card " +
+                "(toggle bottom=${bounds.bottom}, rail top=${leadChip.top})",
+            bounds.bottom <= leadChip.top,
         )
     }
 
@@ -466,13 +472,17 @@ class DueRailScreenshotTest {
     @Test
     fun done_isNotAFilledPrimaryButton() {
         var done = ""
-        var chromeRgb = 0
+        var planeRgb = 0
         var primaryRgb = 0
         composeTestRule.mount("w360dp-h640dp", 1f, dark = false, locale = Locale.ENGLISH) {
             done = stringResource(Res.string.due_planner_done)
             // NAMED, not derived from another pixel of the same frame: a probe that compares the
             // button with its neighbour passes just as happily on a frame where both are wrong.
-            chromeRgb = AppSurface.bottomChrome().toArgb() and 0xFFFFFF
+            //
+            // The composer CARD since redesign B pass 2 — the planner, and Done with it, renders
+            // inside the card now, not on the bare chrome. The claim is unchanged: the pixel under
+            // Done is the surface it stands on, never the `primary` fill.
+            planeRgb = AppSurface.card().toArgb() and 0xFFFFFF
             primaryRgb = MaterialTheme.colorScheme.primary.toArgb() and 0xFFFFFF
             DockStub(state = DueRailFixture.Expanded)
         }
@@ -498,10 +508,10 @@ class DueRailScreenshotTest {
 
         assertEquals(
             "Done must not be a filled primary button — it dismisses the planner, while the action " +
-                "that commits the task is the '+' in the field below it. Its leading edge reads " +
-                "#%06X where the dock's own #%06X is expected".format(here, chromeRgb) +
+                "that commits the task is the '+' in the field above it. Its leading edge reads " +
+                "#%06X where the composer card's own #%06X is expected".format(here, planeRgb) +
                 (if (here == primaryRgb) " — that is the `primary` fill." else ""),
-            chromeRgb,
+            planeRgb,
             here,
         )
     }
@@ -678,6 +688,9 @@ class DueRailScreenshotTest {
 
         /** How far inside a control's leading edge a probe lands — clear of its antialiased rim. */
         const val EdgeProbeInsetPx = 2
+
+        /** The rail's / planner's edge inset inside the composer card — what both hosts pass. */
+        val CardInset = AppDimens.SpacingSm
     }
 
     /**
@@ -742,7 +755,12 @@ class DueRailScreenshotTest {
             // The real resource, not an English literal: a frame named _ru_ that renders two
             // English strings cannot be used to check a locale, which is what it exists for.
             placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
-            aboveInput = {
+            // As both hosts pass it (owner decision O3): the field gives up focus while the planner
+            // is open, so the card's ring is idle in the expanded frames.
+            inputSuspended = expanded,
+            // `attributes`, inside the composer card, with the 8dp inset the card asks for — the
+            // mount both capture hosts use since redesign B pass 2.
+            attributes = {
                 Column {
                     DueRailRow(
                         // The formatted answer the host produces. `due_tomorrow` is the real
@@ -763,6 +781,7 @@ class DueRailScreenshotTest {
                         // is what `trailingToggle` below mounts. The rail keeps the parameter as
                         // design-system API and both capture hosts pass nothing.
                         trailing = null,
+                        horizontalPadding = CardInset,
                     )
                     DuePlannerPanel(
                         expanded = expanded,
@@ -775,6 +794,7 @@ class DueRailScreenshotTest {
                         onTimeClick = {},
                         onRepeatClick = onRepeatClick,
                         onDoneClick = {},
+                        horizontalPadding = CardInset,
                     )
                 }
             },
@@ -782,6 +802,7 @@ class DueRailScreenshotTest {
                 SourceRowSection(
                     title = stringResource(Res.string.capture_dock_ai_entry_title),
                     onSelect = {},
+                    style = SourceRowSectionStyle.Dock,
                 )
             },
             // The seat Important took on 2026-09-03: the field's trailing slot, immediately before

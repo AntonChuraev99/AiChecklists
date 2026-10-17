@@ -2,35 +2,43 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_empty_subtitle
@@ -44,11 +52,16 @@ import aichecklists.core.designsystem.generated.resources.chat_features_example_
 import aichecklists.core.designsystem.generated.resources.chat_features_example_from_attachment
 import aichecklists.core.designsystem.generated.resources.chat_features_example_reminder
 import aichecklists.core.designsystem.generated.resources.chat_panel_greeting
+import com.antonchuraev.homesearchchecklist.desingsystem.components.GroupPosition
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.SparkleTile
+import com.antonchuraev.homesearchchecklist.desingsystem.components.groupPositionOf
+import com.antonchuraev.homesearchchecklist.desingsystem.components.groupSegment
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import org.jetbrains.compose.resources.stringResource
 
 // ---------------------------------------------------------------------------
@@ -106,7 +119,7 @@ fun ChatBody(
 //
 // The localized copy IS the "we speak your language" signal (all strings from Compose Resources) —
 // there is deliberately NO in-chat language badge. Two densities:
-//  - compact=false (FULL): centered hero + 4 full-width suggestion cards (ChatScreen + dock full).
+//  - compact=false (FULL): bottom-anchored greeting + one 4-row suggestion group (ChatScreen + full overlay).
 //  - compact=true  (dock expanded body): left-aligned greeting + a scrollable prompt-chip row.
 // Every suggestion PREFILLS the composer (onPrefill) — it never sends.
 // ---------------------------------------------------------------------------
@@ -131,63 +144,77 @@ fun ChatEmptyState(
     }
 }
 
+/**
+ * Full empty state — redesign B pass 2 (spec §2.1): greeting + ONE grouped container of four
+ * suggestions, anchored at the BOTTOM, right above the input it prefills (the eye is already there).
+ *
+ * The column scrolls: at RU × fontScale 1.5 the headline takes two lines and the group no longer
+ * fits a 640dp phone above the input (spec risk 4). At fontScale ≥ 1.3 the 48dp avatar steps aside
+ * so the suggestions — the part that does something — keep the room.
+ */
 @Composable
 private fun ChatEmptyStateFull(
     onPrefill: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
+    val showAvatar = LocalDensity.current.fontScale < AVATAR_HIDE_FONT_SCALE
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val viewportHeight = maxHeight
+        Box(
             modifier = Modifier
-                .widthIn(max = 480.dp)
-                .adaptiveContentWidth()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingLg),
+                .fillMaxSize()
+                // Reverse: scroll 0 is the BOTTOM, so when the content outgrows the viewport the
+                // suggestions beside the input stay in view and the greeting is what scrolls off —
+                // the same anchoring as the reverse-layout message list that replaces this.
+                .verticalScroll(rememberScrollState(), reverseScrolling = true),
+            contentAlignment = Alignment.BottomCenter,
         ) {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(40.dp),
-            )
-
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+                modifier = Modifier
+                    // Fill the viewport so the content can sit at its bottom; grow past it to scroll.
+                    .heightIn(min = viewportHeight)
+                    .widthIn(max = 480.dp)
+                    .adaptiveContentWidth()
+                    .padding(
+                        start = AppDimens.ScreenPaddingHorizontal,
+                        end = AppDimens.ScreenPaddingHorizontal,
+                        top = AppDimens.SpacingMd,
+                        bottom = AppDimens.SpacingMd,
+                    ),
+                verticalArrangement = Arrangement.Bottom,
             ) {
+                if (showAvatar) {
+                    SparkleTile(size = 48.dp, cornerRadius = 24.dp)
+                }
                 Text(
                     text = stringResource(Res.string.chat_empty_title),
                     style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(top = if (showAvatar) AppDimens.SpacingMd else 0.dp)
                         .semantics { heading() },
                 )
                 Text(
                     text = stringResource(Res.string.chat_empty_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = AppDimens.SpacingXs),
                 )
-            }
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-            ) {
-                suggestionCards().forEach { card ->
-                    val text = stringResource(card.exampleRes)
-                    SuggestionCard(
-                        text = text,
-                        leadingIcon = card.icon,
-                        onClick = { onPrefill(text) },
-                    )
+                Column(modifier = Modifier.fillMaxWidth().padding(top = AppDimens.SpacingLg)) {
+                    val cards = suggestionCards()
+                    cards.forEachIndexed { index, card ->
+                        val text = stringResource(card.exampleRes)
+                        SuggestionRow(
+                            text = text,
+                            spec = card,
+                            position = groupPositionOf(index, cards.size),
+                            onClick = { onPrefill(text) },
+                        )
+                    }
                 }
             }
         }
@@ -234,68 +261,93 @@ private fun ChatEmptyStateCompact(
     }
 }
 
+/**
+ * One suggestion as a segment of the grouped container (the Inbox grammar: `groupSegment`, inset
+ * dividers under the text). Tap = prefill the composer, never send.
+ *
+ * Fill is plane-relative ([AppChatColors.raised]) rather than the group's default `card()`: the same
+ * body renders inside the full-screen chat overlay on the bottom chrome.
+ */
 @Composable
-private fun SuggestionCard(
+private fun SuggestionRow(
     text: String,
-    leadingIcon: ImageVector,
+    spec: SuggestionCardSpec,
+    position: GroupPosition,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.large,
-        // Plane-relative + firm outline: the empty state renders on the page in the full chat and
-        // inside the chrome in the compact dock, and these cards are tappable suggestions rather
-        // than content. See AppChatColors.
-        color = AppChatColors.raised(),
-        border = BorderStroke(1.dp, AppChatColors.controlOutline()),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .minimumInteractiveComponentSize(),
+            .groupSegment(
+                position = position,
+                color = AppChatColors.raised(),
+                dividerInsetStart = SuggestionDividerInset,
+            )
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 56.dp)
+            .padding(AppDimens.SpacingMd),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .size(SuggestionTileSize)
+                .clip(CircleShape)
+                .background(GistiColors.paletteTint(spec.paletteIndex)),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = leadingIcon,
+                imageVector = spec.icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Outlined.NorthEast,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = GistiColors.paletteContent(spec.paletteIndex),
                 modifier = Modifier.size(18.dp),
             )
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Outlined.NorthEast,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
+
+private val SuggestionTileSize = 32.dp
+
+/** Divider starts under the text: 12 padding + 32 tile + 12 gap. */
+private val SuggestionDividerInset = 56.dp
+
+/** At or above this font scale the empty state's 48dp avatar steps aside (spec risk 4). */
+private const val AVATAR_HIDE_FONT_SCALE = 1.3f
 
 /** The four suggestion actions offered in the compact prompt-chip row. */
 private enum class ChatSuggestionAction { CREATE, ATTACHMENT, REMINDER, ASK }
 
-/** A full-width suggestion card definition: leading vector icon + the example string to prefill. */
+/**
+ * A suggestion row definition: leading vector icon, its palette position (0 green · 1 blue · 2 peach
+ * · 3 lilac — `GistiColors.paletteTint`) and the example string to prefill.
+ */
 private data class SuggestionCardSpec(
     val icon: ImageVector,
+    val paletteIndex: Int,
     val exampleRes: org.jetbrains.compose.resources.StringResource,
 )
 
 /**
- * The four FULL-layout suggestion cards, in scan order. Icons are Material vectors (NOT emoji):
- * Skiko/wasm renders emoji as tofu without LocalEmojiFont, and these cards use plain [Icon]s.
+ * The four FULL-layout suggestions, in scan order. Icons are Material vectors (NOT emoji):
+ * Skiko/wasm renders emoji as tofu without LocalEmojiFont, and these rows use plain [Icon]s.
  */
 private fun suggestionCards(): List<SuggestionCardSpec> = listOf(
-    SuggestionCardSpec(Icons.Outlined.AutoAwesome, Res.string.chat_features_example_create),
-    SuggestionCardSpec(Icons.Outlined.AttachFile, Res.string.chat_features_example_from_attachment),
-    SuggestionCardSpec(Icons.Outlined.Notifications, Res.string.chat_features_example_reminder),
-    SuggestionCardSpec(Icons.Outlined.ChatBubbleOutline, Res.string.chat_features_example_ask),
+    SuggestionCardSpec(Icons.Outlined.Checklist, 0, Res.string.chat_features_example_create),
+    SuggestionCardSpec(Icons.Outlined.AttachFile, 3, Res.string.chat_features_example_from_attachment),
+    SuggestionCardSpec(Icons.Outlined.Notifications, 2, Res.string.chat_features_example_reminder),
+    SuggestionCardSpec(Icons.Outlined.ChatBubbleOutline, 1, Res.string.chat_features_example_ask),
 )

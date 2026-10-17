@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
  * @param label Checklist name used to derive the monogram. Pass empty string for icon fallback.
  * @param size Visual dimensions of the tile (width = height).
  * @param cornerRadius Shape corner radius.
+ * @param icon Overrides the monogram with an icon in the same tint (e.g. a folder level of the
+ *   detail header card). Null = monogram / checklist fallback as above.
  */
 @Composable
 fun GistiAvatarTile(
@@ -50,6 +53,7 @@ fun GistiAvatarTile(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
     cornerRadius: Dp = 14.dp,
+    icon: ImageVector? = null,
 ) {
     val tint = GistiColors.avatarTint(seed)
     val content = GistiColors.avatarContent(seed)
@@ -64,7 +68,14 @@ fun GistiAvatarTile(
             .clip(RoundedCornerShape(cornerRadius))
             .background(tint),
     ) {
-        if (monogram != null) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = content,
+                modifier = Modifier.size(size * 0.5f),
+            )
+        } else if (monogram != null) {
             Text(
                 text = monogram,
                 color = content,

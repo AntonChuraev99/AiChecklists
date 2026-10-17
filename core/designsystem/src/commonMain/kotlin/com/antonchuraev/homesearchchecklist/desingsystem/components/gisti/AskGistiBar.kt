@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -24,45 +23,93 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+
+/** Visual variant of [AskGistiBar]. */
+enum class AskGistiBarStyle {
+    /** The original home-screen card bar: 56dp, 16dp corners, white card + 1.5dp hairline. */
+    Card,
+
+    /**
+     * Redesign B "Ask pill" inside the v2 bottom plate: min 48dp, full pill, raised on the bottom
+     * chrome ([AppSurface.bottomChromeRaised]) with a 1dp [AppChatColors.controlOutline] ring,
+     * 36dp circular sparkle, 48dp mic target.
+     */
+    ChromePill,
+}
 
 /**
- * Persistent AI command bar shown at the bottom of the home screen.
+ * Persistent AI command bar.
  *
  * The entire bar (excluding the mic button) is one tap target → [onClick].
- * The mic icon is a separate 40dp touch target → [onMicClick].
+ * The mic icon is a separate touch target → [onMicClick]; pass `null` to render no mic at all (a mic
+ * that does nothing is a dead affordance).
  *
- * Visual spec (from gisti-extra.jsx AskGistiBar):
+ * [AskGistiBarStyle.Card] (default) — visual spec from gisti-extra.jsx AskGistiBar:
  *  - Height: 56dp, corner radius: 16dp
- *  - Background: `surfaceContainerLowest` (white card)
- *  - Border: 1.5dp `outlineVariant`
- *  - Shadow: light only (2dp), none in dark (follows project's AppCard pattern)
+ *  - Background: `surfaceContainerLowest` (card)
+ *  - Border: 1.5dp `outlineVariant`, no shadow
  *  - Left: [SparkleTile] 28dp
- *  - Center: placeholder in `onSurfaceVariant` faint, or value in `onSurface`
+ *  - Center: placeholder in `onSurfaceVariant`, or value in `onSurface`
  *  - Right: [IconButton] 40dp with Mic icon in `onSurfaceVariant`
  *
- * Token mapping:
- * - Container: `colorScheme.surfaceContainerLowest`
- * - Border: `colorScheme.outlineVariant`
- * - Placeholder text: `colorScheme.onSurfaceVariant`
- * - Value text: `colorScheme.onSurface`
- * - Mic icon: `colorScheme.onSurfaceVariant`
+ * [AskGistiBarStyle.ChromePill] — redesign B (the v2 shell's Ask pill):
+ *  - min height 48dp, shape [AppShapeTokens.Pill]
+ *  - container [AppSurface.bottomChromeRaised], 1dp [AppChatColors.controlOutline]
+ *  - [SparkleTile] 36dp circle, label `bodyLarge` `onSurfaceVariant`, up to 2 lines + ellipsis
+ *  - mic: 48dp target, `primary` glyph (the mock's blue mic)
  *
  * @param placeholder Text shown when [value] is null.
  * @param onClick Invoked when the non-mic area is tapped (opens chat).
- * @param onMicClick Invoked when the mic icon is tapped (starts voice input).
+ * @param onMicClick Invoked when the mic icon is tapped (starts voice input); null hides the mic.
  * @param value If non-null, shown in place of the placeholder with full `onSurface` color.
- * @param micContentDescription Accessibility label for the mic [IconButton].
+ * @param micContentDescription Accessibility label for the mic button — pass the existing chat mic
+ *   string; required whenever [onMicClick] is non-null.
+ * @param style [AskGistiBarStyle.Card] or [AskGistiBarStyle.ChromePill].
  */
 @Composable
 fun AskGistiBar(
     placeholder: String,
     onClick: () -> Unit,
-    onMicClick: () -> Unit,
+    onMicClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     micContentDescription: String = "",
     value: String? = null,
+    style: AskGistiBarStyle = AskGistiBarStyle.Card,
+) {
+    when (style) {
+        AskGistiBarStyle.Card -> AskGistiCardBar(
+            placeholder = placeholder,
+            onClick = onClick,
+            onMicClick = onMicClick,
+            modifier = modifier,
+            micContentDescription = micContentDescription,
+            value = value,
+        )
+        AskGistiBarStyle.ChromePill -> AskGistiChromePill(
+            placeholder = placeholder,
+            onClick = onClick,
+            onMicClick = onMicClick,
+            modifier = modifier,
+            micContentDescription = micContentDescription,
+            value = value,
+        )
+    }
+}
+
+@Composable
+private fun AskGistiCardBar(
+    placeholder: String,
+    onClick: () -> Unit,
+    onMicClick: (() -> Unit)?,
+    modifier: Modifier,
+    micContentDescription: String,
+    value: String?,
 ) {
     val shape = RoundedCornerShape(16.dp)
 
@@ -91,7 +138,7 @@ fun AskGistiBar(
                     onClick = onClick,
                     role = Role.Button,
                 )
-                .padding(start = 14.dp, end = 4.dp),
+                .padding(start = 14.dp, end = if (onMicClick != null) 4.dp else 14.dp),
         ) {
             SparkleTile(size = 28.dp)
 
@@ -107,16 +154,89 @@ fun AskGistiBar(
                 modifier = Modifier.weight(1f),
             )
 
-            IconButton(
-                onClick = onMicClick,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Mic,
-                    contentDescription = micContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(AppDimens.IconSizeMd),
-                )
+            if (onMicClick != null) {
+                IconButton(
+                    onClick = onMicClick,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = micContentDescription,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(AppDimens.IconSizeMd),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AskGistiChromePill(
+    placeholder: String,
+    onClick: () -> Unit,
+    onMicClick: (() -> Unit)?,
+    modifier: Modifier,
+    micContentDescription: String,
+    value: String?,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
+        shape = AppShapeTokens.Pill,
+        color = AppSurface.bottomChromeRaised(),
+        border = BorderStroke(1.dp, AppChatColors.controlOutline()),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                // The pill area is ONE button; the mic below is a sibling node with its own role, so
+                // TalkBack reads "Ask Gisti or add a task, button" then "Voice input, button".
+                .clickable(onClick = onClick, role = Role.Button)
+                .padding(start = 6.dp, end = if (onMicClick != null) 0.dp else 16.dp),
+        ) {
+            SparkleTile(size = 36.dp, cornerRadius = 18.dp)
+
+            Text(
+                text = value ?: placeholder,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (value != null) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                // Two lines, not one: measured on the 320dp × 1.5 RU golden, one line cut the label
+                // to "Спросите Gi…" — the brand and the whole promise gone. The pill grows (heightIn)
+                // and the shell plate measures itself, so a second line costs height, not meaning.
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 12.dp),
+            )
+
+            if (onMicClick != null) {
+                IconButton(
+                    onClick = onMicClick,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = micContentDescription
+                        },
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = null, // carried by the button node above
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(AppDimens.IconSizeMd),
+                    )
+                }
             }
         }
     }

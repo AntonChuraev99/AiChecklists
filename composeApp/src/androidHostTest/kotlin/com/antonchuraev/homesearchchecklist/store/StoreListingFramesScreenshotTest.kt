@@ -483,6 +483,8 @@ class StoreListingFramesScreenshotTest {
             onOpenChat = {},
             onOpenSettings = {},
             onOpenUpdates = {},
+            // Redesign B: the Ask pill's mic, as the shipped host wires it (owner decision 2026-10-16).
+            onOpenChatVoice = {},
         ) { InboxInShell() }
     }
 

@@ -1,9 +1,14 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -12,11 +17,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -223,8 +236,9 @@ fun QuickCaptureDock(
      */
     highlightRange: IntRange? = null,
     /**
-     * Content rendered between the top hairline and the input — in practice the task-create chip row
-     * (reminder presets, Important, Repeat).
+     * LEGACY since redesign B pass 2 — the three hosts pass [attributes] instead, which renders inside
+     * the composer card. Content rendered on the chrome between the top hairline and the card. Kept so
+     * a host (or a "before" fixture) can still mount a row outside the card.
      *
      * A slot rather than a typed parameter because those chips are driven by feature-layer domain
      * types (draft state, repeat config, the Smart-Add parse) that have no business in the design
@@ -267,9 +281,61 @@ fun QuickCaptureDock(
      * That drift is exactly what this shared component exists to prevent.
      */
     trailingToggle: (@Composable () -> Unit)? = null,
+    /**
+     * What configures THIS task — the due rail (Inbox, Calendar) or the reminder chips (detail) —
+     * drawn INSIDE the composer card, under the text row and a hairline (redesign B pass 2, §1.1).
+     *
+     * The card is the grammar of the Inbox's own task groups: one cream container, rows inside, inset
+     * dividers. Field, date and "important" are all properties of the one task being composed, so they
+     * share its container, while the sources in [belowInput] — "or make a whole checklist instead" —
+     * stay outside it. The slot adds no horizontal padding: the content brings its own edge inset
+     * (`horizontalPadding = 8.dp` on the rail), because a scrolling row has to carry its inset INSIDE
+     * the scroll (see [DueRailRow]).
+     *
+     * Supersedes [aboveInput] for all three hosts; null leaves the card a bare text row.
+     */
+    attributes: (@Composable () -> Unit)? = null,
+    /**
+     * Files staged for the task before it exists (detail screen only), drawn at the TOP of the
+     * composer card above the text row. Null — or a slot that renders nothing — costs no height.
+     */
+    attachments: (@Composable () -> Unit)? = null,
+    /**
+     * True while something inside the card needs the space the keyboard takes — in practice the due
+     * planner (`DraftDueUiState.plannerExpanded`). Owner decision O3 (redesign B pass 2): the planner
+     * plus a ~260dp keyboard overflow a 360×800 window, so while this is true the field gives up
+     * focus and the keyboard goes down; when it turns false again the field takes focus back and the
+     * keyboard returns. Purely UI-local: the draft text is hoisted, so nothing is lost. A host with
+     * no planner (the detail screen) leaves it false and nothing changes there.
+     */
+    inputSuspended: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    // The value the effect last acted on — `null` before the first run. A plain holder, not snapshot
+    // state: it is read and written only inside the effect, and must not recompose anything.
+    val lastSuspended = remember { arrayOfNulls<Boolean>(1) }
+    // ONE effect owns the field's focus for the dock's whole life, so the mount-time focus request
+    // and the planner's suspend/resume cannot race each other. Keyed on the flag, so it runs once per
+    // appearance (see the host contract) and once per planner open/close.
+    LaunchedEffect(inputSuspended) {
+        val previous = lastSuspended[0]
+        when {
+            inputSuspended -> {
+                focusManager.clearFocus(force = true)
+                keyboard?.hide()
+            }
+            // First appearance: raise the keyboard, as the dock always has.
+            previous == null -> focusRequester.requestFocus()
+            // The planner closed (Done, or the lead chip): hand the field back with its keyboard.
+            previous == true -> {
+                focusRequester.requestFocus()
+                keyboard?.show()
+            }
+        }
+        lastSuspended[0] = inputSuspended
+    }
 
     // ── Both rows, always ────────────────────────────────────────────────────────────────────────
     // This dock briefly dropped the DATE PRESETS whenever the window was under 590dp tall or
@@ -283,16 +349,13 @@ fun QuickCaptureDock(
     //  - The presets are a `LazyRow` that already scrolls sideways, so what they needed was never
     //    width. It was ~48dp of HEIGHT, and part of that is available from the dock's own padding.
     //
-    // The compression below pays for part of it and no more: both slot gaps tighten from SpacingMd
-    // to SpacingSm whenever both rows are mounted, which returns 8dp of the ~48dp the row costs. So
-    // the dock IS taller than the evicting version by roughly 40dp, deliberately. Measured totals
-    // with both rows: 201dp at 320×568 / fontScale 1.0, 213dp at 360×640 / fontScale 1.3 — against a
-    // ~250dp keyboard that leaves ~105–177dp of list, which is one to two rows. That is the right
-    // way round: while the dock is up the user is typing into it, not reading the list behind a 45%
-    // scrim, and losing a row of a list you are not reading costs less than losing a due date you
+    // Since redesign B pass 2 the rail lives INSIDE the composer card, under the text row, and the
+    // card's own geometry is what keeps both rows affordable: the rail shares the card instead of
+    // owning a padded band above it, so the dock with both rows stays at the ~200dp the evicting
+    // version was measured against (201dp at 320×568 / fontScale 1.0 before the card). Losing a row
+    // of a list you are not reading — it is behind a 45% scrim — costs less than losing a due date you
     // came to set.
-    val bothRows = aboveInput != null && belowInput != null
-    val slotGap = if (bothRows) AppDimens.SpacingSm else AppDimens.SpacingMd
+    var cardFocused by remember { mutableStateOf(false) }
 
     Surface(
         // Tone AND radius come from the shared bottom-chrome tokens. This dock's bottom edge IS the
@@ -302,8 +365,9 @@ fun QuickCaptureDock(
         shape = AppShapeTokens.SheetTop,
         modifier = modifier.fillMaxWidth(),
     ) {
-        // Both slots and the field are drawn on the bottom chrome, not on the page — the chips the
-        // host passes into `aboveInput` are the same ones the chat dock renders. See AppChatColors.
+        // The plate, the legacy slot and the source row are drawn on the bottom chrome, not on the
+        // page — the chips a host passes into `aboveInput` are the same ones the chat dock renders.
+        // See AppChatColors. The composer card re-provides the PAGE tone for its own content below.
         CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.BottomChrome) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Hairline on the TOP edge only — the dock flows into the system-nav strip below it, and
@@ -324,42 +388,120 @@ fun QuickCaptureDock(
                     thickness = AppDimens.DividerThickness,
                     color = AppSurface.bottomChromeSeam(),
                 )
-                // The reminder/priority chips sit above the input; the AI source row sits below it.
-                // See [belowInput]'s KDoc for why "below" is safe here and was not in the dock's
-                // previous, content-hosted incarnation.
+                // Legacy: a row ABOVE the card, on the chrome. None of the three hosts passes it since
+                // the composer card (they pass [attributes]); it stays for API compatibility.
                 if (aboveInput != null) {
-                    Box(modifier = Modifier.padding(top = slotGap)) { aboveInput() }
+                    Box(modifier = Modifier.padding(top = AppDimens.SpacingMd)) { aboveInput() }
                 }
-                AddItemInputField(
-                    text = text,
-                    onTextChange = onTextChange,
-                    onAdd = onAdd,
-                    placeholder = placeholder,
-                    highlightRange = highlightRange,
-                    focusRequester = focusRequester,
-                    trailingToggle = trailingToggle,
+                ComposerCard(
+                    focused = cardFocused,
                     modifier = Modifier
                         .adaptiveContentWidth()
                         .padding(
-                            horizontal = AppDimens.ScreenPaddingHorizontal,
-                            // 4dp tighter than the input's own SpacingMd when a second row follows —
-                            // the 4dp the source pills took to reach a 48dp touch target comes from
-                            // here rather than from the pill, which is what keeps the pills at full size.
-                            vertical = if (belowInput != null) AppDimens.SpacingSm else AppDimens.SpacingMd,
-                        ),
-                )
+                            start = AppDimens.SpacingMd,
+                            end = AppDimens.SpacingMd,
+                            top = AppDimens.SpacingMd,
+                        )
+                        // `hasFocus`, not `isFocused`: the focus lives on the text field INSIDE the
+                        // card, and the ring is the card's statement about it.
+                        .onFocusChanged { cardFocused = it.hasFocus },
+                ) {
+                    if (attachments != null) {
+                        Box(
+                            modifier = Modifier.padding(
+                                start = AppDimens.SpacingMd,
+                                end = AppDimens.SpacingMd,
+                                top = AppDimens.SpacingMd,
+                            ),
+                        ) { attachments() }
+                    }
+                    AddItemInputField(
+                        text = text,
+                        onTextChange = onTextChange,
+                        onAdd = onAdd,
+                        placeholder = placeholder,
+                        highlightRange = highlightRange,
+                        focusRequester = focusRequester,
+                        trailingToggle = trailingToggle,
+                        style = AddItemFieldStyle.Embedded,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (attributes != null) {
+                        // Inset both ends: the divider separates the card's two ROWS, it does not cut
+                        // the card in half — the same rule the Inbox's grouped rows follow.
+                        HorizontalDivider(
+                            thickness = AppDimens.DividerThickness,
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            modifier = Modifier.padding(horizontal = AppDimens.SpacingLg),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = AppDimens.MinTouchTarget),
+                            contentAlignment = Alignment.CenterStart,
+                        ) { attributes() }
+                    }
+                }
                 if (belowInput != null) {
                     Box(
                         modifier = Modifier
                             .adaptiveContentWidth()
                             .padding(
-                                start = AppDimens.ScreenPaddingHorizontal,
-                                end = AppDimens.ScreenPaddingHorizontal,
-                                bottom = slotGap,
+                                start = AppDimens.SpacingMd,
+                                end = AppDimens.SpacingMd,
+                                top = AppDimens.SpacingSm,
                             ),
                     ) { belowInput() }
                 }
+                // The source pills draw a 44dp body inside a 48dp target, so the visible gap to the
+                // plate's bottom edge is this plus their 2dp of touch margin.
+                Spacer(
+                    Modifier.height(
+                        if (belowInput != null) ComposerBottomGapWithSources else AppDimens.SpacingMd,
+                    ),
+                )
             }
         }
     }
 }
+
+/**
+ * The composer card (redesign B pass 2, variant B): one cream container holding the task field and
+ * everything that configures that task.
+ *
+ * `AppSurface.card()`, NOT `bottomChromeRaised()`: in dark the latter equals `recessed()`, and the
+ * recessed chips inside the card would vanish into it (spec §0, found on the canvas). Its content is
+ * provided the PAGE tone, so every `AppChatColors` accessor inside resolves as it does on a page
+ * card — [AppChatColors.chipFill] gives `recessed`, a real step in both themes.
+ *
+ * The ring is the focus statement: 1dp `outline` at rest, 2dp `primary` while the field has focus.
+ * `Surface`'s border is drawn over the content without insetting it, so the ring changing width never
+ * moves the text under the caret.
+ */
+@Composable
+private fun ComposerCard(
+    focused: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        color = AppSurface.card(),
+        shape = AppShapeTokens.Group,
+        border = if (focused) {
+            BorderStroke(ComposerFocusRing, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(AppDimens.DividerThickness, MaterialTheme.colorScheme.outline)
+        },
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.Page) {
+            Column(modifier = Modifier.fillMaxWidth(), content = content)
+        }
+    }
+}
+
+/** Width of the composer card's ring while its field has focus. */
+private val ComposerFocusRing = 2.dp
+
+/** Plate padding under the source row (spec: 6dp; the pills' own 2dp touch margin adds the rest). */
+private val ComposerBottomGapWithSources = 6.dp

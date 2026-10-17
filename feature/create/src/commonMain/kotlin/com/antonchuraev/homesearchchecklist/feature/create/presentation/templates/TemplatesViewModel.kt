@@ -12,6 +12,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
@@ -172,7 +173,8 @@ class TemplatesViewModel(
             try {
                 val checklist = Checklist(
                     name = template.name,
-                    items = template.items.map { ChecklistItem(text = it, checked = false) }
+                    items = template.items.map { ChecklistItem(text = it, checked = false) },
+                    separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
                 )
 
                 val checklistId = checklistRepository.addChecklist(checklist)

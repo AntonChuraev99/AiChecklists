@@ -23,6 +23,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
@@ -77,8 +78,8 @@ class AiChatVariantsScreenshotTest {
 
     @Test
     fun variant_empty_welcome() = capture {
-        // showSenderLabel = false: the static greeting carries no avatar/label (welcome case).
-        ChatMessageBubble(message = welcomeMessage, showSenderLabel = false)
+        // showAvatar = false: a non-closing turn of a run — the 28dp spacer keeps the start edge.
+        ChatMessageBubble(message = welcomeMessage, showAvatar = false)
     }
 
     @Test
@@ -88,7 +89,7 @@ class AiChatVariantsScreenshotTest {
             message = plainAnswerMessage,
             onFeedbackClick = {},
             onThumbUpClick = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -106,7 +107,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onOpenChecklist = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -118,7 +119,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onAskAiFallback = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -130,7 +131,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onPaywallCta = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -143,7 +144,7 @@ class AiChatVariantsScreenshotTest {
             onFeedbackClick = {},
             onThumbUpClick = {},
             onRetry = {},
-            showSenderLabel = true,
+            showAvatar = true,
         )
     }
 
@@ -204,6 +205,10 @@ class AiChatVariantsScreenshotTest {
     @Test fun variant_post_action_undo_move_light() = capture { Choice(false, postActionChoice()) }
     @Test fun variant_post_action_undo_move_dark() = capture { Choice(true, postActionChoice()) }
 
+    // B pass 2: the D1 offer as it actually renders in both hosts — INSIDE the reply that said it.
+    @Test fun variant_post_action_in_reply_light() = capture { PostActionInReply(false) }
+    @Test fun variant_post_action_in_reply_dark() = capture { PostActionInReply(true) }
+
     @Test fun variant_move_target_picker_light() = capture { Choice(false, moveTargetChoice()) }
     @Test fun variant_move_target_picker_dark() = capture { Choice(true, moveTargetChoice()) }
 
@@ -216,6 +221,10 @@ class AiChatVariantsScreenshotTest {
     // clock so record/verify agree on one frame and the run does not wait on a never-idle clock.
     @Test fun variant_chip_executing_spinner_light() = capture(pinMs = PIN_MS) { Choice(false, executingChoice()) }
     @Test fun variant_chip_executing_spinner_dark() = capture(pinMs = PIN_MS) { Choice(true, executingChoice()) }
+
+    // The which-list picker above executes on a ROW now; this keeps the CHIP spinner framed.
+    @Test fun variant_chip_executing_primary_light() =
+        capture(pinMs = PIN_MS) { Choice(false, reminderChoice().copy(executingId = "confirm", executingLabel = "Setting…")) }
 
     // =========================================================================
     // Direct components. One golden each.
@@ -258,6 +267,25 @@ class AiChatVariantsScreenshotTest {
                 onEditChange = {},
                 onEditConfirm = {},
                 compact = compact,
+            )
+        }
+    }
+
+    @Composable
+    private fun PostActionInReply(darkTheme: Boolean) {
+        val pending = postActionChoice()
+        Frame(darkTheme = darkTheme) {
+            ChatMessageBubble(
+                message = ChatMessage(
+                    id = "moved",
+                    role = ChatRole.Assistant,
+                    timestamp = 0L,
+                    content = "Added «milk» to Shopping.",
+                ),
+                onFeedbackClick = {},
+                onThumbUpClick = {},
+                showAvatar = true,
+                attachedActions = { AttachedChoiceActions(pending = pending, onSelect = {}) },
             )
         }
     }
@@ -423,6 +451,7 @@ private fun deleteChoice() = PendingChoice(
             ),
         ),
         escape = escapeCancel(),
+        kind = ChoiceKind.Delete,
     ),
 )
 
@@ -447,6 +476,7 @@ private fun reminderChoice() = PendingChoice(
             ChoiceOption(id = "edit", label = "Edit", role = ChoiceRole.Default, action = ChoiceAction.Edit),
         ),
         escape = escapeCancel(),
+        kind = ChoiceKind.Reminder,
     ),
 )
 
@@ -474,6 +504,7 @@ private fun createChecklistChoice(): PendingChoice {
                 ),
             ),
             escape = escapeCancel(),
+            kind = ChoiceKind.CreateChecklist,
         ),
     )
 }
@@ -497,6 +528,7 @@ private fun whichListMemoryChoice() = PendingChoice(
             whichListChip("c2", "Weekend", "3", 3L),
         ),
         escape = escapeCancel(),
+        kind = ChoiceKind.PickList,
     ),
     showMemoryToggle = true,
 )
@@ -509,6 +541,7 @@ private fun whichListChip(id: String, name: String, meta: String, checklistId: L
     action = ChoiceAction.Execute(
         ToolCall.AddItem(checklistHint = name, itemText = "eggs", checklistId = checklistId),
     ),
+    seedId = checklistId,
 )
 
 /** Variant 13 — agent batch: numbered plan inside the bubble (one destructive line), "Do it all". */
@@ -519,6 +552,7 @@ private fun agentBatchChoice() = PendingChoice(
             ChoiceOption(id = "all", label = "Do it all", role = ChoiceRole.Primary, action = ChoiceAction.ExecuteAll),
         ),
         escape = escapeCancel(),
+        kind = ChoiceKind.Batch,
     ),
     batchItems = listOf(
         AgentPlanItem("Add «milk» to Shopping"),
@@ -570,11 +604,12 @@ private fun moveTargetChoice(): PendingChoice {
         choice = ChatChoice(
             prompt = "Which list?",
             options = listOf(
-                ChoiceOption("m0", "Groceries", role = ChoiceRole.Default, action = ChoiceAction.MoveTo(handle, "Groceries")),
-                ChoiceOption("m1", "Weekend", role = ChoiceRole.Default, action = ChoiceAction.MoveTo(handle, "Weekend")),
-                ChoiceOption("m2", "Work", role = ChoiceRole.Default, action = ChoiceAction.MoveTo(handle, "Work")),
+                ChoiceOption("m0", "Groceries", role = ChoiceRole.Default, action = ChoiceAction.MoveTo(handle, "Groceries"), seedId = 2L),
+                ChoiceOption("m1", "Weekend", role = ChoiceRole.Default, action = ChoiceAction.MoveTo(handle, "Weekend"), seedId = 3L),
+                ChoiceOption("m2", "Work", role = ChoiceRole.Default, action = ChoiceAction.MoveTo(handle, "Work"), seedId = 4L),
             ),
             escape = escapeCancel(),
+            kind = ChoiceKind.Move,
         ),
     )
 }
@@ -596,6 +631,7 @@ private fun inlineEditChoice() = PendingChoice(
             ),
         ),
         escape = escapeCancel(),
+        kind = ChoiceKind.AddItems,
     ),
     editText = "milk",
 )
@@ -610,15 +646,18 @@ private fun executingChoice() = PendingChoice(
                 label = "Shopping",
                 role = ChoiceRole.Default,
                 action = ChoiceAction.Execute(ToolCall.AddItem(checklistHint = "Shopping", itemText = "milk", checklistId = 1L)),
+                seedId = 1L,
             ),
             ChoiceOption(
                 id = "s1",
                 label = "Groceries",
                 role = ChoiceRole.Default,
                 action = ChoiceAction.Execute(ToolCall.AddItem(checklistHint = "Groceries", itemText = "milk", checklistId = 2L)),
+                seedId = 2L,
             ),
         ),
         escape = escapeCancel(),
+        kind = ChoiceKind.PickList,
     ),
     executingId = "s0",
     executingLabel = "Adding…",

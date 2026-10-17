@@ -80,4 +80,19 @@ object AppShapeTokens {
      */
     val SheetTop: CornerBasedShape =
         RoundedCornerShape(topStart = BottomChromeCorner, topEnd = BottomChromeCorner)
+
+    /**
+     * Radius of a grouped section container (redesign B) as a [Dp] — `Modifier.groupSegment` rounds
+     * only the OUTER corners of the first / last segment, so it needs the number, not a shape.
+     */
+    val GroupCorner: Dp = 24.dp
+
+    /** Grouped section container (redesign B): one 24dp container per section, rows inside. */
+    val Group: CornerBasedShape = RoundedCornerShape(GroupCorner)
+
+    /** Checklist detail header card (redesign B). A named alias of `AppShapes.extraLarge` (28dp). */
+    val HeaderCard: CornerBasedShape = AppShapes.extraLarge
+
+    /** The tail corner of a chat bubble (redesign B; was a 4dp literal in `ChatMessageBubble`). */
+    val ChatBubbleTail: Dp = 8.dp
 }

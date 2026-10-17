@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.components
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.item_priority_action
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -10,10 +12,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +30,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -35,6 +45,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefau
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppDueChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChipDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppRoundCheckbox
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSourceIcon
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTextStyles
@@ -44,6 +55,19 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.DueLabelSpec
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.dueLabelSpec
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.label
+import org.jetbrains.compose.resources.stringResource
+
+/**
+ * Which container a [TaskRow] draws itself in.
+ *
+ * - [Card]: its own outlined card (comfortable) or a bare line (compact) - today's rendering, kept
+ *   byte-for-byte for every caller that does not opt in.
+ * - [Grouped]: redesign B. No container of its own - the CALLER paints one segment of a grouped
+ *   section with `Modifier.groupSegment(...)`, which also draws the inset divider. Round checkbox
+ *   ([AppRoundCheckbox]), 16dp inset / 12dp gap, and priority as an amber ring + inline star instead
+ *   of the leading bar.
+ */
+enum class RowContainer { Card, Grouped }
 
 /**
  * One task in a list, with the project-wide 30/70 hit-zone split: the left 30% toggles the checkbox,
@@ -113,7 +137,9 @@ fun TaskRow(
     modifier: Modifier = Modifier,
     source: GistiSourceKind = GistiSourceKind.Manual,
     nowMillis: Long = currentTimeMillis(),
+    container: RowContainer = RowContainer.Card,
 ) {
+    val grouped = container == RowContainer.Grouped
     val due = item.dueLabelSpec(nowMillis = nowMillis)
     // priorityIndicator, not star: the bar is the ONLY channel carrying priority on this row (the
     // 16dp trailing star is gone), so it has to clear the 3:1 non-text contrast bar by itself.
@@ -160,7 +186,9 @@ fun TaskRow(
                 // final measured size and costs no layout pass. The card clips it to the corner
                 // radius; in the compact layout there is no card and it is a plain edge.
                 .then(
-                    if (item.priority > 0) {
+                    // Grouped: the bar is NOT drawn - the amber ring + the inline star carry
+                    // priority there, which also keeps it from being colour-only (spec 2.2).
+                    if (item.priority > 0 && !grouped) {
                         Modifier.priorityBar(priorityColor)
                     } else {
                         Modifier
@@ -172,21 +200,32 @@ fun TaskRow(
                     .fillMaxWidth()
                     .align(Alignment.Center)
                     .padding(
-                        horizontal = AppDensity.RowPaddingHorizontal,
+                        horizontal = if (grouped) {
+                            AppDensity.GroupRowPaddingHorizontal
+                        } else {
+                            AppDensity.RowPaddingHorizontal
+                        },
                         vertical = AppDensity.RowPaddingVertical,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppDensity.RowGap),
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (grouped) AppDensity.GroupRowGap else AppDensity.RowGap,
+                ),
             ) {
-                Checkbox(
-                    checked = item.checked,
-                    // null → the tap overlay below owns the gesture, so the checkbox never competes
-                    // with the 30/70 split for the same pointer.
-                    onCheckedChange = null,
-                )
+                if (grouped) {
+                    // Visual only: the 30% overlay below owns the gesture and the semantics.
+                    AppRoundCheckbox(checked = item.checked, important = item.priority > 0)
+                } else {
+                    Checkbox(
+                        checked = item.checked,
+                        // null → the tap overlay below owns the gesture, so the checkbox never
+                        // competes with the 30/70 split for the same pointer.
+                        onCheckedChange = null,
+                    )
+                }
 
                 if (singleLine) {
-                    TaskTitle(item = item, modifier = Modifier.weight(1f))
+                    TaskTitle(item = item, showStar = grouped, modifier = Modifier.weight(1f))
                     // No second line to hang a meta row from, so the date moves to the trailing
                     // edge. The attachment chip does NOT come with it: of the three indicators it
                     // is the least load-bearing, and the width it would take is the width the date
@@ -199,15 +238,17 @@ fun TaskRow(
                             maxWidth = CompactDueChipMaxWidth,
                             isRepeating = item.repeatRule != null,
                             hasAlarm = item.alarmEnabled,
+                            compact = grouped,
                         )
                     }
                 } else {
                     Column(modifier = Modifier.weight(1f)) {
-                        TaskTitle(item = item)
+                        TaskTitle(item = item, showStar = grouped)
                         TaskMetaRow(
                             item = item,
                             due = due,
                             source = source,
+                            compactChip = grouped,
                         )
                     }
                 }
@@ -227,6 +268,19 @@ fun TaskRow(
                             indication = null,
                             onClick = { onCheckedChange(!item.checked) },
                             onLongClick = onDetailsClick,
+                        )
+                        // Grouped: the round checkbox has no semantics of its own, so the 30% zone
+                        // carries them - TalkBack reads "checkbox, checked / not checked" (spec
+                        // 2.2). The Card path keeps today's tree untouched.
+                        .then(
+                            if (grouped) {
+                                Modifier.semantics {
+                                    role = Role.Checkbox
+                                    toggleableState = ToggleableState(item.checked)
+                                }
+                            } else {
+                                Modifier
+                            },
                         ),
                 )
                 Box(
@@ -244,7 +298,11 @@ fun TaskRow(
         }
     }
 
-    if (compact) {
+    if (grouped) {
+        // No container at all: the caller paints this row's segment of the section group
+        // (`Modifier.groupSegment`), including the inset divider. A fill here would cover it.
+        Box(modifier = modifier) { rowContent() }
+    } else if (compact) {
         // No Card, no border, no shape: on the page background this is a plain line, and the list's
         // own divider is the separator. Wrapping it in a zero-elevation borderless Card instead would
         // still paint the card's container colour and leave the row looking like a card that lost its
@@ -272,7 +330,33 @@ fun TaskRow(
  * anyway.
  */
 @Composable
-private fun TaskTitle(item: ChecklistFillItem, modifier: Modifier = Modifier) {
+private fun TaskTitle(
+    item: ChecklistFillItem,
+    modifier: Modifier = Modifier,
+    showStar: Boolean = false,
+) {
+    if (showStar && item.priority > 0) {
+        // Grouped rows: an inline, READ-ONLY star after the title (no clickable - rule
+        // ui-card-patterns: per-item actions live in ItemDetailsSheet). Its description is the
+        // sheet's own "Important" label, so the row reads "..., Important".
+        Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TaskTitleText(item = item, modifier = Modifier.weight(1f, fill = false))
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = stringResource(Res.string.item_priority_action),
+                tint = GistiColors.star,
+                modifier = Modifier
+                    .padding(start = InlineStarGap)
+                    .size(InlineStarSize),
+            )
+        }
+    } else {
+        TaskTitleText(item = item, modifier = modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun TaskTitleText(item: ChecklistFillItem, modifier: Modifier) {
     Text(
         text = item.text,
         style = AppTextStyles.taskTitle,
@@ -287,11 +371,14 @@ private fun TaskTitle(item: ChecklistFillItem, modifier: Modifier = Modifier) {
         textDecoration = if (item.checked) TextDecoration.LineThrough else null,
         maxLines = TaskTitleMaxLines,
         overflow = TextOverflow.Ellipsis,
-        // fillMaxWidth is mandatory for any Text inside a HorizontalPager — without it the text
-        // overflows the page instead of wrapping (rule ui-card-patterns).
-        modifier = modifier.fillMaxWidth(),
+        // Width-bounded by the caller: fillMaxWidth on the plain path (mandatory inside a
+        // HorizontalPager, rule ui-card-patterns), a non-filling weight beside the star.
+        modifier = modifier,
     )
 }
+
+private val InlineStarSize: Dp = 16.dp
+private val InlineStarGap: Dp = 6.dp
 
 /**
  * The second line: everything about the task that is not its text.
@@ -305,6 +392,7 @@ private fun TaskMetaRow(
     item: ChecklistFillItem,
     due: DueLabelSpec?,
     source: GistiSourceKind,
+    compactChip: Boolean = false,
 ) {
     val attachments = item.attachments.size
     if (due == null && source == GistiSourceKind.Manual && attachments == 0) return
@@ -332,6 +420,8 @@ private fun TaskMetaRow(
                 // A date alone does not arm anything — that is the whole reason the model carries
                 // the two separately — so the bell glyph appears only when an alarm really is set.
                 hasAlarm = item.alarmEnabled,
+                // Grouped (redesign B) rows: the lighter pill with a leading alarm glyph.
+                compact = compactChip,
             )
         }
         AppSourceIcon(kind = source)

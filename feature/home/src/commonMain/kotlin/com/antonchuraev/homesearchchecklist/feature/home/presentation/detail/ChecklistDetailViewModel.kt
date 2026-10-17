@@ -724,6 +724,7 @@ class ChecklistDetailViewModel(
             // ── Item-create dock mode ──
             is ChecklistDetailIntent.OnDockItemCreateOpened -> openItemCreateMode(intent.targetWeekday)
             ChecklistDetailIntent.OnDockItemCreateClosed -> closeItemCreateMode()
+            ChecklistDetailIntent.OnItemCreateDismissed -> dismissItemCreateMode()
             is ChecklistDetailIntent.OnItemCreatePresetSelected -> selectItemCreatePreset(intent.preset)
             ChecklistDetailIntent.OnItemCreateReminderPickRequested -> {
                 val tz = TimeZone.currentSystemDefault()
@@ -1313,6 +1314,15 @@ class ChecklistDetailViewModel(
      * [targetWeekday] (ISO 1..7) pins items to a Weekly day column; null in Standard view.
      */
     private fun openItemCreateMode(targetWeekday: Int?) {
+        val current = screenState.value as? ChecklistDetailState.Content
+        // A draft kept by [dismissItemCreateMode] for the SAME target column comes back as-is (the
+        // Inbox capture dock's behaviour). After an explicit close or a send the fields are already
+        // empty, so keeping them is a no-op; another Weekly day starts clean.
+        if (current != null && !current.itemCreateMode && current.itemCreateTargetWeekday == targetWeekday) {
+            updateContentState { it.copy(itemCreateMode = true) }
+            analyticsTracker.event(AnalyticsEvents.DetailUi.QUICK_ADD_OPENED)
+            return
+        }
         _pendingItemInput.value = ""
         updateContentState {
             it.copy(
@@ -1324,9 +1334,32 @@ class ChecklistDetailViewModel(
                 itemCreateReminderPreset = null,
                 itemCreateImportant = false,
                 itemCreateRepeat = null,
+                itemCreateRepeatSheetOpen = false,
+                itemCreateRepeatSheetLocked = false,
+                customPickerForItemCreate = false,
+                // A dismissed draft for ANOTHER column may still hold staged files — never carry them over.
+                itemCreatePendingAttachments = emptyList(),
+                triggerItemCreatePicker = false,
             )
         }
         analyticsTracker.event(AnalyticsEvents.DetailUi.QUICK_ADD_OPENED)
+    }
+
+    /**
+     * v2 capture plate dismissed (BACK / scrim tap): close the mode and any transient sheet or picker
+     * trigger, but KEEP the draft — text, parse, chips, staged attachments, target column — so
+     * [openItemCreateMode] restores it. Only Send ([addItemWithParse]) discards it.
+     */
+    private fun dismissItemCreateMode() {
+        updateContentState {
+            it.copy(
+                itemCreateMode = false,
+                itemCreateRepeatSheetOpen = false,
+                itemCreateRepeatSheetLocked = false,
+                customPickerForItemCreate = false,
+                triggerItemCreatePicker = false,
+            )
+        }
     }
 
     /** Exit item-create mode (dock collapsed/dismissed). Clears input + all chip/sheet state. */

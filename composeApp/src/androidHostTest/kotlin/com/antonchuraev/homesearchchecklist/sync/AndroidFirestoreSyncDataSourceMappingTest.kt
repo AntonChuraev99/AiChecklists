@@ -161,6 +161,18 @@ class AndroidFirestoreSyncDataSourceMappingTest {
     }
 
     @Test
+    fun checklistSyncData_toChecklistSyncData_defaultsSeparateCompletedToFalse_whenKeyAbsent() {
+        // New checklists are created with separateCompleted = true (redesign B), but that is set at
+        // the creation sites, NOT through a parse default. A document written before the field
+        // existed must keep reading as false — otherwise every old list flips its layout on pull.
+        val legacyDocument = fullyPopulated().toMap().throughFirestoreWire() - "separateCompleted"
+
+        val restored = legacyDocument.toChecklistSyncData(documentId = "checklist-cloud-1")
+
+        assertEquals(false, restored.separateCompleted)
+    }
+
+    @Test
     fun checklistSyncData_roundTrip_preservesEmbeddedFillFields() {
         val original = fullyPopulated()
 

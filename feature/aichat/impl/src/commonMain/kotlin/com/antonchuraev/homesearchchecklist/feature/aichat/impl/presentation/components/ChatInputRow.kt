@@ -10,11 +10,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -68,6 +74,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -75,6 +82,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_attach_file_action
+import aichecklists.core.designsystem.generated.resources.chat_credits_label
+import aichecklists.core.designsystem.generated.resources.chat_pricing_caption_action
 import aichecklists.core.designsystem.generated.resources.chat_features_help_action
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder_with_attachment
@@ -169,6 +178,13 @@ fun ChatInputRow(
      * false (the full AI-chat row already shows attach). Defaults to false.
      */
     attachVisibleInSimpleMode: Boolean = false,
+    /**
+     * What sits in the leading slot. [ChatInputLeading.Help] (default) = the "?" features-help button
+     * wired to [onHelpClick] — the dock hosts keep it. [ChatInputLeading.Credits] = the redesign-B
+     * credits chip (full ChatScreen): balance in a pill that opens the pricing sheet. Both hide while
+     * [simpleSendOnly] or [isTranscribing], with the same width-collapse morph.
+     */
+    leading: ChatInputLeading = ChatInputLeading.Help,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -209,6 +225,9 @@ fun ChatInputRow(
 
     // Track drag-cancel locally to drive the Crossfade icon state
     var isDragCancel by remember { mutableStateOf(false) }
+
+    // UI-local: drives the focus ring on the pill (the host callback below is unchanged).
+    var isFieldFocused by remember { mutableStateOf(false) }
 
     // Scale animation: 1.0f → 1.2f when recording (spec §2)
     val micIconScale by animateFloatAsState(
@@ -251,7 +270,14 @@ fun ChatInputRow(
             // in the dock rather than a pill on it. `outline`, not `outlineVariant`, because this is
             // a tappable target. See AppChatColors.
             color = AppChatColors.raised(),
-            border = BorderStroke(1.dp, AppChatColors.controlOutline()),
+            // B pass 2 §2.1: 2dp primary ring while the field has focus — the same rule as the
+            // capture dock's composer card — 1dp control outline otherwise. The 28dp radius on a
+            // 56dp minimum IS the pill at one line and stays 28 as the field grows.
+            border = if (isFieldFocused) {
+                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            } else {
+                BorderStroke(1.dp, AppChatColors.controlOutline())
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp),
@@ -276,22 +302,31 @@ fun ChatInputRow(
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {
-            IconButton(
-                onClick = onHelpClick,
-                enabled = isEnabled && !isRecording && !isTranscribing,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
-                    contentDescription = helpLabel,
-                    modifier = Modifier.size(AppDimens.IconSizeMd),
-                    // Disabled while transcribing too — tinting it like an idle control is what made
-                    // the row read as "ready for input" while the recording was still uploading.
-                    tint = if (isEnabled && !isRecording && !isTranscribing)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            when (leading) {
+                // Not gated on isEnabled (= "not processing"): reading the pricing sheet while an
+                // answer is on its way conflicts with nothing, and a greyed balance read as an error.
+                is ChatInputLeading.Credits -> CreditsLeadingChip(
+                    balance = leading.balance,
+                    onClick = leading.onClick,
+                    enabled = !isRecording && !isTranscribing,
                 )
+                ChatInputLeading.Help -> IconButton(
+                    onClick = onHelpClick,
+                    enabled = isEnabled && !isRecording && !isTranscribing,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                        contentDescription = helpLabel,
+                        modifier = Modifier.size(AppDimens.IconSizeMd),
+                        // Disabled while transcribing too — tinting it like an idle control is what made
+                        // the row read as "ready for input" while the recording was still uploading.
+                        tint = if (isEnabled && !isRecording && !isTranscribing)
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    )
+                }
             }
         }
         AnimatedVisibility(
@@ -313,25 +348,22 @@ fun ChatInputRow(
                 if (newValue.text != text) onTextChange(newValue.text)
             },
             placeholder = {
-                // Force the hint to a single line regardless of the field being multiline
-                // (singleLine=false / maxLines=4 below). Without this the wider RU string
-                // "Сообщение Gisti" wraps to 2 lines in the narrow weight(1f) slot. Ellipsis is a
-                // safety net only — the hint is short enough to fit; typed text still grows to 4 lines.
+                // Up to TWO lines (B pass 2 §2.1, iteration-10 open item): at 320dp the RU hint
+                // "Сообщение Gisti" beside the credits chip truncated to "Сооб…" on one line — a
+                // wrapped hint reads, a clipped one does not. The pill grows (heightIn, never a fixed
+                // height). Ellipsis only past the second line; typed text still grows to 4 lines.
                 // While transcribing the hint is a STATUS, not an invitation to type: full-strength
                 // onSurface (the idle hint is the weaker onSurfaceVariant) and a polite live region so
                 // TalkBack announces it once instead of leaving a silent disabled field.
-                androidx.compose.material3.Text(
+                // The status may wrap to a second line at large font scales — a cut-off
+                // «Recogni…» is not a status; the idle hint gets the same two lines (see above).
+                ChatInputPlaceholder(
                     text = placeholder,
-                    style = MaterialTheme.typography.bodyLarge,
                     color = if (isTranscribing) {
                         MaterialTheme.colorScheme.onSurface
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    // The status may wrap to a second line at large font scales — a cut-off
-                    // «Recogni…» is not a status. The idle hint stays single-line (see above).
-                    maxLines = if (isTranscribing) 2 else 1,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = if (isTranscribing) {
                         Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     } else {
@@ -345,7 +377,10 @@ fun ChatInputRow(
             modifier = Modifier
                 .weight(1f)
                 .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base }
-                .onFocusChanged { onFocusChanged?.invoke(it.isFocused) },
+                .onFocusChanged {
+                    isFieldFocused = it.isFocused
+                    onFocusChanged?.invoke(it.isFocused)
+                },
             // Item-create (simpleSendOnly): Enter/Done adds the item (parity with the removed inline
             // field) and the first letter auto-capitalizes (Sentences). AI-chat path is unchanged.
             keyboardOptions = KeyboardOptions(
@@ -589,6 +624,108 @@ fun ChatInputRow(
         }  // end Row
         }  // end Surface
     }  // end Column
+}
+
+/**
+ * The field hint: up to TWO lines, but only ever broken BETWEEN words.
+ *
+ * At 320dp × fontScale 1.5 the RU word «Сообщение» alone is wider than the slot left between the
+ * credits chip and attach / mic, so a plain `maxLines = 2` broke it mid-word («Сообщ / ение …») —
+ * worse than the old one-line «Сооб…». When every word fits the slot the hint wraps on words (2
+ * lines); when one does not, it falls back to a single ellipsised line. Measured against the slot's
+ * own constraints, so the decision follows the real width, font scale and locale.
+ */
+@Composable
+private fun ChatInputPlaceholder(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val style = MaterialTheme.typography.bodyLarge
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier = modifier) {
+        val maxWidthPx = constraints.maxWidth
+        val bounded = constraints.hasBoundedWidth
+        val wrapsOnWords = remember(text, style, maxWidthPx, bounded) {
+            !bounded || text.split(' ').filter { it.isNotEmpty() }.all { word ->
+                measurer.measure(text = word, style = style, maxLines = 1, softWrap = false).size.width <= maxWidthPx
+            }
+        }
+        Text(
+            text = text,
+            style = style,
+            color = color,
+            maxLines = if (wrapsOnWords) 2 else 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Content of [ChatInputRow]'s leading slot (redesign B §2.10). */
+sealed interface ChatInputLeading {
+    /** The "?" features-help button (today's default; the dock hosts keep it). */
+    data object Help : ChatInputLeading
+
+    /** The credits chip: [balance] in a pill; [onClick] opens the pricing sheet. */
+    data class Credits(val balance: Int, val onClick: () -> Unit) : ChatInputLeading
+}
+
+/**
+ * Credits chip in the input's leading slot: a 32dp `primaryContainer` pill (sparkle 16dp in
+ * `primary` + the balance in `labelLarge` Bold `onPrimaryContainer`) inside a 48dp target. Grows with
+ * the text at large font scales (`heightIn`, never a fixed height).
+ *
+ * Semantics: ONE button whose name is the full `chat_credits_label` ("80 credits left · ≈ 0–3") and
+ * whose click label is `chat_pricing_caption_action` ("Why?") — the bare digit is not announced.
+ */
+@Composable
+private fun CreditsLeadingChip(
+    balance: Int,
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    val description = stringResource(Res.string.chat_credits_label, balance)
+    val clickLabel = stringResource(Res.string.chat_pricing_caption_action)
+    val contentAlpha = if (enabled) 1f else 0.38f
+    Box(
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .clip(CircleShape)
+            .clickable(
+                enabled = enabled,
+                onClickLabel = clickLabel,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = description }
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .heightIn(min = 32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .clearAndSetSemantics {},
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = balance.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = contentAlpha),
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 /**

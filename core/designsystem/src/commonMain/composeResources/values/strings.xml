@@ -1394,10 +1394,10 @@
 
     <!-- AI Chat Pricing Help Sheet -->
     <string name="chat_pricing_sheet_title">How AI Chat charges credits</string>
-    <string name="chat_pricing_layer1_title">Standard commands — free</string>
-    <string name="chat_pricing_layer1_detail">Add, find, delete, mark done, simple reminders. Processed on your device, no credits.</string>
-    <string name="chat_pricing_layer2_title">Smart commands — 1 credit</string>
-    <string name="chat_pricing_layer2_detail">Bulk operations or ambiguous wording. AI helps us understand exactly what you mean.</string>
+    <string name="chat_pricing_layer1_title">Each answer — 0 to 3 credits</string>
+    <string name="chat_pricing_layer1_detail">Every message is handled by AI in the cloud. The cost depends on the request:</string>
+    <string name="chat_pricing_layer2_title">Commands — 1 credit</string>
+    <string name="chat_pricing_layer2_detail">Add, find, delete, mark done, reminders, bulk changes.</string>
     <string name="chat_pricing_layer3_title">Open questions — 3 credits</string>
     <string name="chat_pricing_layer3_detail">«What should I do this week?», planning, summaries. Full AI reasoning.</string>
     <string name="chat_pricing_apply_note">Write actions (add / delete / set) always show a preview. Credits are charged when we figure out what you meant, not when you tap Apply.</string>
@@ -1977,4 +1977,13 @@
     <string name="activation_sheet_today_lower">today, %1$s</string>
     <string name="activation_sheet_tomorrow_lower">tomorrow, %1$s</string>
     <string name="activation_sheet_reminder_failed">Couldn't set the reminder. Set it from the list instead.</string>
+    <!-- Redesign B "Soft & tactile" (2026-10-16) -->
+    <string name="nav_ask_pill_label">Ask Gisti or add a task</string>
+    <string name="inbox_header_date">%1$s, %2$s %3$d</string>
+    <string name="detail_header_progress">%1$d left · %2$d of %3$d done</string>
+    <string name="detail_ask_about_list">Ask Gisti about this list</string>
+    <string name="chat_header_title">Gisti</string>
+    <string name="chat_header_subtitle">Your checklist helper</string>
+    <string name="chat_message_show_actions">Show actions</string>
+    <string name="checklist_card_no_items">No items yet</string>
 </resources>

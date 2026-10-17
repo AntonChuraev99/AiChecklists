@@ -2,19 +2,21 @@ package com.antonchuraev.homesearchchecklist.navigation
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.chat_dock_mic_description
 import aichecklists.core.designsystem.generated.resources.nav_add_task_fab_content_description
+import aichecklists.core.designsystem.generated.resources.nav_ask_pill_label
 import aichecklists.core.designsystem.generated.resources.nav_chat_fab_content_description
 import aichecklists.core.designsystem.generated.resources.nav_tab_inbox
 import aichecklists.core.designsystem.generated.resources.nav_tab_overview
 import aichecklists.core.designsystem.generated.resources.nav_tab_projects
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -42,14 +45,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The v2 Compact chrome: the AI entry point moves INTO the bottom bar (a raised circle in the middle
- * of a 2+2 split) and the right-hand floating stack goes away with it — capture is an inline row in
- * the list now.
+ * The v2 Compact chrome after redesign B: the raised centre AI circle is gone, and the AI entry
+ * point is the flat **Ask pill** at the top of the bottom PLATE, above four equal tabs
+ * (DESIGN_SPEC_B §2.5).
  *
- * Every claim here is positional or about hit-testing, so it is asserted on a composed tree:
- * "which callback a tap at these coordinates reaches" is precisely the question a state-level test
- * cannot answer, and it is the question this layout gets wrong most easily (Compose does not deliver
- * touches outside a parent's bounds, and `NavigationBar` is a rectangle-clipped `Surface`).
+ * Every claim is positional or about hit-testing, so it is asserted on a composed tree — "which
+ * callback a tap at these coordinates reaches" is the question a state-level test cannot answer.
+ * The previous file pinned the 2+2 split, the 76dp gap and the overhanging half of the circle; those
+ * cases are gone with the circle, not weakened — the new cases below pin what replaced them.
  *
  * Run:
  *   ./gradlew :composeApp:testAndroidHostTest --tests "*V2ShellAiButtonTest*"
@@ -64,74 +67,91 @@ class V2ShellAiButtonTest {
 
     private companion object {
         const val CONTENT_MARKER = "SCREEN CONTENT UNDER THE SHELL"
+        const val CONTENT_TAG = "hostedContent"
     }
 
-    // ── B5. The AI button lives in the bar, centred, and is a BUTTON ─────────
+    // ── The pill: where it is and what it is ────────────────────────────────
 
     /**
-     * Catches: the AI affordance still floating in the bottom-RIGHT corner instead of sitting in the
-     * middle of the bar.
+     * Catches: the AI entry point left anywhere but ABOVE the tabs, inside the plate — e.g. a
+     * revived floating circle, or the pill rendered under the bar.
      *
-     * Horizontal centring is the discriminator — presence alone passes today, because the corner FAB
-     * already carries the same content description. A raised circle centred over a 2+2 bar is the
-     * anatomy the owner chose (variant A), and it is what makes the four destinations read as two
-     * pairs rather than a row with a stray button beside it.
+     * Asserted geometrically: the pill's bottom edge is above every tab's top edge, it spans most of
+     * the window (it is a pill, not a button), and it is centred.
      */
     @Test
-    fun compactShell_rendersTheAiButtonCentredInTheBottomBar() {
-        var chatLabel = ""
+    fun compactShell_rendersTheAskPillAboveTheFourTabs() {
+        var pillLabel = ""
+        var inboxLabel = ""
         composeTestRule.setContent {
-            chatLabel = stringResource(Res.string.nav_chat_fab_content_description)
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            inboxLabel = stringResource(Res.string.nav_tab_inbox)
             V2ShellUnderTest()
         }
         composeTestRule.waitForIdle()
 
-        // Precondition: the shell composed and its hosted screen is on screen.
         composeTestRule.onNodeWithText(CONTENT_MARKER).assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription(chatLabel).assertIsDisplayed()
+        val pill = composeTestRule.onNodeWithText(pillLabel).assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val tab = composeTestRule.onNodeWithText(inboxLabel).fetchSemanticsNode().boundsInRoot
+        val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width.toFloat()
 
-        val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width
-        val buttonCentreX = composeTestRule.onNodeWithContentDescription(chatLabel)
-            .fetchSemanticsNode().boundsInRoot.center.x
-        val tolerancePx = with(composeTestRule.density) { 24.dp.toPx() }
-
+        assertTrue(pill.bottom <= tab.top, "The pill must sit above the tabs (pill=$pill, tab=$tab)")
         assertTrue(
-            abs(buttonCentreX - rootWidth / 2f) <= tolerancePx,
-            "The AI button must be horizontally centred in the bar " +
-                "(centre=$buttonCentreX, window centre=${rootWidth / 2f}, tolerance=$tolerancePx)",
+            pill.width >= rootWidth * 0.8f,
+            "The pill must span the plate (width=${pill.width}, window=$rootWidth)",
+        )
+        val tolerancePx = with(composeTestRule.density) { 4.dp.toPx() }
+        assertTrue(
+            abs(pill.center.x - rootWidth / 2f) <= tolerancePx,
+            "The pill must be centred (centre=${pill.center.x}, window centre=${rootWidth / 2f})",
         )
     }
 
-    /**
-     * Catches: the AI entry point implemented as a fifth `NavigationBarItem`.
-     *
-     * It is an ACTION, not a place — TalkBack announcing "tab" would promise navigation to a
-     * destination that does not exist, and a tab is also the wiring that would route the tap through
-     * `onNavigate` instead of `onOpenChat` (see the context test below).
-     */
+    /** It is an ACTION, not a place: `Role.Button`, never a fifth tab. */
     @Test
-    fun compactShell_aiButtonIsAnnouncedAsAButtonNotATab() {
-        var chatLabel = ""
+    fun compactShell_askPillIsAnnouncedAsAButton() {
+        var pillLabel = ""
         composeTestRule.setContent {
-            chatLabel = stringResource(Res.string.nav_chat_fab_content_description)
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
             V2ShellUnderTest()
         }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithContentDescription(chatLabel).assert(
+        composeTestRule.onNodeWithText(pillLabel).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
         )
     }
 
-    // ── A4 / B4. No floating "+" on Compact any more ─────────────────────────
+    /**
+     * Catches: the hosted screen running UNDER the plate. The content box must end where the plate
+     * starts — the plate's MEASURED height (pill + bar) is what the box consumes, so a regression to
+     * measuring the bar alone shows up here as content overlapping the pill.
+     */
+    @Test
+    fun compactShell_contentEndsAboveThePlate() {
+        var pillLabel = ""
+        composeTestRule.setContent {
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            V2ShellUnderTest()
+        }
+        composeTestRule.waitForIdle()
+
+        val contentBottom = composeTestRule.onNodeWithTag(CONTENT_TAG).fetchSemanticsNode()
+            .boundsInRoot.bottom
+        val pillTop = composeTestRule.onNodeWithText(pillLabel).fetchSemanticsNode().boundsInRoot.top
+        assertTrue(
+            contentBottom <= pillTop,
+            "Hosted content must end above the plate (content bottom=$contentBottom, pill top=$pillTop)",
+        )
+    }
+
+    // ── No floating "+" on Compact ───────────────────────────────────────────
 
     /**
-     * Catches: the right-hand create FAB surviving the redesign.
-     *
      * `showCreateFab = true` is passed on purpose — App.kt still reports "this tab can take a
-     * capture" for the Inbox. The Compact shell must stop turning that into a floating button, since
-     * the inline add-task row in the list is the capture affordance now; two of them would compete,
-     * and the collapsed FAB-band reserve (132dp → ~32dp) assumes only one exists.
+     * capture" for the Inbox. Compact must not turn that into a floating button: the inline
+     * add-task row in the list is the capture affordance.
      */
     @Test
     fun compactShell_onTheInboxTab_rendersNoFloatingCreateFab() {
@@ -143,38 +163,134 @@ class V2ShellAiButtonTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText(CONTENT_MARKER).assertIsDisplayed()
-        val createFabNodes = composeTestRule
-            .onAllNodesWithContentDescription(createLabel)
-            .fetchSemanticsNodes()
         assertEquals(
             0,
-            createFabNodes.size,
-            "Compact must not render a floating create FAB any more — capture is the inline " +
-                "add-task row in the list",
+            composeTestRule.onAllNodesWithContentDescription(createLabel).fetchSemanticsNodes().size,
+            "Compact must not render a floating create FAB — capture is the inline add-task row",
         )
     }
 
-    // ── B6 / B7. The tap reaches the host's chat callback, not navigation ────
+    // ── Taps reach the right callback ────────────────────────────────────────
 
     /**
-     * Catches two failures at once, both of which ship silently:
-     *
-     * 1. A tap that lands in the BAR GAP beside the raised circle does nothing. The circle overhangs
-     *    the bar's top edge, and Compose does not deliver touches outside a parent's bounds — so a
-     *    circle parented to `NavigationBar` (a rectangle-clipped `Surface`) swallows the overhanging
-     *    half, and the gap under it is dead space in a strip where every other pixel is a target.
-     * 2. The tap reaching `onNavigate` instead of `onOpenChat`. That is the wiring a fifth nav item
-     *    would produce — and `onOpenChat` is the ONLY callback that clears `chatSheetContextId`, so
-     *    routing the tap anywhere else leaves a chat opened from the bar still anchored to a
-     *    checklist the user has already left (see V2ChatEntryPointSourceGuardTest for that half).
+     * One tap = one open, and never through `onNavigate`. `ai_chat_opened` / `nav_chat_fab_tapped`
+     * are fired off the host's open callback, so a double-firing hit area would double every chat open;
+     * routing through `onNavigate` would skip the checklist-context reset only `onOpenChat` performs.
      */
     @Test
-    fun compactShell_tapInTheBarGap_opensChat_withoutNavigating() {
-        var inboxLabel = ""
+    fun compactShell_tapOnThePill_opensTheChatExactlyOnce_withoutNavigating() {
+        var pillLabel = ""
+        var openChatCount = 0
+        var voiceCount = 0
+        val navigations = mutableListOf<String>()
+        composeTestRule.setContent {
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            V2ShellUnderTest(
+                onOpenChat = { openChatCount++ },
+                onOpenChatVoice = { voiceCount++ },
+                onNavigate = { navigations += it },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText(pillLabel).performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(1, openChatCount, "One tap on the pill must open the chat exactly once")
+        assertEquals(0, voiceCount, "A tap on the pill body must not start voice")
+        assertTrue(navigations.isEmpty(), "The pill must not route through onNavigate: $navigations")
+    }
+
+    /**
+     * Catches: a dead strip at the pill's leading edge (the sparkle tile). The WHOLE pill except the
+     * mic is one target — a tap on the sparkle is the most natural "Ask Gisti" tap there is.
+     */
+    @Test
+    fun compactShell_tapOnThePillsSparkleEdge_opensTheChat() {
+        var pillLabel = ""
+        var openChatCount = 0
+        composeTestRule.setContent {
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            V2ShellUnderTest(onOpenChat = { openChatCount++ })
+        }
+        composeTestRule.waitForIdle()
+
+        val pill = composeTestRule.onNodeWithText(pillLabel).fetchSemanticsNode().boundsInRoot
+        val sparkleX = pill.left + with(composeTestRule.density) { 24.dp.toPx() }
+        composeTestRule.onRoot().performTouchInput { click(Offset(sparkleX, pill.center.y)) }
+        composeTestRule.waitForIdle()
+
+        assertEquals(1, openChatCount, "A tap on the pill's sparkle must open the chat")
+    }
+
+    /**
+     * The mic is its own target and its own action (owner decision 2026-10-16): it reaches
+     * `onOpenChatVoice`, never `onOpenChat`, and is announced as a button with the chat mic's name.
+     */
+    @Test
+    fun compactShell_tapOnTheMic_startsVoice_notTheTextChat() {
+        var micLabel = ""
+        var openChatCount = 0
+        var voiceCount = 0
+        composeTestRule.setContent {
+            micLabel = stringResource(Res.string.chat_dock_mic_description)
+            V2ShellUnderTest(
+                onOpenChat = { openChatCount++ },
+                onOpenChatVoice = { voiceCount++ },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(micLabel)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(1, voiceCount, "The mic must start the voice entry exactly once")
+        assertEquals(0, openChatCount, "The mic must not ALSO open the text chat")
+    }
+
+    /**
+     * Contract with the host: `onOpenChatVoice == null` draws NO mic. A mic that does nothing is a
+     * dead affordance, and App.kt compiles unchanged against the default.
+     */
+    @Test
+    fun compactShell_withoutAVoiceEntry_drawsNoMic() {
+        var micLabel = ""
+        var pillLabel = ""
+        composeTestRule.setContent {
+            micLabel = stringResource(Res.string.chat_dock_mic_description)
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            V2ShellUnderTest(onOpenChatVoice = null)
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText(pillLabel).assertIsDisplayed()
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithContentDescription(micLabel).fetchSemanticsNodes().size,
+            "No voice entry → no mic",
+        )
+    }
+
+    /**
+     * Catches: the tabs still split around a gap. With the circle gone the four tabs are EQUAL
+     * (spec §2.5 R2), and a tap on Calendar's inner edge — the side the old gap sat on — navigates.
+     */
+    @Test
+    fun compactShell_fourEqualTabs_innerEdgeTapNavigates() {
+        val labels = mutableListOf<String>()
+        var calendarLabel = ""
         var openChatCount = 0
         val navigations = mutableListOf<String>()
         composeTestRule.setContent {
-            inboxLabel = stringResource(Res.string.nav_tab_inbox)
+            calendarLabel = stringResource(Res.string.calendar_nav_label)
+            labels.clear()
+            labels += stringResource(Res.string.nav_tab_inbox)
+            labels += calendarLabel
+            labels += stringResource(Res.string.nav_tab_projects)
+            labels += stringResource(Res.string.nav_tab_overview)
             V2ShellUnderTest(
                 onOpenChat = { openChatCount++ },
                 onNavigate = { navigations += it },
@@ -182,282 +298,123 @@ class V2ShellAiButtonTest {
         }
         composeTestRule.waitForIdle()
 
-        // The bar's vertical middle, read off a real destination rather than a constant: at a large
-        // font scale the bar is taller than AppDimens.BottomBarHeight.
-        val barCentreY = composeTestRule.onNodeWithText(inboxLabel).fetchSemanticsNode()
-            .boundsInRoot.center.y
-        val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width
-
-        composeTestRule.onRoot().performTouchInput {
-            click(Offset(rootWidth / 2f, barCentreY))
+        val centres = labels.map {
+            composeTestRule.onNodeWithText(it).fetchSemanticsNode().boundsInRoot.center.x
         }
-        composeTestRule.waitForIdle()
-
-        assertEquals(
-            1,
-            openChatCount,
-            "A tap in the middle of the bar must open the chat — the AI hit area spans the whole " +
-                "gap between the two pairs of destinations, so a near-miss is never dead space",
-        )
+        val steps = centres.zipWithNext { a, b -> b - a }
+        val tolerancePx = with(composeTestRule.density) { 2.dp.toPx() }
         assertTrue(
-            navigations.isEmpty(),
-            "The AI tap must not be routed through onNavigate (it would skip the checklist-context " +
-                "reset that only onOpenChat performs); navigations seen: $navigations",
+            steps.all { abs(it - steps.first()) <= tolerancePx },
+            "The four tabs must be evenly spaced, no centre gap (label centres=$centres)",
         )
-    }
 
-    /**
-     * One tap = one open. Guards the analytics contract from the other side: `ai_chat_opened` is
-     * fired off the host's open callback, so a hit area that overlaps itself (circle + gap both
-     * clickable) would double every chat open in the arm the experiment is measuring.
-     */
-    @Test
-    fun compactShell_tapOnTheAiButton_opensTheChatExactlyOnce() {
-        var chatLabel = ""
-        var openChatCount = 0
-        composeTestRule.setContent {
-            chatLabel = stringResource(Res.string.nav_chat_fab_content_description)
-            V2ShellUnderTest(onOpenChat = { openChatCount++ })
-        }
+        val calendar = composeTestRule.onNodeWithText(calendarLabel).fetchSemanticsNode().boundsInRoot
+        val step = steps.first()
+        // Halfway between Calendar's label centre and the slot boundary toward Projects.
+        val innerX = calendar.center.x + step / 4f
+        composeTestRule.onRoot().performTouchInput { click(Offset(innerX, calendar.center.y)) }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithContentDescription(chatLabel).performClick()
-        composeTestRule.waitForIdle()
-
-        assertEquals(1, openChatCount, "One tap on the AI button must open the chat exactly once")
+        assertEquals(listOf(V2Destination.Calendar), navigations)
+        assertEquals(0, openChatCount, "A tab tap must never open the chat")
     }
 
+    // ── States that change the plate ─────────────────────────────────────────
+
     /**
-     * The other half of the same hit area: the RAISED part of the circle must stay tappable.
-     *
-     * This is the constraint the whole "sibling of the bar, not a child" layout exists for — Compose
-     * does not deliver touches outside a parent's bounds, so a circle parented to the rectangle-clipped
-     * `NavigationBar` swallows every tap on its overhanging half. It is also the invariant most at risk
-     * from the fix below it: the gap hit area was trimmed to the bar's height so it stops eating the
-     * content's gestures, and trimming the circle's own bounds with it would silently kill the top 22dp
-     * of the primary action.
+     * Catches: any part of the plate surviving under the quick-capture dock (owner, Pixel 9: "при
+     * создании чеклиста в открытом состоянии не должна быть видна нижняя навигация"). Four probes,
+     * because "hidden" can be half-right in four ways: no tab label, no pill, no mic, and a tap where
+     * the plate used to be reaches nothing — while the hosted screen is still there.
      */
     @Test
-    fun compactShell_tapOnTheRaisedHalfOfTheCircle_opensTheChat() {
+    fun compactShell_whileTheCaptureDockIsUp_thePlateIsGone() {
         var inboxLabel = ""
+        var pillLabel = ""
+        var micLabel = ""
         var openChatCount = 0
-        composeTestRule.setContent {
-            inboxLabel = stringResource(Res.string.nav_tab_inbox)
-            V2ShellUnderTest(onOpenChat = { openChatCount++ })
-        }
-        composeTestRule.waitForIdle()
-
-        val barTop = composeTestRule.onNodeWithText(inboxLabel).fetchSemanticsNode().boundsInRoot.top
-        val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width
-        val overhangY = barTop - with(composeTestRule.density) { 10.dp.toPx() }
-
-        composeTestRule.onRoot().performTouchInput {
-            click(Offset(rootWidth / 2f, overhangY))
-        }
-        composeTestRule.waitForIdle()
-
-        assertEquals(
-            1,
-            openChatCount,
-            "The part of the circle that rises above the bar must still open the chat — that is the " +
-                "whole reason it is a sibling of the bar rather than one of its children",
-        )
-    }
-
-    /**
-     * Catches: the AI hit area eating the content's gestures.
-     *
-     * The hit area spans the 76dp gap so a near-miss beside the circle is never dead space. When it
-     * ALSO covered the 22dp of overhang it covered a 76×22dp strip of the SCREEN, at the bottom centre
-     * — where a thumb starts a scroll. `Modifier.clickable` installs a pointer-input node that does not
-     * share events with siblings, so every gesture begun in that strip died there instead of reaching
-     * the list, on every tab, whether or not anything was drawn under it.
-     *
-     * Asserted as "the content gets the tap", not as "the chat does not open", because the second half
-     * alone would also pass if the strip simply swallowed the event.
-     */
-    @Test
-    fun compactShell_tapBesideTheCircleAboveTheBar_reachesTheContent_notTheChat() {
-        var inboxLabel = ""
-        var openChatCount = 0
-        var contentTaps = 0
-        composeTestRule.setContent {
-            inboxLabel = stringResource(Res.string.nav_tab_inbox)
-            V2ShellUnderTest(
-                onOpenChat = { openChatCount++ },
-                content = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable { contentTaps++ }
-                    ) { Text(CONTENT_MARKER) }
-                },
-            )
-        }
-        composeTestRule.waitForIdle()
-
-        val barTop = composeTestRule.onNodeWithText(inboxLabel).fetchSemanticsNode().boundsInRoot.top
-        val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width
-        // 32dp off centre: outside the 56dp circle (28dp half-width), inside the 76dp gap (38dp).
-        // 10dp above the bar: inside the 22dp overhang.
-        val besideCircleX = rootWidth / 2f + with(composeTestRule.density) { 32.dp.toPx() }
-        val overhangY = barTop - with(composeTestRule.density) { 10.dp.toPx() }
-
-        composeTestRule.onRoot().performTouchInput {
-            click(Offset(besideCircleX, overhangY))
-        }
-        composeTestRule.waitForIdle()
-
-        assertEquals(
-            1,
-            contentTaps,
-            "A tap beside the circle but above the bar belongs to the screen — the AI hit area must " +
-                "stop at the bar's top edge, or it takes a 76x22dp bite out of every tab's content",
-        )
-        assertEquals(0, openChatCount, "That tap must not open the chat")
-    }
-
-    /**
-     * Catches: any part of the bottom navigation surviving under the quick-capture dock.
-     *
-     * ## This test used to assert the exact opposite, and that is the point of it
-     * It read `compactShell_whileTheCaptureDockIsUp_theBarCentreStillOpensTheChat` and pinned the bar
-     * — gap, hit area and all — as STAYING lit under the dock, on the reasoning that capture dims
-     * nothing so an empty 76dp notch would be a hole the user is looking at. The owner rejected the
-     * whole arrangement from a Pixel 9: "при создании чеклиста в открытом состоянии не должна быть
-     * видна нижняя навигация". The dock is the bottom chrome now; the notch argument dissolves with
-     * the bar that had the notch in it.
-     *
-     * Four probes, because "the bar is hidden" can be got half-right in four separate ways and three
-     * of them leave something tappable on screen with nothing drawn under it:
-     *  - no destination LABEL (the bar's own content),
-     *  - no AI content description (the raised circle AND its 76dp hit area share it — the hit area
-     *    is the node that carries the description, so its absence is what proves no invisible target
-     *    is left in the middle of the dock),
-     *  - a tap where the bar's centre used to be reaches neither the chat nor a tab,
-     *  - the hosted screen is still there (this must not pass by rendering nothing at all).
-     */
-    @Test
-    fun compactShell_whileTheCaptureDockIsUp_theBottomNavigationIsGone() {
-        var inboxLabel = ""
-        var aiDescription = ""
-        var openChatCount = 0
+        var voiceCount = 0
         val navigations = mutableListOf<String>()
         composeTestRule.setContent {
             inboxLabel = stringResource(Res.string.nav_tab_inbox)
-            aiDescription = stringResource(Res.string.nav_chat_fab_content_description)
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            micLabel = stringResource(Res.string.chat_dock_mic_description)
             V2ShellUnderTest(
                 captureOpen = true,
                 onOpenChat = { openChatCount++ },
+                onOpenChatVoice = { voiceCount++ },
                 onNavigate = { navigations += it },
             )
         }
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText(inboxLabel).assertDoesNotExist()
-        composeTestRule.onNodeWithContentDescription(aiDescription).assertDoesNotExist()
-        // The screen is still hosted — otherwise the two assertions above would pass on an empty tree.
+        composeTestRule.onNodeWithText(pillLabel).assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription(micLabel).assertDoesNotExist()
         composeTestRule.onNodeWithText(CONTENT_MARKER).assertIsDisplayed()
 
-        // Where the bar's centre used to be: the shell's bottom edge, in the middle. Nothing of the
-        // chrome may answer there any more.
         val root = composeTestRule.onRoot().fetchSemanticsNode().size
         composeTestRule.onRoot().performTouchInput {
             click(Offset(root.width / 2f, root.height - 8f))
+            click(Offset(root.width / 2f, root.height - 120f))
         }
         composeTestRule.waitForIdle()
 
         assertEquals(0, openChatCount, "No chat affordance may survive under the capture dock")
-        assertTrue(
-            navigations.isEmpty(),
-            "No destination may survive under the capture dock, visible or not — found $navigations",
-        )
+        assertEquals(0, voiceCount, "No voice affordance may survive under the capture dock")
+        assertTrue(navigations.isEmpty(), "No destination may survive under the dock: $navigations")
     }
 
     /**
-     * Catches: the hit area overlapping the destinations beside it.
-     *
-     * Its width is [V2ShellMetrics.AiButtonGapWidth] (76dp) while the spacer that opens the gap is
-     * 60dp — the difference is the 8dp-per-side `Arrangement.spacedBy` that M3's `NavigationBar`
-     * applies INTERNALLY. That is a private constant of a library this project pins to an alpha, so the
-     * arithmetic is verified against the artifact in [V2ShellMetrics.AiButtonBarSpacer]'s KDoc AND
-     * pinned here: if a material3 bump changes the spacing, the 76dp area starts overhanging Calendar
-     * and Projects and a tap on their inner edge opens the chat instead of switching tabs — a failure
-     * with no visual symptom whatsoever.
+     * While the chat dock owns the screen the pill hands off (fades) but stays composed; it must be
+     * OUT of the a11y tree meanwhile, or TalkBack reads an "Ask Gisti" button under the open chat.
      */
     @Test
-    fun compactShell_tapOnTheInnerEdgeOfANeighbourTab_navigates_insteadOfOpeningChat() {
-        var calendarLabel = ""
-        var openChatCount = 0
-        val navigations = mutableListOf<String>()
+    fun compactShell_whileTheChatIsOpen_thePillLeavesTheA11yTree() {
+        var pillLabel = ""
+        var micLabel = ""
         composeTestRule.setContent {
-            calendarLabel = stringResource(Res.string.calendar_nav_label)
-            V2ShellUnderTest(
-                onOpenChat = { openChatCount++ },
-                onNavigate = { navigations += it },
-            )
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            micLabel = stringResource(Res.string.chat_dock_mic_description)
+            V2ShellUnderTest(chatOpen = true)
         }
         composeTestRule.waitForIdle()
 
-        // Calendar is the last destination BEFORE the gap, so its trailing edge is the one the AI hit
-        // area would encroach on first.
-        val calendarBounds = composeTestRule.onNodeWithText(calendarLabel)
-            .fetchSemanticsNode().boundsInRoot
-        val insideEdgeX = calendarBounds.right - with(composeTestRule.density) { 2.dp.toPx() }
-
-        composeTestRule.onRoot().performTouchInput {
-            click(Offset(insideEdgeX, calendarBounds.center.y))
-        }
-        composeTestRule.waitForIdle()
-
-        assertEquals(
-            listOf(V2Destination.Calendar),
-            navigations,
-            "A tap on the inner edge of the destination next to the gap must switch tabs",
-        )
-        assertEquals(
-            0,
-            openChatCount,
-            "The AI hit area must stay inside the gap — 76dp against a 60dp spacer only works while " +
-                "M3 keeps its 8dp-per-side item spacing",
-        )
+        composeTestRule.onNodeWithText(pillLabel).assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription(micLabel).assertDoesNotExist()
+        composeTestRule.onNodeWithText(CONTENT_MARKER).assertIsDisplayed()
     }
 
-    // ── B9. Medium and Expanded are untouched ────────────────────────────────
+    // ── Medium and Expanded are untouched ────────────────────────────────────
 
     /**
-     * The redesign is Compact-only. At rail width the AI button stays in the rail HEADER (left edge)
-     * and the create FAB stays with it — there is no bottom bar to move into, and the inline
-     * add-task row does not replace a rail button.
-     *
-     * The x-position assertion is what makes this more than a presence check: it fails if the AI
-     * button migrates to a centred bottom affordance at every size.
+     * The plate is Compact-only. At rail width the AI button stays in the rail HEADER (left edge)
+     * with the create FAB, keeps its "Ask Gisti" name, and there is no pill.
      */
     @Test
     @Config(sdk = [34], qualifiers = "w800dp-h1280dp-normal-long-notround-any-320dpi-keyshidden-nonav")
     fun mediumShell_keepsTheRailWithBothButtons() {
         var chatLabel = ""
         var createLabel = ""
-        var inboxLabel = ""
-        var calendarLabel = ""
-        var projectsLabel = ""
-        var overviewLabel = ""
+        var pillLabel = ""
+        val tabs = mutableListOf<String>()
         composeTestRule.setContent {
             chatLabel = stringResource(Res.string.nav_chat_fab_content_description)
             createLabel = stringResource(Res.string.nav_add_task_fab_content_description)
-            inboxLabel = stringResource(Res.string.nav_tab_inbox)
-            calendarLabel = stringResource(Res.string.calendar_nav_label)
-            projectsLabel = stringResource(Res.string.nav_tab_projects)
-            overviewLabel = stringResource(Res.string.nav_tab_overview)
+            pillLabel = stringResource(Res.string.nav_ask_pill_label)
+            tabs.clear()
+            tabs += stringResource(Res.string.nav_tab_inbox)
+            tabs += stringResource(Res.string.calendar_nav_label)
+            tabs += stringResource(Res.string.nav_tab_projects)
+            tabs += stringResource(Res.string.nav_tab_overview)
             V2ShellUnderTest(showCreateFab = true)
         }
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithContentDescription(chatLabel).assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription(createLabel).assertIsDisplayed()
-        listOf(inboxLabel, calendarLabel, projectsLabel, overviewLabel).forEach { label ->
-            composeTestRule.onNodeWithText(label).assertIsDisplayed()
-        }
+        tabs.forEach { composeTestRule.onNodeWithText(it).assertIsDisplayed() }
+        composeTestRule.onNodeWithText(pillLabel).assertDoesNotExist()
 
         val rootWidth = composeTestRule.onRoot().fetchSemanticsNode().size.width
         val chatCentreX = composeTestRule.onNodeWithContentDescription(chatLabel)
@@ -486,11 +443,8 @@ class V2ShellAiButtonTest {
         }
         composeTestRule.waitForIdle()
 
-        // The two extended FABs are matched on the UNMERGED tree: M3's
-        // ExtendedFloatingActionButton wraps its text slot in `clearAndSetSemantics`, so the label
-        // never reaches the button's merged node (their icons pass contentDescription = null, which
-        // is why the merged nodes carry no label at all — a pre-existing a11y gap in this drawer,
-        // out of scope here but worth knowing before touching it).
+        // Matched on the UNMERGED tree: M3's ExtendedFloatingActionButton wraps its text slot in
+        // `clearAndSetSemantics`, so the label never reaches the button's merged node.
         composeTestRule.onNodeWithText(chatLabel, useUnmergedTree = true).assertIsDisplayed()
         composeTestRule.onNodeWithText(createLabel, useUnmergedTree = true).assertIsDisplayed()
         composeTestRule.onNodeWithText(inboxLabel).assertIsDisplayed()
@@ -505,11 +459,10 @@ class V2ShellAiButtonTest {
         selectedTab: String = V2Destination.Inbox,
         showCreateFab: Boolean = false,
         captureOpen: Boolean = false,
+        chatOpen: Boolean = false,
         onOpenChat: () -> Unit = {},
+        onOpenChatVoice: (() -> Unit)? = {},
         onNavigate: (String) -> Unit = {},
-        content: @Composable () -> Unit = {
-            Box(modifier = Modifier.fillMaxSize()) { Text(CONTENT_MARKER) }
-        },
     ) {
         AppTheme(darkTheme = false) {
             V2NavigationShell(
@@ -521,9 +474,15 @@ class V2ShellAiButtonTest {
                 showCreateFab = showCreateFab,
                 onOpenCreate = {},
                 barVisible = true,
+                chatOpen = chatOpen,
                 captureOpen = captureOpen,
                 overlayContent = null,
-                content = { content() },
+                onOpenChatVoice = onOpenChatVoice,
+                content = {
+                    Box(modifier = Modifier.fillMaxSize().testTag(CONTENT_TAG)) {
+                        Text(CONTENT_MARKER)
+                    }
+                },
             )
         }
     }

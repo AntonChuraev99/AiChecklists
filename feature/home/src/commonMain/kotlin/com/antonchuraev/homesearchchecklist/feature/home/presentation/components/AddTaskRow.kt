@@ -3,13 +3,16 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.component
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
@@ -20,7 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -77,6 +83,13 @@ import org.jetbrains.compose.resources.stringResource
  * reader believes an empty page still shows a taller row. Restore it from git, don't re-invent it, if
  * the empty-state decision is ever reverted.
  *
+ * ## Redesign B (2026-10-16): a soft pill
+ * Pill shape ([AppShapeTokens.Pill]), the cream card fill + 1dp `outlineVariant` hairline the task
+ * groups use, and the plus inside a 28dp RECESSED circle. On the sand page the old
+ * `surfaceContainerHigh` slab measured almost no step, so the row leans on the same card/hairline
+ * pair as the groups above it; the recessed disc is what keeps it reading as an action, not a task
+ * (no checkbox, no ink). Shared with the Calendar tab, which inherits the same look.
+ *
  * @param onClick report the tap to the host — this composable never opens the dock itself. The dock's
  *   open flag is shell state (the shell hides its own chrome while the dock is up), so a screen-local
  *   flag would leave chrome floating over the dock it raised.
@@ -91,29 +104,39 @@ internal fun AddTaskRow(
             .fillMaxWidth()
             // clip BEFORE the fill: background() paints the node's whole rect, so an unclipped fill
             // draws a square behind the rounded ripple.
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clip(AppShapeTokens.Pill)
+            .background(AppSurface.card())
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, AppShapeTokens.Pill)
             .clickable(role = Role.Button, onClick = onClick)
             // A tap target, not a text line: the label alone is ~24dp tall, which is half the
             // project's MinTouchTarget.
             .heightIn(min = AppDimens.MinTouchTarget)
             .padding(
-                // Wider than the old containerless row: with a fill, the glyph sitting 8dp from the
-                // pill's edge reads as cramped against the same 16dp the cards inset their text by.
-                horizontal = AppDimens.SpacingLg,
-                vertical = AppDimens.SpacingSm,
+                // 12dp to the disc: the 28dp circle sits where a group row's 24dp checkbox box sits
+                // (16dp inset), so the plus lines up with the checkboxes above it.
+                start = AppDimens.SpacingMd,
+                end = AppDimens.SpacingLg,
+                top = AppDimens.SpacingSm,
+                bottom = AppDimens.SpacingSm,
             ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Add,
-            // The label below is the accessible name; a description here would make a screen reader
-            // announce "Add task, Add task".
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(AppDimens.IconSizeMd),
-        )
+        Box(
+            modifier = Modifier
+                .size(AddDiscSize)
+                .background(AppSurface.recessed(), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                // The label below is the accessible name; a description here would make a screen
+                // reader announce "Add task, Add task".
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(AddGlyphSize),
+            )
+        }
         Text(
             text = stringResource(Res.string.inbox_add_task_row),
             style = MaterialTheme.typography.bodyLarge,
@@ -127,3 +150,9 @@ internal fun AddTaskRow(
         )
     }
 }
+
+/** The recessed disc behind the plus (spec 3.1). */
+private val AddDiscSize = 28.dp
+
+/** The plus inside it. */
+private val AddGlyphSize = 20.dp

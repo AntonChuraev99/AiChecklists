@@ -115,8 +115,10 @@ fun AddItemInputField(
     highlightRange: IntRange? = null,
     focusRequester: FocusRequester? = null,
     trailingToggle: (@Composable () -> Unit)? = null,
+    style: AddItemFieldStyle = AddItemFieldStyle.Outlined,
 ) {
     val isTextNotBlank = text.isNotBlank()
+    val embedded = style == AddItemFieldStyle.Embedded
 
     Column(modifier = modifier.fillMaxWidth()) {
         // Chip preview slot — animated so appear/disappear is smooth.
@@ -139,11 +141,23 @@ fun AddItemInputField(
             onValueChange = onTextChange,
             placeholder = placeholder,
             singleLine = false,
+            // Embedded: four lines, then the field scrolls inside itself — the composer card around
+            // it must not push the rail and the source row off a short window while a long task is
+            // typed (spec B pass 2, §1.1). Outlined keeps its unbounded growth.
+            maxLines = if (embedded) EmbeddedMaxLines else Int.MAX_VALUE,
+            borderless = embedded,
             modifier = Modifier
                 .fillMaxWidth()
                 // Drawn BEHIND the OutlinedTextField, whose own container is transparent — this is
                 // the fill the field never had. Same shape as the ring it sits under (see the KDoc).
-                .background(AppChatColors.raised(), MaterialTheme.shapes.small)
+                // Embedded draws none: the composer card IS the field's body there.
+                .then(
+                    if (embedded) {
+                        Modifier
+                    } else {
+                        Modifier.background(AppChatColors.raised(), MaterialTheme.shapes.small)
+                    }
+                )
                 .then(
                     if (focusRequester != null) {
                         Modifier.focusRequester(focusRequester)
@@ -308,6 +322,20 @@ fun ImportantStarToggle(
         }
     }
 }
+
+/**
+ * How [AddItemInputField] draws its own body.
+ *
+ * - [Outlined] — the field is a filled, ringed box of its own. The four page-plane call sites
+ *   (analyze preview, template preview, create checklist, weekly detail) and nothing else.
+ * - [Embedded] — no ring, no fill: the field sits inside a container that owns the boundary and the
+ *   focus ring — the capture dock's composer card (redesign B pass 2). Also caps the field at
+ *   [EmbeddedMaxLines] lines, after which it scrolls.
+ */
+enum class AddItemFieldStyle { Outlined, Embedded }
+
+/** Lines an [AddItemFieldStyle.Embedded] field grows to before it scrolls inside itself. */
+private const val EmbeddedMaxLines = 4
 
 /** Touch target of a control in the input field's trailing slot — the 48dp floor, never less. */
 private val TrailingActionTarget = 48.dp

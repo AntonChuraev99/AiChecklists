@@ -109,7 +109,47 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.zIndex
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AiInviteStyle
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppAiInviteRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppRoundCheckbox
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSectionHeader
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSoftIconButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureChromeScrim
+import com.antonchuraev.homesearchchecklist.desingsystem.components.CaptureDockTopUnmeasured
+import com.antonchuraev.homesearchchecklist.desingsystem.components.GroupPosition
+import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.groupPositionOf
+import com.antonchuraev.homesearchchecklist.desingsystem.components.groupSegment
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.AppChecklistHeaderCard
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTextStyles
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.RowContainer
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.smartAddHighlightRange
+import kotlin.math.roundToInt
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.TopAppBarDefaults
@@ -199,6 +239,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiC
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiItemCreatePromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
@@ -261,18 +302,8 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
-/**
- * Material 3 `FabPrimaryContainerHeight`. Not a design token in [AppDimens] because it is the
- * component's own size, not spacing — but it has to be named here because the list's bottom padding
- * and the snackbar host both have to reserve exactly the band the FAB floats in.
- */
-private val DetailFabSize = 56.dp
-
-/**
- * Vertical space the FAB occupies over the list: its own height plus the gap it keeps from the
- * bottom edge. Anything that must not end up underneath the FAB reserves this.
- */
-private val DetailFabBand = DetailFabSize + AppDimens.SpacingLg
+/** Gap between the blocks of the v2 (redesign B) Standard list: header card → groups → Ask row. */
+private val DetailGroupGap = 12.dp
 
 @Composable
 fun ChecklistDetailScreen(
@@ -556,16 +587,9 @@ private fun ChecklistDetailContent(
     weeklyTodayWeekday: Int? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    // Focus plumbing for the v2 inline add row, so the toolbar "+" still has somewhere to send the
-    // caret now that there is no dock to expand. A signal counter rather than a direct
-    // requestFocus() call: the row lives INSIDE the LazyColumn, so its FocusRequester is only
-    // attached while the row is composed — calling requestFocus from the toolbar would throw
-    // whenever the row is scrolled off screen. The toolbar bumps the signal and scrolls; the row
-    // focuses itself when it composes. `handled` stops a later re-composition (scrolling the row
-    // back into view) from popping the keyboard again on a stale signal.
-    val inlineAddFocusRequester = remember { FocusRequester() }
-    var inlineAddFocusSignal by remember { mutableStateOf(0) }
-    var inlineAddFocusHandled by remember { mutableStateOf(0) }
+    // v2 (redesign B) Standard view: the list is grouped, the add-task input is the bottom capture
+    // plate and the chat entry is the "Ask Gisti about this list" row. Weekly keeps today's v2 layout.
+    val v2Standard = useInlineAddRow && state.checklist.viewMode == ChecklistViewMode.Standard
 
     // Measured chat-dock height (already includes the dock's own ime + navbar insets). Hoisted ABOVE
     // AppScaffold so the snackbarHost slot can lift snackbars/toasts to sit just above the dock
@@ -618,9 +642,10 @@ private fun ChecklistDetailContent(
             // v2 (inline add row): there is NO dock, so dockState.offset is permanently NaN and the
             // branch below would do nothing at all — BACK swallowed with no visible effect, which is
             // a bug, not a no-op. Exit item-create directly instead; once it is off this handler
-            // disables and the next BACK reaches NavDisplay.
+            // disables and the next BACK reaches NavDisplay. Dismiss, not close: the draft is kept and
+            // comes back on the next open (DESIGN_SPEC_B §4, same as the Inbox capture dock).
             useInlineAddRow && state.itemCreateMode ->
-                onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
+                onIntent(ChecklistDetailIntent.OnItemCreateDismissed)
             // Item-create: Back closes the create dock and returns the screen to its OPENED (peek)
             // state. ALWAYS collapse to Peek (regardless of the unrelated chat-input draft) — settling
             // to Peek flips dockExpanded→false, which fires OnDockItemCreateClosed and exits the mode.
@@ -826,62 +851,24 @@ private fun ChecklistDetailContent(
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    /**
-     * LazyColumn index of the v2 inline add row, which sits directly AFTER the active rows:
-     * `[header(s)][active rows][inline_add_item][completed_header][completed rows]`.
-     *
-     * Exists because the row must be scrolled into view before it can take focus — it lives inside the
-     * LazyColumn, so its FocusRequester only attaches while it is composed. Same arithmetic the
-     * added-item scroll below uses; kept as one lambda so the two cannot drift apart.
-     */
-    val inlineAddRowIndex: () -> Int = {
-        val checkedIds = if (state.separateCompleted) {
-            state.defaultFill?.items?.filter { it.checked }?.map { it.id }?.toSet().orEmpty()
-        } else {
-            emptySet()
-        }
-        val activeNodeCount = if (state.foldersEnabled) {
-            state.levelNodes.count { node ->
-                node !is LevelNode.Leaf || node.fillItemId !in checkedIds
-            }
-        } else {
-            val visibleIds = state.visibleFillItemIds
-            val visible = state.defaultFill?.items?.let { items ->
-                if (visibleIds == null) items else items.filter { it.id in visibleIds }
-            }.orEmpty()
-            visible.count { it.id !in checkedIds }
-        }
-        val headerCount = 1 + (if (state.additionalFillsCount > 0) 1 else 0)
-        headerCount + activeNodeCount
-    }
-
-    // ── "Open the inline add row" — ONE implementation, two carriers ──────────────────────────────
-    // The v2 FAB and the empty state's add-task button are the same action in two places (they are
-    // never on screen together — see `fabShown`). This used to live inline in the FAB's onClick, and
-    // copying those four steps into the empty state would have been the drift the repo's own
-    // "collapse it into one helper" rule is about: the re-tap guard, the bump-BEFORE-scroll ordering
-    // and the index arithmetic are each a fixed defect, and a second copy inherits none of them.
-    val openInlineAdd: () -> Unit = {
-        // Re-tap guard: if item-create is already open, do NOT re-open it (that would wipe
-        // in-progress text) — just re-focus and scroll.
+    // ── "Open the capture plate" — ONE implementation, two carriers ───────────────────────────────
+    // The resting plate at the bottom and the empty state's add-task button are the same action. The
+    // plate is a scaffold slot (always on screen), so there is no scroll or focus plumbing left: the
+    // active plate is a [QuickCaptureDock], which focuses its own field when it mounts.
+    // Re-tap guard: re-opening while open would wipe the in-progress draft.
+    val openPlate: () -> Unit = {
         if (!state.itemCreateMode) {
             onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
         }
-        // Bump BEFORE the scroll: the row focuses itself when it composes, and the scroll is what
-        // composes it.
-        //
-        // Targets the inline row's OWN index, not totalItemsCount - 1. The list is
-        // [header(s)][active rows][inline_add_item][completed_header][completed rows], so with
-        // separateCompleted on and a screenful of completed items the last index scrolls PAST the
-        // inline row — it leaves the composition, its LaunchedEffect never runs, and the tap becomes
-        // a silent no-op.
-        inlineAddFocusSignal++
-        dockScope.launch {
-            val total = listState.layoutInfo.totalItemsCount
-            if (total > 0) {
-                val target = inlineAddRowIndex().coerceIn(0, total - 1)
-                listState.animateScrollToItem(target)
-            }
+    }
+
+    // Bar title appears only once the header card has scrolled away (v2 Standard). Index alone never
+    // trips on a short list (LazyColumn clamps), so the card's own measured height is the threshold.
+    var headerCardHeightPx by remember { mutableIntStateOf(0) }
+    val headerScrolledOff by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                (headerCardHeightPx > 0 && listState.firstVisibleItemScrollOffset > headerCardHeightPx * 3 / 4)
         }
     }
 
@@ -954,6 +941,9 @@ private fun ChecklistDetailContent(
             if (state.separateCompleted && completedInState.isNotEmpty()) {
                 val completedIdx = completedInState.indexOfFirst { it.id == focusItemId }
                 if (completedIdx < 0) return@LaunchedEffect // item not found at all
+                // v2 Standard: the "Ask Gisti about this list" row sits between the active rows and
+                // the completed header.
+                if (v2Standard && onOpenChat != null && !isEditMode) index += 1
                 index += 1 // completed_header
                 index += completedIdx
             } else {
@@ -1078,55 +1068,34 @@ private fun ChecklistDetailContent(
         totalCount - checkedCount
     }
 
-    // ── v2 FAB visibility — a LAMBDA, not a value ─────────────────────────────────────────────────
-    // THREE consumers need the same answer: the FAB itself, the list's bottom contentPadding (so the
-    // last card — and its right-70% "open details" zone — is not trapped under the FAB) and the
-    // snackbar host, which is a scaffold slot and cannot see the content scope at all.
-    //
-    // Hoisting the ANSWER would have meant reading WindowInsets.ime in this function's body, and the
-    // IME inset animates frame by frame: the whole screen — top bar, actions, snackbar host and
-    // content — would become one recomposition scope invalidated on every frame the keyboard moves.
-    // Worse, it would do so in BOTH arms, and this change must leave the classic view untouched.
-    // A lambda moves each read into its CALLER's scope, so only that slot re-runs.
-    //
-    // The arm/mode/edit tests come FIRST so v1 short-circuits and never reads an inset at all.
-    //
-    // The IME check is a plain comparison rather than the derivedStateOf used further down for the
-    // dock: derivedStateOf over two already-read Dp values never invalidates (it reads no state
-    // inside), which would freeze the FAB visible over the keyboard.
-    // An EMPTY level is the fourth reason, added 2026-08-17: there the add-task action moves INTO the
-    // empty state (see [ChecklistDetailEmptyState]) and the FAB would be a second control carrying the
-    // same `detail_add_task_fab` name — indistinguishable to a screen reader, ambiguous to any UI test
-    // matching on it. It is a gate on the same `isLevelEmpty` the empty state is mounted under, so
-    // "exactly one of the two" holds by construction rather than by two agreeing conditions.
-    // Placed with the arm/mode/edit tests, before any inset is read, for the same reason they are.
-    val fabShown: @Composable () -> Boolean = {
-        if (!useInlineAddRow ||
-            state.checklist.viewMode != ChecklistViewMode.Standard ||
-            isEditMode ||
-            isLevelEmpty
-        ) {
-            false
-        } else {
-            val fabImeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-            val fabNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            fabImeBottom <= fabNavBottom + AppDimens.SpacingSm
-        }
+    // ── v2 capture plate scrim tiles (same three-tile scheme as the Inbox's capture dock) ──────────
+    // Held as UNDELEGATED state and read only inside [CaptureChromeScrim]'s layout lambda: the dock
+    // rides the ime inset, so reading them here would recompose the whole screen once per keyboard
+    // frame (`windowinsets-hoist-widens-recomposition-scope`).
+    val plateOpen = v2Standard && !isEditMode && state.itemCreateMode
+    val plateContentTopPx = remember { mutableFloatStateOf(0f) }
+    val plateDockTopPx = remember(plateOpen) { mutableFloatStateOf(CaptureDockTopUnmeasured) }
+    val plateScrimColor = captureDockScrimColor()
+    // Tap outside the active plate closes it, like the Inbox dock's scrim. The VM keeps the draft on
+    // dismiss and restores it on the next open, so a typed task is never lost here.
+    val dismissPlate: () -> Unit = {
+        chatFocusManager.clearFocus()
+        onIntent(ChecklistDetailIntent.OnItemCreateDismissed)
     }
 
     // Root Box wraps the AppScaffold so the top-bar scrim can be a sibling ABOVE the scaffold chrome.
     // Bottom sheets / dialogs stay OUTSIDE this Box (below) so they are never dimmed and float on top.
     Box(modifier = Modifier.fillMaxSize()) {
     AppScaffold(
-        // v2: the name (of the checklist, or of the FOLDER while drilled in) moves out of the in-list
-        // ProgressHeader and into the bar, with the open-task count as its subtitle — the same
-        // anatomy the other v2 screens use. v1 keeps title = null, so its bar is untouched.
-        title = if (useInlineAddRow) {
-            state.currentFolderTitle ?: state.checklist.name
-        } else {
-            null
+        // v2 Standard (redesign B): the name lives in the header card at the top of the list; the bar
+        // shows it only once that card has scrolled away. v2 Weekly keeps the name + open-task count
+        // in the bar (it has no header card). v1 keeps title = null, so its bar is untouched.
+        title = when {
+            v2Standard -> if (headerScrolledOff) state.currentFolderTitle ?: state.checklist.name else null
+            useInlineAddRow -> state.currentFolderTitle ?: state.checklist.name
+            else -> null
         },
-        subtitle = if (useInlineAddRow) {
+        subtitle = if (useInlineAddRow && !v2Standard) {
             pluralStringResource(Res.plurals.inbox_task_count, openTaskCount, openTaskCount)
         } else {
             null
@@ -1139,10 +1108,37 @@ private fun ChecklistDetailContent(
                 onIntent(ChecklistDetailIntent.OnBackClick)
             }
         },
+        navigationIcon = if (v2Standard) {
+            {
+                AppSoftIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(Res.string.back),
+                    onClick = {
+                        if (isEditMode) isEditMode = false else onIntent(ChecklistDetailIntent.OnBackClick)
+                    },
+                )
+            }
+        } else {
+            null
+        },
         scrollBehavior = scrollBehavior,
         // Content extends behind the navbar so the glass dock's blurred backdrop covers the navbar
         // zone (matches MainScreen); the dock carries its own navigationBarsPadding.
-        contentExtendsBehindNavBar = true,
+        // v2 Standard: no dock — the capture plate is the bottomBar slot, which then owns
+        // ime ∪ navigationBars (as on the Inbox), so the content must stop above it.
+        contentExtendsBehindNavBar = !v2Standard,
+        bottomBar = {
+            if (v2Standard && !isEditMode) {
+                DetailCapturePlate(
+                    state = state,
+                    onIntent = onIntent,
+                    onOpen = openPlate,
+                    dockModifier = Modifier
+                        .onGloballyPositioned { plateDockTopPx.floatValue = it.positionInRoot().y }
+                        .background(plateScrimColor),
+                )
+            }
+        },
         snackbarHost = {
             // Lift the snackbar to sit ABOVE the floating chat dock (the measured dockHeightPx already
             // includes the dock's ime + navbar insets). When the dock is hidden (edit mode / no chat
@@ -1154,13 +1150,11 @@ private fun ChecklistDetailContent(
                     dockShown -> Modifier.padding(
                         bottom = with(LocalDensity.current) { dockHeightPx.toDp() } + AppDimens.SpacingSm
                     )
-                    // v2 has no dock, so it would fall into the plain-imePadding branch below — but
-                    // contentExtendsBehindNavBar means nothing insets this host from the navigation
-                    // bar, and the FAB now occupies the bottom-end corner. The undo-delete snackbar
-                    // is this screen's most frequent message; it has to clear both.
+                    // v2 Standard: the scaffold already lifts the host above the bottomBar plate.
+                    v2Standard -> Modifier
+                    // v2 Weekly: content extends behind the navbar, so clear it (and the keyboard).
                     useInlineAddRow -> Modifier
                         .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                        .padding(bottom = if (fabShown()) DetailFabBand else 0.dp)
                     else -> Modifier.imePadding()
                 },
             )
@@ -1175,6 +1169,27 @@ private fun ChecklistDetailContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+            } else if (v2Standard) {
+                // v2 Standard (redesign B): bell · overflow as soft discs. The sparkle moved INTO the
+                // list as the "Ask Gisti about this list" row (same lambda); "+" is the capture plate;
+                // share lives in the overflow sheet.
+                val hasActiveSchedule = state.checklist.reminderAt != null ||
+                    state.checklist.repeatRule != null
+                AppSoftIconButton(
+                    icon = if (hasActiveSchedule) Icons.Filled.Notifications else Icons.Outlined.Notifications,
+                    contentDescription = stringResource(Res.string.reminder_set_reminder),
+                    onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) },
+                    tint = if (hasActiveSchedule) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+                AppSoftIconButton(
+                    icon = Icons.Filled.MoreHoriz,
+                    contentDescription = stringResource(Res.string.more_options),
+                    onClick = { onIntent(ChecklistDetailIntent.OnOverflowMenuClick) },
+                )
             } else {
                 // Normal mode: regular toolbar actions.
                 // Visual order right→left (as the user reads the bar): settings · notifications ·
@@ -1311,12 +1326,13 @@ private fun ChecklistDetailContent(
                 // the viewport above the keyboard (restoring the pre-dock adjustResize "content lifts"
                 // behaviour), so the contentPadding only needs breathing room here — adding imeBottom
                 // too would double-count and push the last item too far up.
+                // v2 Standard: the plate is a scaffold slot, the content already ends above it (and
+                // above the keyboard) — just breathing room under the last block.
+                v2Standard -> AppDimens.SpacingLg
                 imeVisible -> AppDimens.SpacingSm
                 showDock -> dockHeight + AppDimens.SpacingXxl
-                // v2 always lands here (no dock). The FAB floats OVER the list, so without its band
-                // the last card sits under it — and with it the right-70% zone that opens the item
-                // details sheet, which would read as a dead card rather than a covered one.
-                else -> navBottom + AppDimens.SpacingLg + (if (fabShown()) DetailFabBand else 0.dp)
+                // v2 Weekly and edit mode land here (no dock; content runs behind the navbar).
+                else -> navBottom + AppDimens.SpacingLg
             }
             // FIX B: answer cap (status bar → keyboard top), computed HERE at the host where the ime
             // inset is reliable. Unspecified when the keyboard is down (use the design cap).
@@ -1334,7 +1350,11 @@ private fun ChecklistDetailContent(
                     // Report where the scaffold content starts in the root (= status bar + top app bar
                     // height). The top-bar scrim in the root Box uses this as its exact height so the two
                     // scrims tile without a seam. Recomputes on any layout change (size-class flip etc.).
-                    .onGloballyPositioned { contentTopPx = it.positionInRoot().y },
+                    .onGloballyPositioned {
+                        val top = it.positionInRoot().y
+                        contentTopPx = top
+                        plateContentTopPx.floatValue = top
+                    },
             ) {
               Box(
                   modifier = Modifier
@@ -1386,7 +1406,7 @@ private fun ChecklistDetailContent(
                     else emptyList()
                 }
             }
-            var completedExpanded by remember { mutableStateOf(true) }
+            var completedExpanded by rememberSaveable { mutableStateOf(true) }
 
             // SINGLE mixed reorderable list of nodes at this level (folders + leaves intermixed in
             // template order), so a folder can be dragged to any slot between items. In folder mode
@@ -1438,40 +1458,8 @@ private fun ChecklistDetailContent(
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
-            // v2 progress line — chrome, not a card: full-bleed under the app bar, Material's own
-            // 4dp height, no clip. The name and the "3 / 7" counter it used to sit under now live in
-            // the bar, so the bare line is all that is left of ProgressHeader here.
-            //
-            // Hidden on an empty level (a 0% line under an empty screen is noise) and, by living in
-            // the Standard branch, never rendered in Weekly at all.
-            if (useInlineAddRow) {
-                val progressDescription = stringResource(
-                    Res.string.detail_progress_content_description,
-                    checkedCount,
-                    totalCount,
-                )
-                AnimatedVisibility(
-                    visible = !isLevelEmpty,
-                    enter = expandVertically(animationSpec = tween(durationMillis = 200)) +
-                        fadeIn(animationSpec = tween(durationMillis = 200)),
-                    exit = shrinkVertically(animationSpec = tween(durationMillis = 200)) +
-                        fadeOut(animationSpec = tween(durationMillis = 200)),
-                ) {
-                    AppLinearProgressIndicator(
-                        progress = { progressFraction },
-                        // The visible ratio is gone from the screen, so without this a screen reader
-                        // would announce a bare percentage with nothing to anchor it.
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics { contentDescription = progressDescription },
-                        color = if (isComplete) {
-                            MaterialTheme.colorScheme.tertiary
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                    )
-                }
-            }
+            // (v2's full-bleed progress line is gone: redesign B puts the progress ring in the header
+            // card, slot 0 of the list.)
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -1480,10 +1468,15 @@ private fun ChecklistDetailContent(
                     // Shrink the list above the keyboard. Under enableEdgeToEdge the window no longer
                     // resizes on IME, so without this the keyboard overlaps the last item and the
                     // inline add-input (the regression after the chat-dock floating-overlay rework).
-                    .imePadding()
+                    // v2 Standard: the capture plate in the bottomBar slot already carries the ime
+                    // inset and the scaffold shortens the content by it — a second imePadding here
+                    // would reserve the keyboard twice.
+                    .then(if (v2Standard) Modifier else Modifier.imePadding())
                     .adaptiveContentWidth()
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                // v2 Standard: rows of one group touch (the group draws its own dividers); the gaps
+                // between blocks are explicit paddings.
+                verticalArrangement = Arrangement.spacedBy(if (v2Standard) 0.dp else AppDimens.SpacingSm),
                 // Bottom contentPadding clears the floating dock (IME lift is handled by imePadding
                 // above) — this is the "empty space" between the last item and the floating dock.
                 contentPadding = PaddingValues(bottom = listBottomPadding),
@@ -1500,7 +1493,32 @@ private fun ChecklistDetailContent(
                     // inlineAddRowIndex(), the focus-item auto-scroll and the reorder offset all
                     // count it as header slot 0. Dropping it would send the FAB scroll and every
                     // drag-and-drop write one row off.
-                    Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                        modifier = if (v2Standard) {
+                            Modifier.padding(top = AppDimens.SpacingSm, bottom = DetailGroupGap)
+                        } else {
+                            Modifier
+                        },
+                    ) {
+                        if (v2Standard) {
+                            // Redesign B header card: avatar tile · name · "2 left · 4 of 6 done" ·
+                            // progress ring. Replaces the bar title/subtitle and the progress line.
+                            AppChecklistHeaderCard(
+                                seed = state.checklist.id,
+                                title = state.currentFolderTitle ?: state.checklist.name,
+                                subtitle = stringResource(
+                                    Res.string.detail_header_progress,
+                                    openTaskCount,
+                                    checkedCount,
+                                    totalCount,
+                                ),
+                                checked = checkedCount,
+                                total = totalCount,
+                                isFolder = state.currentFolderTitle != null,
+                                modifier = Modifier.onSizeChanged { headerCardHeightPx = it.height },
+                            )
+                        }
                         // Notifications-off banner: one controller for the CTA; its dialog answer goes
                         // back to the VM. v2 → first in the slot; v1 → after ProgressHeader (below).
                         val bannerPermission = rememberNotificationPermissionController { result ->
@@ -1531,11 +1549,13 @@ private fun ChecklistDetailContent(
                             }
                             if (isLevelEmpty) {
                                 ChecklistDetailEmptyState(
-                                    // The SAME lambda the FAB runs — see [openInlineAdd]. The FAB is
-                                    // withheld on an empty level (`fabShown`), so this is the one
-                                    // copy of that action on screen, not a second door to it.
-                                    onAddTaskClick = openInlineAdd,
-                                    modifier = Modifier.padding(top = AppDimens.SpacingXxl),
+                                    // The SAME lambda the resting capture plate runs — see
+                                    // [openPlate]. The plate is labelled "Add a task", this button
+                                    // keeps "Add task", so the two never share an accessible name.
+                                    onAddTaskClick = openPlate,
+                                    modifier = Modifier.padding(
+                                        top = if (v2Standard) AppDimens.SpacingLg else AppDimens.SpacingXxl,
+                                    ),
                                 )
                             }
                         } else {
@@ -1560,9 +1580,10 @@ private fun ChecklistDetailContent(
                     item {
                         ViewAllFillsCard(
                             fillsCount = state.additionalFillsCount,
-                            onClick = { onIntent(ChecklistDetailIntent.OnViewAllFillsClick) }
+                            onClick = { onIntent(ChecklistDetailIntent.OnViewAllFillsClick) },
+                            grouped = v2Standard,
                         )
-                        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                        Spacer(modifier = Modifier.height(if (v2Standard) DetailGroupGap else AppDimens.SpacingSm))
                     }
                 }
 
@@ -1580,10 +1601,25 @@ private fun ChecklistDetailContent(
                         key = node.reorderId,
                         enabled = isEditMode,
                     ) { isDragging ->
+                        // v2 Standard: each row paints its own segment of ONE grouped container
+                        // (re-segmented live from localNodes order while a row is dragged). The
+                        // dragged row lifts out as a single 16dp card with a 2dp primary ring.
+                        val segment = when {
+                            !v2Standard -> Modifier
+                            isDragging -> Modifier
+                                .zIndex(1f)
+                                .background(AppSurface.card(), MaterialTheme.shapes.medium)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium)
+                                .clip(MaterialTheme.shapes.medium)
+                            else -> Modifier.groupSegment(groupPositionOf(index, localNodes.size))
+                        }
+                        val rowContainer = if (v2Standard) RowContainer.Grouped else RowContainer.Card
                         when (node) {
                             is LevelNode.Folder -> {
                                 val folder = node.model
                                 FolderCard(
+                                    modifier = segment,
+                                    container = rowContainer,
                                     name = folder.name,
                                     total = folder.total,
                                     progressLabel = stringResource(
@@ -1617,8 +1653,11 @@ private fun ChecklistDetailContent(
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(item.id))
                                         },
+                                        modifier = segment,
+                                        grouped = v2Standard,
                                     ) {
                                         ChecklistItemCard(
+                                            container = rowContainer,
                                             item = item,
                                             isDragging = isDragging,
                                             isEditMode = isEditMode,
@@ -1652,95 +1691,34 @@ private fun ChecklistDetailContent(
                 }
 
                 // Add-item input moved to the shared chat dock (item-create mode, the "+" toolbar
-                // button). The former inline LazyColumn field has been removed — adding items now
-                // reuses the dock's bottom input + selectable reminder/property chips.
+                // button) in v1. In v2 Standard it is the bottom capture plate (a scaffold slot, see
+                // [DetailCapturePlate]); no add-item row lives in this list any more.
                 //
-                // …EXCEPT in the v2 nav arm, where the dock is gone. The row below is its
-                // replacement. It is emitted only when [useInlineAddRow] is true — not an empty
-                // `item {}` — so the control arm's LazyColumn gets no extra slot and no extra
-                // `spacedBy` gap. Everything binds to the EXISTING item-create intents:
-                // OnAddItemWithParse is the single source of truth for the template+fill dual write,
-                // Smart-Add parsing and reminder scheduling (rule `checklist-domain`), so no item is
-                // ever written from here.
-                if (useInlineAddRow) {
-                    item(key = "inline_add_item") {
-                        // Focus the row when the toolbar "+" asked for it AND the row is actually
-                        // composed. A failure is logged, never swallowed: a "+" that silently does
-                        // nothing reads as a frozen screen.
-                        LaunchedEffect(inlineAddFocusSignal) {
-                            if (inlineAddFocusSignal > inlineAddFocusHandled) {
-                                inlineAddFocusHandled = inlineAddFocusSignal
-                                runCatching { inlineAddFocusRequester.requestFocus() }
-                                    .onFailure { e ->
-                                        logger.warning(
-                                            "ChecklistDetail",
-                                            "inline add-row focus request failed: ${e.message}",
-                                        )
-                                    }
-                            }
-                        }
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                        ) {
-                            // Chips + staged attachments appear once the row is active, exactly as
-                            // they did inside the expanded dock — an input that only takes text
-                            // would be a regression even though items still get created.
-                            if (state.itemCreateMode) {
-                                ItemCreateChipsRow(
-                                    state = state,
-                                    onIntent = onIntent,
-                                    horizontalPadding = 0.dp,
-                                )
-                                ItemCreateAttachmentStrip(
-                                    pending = state.itemCreatePendingAttachments,
-                                    onRemove = { sourcePath ->
-                                        onIntent(
-                                            ChecklistDetailIntent
-                                                .OnRemoveItemCreatePendingAttachment(sourcePath)
-                                        )
-                                    },
-                                    horizontalPadding = 0.dp,
-                                )
-                            }
-                            InlineAddItemInput(
-                                text = state.pendingItemInput,
-                                canSend = state.pendingItemInput.isNotBlank(),
-                                focusRequester = inlineAddFocusRequester,
-                                onTextChange = {
-                                    onIntent(ChecklistDetailIntent.OnItemInputChanged(it))
-                                },
-                                onSubmit = { onIntent(ChecklistDetailIntent.OnAddItemWithParse) },
-                                onAttachClick = {
-                                    onIntent(ChecklistDetailIntent.OnItemCreateAttachClick)
-                                },
-                                onFocusChanged = { focused ->
-                                    when {
-                                        // Focus IS the "open item-create" gesture here: it reveals
-                                        // the chips and initialises their state, mirroring what the
-                                        // dock's "+" used to do.
-                                        focused && !state.itemCreateMode ->
-                                            onIntent(
-                                                ChecklistDetailIntent.OnDockItemCreateOpened(null)
-                                            )
-                                        // Blur with a draft KEEPS the mode (and the chip selections)
-                                        // alive — the dock's own "a draft holds it open" rule.
-                                        !focused && state.itemCreateMode &&
-                                            state.pendingItemInput.isBlank() ->
-                                            onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
-                                    }
-                                },
-                            )
-                        }
+                // v2 Standard: "Ask Gisti about this list" — the top-bar sparkle's lambda, moved
+                // verbatim (seed the chat with THIS checklist, then open it), so the chat entry and
+                // its analytics source are unchanged. Hidden in edit mode (reorder, not chat).
+                if (v2Standard && onOpenChat != null && !isEditMode) {
+                    item(key = "ask_about_list") {
+                        AppAiInviteRow(
+                            title = stringResource(Res.string.detail_ask_about_list),
+                            onClick = {
+                                onOpenChatSheet?.invoke()
+                                onOpenChat()
+                            },
+                            style = AiInviteStyle.Outlined,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = if (localNodes.isEmpty()) 0.dp else DetailGroupGap),
+                        )
                     }
                 }
-
                 // Completed section (only when separateCompleted is on and there are completed items)
                 if (state.separateCompleted && completedItems.isNotEmpty()) {
                     item(key = "completed_header") {
                         CompletedSectionHeader(
                             completedCount = completedItems.size,
                             expanded = completedExpanded,
+                            grouped = v2Standard,
                             onToggle = {
                                 val newExpanded = !completedExpanded
                                 completedExpanded = newExpanded
@@ -1764,8 +1742,19 @@ private fun ChecklistDetailContent(
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                     onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(item.id))
                                 },
+                                // v2 Standard: the completed rows are their own group; fade + place
+                                // on expand / collapse / check.
+                                modifier = if (v2Standard) {
+                                    Modifier
+                                        .animateItem()
+                                        .groupSegment(groupPositionOf(index, completedItems.size))
+                                } else {
+                                    Modifier
+                                },
+                                grouped = v2Standard,
                             ) {
                                 ChecklistItemCard(
+                                    container = if (v2Standard) RowContainer.Grouped else RowContainer.Card,
                                     item = item,
                                     isDragging = false,
                                     isEditMode = isEditMode,
@@ -1793,42 +1782,23 @@ private fun ChecklistDetailContent(
                 } // end when (state.checklist.viewMode)
               } // end hazeSource Box (live backdrop captured by the dock)
 
-              // v2 FAB — the toolbar "+" in a new carrier, bottom-end where Todoist puts it. A
-              // sibling of the haze source rather than an AppScaffold slot: AppScaffold has no FAB
-              // slot and core/designsystem is out of scope here. Hidden with the keyboard up (the
-              // inline add row already owns that moment) and in edit mode (drag/delete, not create).
-              AnimatedVisibility(
-                  visible = fabShown(),
-                  enter = scaleIn(tween(durationMillis = 200, easing = FastOutSlowInEasing)) + fadeIn(),
-                  exit = scaleOut(tween(durationMillis = 150)) + fadeOut(),
-                  modifier = Modifier
-                      .align(Alignment.BottomEnd)
-                      .navigationBarsPadding()
-                      .padding(
-                          end = AppDimens.ScreenPaddingHorizontal,
-                          bottom = AppDimens.SpacingLg,
-                      ),
-              ) {
-                  FloatingActionButton(
-                      // [openInlineAdd] — the same lambda the empty state's add-task button runs, and
-                      // the only implementation of "open the inline add row" left on this screen. The
-                      // toolbar "+" no longer has a v2 branch to be verbatim with: it is gated on
-                      // `!useInlineAddRow`, i.e. it exists only in the control arm, where it expands
-                      // the chat dock instead.
-                      onClick = openInlineAdd,
-                      containerColor = MaterialTheme.colorScheme.primary,
-                      contentColor = MaterialTheme.colorScheme.onPrimary,
-                  ) {
-                      Icon(
-                          imageVector = Icons.Filled.Add,
-                          // NOT add_item: the inline add row's send button already uses it, and in v2
-                          // both are on screen at once — two nodes with the same description are
-                          // indistinguishable to a screen reader (and ambiguous to UI tests).
-                          contentDescription = stringResource(Res.string.detail_add_task_fab),
-                      )
-                  }
+              // v2 Standard capture plate — CONTENT scrim + tap-outside, in one node (the Inbox's
+              // tile 2). `matchParentSize` binds it to the content slot, which the scaffold lays out
+              // above the plate, so the plate, the snackbar and the system-nav strip stay bright.
+              // `detectTapGestures`, NOT `clickable`: a drag falls through to the list, only a real
+              // tap dismisses (see [dismissPlate]).
+              if (plateOpen) {
+                  Box(
+                      modifier = Modifier
+                          .matchParentSize()
+                          .background(plateScrimColor)
+                          // Keyed on the draft's blankness: the lambda reads it, and a Unit key would
+                          // keep the first composition's closure forever.
+                          .pointerInput(state.pendingItemInput.isBlank()) {
+                              detectTapGestures(onTap = { dismissPlate() })
+                          },
+                  )
               }
-
               // Item-create CONTENT scrim — dims the list while item-create mode is active. A sibling
               // drawn AFTER the list content but BEFORE the navbar strip + dock below: it covers the
               // scrolling content, then the navbar strip and the dock draw ON TOP and stay bright (the
@@ -2002,6 +1972,15 @@ private fun ChecklistDetailContent(
                     ),
             )
         }
+
+        // v2 Standard capture plate — the chrome tile (status bar + app bar), capped at the plate's
+        // own top edge (see [captureScrimBottomPx]). No pointer input: the bar's actions stay pressable.
+        CaptureChromeScrim(
+            visible = plateOpen,
+            color = plateScrimColor,
+            contentTopPx = { plateContentTopPx.floatValue },
+            dockTopPx = { plateDockTopPx.floatValue },
+        )
 
         // FULL chat overlay — sibling of AppScaffold (covers the top bar; statusBarsPadding inside).
         // Opaque, above the dock AND the top-bar scrim. Renders nothing until opened (its own reveal gate).
@@ -2568,9 +2547,27 @@ private fun CompletionBanner() {
 @Composable
 private fun ViewAllFillsCard(
     fillsCount: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    /** v2 Standard (redesign B): one Single segment of the grouped style instead of an [AppCard]. */
+    grouped: Boolean = false,
 ) {
-    AppCard(onClick = onClick) {
+    if (grouped) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .groupSegment(GroupPosition.Single)
+                .clickable(onClick = onClick)
+                .heightIn(min = AppDensity.RowMinHeightCompact)
+                .padding(horizontal = AppDensity.GroupRowPaddingHorizontal, vertical = AppDimens.SpacingMd),
+        ) { ViewAllFillsRow(fillsCount) }
+        return
+    }
+    AppCard(onClick = onClick) { ViewAllFillsRow(fillsCount) }
+}
+
+@Composable
+private fun ViewAllFillsRow(fillsCount: Int) {
+    run {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -2603,6 +2600,13 @@ private fun SwipeableChecklistItemCard(
     isEditMode: Boolean,
     onSwipeDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * v2 Standard (redesign B): the row is one transparent segment of a grouped container, and
+     * [modifier] carries that segment (fill, hairline, divider, clip) on the STATIC layer. The red
+     * slab then only fills the width the content has vacated — a full-size slab would show through
+     * the transparent row behind its text.
+     */
+    grouped: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     if (isEditMode) {
@@ -2631,7 +2635,31 @@ private fun SwipeableChecklistItemCard(
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier,
-        backgroundContent = { if (isSwiping) SwipeDeleteBackground() },
+        backgroundContent = {
+            if (isSwiping) {
+                if (grouped) {
+                    // Width read in the LAYOUT phase from the live drag offset (no recomposition per
+                    // frame); the segment's clip on [modifier] gives the slab its corners.
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                        SwipeDeleteBackground(
+                            modifier = Modifier.layout { measurable, constraints ->
+                                // requireOffset() throws only before the anchors are first measured
+                                // — no drag can exist then, so "nothing vacated" (0) is exact.
+                                val offset = runCatching { dismissState.requireOffset() }.getOrDefault(0f)
+                                val width = (-offset).roundToInt().coerceIn(0, constraints.maxWidth)
+                                val placeable = measurable.measure(
+                                    constraints.copy(minWidth = width, maxWidth = width),
+                                )
+                                layout(width, placeable.height) { placeable.place(0, 0) }
+                            },
+                            shape = RectangleShape,
+                        )
+                    }
+                } else {
+                    SwipeDeleteBackground()
+                }
+            }
+        },
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
     ) {
@@ -2640,11 +2668,14 @@ private fun SwipeableChecklistItemCard(
 }
 
 @Composable
-private fun SwipeDeleteBackground() {
+private fun SwipeDeleteBackground(
+    modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.medium,
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(shape)
             .background(MaterialTheme.colorScheme.error)
             .padding(horizontal = AppDimens.SpacingXl),
         contentAlignment = Alignment.CenterEnd,
@@ -2669,8 +2700,18 @@ internal fun ChecklistItemCard(
     onLongClick: () -> Unit,
     isHighlighted: Boolean = false,
     cardDragModifier: Modifier = Modifier,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * [RowContainer.Card] (default) keeps today's outlined card byte-for-byte — v1, Weekly and every
+     * other caller. [RowContainer.Grouped] (v2 Standard, redesign B) draws NO container: the caller
+     * paints the row's segment with `Modifier.groupSegment` (fill, hairline, inset divider, clip).
+     * Grouped swaps the M3 checkbox for the visual-only [AppRoundCheckbox], shows priority as the
+     * amber ring + an inline read-only star (instead of the meta-row chip), and gives the 30% check
+     * zone `Role.Checkbox` semantics, since the round checkbox has none of its own.
+     */
+    container: RowContainer = RowContainer.Card,
 ) {
+    val grouped = container == RowContainer.Grouped
     // Highlight animation: flash primaryContainer for ~1 s when navigated from Calendar.
     // animateColorAsState provides a smooth fade-in/out over 280 ms on both edges.
     val highlightColor by animateColorAsState(
@@ -2708,7 +2749,11 @@ internal fun ChecklistItemCard(
         .then(if (isEditMode) cardDragModifier else Modifier)
 
     val cardContent: @Composable () -> Unit = {
-        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = if (grouped) AppDensity.RowMinHeightComfortable else 64.dp),
+        ) {
             // ── Highlight overlay: drawn first (behind content), fades in/out ──
             if (highlightColor != Color.Transparent) {
                 Box(
@@ -2723,12 +2768,26 @@ internal fun ChecklistItemCard(
                     .fillMaxWidth()
                     .align(Alignment.Center)
                     .padding(
-                        horizontal = AppDimens.SpacingMd,
+                        horizontal = if (grouped) AppDensity.GroupRowPaddingHorizontal else AppDimens.SpacingMd,
                         vertical = AppDimens.SpacingSm
                     ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!isEditMode) {
+                if (grouped) {
+                    // Same 24dp column in both modes so the text keeps its x (and stays on the
+                    // group's divider inset): round checkbox normally, a drag glyph in edit mode.
+                    if (isEditMode) {
+                        Icon(
+                            imageVector = Icons.Filled.DragIndicator,
+                            contentDescription = null, // decorative — the whole row is the handle
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(AppDensity.RoundCheckboxBox),
+                        )
+                    } else {
+                        AppRoundCheckbox(checked = item.checked, important = item.priority > 0)
+                    }
+                    Spacer(modifier = Modifier.width(AppDensity.GroupRowGap))
+                } else if (!isEditMode) {
                     Checkbox(
                         checked = item.checked,
                         onCheckedChange = null, // tap overlay handles it
@@ -2745,7 +2804,7 @@ internal fun ChecklistItemCard(
                     // in ItemDetailsSheet, never on the card per the 30/70 hit-zone rule).
                     val textWholeUrl = item.text.asWholeUrl()
                     val textStartPadding =
-                        Modifier.padding(start = if (isEditMode) AppDimens.SpacingSm else 0.dp)
+                        Modifier.padding(start = if (isEditMode && !grouped) AppDimens.SpacingSm else 0.dp)
                     if (textWholeUrl != null) {
                         AppItemMetaChip(
                             icon = Icons.Filled.Link,
@@ -2755,20 +2814,37 @@ internal fun ChecklistItemCard(
                             modifier = textStartPadding,
                         )
                     } else {
-                        Text(
-                            text = rememberLinkifiedText(
-                                raw = item.text,
-                                linkColor = MaterialTheme.colorScheme.primary,
-                            ),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (item.checked) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                            modifier = Modifier.fillMaxWidth().then(textStartPadding)
-                        )
+                        val itemText: @Composable (Modifier) -> Unit = { textModifier ->
+                            Text(
+                                text = rememberLinkifiedText(
+                                    raw = item.text,
+                                    linkColor = MaterialTheme.colorScheme.primary,
+                                ),
+                                style = if (grouped) AppTextStyles.taskTitle else MaterialTheme.typography.bodyLarge,
+                                color = if (item.checked) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                                modifier = textModifier.then(textStartPadding)
+                            )
+                        }
+                        if (grouped && item.priority > 0) {
+                            // Inline, READ-ONLY star after the text (no clickable — rule
+                            // ui-card-patterns); described with the sheet's own "Important" label.
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                itemText(Modifier.weight(1f, fill = false))
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = stringResource(Res.string.item_priority_action),
+                                    tint = GistiColors.star,
+                                    modifier = Modifier.padding(start = 6.dp).size(16.dp),
+                                )
+                            }
+                        } else {
+                            itemText(Modifier.fillMaxWidth())
+                        }
                     }
 
                     if (!isEditMode) {
@@ -2798,7 +2874,8 @@ internal fun ChecklistItemCard(
                     }
 
                     if (!isEditMode) {
-                        ItemMetaRow(item = item)
+                        // Grouped: priority is the amber ring + the star, so the chip would repeat it.
+                        ItemMetaRow(item = item, showPriority = !grouped)
                     }
                 }
                 // Priority is now shown as a chip inside ItemMetaRow (below item text).
@@ -2822,6 +2899,16 @@ internal fun ChecklistItemCard(
                                 onClick = { onCheckedChange(!item.checked) },
                                 onLongClick = onLongClick
                             )
+                            .then(
+                                if (grouped) {
+                                    Modifier.semantics {
+                                        role = Role.Checkbox
+                                        toggleableState = ToggleableState(item.checked)
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                            )
                     )
                     Box(
                         modifier = Modifier
@@ -2842,6 +2929,12 @@ internal fun ChecklistItemCard(
     // Shared "filled + hairline" card in both themes (see AppCardDefaults). "Lifted while dragging"
     // is shown by an accent ring — the border animates to primary at 2dp — NOT by a shadow, so there
     // is no side-ear artifact and the visual is identical on Android and Web.
+    if (grouped) {
+        // No container: the caller's `groupSegment` (or, while dragged, the lifted single card) is
+        // the surface. Wiggle / completion pop / drag handle ride on the content inside it.
+        Box(modifier = cardModifier) { cardContent() }
+        return
+    }
     val borderColor by animateColorAsState(
         targetValue = if (isDragging) {
             MaterialTheme.colorScheme.primary
@@ -3248,8 +3341,9 @@ internal fun ItemDetailsSheetRow(
 private fun ItemMetaRow(
     item: ChecklistFillItem,
     modifier: Modifier = Modifier,
+    showPriority: Boolean = true,
 ) {
-    val hasPriority = item.priority > 0
+    val hasPriority = showPriority && item.priority > 0
     val hasReminder = item.hasActiveReminder
     val hasAttachments = item.attachments.isNotEmpty()
 
@@ -4398,8 +4492,41 @@ private fun OverflowMenuSheet(
 private fun CompletedSectionHeader(
     completedCount: Int,
     expanded: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    /** v2 Standard (redesign B): [AppSectionHeader] anatomy, the whole row a 48dp toggle. */
+    grouped: Boolean = false,
 ) {
+    if (grouped) {
+        val chevronRotation by animateFloatAsState(
+            targetValue = if (expanded) 0f else 180f,
+            animationSpec = AppMotion.spatialDefault,
+            label = "completed_chevron",
+        )
+        AppSectionHeader(
+            label = stringResource(Res.string.completed_count, completedCount),
+            icon = Icons.Filled.CheckCircle,
+            iconContainer = AppSurface.recessed(),
+            iconContent = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .toggleable(value = expanded, role = Role.Button, onValueChange = { onToggle() }),
+            trailing = {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.ExpandLess,
+                        contentDescription = if (expanded) {
+                            stringResource(Res.string.collapse)
+                        } else {
+                            stringResource(Res.string.expand)
+                        },
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
+                    )
+                }
+            },
+        )
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -4451,6 +4578,11 @@ private fun ItemCreateChipsRow(
      * LazyColumn already applies the screen padding (double padding — rule `ui-card-patterns`).
      */
     horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
+    /**
+     * The redesign-B-pass-2 look for the chips inside the capture dock's composer card (borderless
+     * soft fill, selected = `primaryContainer` + check). Same chips, same intents — visual only.
+     */
+    soft: Boolean = false,
 ) {
     val tz = TimeZone.currentSystemDefault()
     val pickTimeLabel = state.itemCreateReminderAt
@@ -4475,7 +4607,7 @@ private fun ItemCreateChipsRow(
             Box(
                 modifier = Modifier
                     .padding(horizontal = horizontalPadding)
-                    .padding(bottom = AppDimens.SpacingSm)
+                    .padding(top = if (soft) AppDimens.SpacingSm else 0.dp, bottom = AppDimens.SpacingSm)
             ) {
                 TokenChipPreview(
                     label = resolveChipLabel(token.display),
@@ -4485,6 +4617,7 @@ private fun ItemCreateChipsRow(
         }
         GistiSelectableChipRow(
             contentPadding = PaddingValues(horizontal = horizontalPadding),
+            style = if (soft) GistiSelectableChipStyle.Soft else GistiSelectableChipStyle.Outlined,
             chips = gistiItemCreatePromptChips(
                 in1HourLabel = stringResource(Res.string.item_create_chip_in_1_hour),
                 tomorrowMorningLabel = stringResource(Res.string.item_create_chip_tomorrow_morning),
@@ -4528,9 +4661,16 @@ private fun ItemCreateAttachmentStrip(
     onRemove: (sourcePath: String) -> Unit,
     /** See [ItemCreateChipsRow]'s parameter of the same name — 0.dp from the v2 inline row. */
     horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
+    /**
+     * The composer-card look (redesign B pass 2): 56dp tiles with a 14dp corner and a remove control
+     * that is a 24dp `onSurface` disc inside a full 48dp target. The v2 inline row keeps today's 64dp
+     * tiles (default false).
+     */
+    composer: Boolean = false,
 ) {
     if (pending.isEmpty()) return
-    val tileShape = RoundedCornerShape(8.dp)
+    val tileSize = if (composer) ComposerAttachmentTile else 64.dp
+    val tileShape = RoundedCornerShape(if (composer) ComposerAttachmentCorner else 8.dp)
     val removeLabel = stringResource(Res.string.item_create_remove_attachment)
     LazyRow(
         modifier = Modifier
@@ -4540,7 +4680,7 @@ private fun ItemCreateAttachmentStrip(
         contentPadding = PaddingValues(vertical = AppDimens.SpacingXs),
     ) {
         items(pending, key = { it.sourcePath }) { att ->
-            Box(modifier = Modifier.size(64.dp)) {
+            Box(modifier = Modifier.size(tileSize)) {
                 Surface(
                     shape = tileShape,
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -4570,102 +4710,198 @@ private fun ItemCreateAttachmentStrip(
                         }
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(2.dp)
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .clickable { onRemove(att.sourcePath) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = removeLabel,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp),
-                    )
+                if (composer) {
+                    // A full 48dp TARGET inside the 56dp tile (top-end), the 24dp disc drawn in its
+                    // corner — the old 20dp control failed the 48dp floor. The tile itself has no
+                    // other action, so the large target steals nothing.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(AppDimens.MinTouchTarget)
+                            .clickable(role = Role.Button) { onRemove(att.sourcePath) }
+                            .semantics { contentDescription = removeLabel },
+                        contentAlignment = Alignment.TopEnd,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                // Hangs over the tile's corner (into the strip's 4dp vertical
+                                // padding and the 8dp gap) so it covers the corner, not the
+                                // thumbnail's subject — the canvas placement.
+                                .offset(x = ComposerRemoveOverhang, y = -ComposerRemoveOverhang)
+                                .size(ComposerRemoveDisc)
+                                .background(MaterialTheme.colorScheme.onSurface, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { onRemove(att.sourcePath) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = removeLabel,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** Composer-card attachment tile, its corner and the remove disc (spec B pass 2: 56 / 14 / 24). */
+private val ComposerAttachmentTile = 56.dp
+private val ComposerAttachmentCorner = 14.dp
+private val ComposerRemoveDisc = 24.dp
+private val ComposerRemoveOverhang = 4.dp
+
 /**
- * Todoist-style "+ Add task" row — the v2 replacement for the dock's item-create input.
+ * The v2 Standard add-task surface (redesign B): a bottom plate that replaces BOTH the old inline add
+ * row and the FAB. Mounted in `AppScaffold.bottomBar`, which owns `ime ∪ navigationBars`, so it rides
+ * the keyboard with no inset code of its own.
  *
- * Deliberately dumb: it owns NO create logic. [onSubmit] fires
- * [ChecklistDetailIntent.OnAddItemWithParse], which is the single source of truth for the
- * template+fill dual write, Smart-Add parsing and reminder scheduling. Writing the item here would
- * re-open the template/fill desync bug and skip the Smart-Add parser entirely.
+ * - Resting (`!state.itemCreateMode`): ONE button labelled "Add a task" — a pill plus a filled "+"
+ *   disc that is part of the same node (no second "Add" node for a screen reader; the empty state's
+ *   CTA keeps the distinct "Add task" label). Tap → [onOpen].
+ * - Active: the shared [QuickCaptureDock] (the Inbox's capture surface), wired to the SAME item-create
+ *   intents the inline row used: the chip row (reminder presets, Important, Repeat, Smart-Add token
+ *   preview) and the staged-attachment strip above the field, attach in the trailing slot, and
+ *   `OnAddItemWithParse` as the single write path (template + fill dual write, Smart-Add, reminders).
+ *   It focuses itself on mount and stays open across adds.
  *
- * Unlike the original pre-dock inline input (removed in 2ac512ed) this row does NOT self-dismiss
- * when the keyboard hides: in v2 it is a permanent affordance at the end of the list, so a closing
- * keyboard must leave it in place. It also never clears its own focus after a send — the ViewModel
- * keeps item-create mode on precisely so the user can add several tasks in a row
- * (asserted by `ChecklistDetailSmartAddTest`).
- *
- * @param canSend false while the input is blank → both submit paths are inert, so a blank item can
- *   never be created.
- * @param focusRequester lets the toolbar "+" put the caret here (there is no dock left to expand).
- * @param onFocusChanged drives item-create mode: focus opens it (revealing the chips), blur closes
- *   it only when the draft is empty.
+ * Deliberately owns no create logic. [dockModifier] carries the host's scrim-shoulder background and
+ * the dock-top measurement (see [captureScrimBottomPx]).
  */
 @Composable
-private fun InlineAddItemInput(
-    text: String,
-    canSend: Boolean,
-    focusRequester: FocusRequester,
-    onTextChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onAttachClick: () -> Unit,
-    onFocusChanged: (Boolean) -> Unit,
+private fun DetailCapturePlate(
+    state: ChecklistDetailState.Content,
+    onIntent: (ChecklistDetailIntent) -> Unit,
+    onOpen: () -> Unit,
+    dockModifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-    ) {
-        AppTextField(
-            value = text,
-            onValueChange = onTextChange,
-            placeholder = stringResource(Res.string.detail_inline_add_placeholder),
-            singleLine = false,
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focusRequester)
-                .onFocusChanged { onFocusChanged(it.isFocused) },
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Done,
-                capitalization = KeyboardCapitalization.Sentences,
-            ),
-            keyboardActions = KeyboardActions(onDone = { if (canSend) onSubmit() }),
+    if (state.itemCreateMode) {
+        // A typed val, not `if` inline in the argument: a lambda produced by an expression branch is
+        // not reliably typed @Composable, and KSP fails on it ("No fir element for KtParameter").
+        val attachmentsSlot: (@Composable () -> Unit)? =
+            if (state.itemCreatePendingAttachments.isNotEmpty()) {
+                {
+                    ItemCreateAttachmentStrip(
+                        pending = state.itemCreatePendingAttachments,
+                        onRemove = { sourcePath ->
+                            onIntent(ChecklistDetailIntent.OnRemoveItemCreatePendingAttachment(sourcePath))
+                        },
+                        horizontalPadding = 0.dp,
+                        composer = true,
+                    )
+                }
+            } else {
+                null
+            }
+        QuickCaptureDock(
+            text = state.pendingItemInput,
+            onTextChange = { onIntent(ChecklistDetailIntent.OnItemInputChanged(it)) },
+            onAdd = { if (state.pendingItemInput.isNotBlank()) onIntent(ChecklistDetailIntent.OnAddItemWithParse) },
+            placeholder = stringResource(Res.string.item_create_input_placeholder),
+            // The Inbox's own offset check (TaskDraft.smartAddHighlightRange) over this screen's draft,
+            // so a stale or shifted parse never tints the wrong words.
+            highlightRange = TaskDraft(
+                text = state.pendingItemInput,
+                parsedToken = state.parsedToken,
+            ).smartAddHighlightRange(),
+            modifier = dockModifier,
+            // Redesign B pass 2: staged files at the top of the composer card, the same chip set
+            // under the text row. Visual only — same intents, same state.
+            attachments = attachmentsSlot,
+            attributes = {
+                ItemCreateChipsRow(
+                    state = state,
+                    onIntent = onIntent,
+                    horizontalPadding = AppDimens.SpacingSm,
+                    soft = true,
+                )
+            },
+            trailingToggle = {
+                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnItemCreateAttachClick) }) {
+                    Icon(
+                        imageVector = Icons.Outlined.AttachFile,
+                        contentDescription = stringResource(Res.string.attachment_add_file_button),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
         )
-        IconButton(onClick = onAttachClick) {
-            Icon(
-                imageVector = Icons.Outlined.AttachFile,
-                // Reuses the existing attachment label rather than minting a v2-only key: the
-                // contract's string list has none for this button, and inventing one would drift
-                // in translation against the identical action elsewhere in this screen.
-                contentDescription = stringResource(Res.string.attachment_add_file_button),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onSubmit, enabled = canSend) {
-            Icon(
-                imageVector = Icons.Outlined.Add,
-                contentDescription = stringResource(Res.string.add_item),
-                tint = if (canSend) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
+        return
+    }
+
+    val label = stringResource(Res.string.detail_inline_add_placeholder)
+    Surface(
+        color = AppSurface.bottomChrome(),
+        shape = AppShapeTokens.SheetTop,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .adaptiveContentWidth()
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
+                .heightIn(min = 48.dp)
+                // ONE node: `clickable` merges the pill's text into a single button named
+                // "Add a task"; the "+" disc carries no description of its own.
+                .clip(AppShapeTokens.Pill)
+                .clickable(role = Role.Button, onClick = onOpen),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .clip(AppShapeTokens.Pill)
+                    .background(AppSurface.bottomChromeRaised())
+                    .border(1.dp, AppChatColors.controlOutline(), AppShapeTokens.Pill)
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         }
     }
 }
-
 private val WHITESPACE_RUN_REGEX = Regex("""\s+""")
 
 /**

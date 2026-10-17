@@ -108,6 +108,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBack
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSectionStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
@@ -406,6 +407,9 @@ fun CalendarScreen(
                         // surface, and a highlight that appeared on one tab and not the other would
                         // read as the parser working only sometimes.
                         highlightRange = draft.smartAddHighlightRange(),
+                        // Same as the Inbox tab (owner decision O3): keyboard down while the planner
+                        // is open, back on Done.
+                        inputSuspended = due.plannerExpanded,
                         // Behind the dock, not over it: the only pixels this reaches are the two
                         // corners `SheetTop` clips away, which otherwise show the raw page against
                         // the dimmed page beside them (measured ΔL* +41 in light). The content scrim
@@ -427,11 +431,13 @@ fun CalendarScreen(
                         // planner panel now, and THIS screen mounts the sheets behind them
                         // ([DraftDueSheetHost], below the scaffold). The flags existed only because
                         // no host outside the detail screen had them.
-                        aboveInput = {
+                        // Inside the composer card (redesign B pass 2), exactly as the Inbox tab.
+                        attributes = {
                             DueRailSection(
                                 draft = draft,
                                 due = due,
                                 onIntent = onDueIntent,
+                                horizontalPadding = AppDimens.SpacingSm,
                             )
                         },
                         // The same toggle the Inbox dock mounts, in the same seat — the two capture
@@ -458,6 +464,7 @@ fun CalendarScreen(
                             CollapsibleSourceRow(collapsed = due.plannerExpanded) {
                                 SourceRowSection(
                                     title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                    style = SourceRowSectionStyle.Dock,
                                     onSelect = onAiSourceTapped,
                                 )
                             }

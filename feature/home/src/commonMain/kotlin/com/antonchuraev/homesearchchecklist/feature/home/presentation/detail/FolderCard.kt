@@ -1,9 +1,18 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Notifications
@@ -23,7 +32,10 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.folder_reminder
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTextStyles
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.RowContainer
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -71,7 +83,30 @@ internal fun FolderCard(
     isDragging: Boolean = false,
     cardDragModifier: Modifier = Modifier,
     wiggleAngle: Float = 0f,
+    /**
+     * [RowContainer.Card] (default) keeps the [AppCard] rendering byte-for-byte. [RowContainer.Grouped]
+     * (v2 Standard, redesign B) draws no container — the caller paints the row's `groupSegment` — and
+     * shows a 28dp folder tile, the name, the progress as plain text, the bell and a chevron. Same
+     * callbacks, same edit-mode drag handle.
+     */
+    container: RowContainer = RowContainer.Card,
 ) {
+    if (container == RowContainer.Grouped) {
+        GroupedFolderRow(
+            name = name,
+            total = total,
+            progressLabel = progressLabel,
+            hasReminder = hasReminder,
+            onOpen = onOpen,
+            onLongPress = onLongPress,
+            modifier = modifier,
+            isEditMode = isEditMode,
+            isDragging = isDragging,
+            cardDragModifier = cardDragModifier,
+            wiggleAngle = wiggleAngle,
+        )
+        return
+    }
     // Tap (open) / long-press (actions) are handed to AppCard, which applies combinedClickable to
     // its INNER content — so the Card clips the ripple to its rounded [shape] and no rectangle
     // bleeds past the corners. Drag/wiggle/zIndex stay on the OUTER modifier so the elevation
@@ -137,3 +172,100 @@ internal fun FolderCard(
         }
     }
 }
+
+/**
+ * Grouped (redesign B) folder row. The whole row is the target (tap = open, long-press = actions);
+ * in edit mode it is the reorder handle instead. The tile sits in the checkbox column of the leaf rows
+ * so the name starts on the same x as their text (and the group's divider inset).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GroupedFolderRow(
+    name: String,
+    total: Int,
+    progressLabel: String,
+    hasReminder: Boolean,
+    onOpen: () -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier,
+    isEditMode: Boolean,
+    isDragging: Boolean,
+    cardDragModifier: Modifier,
+    wiggleAngle: Float,
+) {
+    Box(
+        modifier = modifier
+            .then(if (isDragging) Modifier.zIndex(1f) else Modifier)
+            .fillMaxWidth()
+            .then(
+                if (isEditMode) {
+                    cardDragModifier
+                } else {
+                    Modifier.combinedClickable(onClick = onOpen, onLongClick = onLongPress)
+                },
+            ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = AppDensity.RowMinHeightComfortable)
+                .graphicsLayer { if (isEditMode && !isDragging) rotationZ = wiggleAngle }
+                .padding(
+                    start = AppDensity.GroupRowPaddingHorizontal - FolderTileOverhang,
+                    end = AppDimens.SpacingMd,
+                    top = AppDimens.SpacingSm,
+                    bottom = AppDimens.SpacingSm,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(FolderTileSize)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null, // decorative — the name conveys meaning
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(modifier = Modifier.width(AppDensity.GroupRowGap - FolderTileOverhang))
+            Text(
+                text = name,
+                style = AppTextStyles.taskTitle,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = AppDimens.SpacingSm),
+            )
+            if (total > 0) {
+                Text(
+                    text = progressLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            // Read-only reminder indicator (no clickable — see hit-zone rule).
+            if (hasReminder) {
+                Icon(
+                    imageVector = Icons.Filled.Notifications,
+                    contentDescription = stringResource(Res.string.folder_reminder),
+                    modifier = Modifier.padding(start = AppDimens.SpacingXs).size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 28dp folder tile; it overhangs the leaf rows' 24dp checkbox column by 2dp on each side. */
+private val FolderTileSize = 28.dp
+private val FolderTileOverhang = (FolderTileSize - AppDensity.RoundCheckboxBox) / 2

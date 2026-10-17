@@ -7,29 +7,41 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAddCheck
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AddTask
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Checklist
-import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material.icons.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -40,6 +52,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,7 +61,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_choice_edit_label
@@ -56,9 +72,12 @@ import aichecklists.core.designsystem.generated.resources.chat_choice_remember
 import aichecklists.core.designsystem.generated.resources.chat_choice_save
 import aichecklists.core.designsystem.generated.resources.chat_object_more
 import aichecklists.core.designsystem.generated.resources.chat_preview_new_list_label
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
@@ -69,32 +88,32 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Pen
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Claude-style assistant choice block: a prompt bubble followed by tappable choice chips.
+ * Claude-style assistant choice block — redesign B pass 2, variant **"Actions inside the turn"**.
  *
- * Replaces [ChatPreviewCard] (Apply/Cancel/Reject) and [AgentPlanCard] (Apply all/Cancel) with
- * one component. A tap on a chip executes immediately — the ViewModel resolves the chip's
- * [com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction] and runs it.
+ * ONE assistant bubble holds the whole proposal. A tap on an action executes immediately — the
+ * ViewModel resolves the option's [ChoiceAction] and runs it (D1 contract, unchanged).
  *
- * Structure (NOT an AppCard — this is a styled dialogue turn, not a form):
  * ```
- * AiSenderLabel          (reused from ChatMessageBubble)
- * ┌──────────────────┐   prompt bubble: AppChatColors.raised() + 1dp contentOutline()
- * │  prompt          │   shape 20-20-20-4 (tail bottom-left), ChatMarkdownText
- * │  object rows     │   D2: the typed object of the action (item / list / time / …)
- * └──────────────────┘
- * [x] Remember choice    only on the which-list picker for an add
- * [chip] [chip] [chip]   wrapping FlowRow (all-short) or Column-fillMaxWidth (any long label)
- * [escape chip]          separate row
+ * (avatar) ┌─────────────────────────────┐  AppChatColors.raised() + 1dp contentOutline, 20/20/20/8,
+ *          │ (tile) prompt               │  max 300dp, hugging its content
+ *          │  object rows / batch steps   │
+ *          │  Remember my choice   [===]  │  which-list for an add only — AppSwitch row
+ *          ├─────────────────────────────┤  1dp contentOutline, full bubble width
+ *          │ [Primary] [Default] Cancel   │  FlowRow — Escape LAST, as a ghost in the same flow
+ *          │   — or —                     │
+ *          │ ● Shopping        12 • 3 Jul │  OptionRows when the options are destinations
+ *          │ ● Groceries                8 │
+ *          │ Cancel                       │
+ *          └─────────────────────────────┘
  * ```
- * The object rows live INSIDE the bubble on purpose. The bubble is already a container and
- * already means "the AI said this" — a second frame around the rows would turn a dialogue turn
- * into a form, which is what the chips redesign set out to kill. The root stays a [Column].
  *
- * The memory checkbox, by contrast, sits OUTSIDE the bubble: the bubble is what the AI said, the
- * checkbox is what the user does, and the ordering ("check, then pick") reads top-down.
+ * The header tile is decorative and comes from [com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice.kind];
+ * a null kind draws no tile (never guessed from copy).
  *
- * When [PendingChoice.editText] is non-null, the chip row is replaced by an inline
- * [OutlinedTextField] (auto-focus + IME) and the primary chip relabels to "Save".
+ * **Blank prompt** (post-action Undo / Move, AI answer options): the outcome or the question is
+ * already its own assistant message. The hosts attach these actions INSIDE that message's bubble
+ * ([ChatMessageBubble]'s `attachedActions` slot + [AttachedChoiceActions]); this composable only renders
+ * them stand-alone, under the avatar slot, when there is no message to attach them to.
  *
  * @param compact  True for the inline dock (App.kt), false for the full-height chat screen.
  *                 An explicit parameter, NOT a BoxWithConstraints measurement: both surfaces can
@@ -118,8 +137,6 @@ fun AiChoiceResponse(
     onMemoryToggle: (Boolean) -> Unit = {},
 ) {
     val choice = pending.choice
-    val isExecuting = pending.executingId != null
-    val isEditing = pending.editText != null
 
     AnimatedVisibility(
         visible = true,
@@ -127,119 +144,300 @@ fun AiChoiceResponse(
             slideInVertically(animationSpec = tween(400)) { it / 12 },
         exit = fadeOut(animationSpec = tween(200)),
     ) {
-        Column(
-            modifier = modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            // Blank prompt → AI-options case: the question is already its own assistant bubble
-            // above (persisted as a message), so render ONLY the chips — no label, no bubble.
-            // Non-blank prompt → Phase-1 write-intent / batch: label + prompt bubble + chips.
-            if (choice.prompt.isNotBlank()) {
-                AiSenderLabel()
-
-                // Prompt bubble — assistant-style tonal bubble (mirrors ChatMessageBubble received side).
+        if (choice.prompt.isNotBlank()) {
+            // B §2.9: no sender label — the avatar sits BESIDE the bubble (this block is always the
+            // newest assistant turn, so it is the last of its run and carries it).
+            Row(
+                modifier = modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                AssistantAvatarSlot(showAvatar = true)
+                Spacer(modifier = Modifier.width(ChatAvatarLayout.Gap))
                 Surface(
-                    shape = RoundedCornerShape(
-                        topStart = 20.dp,
-                        topEnd = 20.dp,
-                        bottomEnd = 20.dp,
-                        bottomStart = 4.dp,
-                    ),
+                    shape = AssistantBubbleShape,
                     // The SAME pair as ChatMessageBubble's received side, and it has to be: this
                     // bubble and an assistant answer are the same thing said two ways, and they are
-                    // routinely one above the other in one frame. Plane-relative — a fixed
-                    // `surfaceContainerLowest` is `#0D0E11`, ΔL* −6.2 BELOW the dark bottom chrome,
-                    // i.e. a hole punched in the dock rather than a bubble lying on it. Content, not
-                    // a target → the SOFT hairline. See AppChatColors.
+                    // routinely one above the other in one frame. Plane-relative — see AppChatColors.
                     color = AppChatColors.raised(),
                     border = BorderStroke(1.dp, AppChatColors.contentOutline()),
+                    modifier = Modifier.widthIn(max = ChoiceBubbleMaxWidth),
                 ) {
+                    // Hug the content (B mock): without the intrinsic cap a short question with two
+                    // chips would stretch to the 300dp limit.
                     Column(
                         modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .animateContentSize()
-                            // The bubble speaks as one unit; each object row then overrides with
-                            // its own role-carrying description (see ObjectRow).
-                            .semantics(mergeDescendants = true) {},
+                            .width(IntrinsicSize.Max)
+                            .animateContentSize(),
                     ) {
-                        ChatMarkdownText(
-                            markdown = choice.prompt,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                        Column(
+                            // The question speaks as one unit; each object row then overrides with
+                            // its own role-carrying description (see ObjectRow). The actions below
+                            // stay separate targets.
+                            modifier = Modifier.semantics(mergeDescendants = true) {},
+                        ) {
+                            ChoiceHeader(prompt = choice.prompt, kind = choice.kind)
+                            if (choice.objectRows.isNotEmpty()) {
+                                ObjectRows(
+                                    rows = choice.objectRows,
+                                    compact = compact,
+                                    modifier = Modifier.padding(start = 14.dp, top = 6.dp, end = 14.dp, bottom = 4.dp),
+                                )
+                            }
+                            // Agent batch: numbered steps. Untouched by D2 — object rows assume ONE
+                            // typed object, a batch is N heterogeneous ones.
+                            pending.batchItems?.let { items ->
+                                BatchActionList(
+                                    items = items,
+                                    modifier = Modifier.padding(start = 14.dp, top = 8.dp, end = 14.dp, bottom = 6.dp),
+                                )
+                            }
+                        }
+                        ChoiceTurnActions(
+                            pending = pending,
+                            onSelect = onSelect,
+                            onEditChange = onEditChange,
+                            onEditConfirm = onEditConfirm,
+                            onMemoryToggle = onMemoryToggle,
                         )
-                        // D2: the typed object of the action.
-                        if (choice.objectRows.isNotEmpty()) {
-                            ObjectRows(
-                                rows = choice.objectRows,
-                                compact = compact,
-                                modifier = Modifier.padding(top = AppDimens.SpacingSm),
-                            )
-                        }
-                        // Agent-batch: numbered list of actions inside the bubble. Untouched by D2 —
-                        // object rows assume ONE typed object, a batch is N heterogeneous ones.
-                        pending.batchItems?.let { items ->
-                            BatchActionList(
-                                items = items,
-                                modifier = Modifier.padding(top = AppDimens.SpacingSm),
-                            )
-                        }
                     }
                 }
             }
-
-            // Memory of choice — between the bubble and the chips, never inside either.
-            if (pending.showMemoryToggle && !isEditing) {
-                MemoryRow(
-                    checked = pending.rememberChoice,
-                    enabled = !isExecuting,
-                    onCheckedChange = onMemoryToggle,
+        } else {
+            // Stand-alone fallback (no message to attach to): the actions under the avatar slot.
+            Column(modifier = modifier.fillMaxWidth().padding(start = ChatAvatarLayout.Slot)) {
+                ChoiceActionsArea(
+                    pending = pending,
+                    onSelect = onSelect,
+                    onEditChange = onEditChange,
+                    onEditConfirm = onEditConfirm,
+                    contentPadding = false,
                 )
             }
+        }
+    }
+}
 
-            if (isEditing) {
-                EditField(
-                    text = pending.editText.orEmpty(),
-                    onTextChange = onEditChange,
-                    isChecklistName = pending.isCreatingChecklist,
+/**
+ * The actions of a BLANK-prompt choice, for [ChatMessageBubble]'s `attachedActions` slot: the
+ * reply that already said the outcome (or asked the question) carries its Undo / Move / answer
+ * options inside its own bubble, under the divider the bubble draws. Same chips, same callbacks,
+ * same executing state as the stand-alone block.
+ */
+@Composable
+fun AttachedChoiceActions(
+    pending: PendingChoice,
+    onSelect: (optionId: String) -> Unit,
+    onEditChange: (String) -> Unit = {},
+    onEditConfirm: () -> Unit = {},
+) {
+    ChoiceActionsArea(
+        pending = pending,
+        onSelect = onSelect,
+        onEditChange = onEditChange,
+        onEditConfirm = onEditConfirm,
+        contentPadding = true,
+    )
+}
+
+/**
+ * The bottom of a proposal turn: the memory switch (which-list only), the inner divider and the
+ * actions area. Shared by the [AiChoiceResponse] bubble and by [ChatMessageBubble], which attaches
+ * a blank-prompt choice (Undo / Move, AI answer options) inside the message that already said it.
+ *
+ * Must be called inside a bubble column (it draws a full-width divider).
+ */
+@Composable
+private fun ChoiceTurnActions(
+    pending: PendingChoice,
+    onSelect: (optionId: String) -> Unit,
+    onEditChange: (String) -> Unit,
+    onEditConfirm: () -> Unit,
+    onMemoryToggle: (Boolean) -> Unit,
+) {
+    val isExecuting = pending.executingId != null
+    val isEditing = pending.editText != null
+    val showMemory = pending.showMemoryToggle && !isEditing
+    if (showMemory) {
+        MemoryRow(
+            checked = pending.rememberChoice,
+            enabled = !isExecuting,
+            onCheckedChange = onMemoryToggle,
+        )
+    }
+    HorizontalDivider(
+        thickness = 1.dp,
+        color = AppChatColors.contentOutline(),
+        // The memory row brings its own 48dp line box; a bare divider after content needs air.
+        modifier = Modifier.padding(top = if (showMemory) 0.dp else AppDimens.SpacingSm),
+    )
+    ChoiceActionsArea(
+        pending = pending,
+        onSelect = onSelect,
+        onEditChange = onEditChange,
+        onEditConfirm = onEditConfirm,
+        contentPadding = true,
+    )
+}
+
+/**
+ * The actions of a turn: editing (field + Save) · destination rows ([OptionRows]) · a wrapping
+ * chip flow with the Escape ghost LAST in the same flow (owner decision O2, 2026-10-17).
+ *
+ * @param contentPadding True inside a bubble (12dp sides, 10 top, 12 bottom; option rows run
+ *  edge-to-edge and own their insets). False for the stand-alone fallback, which sits on the plane.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChoiceActionsArea(
+    pending: PendingChoice,
+    onSelect: (optionId: String) -> Unit,
+    onEditChange: (String) -> Unit,
+    onEditConfirm: () -> Unit,
+    contentPadding: Boolean,
+) {
+    val choice = pending.choice
+    val isExecuting = pending.executingId != null
+    val side = if (contentPadding) AppDimens.SpacingMd else 0.dp
+    val chipAreaModifier = Modifier.padding(
+        start = side,
+        end = side,
+        top = if (contentPadding) 10.dp else 0.dp,
+        bottom = if (contentPadding) AppDimens.SpacingMd else 0.dp,
+    )
+
+    when {
+        pending.editText != null -> Column(
+            modifier = chipAreaModifier,
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        ) {
+            EditField(
+                text = pending.editText,
+                onTextChange = onEditChange,
+                isChecklistName = pending.isCreatingChecklist,
+            )
+            // While editing, the primary option relabels to "Save" and confirms the edit.
+            val primary = choice.options.firstOrNull { it.role == ChoiceRole.Primary }
+                ?: choice.options.firstOrNull()
+            if (primary != null) {
+                AiChoiceChip(
+                    label = stringResource(Res.string.chat_choice_save),
+                    role = ChoiceRole.Primary,
+                    onClick = onEditConfirm,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
                 )
-                // While editing, the primary option relabels to "Save" and confirms the edit.
-                val primary = choice.options.firstOrNull { it.role == ChoiceRole.Primary }
-                    ?: choice.options.firstOrNull()
-                if (primary != null) {
+            }
+        }
+
+        usesOptionRows(choice.kind, choice.options) -> Column(
+            modifier = Modifier.padding(
+                top = if (contentPadding) AppDimens.SpacingXs else 0.dp,
+                bottom = if (contentPadding) AppDimens.SpacingSm else 0.dp,
+            ),
+        ) {
+            OptionRows(
+                options = choice.options,
+                executingId = pending.executingId,
+                executingLabel = pending.executingLabel,
+                blockInteractive = !isExecuting,
+                onSelect = onSelect,
+                inset = contentPadding,
+            )
+            choice.escape?.let { escape ->
+                Row(modifier = Modifier.padding(start = side, end = side)) {
                     AiChoiceChip(
-                        label = stringResource(Res.string.chat_choice_save),
-                        role = ChoiceRole.Primary,
-                        onClick = onEditConfirm,
-                        modifier = Modifier.fillMaxWidth(),
+                        label = escape.label,
+                        role = escape.role,
+                        onClick = { onSelect(escape.id) },
+                        enabled = !isExecuting,
                         maxLines = 1,
                     )
                 }
-            } else {
-                ChoiceChips(
-                    options = choice.options,
-                    executingId = pending.executingId,
-                    executingLabel = pending.executingLabel,
-                    blockInteractive = !isExecuting,
-                    onSelect = onSelect,
-                )
+            }
+        }
 
+        else -> {
+            val fallbackLoading = stringResource(Res.string.chat_choice_executing_default)
+            FlowRow(
+                modifier = chipAreaModifier,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                // Tighter vertical rhythm between wrapped chip rows (4dp) than the horizontal gap.
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+            ) {
+                choice.options.forEach { option ->
+                    ChoiceChipFor(option, pending.executingId, pending.executingLabel, fallbackLoading, !isExecuting, onSelect)
+                }
                 choice.escape?.let { escape ->
-                    // No extra top padding: the parent column's SpacingSm already separates the
-                    // escape chip from the options above. The old +SpacingXs pushed the gap to 12dp,
-                    // which read as a loose break between two button rows (audit fix — tighten).
-                    Row {
-                        AiChoiceChip(
-                            label = escape.label,
-                            role = escape.role,
-                            onClick = { onSelect(escape.id) },
-                            enabled = !isExecuting,
-                            maxLines = 1,
-                        )
-                    }
+                    AiChoiceChip(
+                        label = escape.label,
+                        role = escape.role,
+                        onClick = { onSelect(escape.id) },
+                        enabled = !isExecuting,
+                        maxLines = 1,
+                    )
                 }
             }
         }
+    }
+}
+
+/**
+ * Destination options read as rows, not chips: "Which list?" (always destinations) and any option
+ * set that carries a meta or a checklist seed (the move-target picker).
+ */
+internal fun usesOptionRows(kind: ChoiceKind?, options: List<ChoiceOption>): Boolean =
+    options.isNotEmpty() &&
+        (kind == ChoiceKind.PickList || options.any { it.meta != null || it.seedId != null })
+
+/**
+ * Header: a 28dp type tile + the question (titleMedium). The tile aligns to the first line; the
+ * question's 24dp line box sits 2dp down so a one-line prompt is centred on the 28dp tile.
+ */
+@Composable
+private fun ChoiceHeader(prompt: String, kind: ChoiceKind?) {
+    Row(
+        modifier = Modifier.padding(start = 14.dp, top = AppDimens.SpacingMd, end = 14.dp, bottom = AppDimens.SpacingXs),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (kind != null) ChoiceKindTile(kind)
+        ChatMarkdownText(
+            markdown = prompt,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = if (kind != null) Modifier.padding(top = 2.dp) else Modifier,
+        )
+    }
+}
+
+/** Decorative type tile (spec §2.1): palette tint + 16dp icon; delete = errorContainer / error. */
+@Composable
+private fun ChoiceKindTile(kind: ChoiceKind) {
+    val cs = MaterialTheme.colorScheme
+    val (fill, tint, icon) = when (kind) {
+        ChoiceKind.CreateChecklist -> Triple(GistiColors.paletteTint(0), GistiColors.paletteContent(0), Icons.Outlined.Checklist)
+        ChoiceKind.AddItems -> Triple(GistiColors.paletteTint(1), GistiColors.paletteContent(1), Icons.Outlined.AddTask)
+        ChoiceKind.Reminder -> Triple(GistiColors.paletteTint(2), GistiColors.paletteContent(2), Icons.Outlined.Alarm)
+        ChoiceKind.Batch -> Triple(
+            GistiColors.paletteTint(3),
+            GistiColors.paletteContent(3),
+            Icons.AutoMirrored.Outlined.PlaylistAddCheck,
+        )
+        ChoiceKind.PickList, ChoiceKind.Move -> Triple(
+            GistiColors.paletteTint(1),
+            GistiColors.paletteContent(1),
+            Icons.AutoMirrored.Outlined.FormatListBulleted,
+        )
+        ChoiceKind.Delete -> Triple(cs.errorContainer, cs.error, Icons.Outlined.Delete)
+    }
+    Box(
+        modifier = Modifier
+            .size(KindTileSize)
+            .clip(CircleShape)
+            .background(fill),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -350,7 +548,7 @@ private fun ObjectRow(row: ChoiceObjectRow) {
 /** Leading icon per row kind; null → the row draws a literal bullet / blank gutter instead. */
 private fun RowKind.icon(): ImageVector? = when (this) {
     RowKind.Item -> Icons.Outlined.Checklist
-    RowKind.Destination, RowKind.Name -> Icons.Outlined.FormatListBulleted
+    RowKind.Destination, RowKind.Name -> Icons.AutoMirrored.Outlined.FormatListBulleted
     RowKind.Time -> Icons.Outlined.Schedule
     RowKind.File -> Icons.Outlined.AttachFile
     RowKind.Count -> Icons.Outlined.NotificationsNone
@@ -359,14 +557,13 @@ private fun RowKind.icon(): ImageVector? = when (this) {
 }
 
 /**
- * "Remember my choice" — a checkbox, deliberately NOT a chip.
+ * "Remember my choice" — a switch row, deliberately NOT a chip.
  *
  * In this block a chip tap EXECUTES. A control that only toggles state must not wear the chip
  * shape, or the contract users learned in D1 ("tap = it happens") stops holding.
  *
- * The whole row is the target ([toggleable] with [Role.Checkbox]); the Checkbox itself takes a
- * null callback so the tap is not counted twice. Height comes from the Checkbox's own 48dp
- * minimum touch target.
+ * The whole row is the target ([toggleable] with [Role.Switch]); the [AppSwitch] itself takes a
+ * null callback so the tap is not counted twice. Never pre-checked (state rule, unchanged).
  */
 @Composable
 private fun MemoryRow(
@@ -377,55 +574,112 @@ private fun MemoryRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .toggleable(
                 value = checked,
                 enabled = enabled,
-                role = Role.Checkbox,
+                role = Role.Switch,
                 onValueChange = onCheckedChange,
-            ),
+            )
+            .padding(horizontal = 14.dp, vertical = AppDimens.SpacingXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
     ) {
-        // No AppCheckbox in the design system yet — raw M3 on theme tokens (the only checkbox in
-        // the chat surface). Worth promoting to core/designsystem if a second one appears.
-        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
         Text(
             text = stringResource(Res.string.chat_choice_remember),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
         )
+        AppSwitch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
 /**
- * Chip container. Every chat chip hugs its content width — never stretched, never full-width (the
- * global rule from the audit). The chips flow in a wrapping [FlowRow] with NO fixed row count, so
- * the layout self-adapts to N options (2, 3, … 6) by spilling onto as many rows as it needs. A long
- * label simply takes more of its row (and, at the extreme, wraps to two lines inside its own pill)
- * rather than forcing the whole block to a column of stretched buttons.
+ * Destination options as rows (spec §2.1 OptionRows): leading project dot (the checklist's avatar
+ * colour, [GistiColors.avatarContent] of [ChoiceOption.seedId]; a list icon when there is no seed),
+ * label `bodyLarge` (2 lines, then ellipsis) and the meta trailing — never dropped, it is what tells
+ * two identically named lists apart. Inset dividers between rows start under the label.
  *
- * Meta ("Shopping • 12 • 3 Jul") rides INSIDE the pill after the label (see [AiChoiceChip], called
- * with `fillWidth = false`) — a single hugging pill, NOT two `weight(1f)` children that would split
- * the space 50/50 and clip (the project's known "two weights split space" bug).
+ * Tap = execute, like a chip. The executing row swaps its dot for a spinner and its label for the
+ * executing label; every other row dims to 38% and stops taking taps.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChoiceChips(
+private fun OptionRows(
     options: List<ChoiceOption>,
     executingId: String?,
     executingLabel: String?,
     blockInteractive: Boolean,
     onSelect: (String) -> Unit,
+    inset: Boolean,
 ) {
     val fallbackLoading = stringResource(Res.string.chat_choice_executing_default)
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        // Tighter vertical rhythm between wrapped chip rows (4dp) than the horizontal gap (8dp).
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-    ) {
-        options.forEach { option ->
-            ChoiceChipFor(option, executingId, executingLabel, fallbackLoading, blockInteractive, onSelect, fillWidth = false)
+    val start = if (inset) OptionRowStart else 0.dp
+    val end = if (inset) 14.dp else 0.dp
+    options.forEachIndexed { index, option ->
+        val isThisLoading = executingId == option.id
+        val dim = if (blockInteractive || isThisLoading) 1f else DisabledAlpha
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable(
+                    enabled = blockInteractive,
+                    role = Role.Button,
+                    onClickLabel = option.label,
+                    onClick = { onSelect(option.id) },
+                )
+                .padding(start = start, end = end, top = AppDimens.SpacingSm, bottom = AppDimens.SpacingSm)
+                .alpha(dim),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(OptionRowGap),
+        ) {
+            val seed = option.seedId
+            Box(modifier = Modifier.size(OptionLeadSlot), contentAlignment = Alignment.Center) {
+                when {
+                    isThisLoading -> CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(OptionLeadSlot),
+                    )
+                    seed != null -> Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(GistiColors.avatarContent(seed)),
+                    )
+                    else -> Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(OptionLeadSlot),
+                    )
+                }
+            }
+            Text(
+                text = if (isThisLoading) (executingLabel ?: fallbackLoading) else option.label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            val meta = option.meta
+            if (meta != null && !isThisLoading) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+        if (index < options.lastIndex) {
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = AppChatColors.contentOutline(),
+                modifier = Modifier.padding(start = start + OptionLeadSlot + OptionRowGap),
+            )
         }
     }
 }
@@ -438,33 +692,28 @@ private fun ChoiceChipFor(
     fallbackLoading: String,
     blockInteractive: Boolean,
     onSelect: (String) -> Unit,
-    fillWidth: Boolean,
 ) {
     val isThisLoading = executingId == option.id
     AiChoiceChip(
         label = option.label,
         role = option.role,
         onClick = { onSelect(option.id) },
-        modifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier,
         enabled = blockInteractive,
         isLoading = isThisLoading,
         loadingLabel = if (isThisLoading) (executingLabel ?: fallbackLoading) else null,
-        leadingIcon = option.role.leadingIcon(),
+        leadingIcon = option.leadingIcon(),
         meta = option.meta,
-        fillWidth = fillWidth,
     )
 }
 
 /**
- * List of proposed / applied actions inside the prompt bubble (destructive lines tinted).
+ * List of proposed actions inside the bubble (spec §2.1 BatchActionList): a 20dp numbered circle
+ * per step (from TWO steps up — "1." on a single action reads like a broken list), destructive steps
+ * marked by a trash circle in `errorContainer` AND `error` text (icon + colour, never colour alone).
  *
- * Numbering appears only from TWO items up: since D1 a single-action choice also renders through
- * here (it is how the question gets its object), and "1. • Milk" reads like a broken list.
- *
- * NEVER truncated — takes no `compact` flag on purpose. Unlike the create-checklist preview rows
- * ([ObjectRows], capped at [PREVIEW_CAP_COMPACT] in the dock), the agent batch is the full plan the
- * user is being asked to approve: hiding step 3 of 4 in the dock would have them approve actions
- * they cannot see. Every step renders on every surface.
+ * NEVER truncated — takes no `compact` flag on purpose. The agent batch is the full plan the user
+ * is being asked to approve: hiding step 3 of 4 in the dock would have them approve actions they
+ * cannot see. Every step renders on every surface.
  */
 @Composable
 private fun BatchActionList(
@@ -472,38 +721,47 @@ private fun BatchActionList(
     modifier: Modifier = Modifier,
 ) {
     val numbered = items.size > 1
+    val cs = MaterialTheme.colorScheme
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
     ) {
         items.forEachIndexed { index, item ->
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (numbered) {
-                    Text(
-                        text = "${index + 1}.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (item.isDestructive) {
-                    Icon(
-                        imageVector = Icons.Outlined.DeleteForever,
-                        contentDescription = null,
-                        modifier = Modifier.size(AppDimens.IconSizeSm),
-                        tint = MaterialTheme.colorScheme.error,
-                    )
+                if (numbered || item.isDestructive) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            // chipFill, not a bare recessed(): on the dark chrome the bubble IS
+                            // recessed() and the circle would vanish (spec risk 9).
+                            .background(if (item.isDestructive) cs.errorContainer else AppChatColors.chipFill()),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (item.isDestructive) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = null,
+                                tint = cs.error,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        } else {
+                            Text(
+                                text = "${index + 1}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = cs.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
                 Text(
                     text = item.text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (item.isDestructive) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
+                    color = if (item.isDestructive) cs.error else cs.onSurface,
                 )
             }
         }
@@ -544,11 +802,18 @@ private fun EditField(
     )
 }
 
-/** Leading icon for a chip role: trash for Destructive, "+" for Add, none otherwise. */
-private fun ChoiceRole.leadingIcon(): ImageVector? = when (this) {
-    ChoiceRole.Destructive -> Icons.Outlined.Delete
-    ChoiceRole.Add -> Icons.Outlined.Add
-    ChoiceRole.Primary, ChoiceRole.Default, ChoiceRole.Escape -> null
+/**
+ * Leading icon of an option chip: the post-action pair carries its verb (Undo arrow, move-to-list
+ * folder — spec §2.1 post-action turn); otherwise by role — trash for Destructive, "+" for Add.
+ */
+private fun ChoiceOption.leadingIcon(): ImageVector? = when (action) {
+    is ChoiceAction.Undo -> Icons.AutoMirrored.Outlined.Undo
+    is ChoiceAction.MoveToList -> Icons.Outlined.DriveFileMove
+    else -> when (role) {
+        ChoiceRole.Destructive -> Icons.Outlined.Delete
+        ChoiceRole.Add -> Icons.Outlined.Add
+        ChoiceRole.Primary, ChoiceRole.Default, ChoiceRole.Escape -> null
+    }
 }
 
 /** Bullet for a preview row (a literal, like the renderer's — punctuation, not language). */
@@ -561,3 +826,10 @@ private const val PREVIEW_BULLET = "•"
  */
 private const val PREVIEW_CAP_COMPACT = 2
 private const val PREVIEW_CAP_FULL = 6
+
+private val ChoiceBubbleMaxWidth = 300.dp
+private val KindTileSize = 28.dp
+private val OptionRowStart = 12.dp
+private val OptionLeadSlot = 18.dp
+private val OptionRowGap = 10.dp
+private const val DisabledAlpha = 0.38f

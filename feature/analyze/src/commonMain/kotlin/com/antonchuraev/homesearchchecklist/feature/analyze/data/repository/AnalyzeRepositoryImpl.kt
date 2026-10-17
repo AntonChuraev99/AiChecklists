@@ -11,6 +11,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.util.FileReader
@@ -172,7 +173,8 @@ class AnalyzeRepositoryImpl(
             val newChecklist = Checklist(
                 name = name,
                 items = result.suggestedItems,
-                foldersEnabled = result.hasFolders
+                foldersEnabled = result.hasFolders,
+                separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
             )
             val checklistId = checklistRepository.addChecklist(newChecklist)
             Result.success(newChecklist.copy(id = checklistId))

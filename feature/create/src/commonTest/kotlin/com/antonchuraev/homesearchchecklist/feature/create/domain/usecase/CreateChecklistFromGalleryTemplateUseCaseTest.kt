@@ -237,6 +237,16 @@ class CreateChecklistFromGalleryTemplateUseCaseTest {
         assertTrue(rig.logger.errors.isEmpty(), "happy path must not log errors: ${rig.logger.errors}")
     }
 
+    /** A checklist created from a gallery template separates completed items (redesign B default). */
+    @Test
+    fun invoke_newChecklist_separatesCompletedByDefault() = runTest {
+        val rig = buildRig(AppResult.Success(template(GalleryTemplateItemData(text = "Passport", note = null))))
+
+        rig.useCase(SLUG)
+
+        assertTrue(rig.repository.addedChecklists.single().separateCompleted)
+    }
+
     /** Case 2 — note-less template: the fill write is skipped entirely (blank notes count as absent). */
     @Test
     fun invoke_whenTemplateHasNoNotes_createsChecklistWithoutWritingFill() = runTest {

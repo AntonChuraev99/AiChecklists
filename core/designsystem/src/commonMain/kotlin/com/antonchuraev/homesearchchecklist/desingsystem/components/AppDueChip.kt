@@ -1,10 +1,12 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTextStyles
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiSchedule
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiScheduleState
@@ -86,6 +89,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiScheduleStat
  * @param hasAlarm An OS alarm is actually armed for this task. A date alone never sets this: the
  *   date is free and unlimited, only the alarm is the metered thing, so the glyph is the one honest
  *   way to tell a user which of the two they have.
+ * @param compact Redesign B grouped-row variant: pill shape, 2dp vertical padding, and the
+ *   alarm/repeat glyph moved to the LEADING slot (replacing the calendar icon) — "⏰ Today 17:00".
+ *   Overdue keeps its own icon and outline. Default `false` renders exactly as before.
  */
 @Composable
 fun AppDueChip(
@@ -95,9 +101,22 @@ fun AppDueChip(
     maxWidth: Dp = AppItemMetaChipDefaults.maxWidth,
     isRepeating: Boolean = false,
     hasAlarm: Boolean = false,
+    compact: Boolean = false,
 ) {
     val colors = GistiSchedule.colors(state)
-    val shape = MaterialTheme.shapes.extraSmall
+    val shape = if (compact) AppShapeTokens.Pill else MaterialTheme.shapes.extraSmall
+    val glyph = trailingGlyph(isRepeating = isRepeating, hasAlarm = hasAlarm)
+    // Compact (redesign B grouped row): ONE leading glyph. The alarm/repeat glyph replaces the
+    // calendar icon instead of trailing it - except Overdue, whose EventBusy icon is a meaning
+    // channel (with its outline) that must survive; there the glyph stays trailing.
+    val promoteGlyph = compact && glyph != null && state != GistiScheduleState.Overdue
+    // Leading, the alarm reads as the mock's alarm clock ("⏰ 17:00"), not the trailing bell.
+    val leadingIcon = when {
+        !promoteGlyph -> state.icon()
+        isRepeating -> Icons.Outlined.Repeat
+        else -> Icons.Outlined.Alarm
+    }
+    val trailingIcon = if (promoteGlyph) null else glyph
 
     // A dashed outline is not expressible as a BorderStroke (which is brush + width, no PathEffect),
     // so the dashed case is drawn by the modifier below and the `border` parameter stays null.
@@ -107,7 +126,7 @@ fun AppDueChip(
     val dashedBorderColor = colors.border?.takeIf { colors.borderDashed }
 
     AppItemMetaChip(
-        icon = state.icon(),
+        icon = leadingIcon,
         label = label,
         containerColor = colors.container,
         contentColor = colors.content,
@@ -118,7 +137,10 @@ fun AppDueChip(
         },
         maxWidth = maxWidth,
         border = solidBorder,
-        trailingIcon = trailingGlyph(isRepeating = isRepeating, hasAlarm = hasAlarm),
+        trailingIcon = trailingIcon,
+        shape = shape,
+        contentPadding = if (compact) AppDueChipDefaults.CompactPadding else AppItemMetaChipDefaults.ContentPadding,
+        iconSize = if (compact) AppDueChipDefaults.CompactIconSize else AppItemMetaChipDefaults.IconSize,
         // Tabular figures: without them "9:05" and "18:00" are different widths and the chip
         // breathes on every tick.
         labelStyle = AppTextStyles.monoTime,
@@ -140,6 +162,12 @@ object AppDueChipDefaults {
 
     /** Gap between dashes. Equal to [DashLength] — an even dash reads as "provisional". */
     val DashGap: Dp = 3.dp
+
+    /** Compact (grouped-row) padding: a lighter ~20dp pill instead of the ~24dp tag. */
+    val CompactPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+
+    /** Compact leading glyph — the alarm/repeat glyph promoted to the front. */
+    val CompactIconSize: Dp = 13.dp
 }
 
 /** The icon that identifies each state. Chosen so the four are distinguishable without colour. */

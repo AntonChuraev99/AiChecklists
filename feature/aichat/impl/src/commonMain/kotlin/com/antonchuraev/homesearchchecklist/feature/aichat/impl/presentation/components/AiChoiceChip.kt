@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
@@ -30,9 +31,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
  * Fully rounded ([RoundedCornerShape] 50%). The fill / text / border color is derived from the
  * [ChoiceRole]:
  * - [ChoiceRole.Primary]     primary / onPrimary (the recommended action, max one per block)
- * - [ChoiceRole.Default]     primaryContainer / onPrimaryContainer
+ * - [ChoiceRole.Default]     `AppChatColors.chipFill()` / onSurface, leading icon in primary (B pass 2)
  * - [ChoiceRole.Destructive] error / onError + a leading trash icon supplied by the caller
- * - [ChoiceRole.Escape]      `AppChatColors.raised()` + 1dp `controlOutline()` + onSurfaceVariant text
+ * - [ChoiceRole.Escape]      ghost: no fill, no ring, onSurfaceVariant text, 12dp padding (B pass 2)
  * - [ChoiceRole.Add]         the SAME fill and outline + onSurface text + a leading "+" from the caller
  *
  * The first three are absolute (they carry their own hue); the two NEUTRAL roles resolve against the
@@ -112,25 +113,44 @@ internal fun AiChoiceChip(
     // "that carry no outline at all", because it exists to be a fill that works as the ONLY channel.
     // Both roles here have a ring. Revisit if the page stops being near-white, or when a production
     // path starts emitting `Add` and it needs to be told apart from `Escape` by more than its label.
+    //
+    // ## Redesign B pass 2 ("Actions inside the turn")
+    // The chips now live INSIDE the assistant bubble, so two roles moved:
+    //  - Default → the cream-sand `chipFill()` with an `onSurface` label (leading icon `primary`). It
+    //    is a borderless fill on top of the bubble, so it must be a real step off `raised()` on both
+    //    planes — `chipFill()` owns the one cell where `recessed()` would vanish (dark chrome).
+    //  - Escape → a ghost: no fill, no ring, `onSurfaceVariant` label. It sits in the SAME flow as the
+    //    other actions now, and a quiet text chip is what tells it apart from them (owner decision
+    //    O2, 2026-10-17). Its 48dp target is unchanged (`minimumInteractiveComponentSize`).
+    // Add keeps the raised fill + firm ring — no production path emits it (see above).
     val container: Color = when (role) {
         ChoiceRole.Primary -> cs.primary
-        ChoiceRole.Default -> cs.primaryContainer
+        ChoiceRole.Default -> AppChatColors.chipFill()
         ChoiceRole.Destructive -> cs.error
-        ChoiceRole.Escape, ChoiceRole.Add -> AppChatColors.raised()
+        ChoiceRole.Escape -> Color.Transparent
+        ChoiceRole.Add -> AppChatColors.raised()
     }
     val content: Color = when (role) {
         ChoiceRole.Primary -> cs.onPrimary
-        ChoiceRole.Default -> cs.onPrimaryContainer
+        ChoiceRole.Default -> cs.onSurface
         ChoiceRole.Destructive -> cs.onError
         ChoiceRole.Escape -> cs.onSurfaceVariant
         ChoiceRole.Add -> cs.onSurface
+    }
+    // The leading icon carries the accent on the neutral-filled Default chip; every other role tints
+    // its icon like its label.
+    val iconTint: Color = when (role) {
+        ChoiceRole.Default -> cs.primary
+        else -> content
     }
     // Dim the whole chip — fill, text, icon AND ring — uniformly when disabled. We can't disable
     // Surface's onClick AND keep custom colors with one flag, so we drop alpha on the colors and gate
     // onClick. The old `if (container == Color.Transparent)` guard is gone with the transparent role
     // it guarded: every role now has a fill, so every role dims the same way.
     val dimAlpha = if (enabled) 1f else 0.38f
-    val effectiveContainer = container.copy(alpha = dimAlpha)
+    // Multiply, never overwrite: the Escape ghost's `Color.Transparent` is black at alpha 0, so
+    // `copy(alpha = 1f)` would paint it a solid black pill.
+    val effectiveContainer = container.copy(alpha = container.alpha * dimAlpha)
     val effectiveContent = content.copy(alpha = dimAlpha)
 
     // Both neutral roles are tap targets, so both take the firm control outline. Escape used to take
@@ -144,10 +164,11 @@ internal fun AiChoiceChip(
     // transparent with a soft hairline; moving both neutral roles onto the firm ring is what made it
     // show.
     val border: BorderStroke? = when (role) {
-        ChoiceRole.Escape, ChoiceRole.Add ->
+        ChoiceRole.Add ->
             BorderStroke(1.dp, AppChatColors.controlOutline().copy(alpha = dimAlpha))
         else -> null
     }
+    val horizontalPadding = if (role == ChoiceRole.Escape) 12.dp else 16.dp
 
     Surface(
         onClick = onClick,
@@ -161,7 +182,7 @@ internal fun AiChoiceChip(
         Row(
             modifier = Modifier
                 .defaultMinSize(minHeight = 40.dp)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = horizontalPadding, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -175,6 +196,7 @@ internal fun AiChoiceChip(
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
+                    tint = iconTint.copy(alpha = dimAlpha),
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -184,6 +206,7 @@ internal fun AiChoiceChip(
             Text(
                 text = if (isLoading) (loadingLabel ?: label) else label,
                 style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = maxLines,
                 // See the KDoc: the label — not the meta — is what gives way when a chip carries
                 // both and the name is long.

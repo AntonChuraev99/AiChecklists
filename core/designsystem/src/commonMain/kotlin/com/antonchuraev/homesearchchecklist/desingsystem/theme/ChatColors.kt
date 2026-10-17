@@ -173,6 +173,37 @@ object AppChatColors {
     }
 
     /**
+     * Fill of a BORDERLESS chip drawn on a cream surface — the redesign-B "soft" chip: due-rail
+     * presets and planner cells inside the capture dock's composer card, the detail screen's create
+     * chips in their soft style.
+     *
+     * A step DOWN from the cream it sits on, carried by the fill alone (no ring), so it has to be a
+     * real step in both themes:
+     *
+     * | | Backdrop | This |
+     * |---|---|---|
+     * | Page plane (incl. the composer card), light | `card` `#FFFDF9` | `recessed` `#EFE9DF` |
+     * | Page plane (incl. the composer card), dark | `card` `#221F1B` | `recessed` `#2D2924` |
+     * | Chrome plane, light | `bottomChromeRaised` `#FFFDF9` | `recessed` |
+     * | Chrome plane, dark | `bottomChromeRaised` = `surfaceContainerHigh` | `surfaceContainerHighest` |
+     *
+     * The last row is the reason this is an accessor and not a bare `recessed()`: in dark,
+     * `bottomChromeRaised()` and `recessed()` are the SAME value, so a recessed chip on a raised
+     * chrome surface would vanish (spec B pass 2, §2.1 / risk 9). The composer card provides the
+     * [ChatSurfaceTone.Page] tone for its content, so its chips resolve through the first two rows.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun chipFill(): Color = when (LocalChatSurfaceTone.current) {
+        ChatSurfaceTone.Page -> AppSurface.recessed()
+        ChatSurfaceTone.BottomChrome -> if (LocalIsDarkTheme.current) {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        } else {
+            AppSurface.recessed()
+        }
+    }
+
+    /**
      * Border of an INTERACTIVE element — chips, the input pill, the collapsed dock bar.
      *
      * Plane-independent: `outline` clears 3 : 1 against every surface in this system, so it does not
