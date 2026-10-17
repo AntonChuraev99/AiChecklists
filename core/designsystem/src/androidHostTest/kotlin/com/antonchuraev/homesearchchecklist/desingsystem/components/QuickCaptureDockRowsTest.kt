@@ -170,7 +170,9 @@ class QuickCaptureDockRowsTest {
             onTextChange = {},
             onAdd = {},
             placeholder = "Add a task…",
-            aboveInput = {
+            // `attributes` — inside the composer card, where both capture hosts mount their date
+            // presets since redesign B pass 2.
+            attributes = {
                 Text(
                     text = PresetsMarker,
                     style = MaterialTheme.typography.labelMedium,
@@ -179,7 +181,13 @@ class QuickCaptureDockRowsTest {
                 )
             },
             belowInput = if (withSourceRow) {
-                { SourceRowSection(title = SectionHeadingMarker, onSelect = {}) }
+                {
+                    SourceRowSection(
+                        title = SectionHeadingMarker,
+                        onSelect = {},
+                        style = SourceRowSectionStyle.Dock,
+                    )
+                }
             } else {
                 null
             },

@@ -122,6 +122,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
@@ -238,6 +239,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiC
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiItemCreatePromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
@@ -4576,6 +4578,11 @@ private fun ItemCreateChipsRow(
      * LazyColumn already applies the screen padding (double padding — rule `ui-card-patterns`).
      */
     horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
+    /**
+     * The redesign-B-pass-2 look for the chips inside the capture dock's composer card (borderless
+     * soft fill, selected = `primaryContainer` + check). Same chips, same intents — visual only.
+     */
+    soft: Boolean = false,
 ) {
     val tz = TimeZone.currentSystemDefault()
     val pickTimeLabel = state.itemCreateReminderAt
@@ -4600,7 +4607,7 @@ private fun ItemCreateChipsRow(
             Box(
                 modifier = Modifier
                     .padding(horizontal = horizontalPadding)
-                    .padding(bottom = AppDimens.SpacingSm)
+                    .padding(top = if (soft) AppDimens.SpacingSm else 0.dp, bottom = AppDimens.SpacingSm)
             ) {
                 TokenChipPreview(
                     label = resolveChipLabel(token.display),
@@ -4610,6 +4617,7 @@ private fun ItemCreateChipsRow(
         }
         GistiSelectableChipRow(
             contentPadding = PaddingValues(horizontal = horizontalPadding),
+            style = if (soft) GistiSelectableChipStyle.Soft else GistiSelectableChipStyle.Outlined,
             chips = gistiItemCreatePromptChips(
                 in1HourLabel = stringResource(Res.string.item_create_chip_in_1_hour),
                 tomorrowMorningLabel = stringResource(Res.string.item_create_chip_tomorrow_morning),
@@ -4653,9 +4661,16 @@ private fun ItemCreateAttachmentStrip(
     onRemove: (sourcePath: String) -> Unit,
     /** See [ItemCreateChipsRow]'s parameter of the same name — 0.dp from the v2 inline row. */
     horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
+    /**
+     * The composer-card look (redesign B pass 2): 56dp tiles with a 14dp corner and a remove control
+     * that is a 24dp `onSurface` disc inside a full 48dp target. The v2 inline row keeps today's 64dp
+     * tiles (default false).
+     */
+    composer: Boolean = false,
 ) {
     if (pending.isEmpty()) return
-    val tileShape = RoundedCornerShape(8.dp)
+    val tileSize = if (composer) ComposerAttachmentTile else 64.dp
+    val tileShape = RoundedCornerShape(if (composer) ComposerAttachmentCorner else 8.dp)
     val removeLabel = stringResource(Res.string.item_create_remove_attachment)
     LazyRow(
         modifier = Modifier
@@ -4665,7 +4680,7 @@ private fun ItemCreateAttachmentStrip(
         contentPadding = PaddingValues(vertical = AppDimens.SpacingXs),
     ) {
         items(pending, key = { it.sourcePath }) { att ->
-            Box(modifier = Modifier.size(64.dp)) {
+            Box(modifier = Modifier.size(tileSize)) {
                 Surface(
                     shape = tileShape,
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -4695,27 +4710,65 @@ private fun ItemCreateAttachmentStrip(
                         }
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(2.dp)
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .clickable { onRemove(att.sourcePath) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = removeLabel,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp),
-                    )
+                if (composer) {
+                    // A full 48dp TARGET inside the 56dp tile (top-end), the 24dp disc drawn in its
+                    // corner — the old 20dp control failed the 48dp floor. The tile itself has no
+                    // other action, so the large target steals nothing.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(AppDimens.MinTouchTarget)
+                            .clickable(role = Role.Button) { onRemove(att.sourcePath) }
+                            .semantics { contentDescription = removeLabel },
+                        contentAlignment = Alignment.TopEnd,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                // Hangs over the tile's corner (into the strip's 4dp vertical
+                                // padding and the 8dp gap) so it covers the corner, not the
+                                // thumbnail's subject — the canvas placement.
+                                .offset(x = ComposerRemoveOverhang, y = -ComposerRemoveOverhang)
+                                .size(ComposerRemoveDisc)
+                                .background(MaterialTheme.colorScheme.onSurface, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { onRemove(att.sourcePath) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = removeLabel,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/** Composer-card attachment tile, its corner and the remove disc (spec B pass 2: 56 / 14 / 24). */
+private val ComposerAttachmentTile = 56.dp
+private val ComposerAttachmentCorner = 14.dp
+private val ComposerRemoveDisc = 24.dp
+private val ComposerRemoveOverhang = 4.dp
 
 /**
  * The v2 Standard add-task surface (redesign B): a bottom plate that replaces BOTH the old inline add
@@ -4742,6 +4795,23 @@ private fun DetailCapturePlate(
     dockModifier: Modifier = Modifier,
 ) {
     if (state.itemCreateMode) {
+        // A typed val, not `if` inline in the argument: a lambda produced by an expression branch is
+        // not reliably typed @Composable, and KSP fails on it ("No fir element for KtParameter").
+        val attachmentsSlot: (@Composable () -> Unit)? =
+            if (state.itemCreatePendingAttachments.isNotEmpty()) {
+                {
+                    ItemCreateAttachmentStrip(
+                        pending = state.itemCreatePendingAttachments,
+                        onRemove = { sourcePath ->
+                            onIntent(ChecklistDetailIntent.OnRemoveItemCreatePendingAttachment(sourcePath))
+                        },
+                        horizontalPadding = 0.dp,
+                        composer = true,
+                    )
+                }
+            } else {
+                null
+            }
         QuickCaptureDock(
             text = state.pendingItemInput,
             onTextChange = { onIntent(ChecklistDetailIntent.OnItemInputChanged(it)) },
@@ -4754,19 +4824,16 @@ private fun DetailCapturePlate(
                 parsedToken = state.parsedToken,
             ).smartAddHighlightRange(),
             modifier = dockModifier,
-            aboveInput = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                ) {
-                    ItemCreateChipsRow(state = state, onIntent = onIntent)
-                    ItemCreateAttachmentStrip(
-                        pending = state.itemCreatePendingAttachments,
-                        onRemove = { sourcePath ->
-                            onIntent(ChecklistDetailIntent.OnRemoveItemCreatePendingAttachment(sourcePath))
-                        },
-                    )
-                }
+            // Redesign B pass 2: staged files at the top of the composer card, the same chip set
+            // under the text row. Visual only — same intents, same state.
+            attachments = attachmentsSlot,
+            attributes = {
+                ItemCreateChipsRow(
+                    state = state,
+                    onIntent = onIntent,
+                    horizontalPadding = AppDimens.SpacingSm,
+                    soft = true,
+                )
             },
             trailingToggle = {
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnItemCreateAttachClick) }) {

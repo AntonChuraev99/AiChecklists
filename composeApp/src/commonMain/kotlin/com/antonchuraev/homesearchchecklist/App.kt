@@ -224,6 +224,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.voi
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.logVoiceRecorderError
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AttachedChoiceActions
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatBody
@@ -1652,8 +1653,12 @@ fun App() {
                                         // The full-screen chat shows both — message in the list, chips
                                         // under it — but this peek frame renders ONE branch, so the chips
                                         // arrived context-free: "Undo" WHAT? Render the message above them.
-                                        val choicePrompt = chatUiState.pendingChoice!!.choice.prompt
-                                        if (choicePrompt.isBlank() && lastAssistantMessage != null) {
+                                        // B pass 2: the chips render INSIDE that message's bubble
+                                        // (attachedActions), one turn — the same as the full chat.
+                                        val pendingNow = chatUiState.pendingChoice!!
+                                        val choicePrompt = pendingNow.choice.prompt
+                                        val attachToReply = choicePrompt.isBlank() && lastAssistantMessage != null
+                                        if (attachToReply && lastAssistantMessage != null) {
                                             ChatMessageBubble(
                                                 message = lastAssistantMessage,
                                                 onFeedbackClick = { msg ->
@@ -1672,20 +1677,28 @@ fun App() {
                                                     { chatViewModel.sendIntent(ChatScreenIntent.OnRetryClick(text)) }
                                                 },
                                                 showAvatar = true,
+                                                attachedActions = {
+                                                    AttachedChoiceActions(
+                                                        pending = pendingNow,
+                                                        onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                                                        onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                                                        onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                                                    )
+                                                },
                                             )
-                                            Spacer(Modifier.height(AppDimens.SpacingSm))
+                                        } else {
+                                            AiChoiceResponse(
+                                                pending = pendingNow,
+                                                onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                                                onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                                                onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                                                // The dock: fewer preview rows fit under the frame cap.
+                                                compact = true,
+                                                onMemoryToggle = { enabled ->
+                                                    chatViewModel.sendIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled))
+                                                },
+                                            )
                                         }
-                                        AiChoiceResponse(
-                                            pending = chatUiState.pendingChoice!!,
-                                            onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
-                                            onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
-                                            onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
-                                            // The dock: fewer preview rows fit under the frame cap.
-                                            compact = true,
-                                            onMemoryToggle = { enabled ->
-                                                chatViewModel.sendIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled))
-                                            },
-                                        )
                                     }
                                     chatUiState.isProcessing -> {
                                         ChatTypingIndicator()

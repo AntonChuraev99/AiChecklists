@@ -25,7 +25,26 @@ data class ChatChoice(
      * the item, the list AND the time — three entities a one-slot prompt could never fit.
      */
     val objectRows: List<ChoiceObjectRow> = emptyList(),
+    /**
+     * What kind of proposal this block is — drives the type tile in the bubble header (redesign B,
+     * pass 2). Null = unknown or not a proposal (post-action chips, AI answer options) → no tile.
+     * Set only where the builder actually knows the kind; never guessed from copy.
+     */
+    val kind: ChoiceKind? = null,
 )
+
+/**
+ * The kind of a [ChatChoice] proposal, for the header type tile.
+ *
+ * - [CreateChecklist] a new checklist (by name or from an attachment).
+ * - [AddItems]        one or more items added to a list.
+ * - [Reminder]        a reminder set on an item, or a mass reminder move.
+ * - [Batch]           the agent's numbered plan of several actions.
+ * - [PickList]        "Which list?" — the options are destination checklists.
+ * - [Move]            moving an item to another list (the options may be destinations).
+ * - [Delete]          an irreversible removal (an item, or the completed items of a list).
+ */
+enum class ChoiceKind { CreateChecklist, AddItems, Reminder, Batch, PickList, Move, Delete }
 
 /**
  * One selectable choice chip.
@@ -40,6 +59,10 @@ data class ChatChoice(
  *               the full form lives in the chip's contentDescription.
  * @param role   Visual + semantic role (drives chip color + icon).
  * @param action What happens when the chip is tapped.
+ * @param seedId Id of the destination checklist this option stands for, or null when the option is
+ *               not a destination or its list could not be resolved. The renderer feeds it to the
+ *               same colour seed as checklist avatars (`GistiColors.avatarContent(seedId)`), so the
+ *               dot on a "Which list?" row matches that project's colour everywhere else.
  */
 data class ChoiceOption(
     val id: String,
@@ -47,6 +70,7 @@ data class ChoiceOption(
     val meta: String? = null,
     val role: ChoiceRole = ChoiceRole.Default,
     val action: ChoiceAction,
+    val seedId: Long? = null,
 )
 
 /**

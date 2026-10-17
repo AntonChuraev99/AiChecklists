@@ -44,6 +44,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.PendingChoice
@@ -111,27 +112,27 @@ class ChatSurfacePlanesScreenshotTest {
         Locale.setDefault(defaultLocale)
     }
 
-    @Test fun planes_360_light() = shoot("w360dp-h2000dp")
+    @Test fun planes_360_light() = shoot("w360dp-h2400dp")
 
-    @Test fun planes_360_dark() = shoot("w360dp-h2000dp", dark = true)
+    @Test fun planes_360_dark() = shoot("w360dp-h2400dp", dark = true)
 
     @Test fun planes_320_light_ru_fontScale13() = shoot(
-        qualifiers = "ru-rRU-w320dp-h2400dp",
+        qualifiers = "ru-rRU-w320dp-h2800dp",
         copy = russian,
         fontScale = 1.3f,
         locale = Locale("ru", "RU"),
     )
 
     @Test fun planes_412_dark_fontScale15() = shoot(
-        qualifiers = "w412dp-h2600dp",
+        qualifiers = "w412dp-h3000dp",
         dark = true,
         fontScale = 1.5f,
     )
 
-    @Test fun planes_600_light() = shoot("w600dp-h2000dp")
+    @Test fun planes_600_light() = shoot("w600dp-h2300dp")
 
     @Test fun planes_360_light_hi_fontScale13() = shoot(
-        qualifiers = "hi-rIN-w360dp-h2400dp",
+        qualifiers = "hi-rIN-w360dp-h2800dp",
         copy = hindi,
         fontScale = 1.3f,
         locale = Locale("hi", "IN"),
@@ -314,6 +315,10 @@ class ChatSurfacePlanesScreenshotTest {
         val escape: String,
         val add: String,
         val dockHint: String,
+        /** B pass 2: the D1 offer rides INSIDE the reply — Undo ghost + Move (a Default chip). */
+        val postReply: String = "Added «milk» to Groceries.",
+        val undo: String = "Undo",
+        val move: String = "Move to another list",
     )
 
     private val english = Copy(
@@ -363,6 +368,9 @@ class ChatSurfacePlanesScreenshotTest {
         escape = "Отмена",
         add = "Всё равно добавить",
         dockHint = "Спросите Gisti…",
+        postReply = "Добавил «молоко» в «Покупки».",
+        undo = "Отменить",
+        move = "В другой список",
     )
 
     private val hindi = english.copy(
@@ -383,6 +391,9 @@ class ChatSurfacePlanesScreenshotTest {
         escape = "रद्द करें",
         add = "फिर भी जोड़ें",
         dockHint = "Gisti से पूछें…",
+        postReply = "«दूध» किराना में जोड़ा।",
+        undo = "पूर्ववत करें",
+        move = "दूसरी सूची में ले जाएं",
     )
 
     @Composable
@@ -423,6 +434,7 @@ class ChatSurfacePlanesScreenshotTest {
                     onEditChange = {},
                     onEditConfirm = {},
                 )
+                PostActionReply(copy)
                 Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
                     // Add takes its leading "+" here because production does: the icon comes from
                     // `ChoiceRole.leadingIcon()` at the AiChoiceResponse call site, not from inside
@@ -522,6 +534,9 @@ class ChatSurfacePlanesScreenshotTest {
                                 onEditConfirm = {},
                                 compact = true,
                             )
+                            // The Default chip on THIS plane is spec risk 9: in dark the bubble is
+                            // bottomChromeRaised = recessed(), so a bare recessed() chip would vanish.
+                            PostActionReply(copy)
                             Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
                                 AiChoiceChip(label = copy.escape, role = ChoiceRole.Escape, onClick = {})
                                 AiChoiceChip(
@@ -602,6 +617,7 @@ class ChatSurfacePlanesScreenshotTest {
                     label = label,
                     role = ChoiceRole.Default,
                     action = ChoiceAction.Dismiss,
+                    seedId = index + 1L,
                 )
             },
             escape = ChoiceOption(
@@ -610,8 +626,28 @@ class ChatSurfacePlanesScreenshotTest {
                 role = ChoiceRole.Escape,
                 action = ChoiceAction.Dismiss,
             ),
+            kind = ChoiceKind.PickList,
         ),
     )
+
+    /** A result reply carrying the D1 offer inside its bubble (Undo ghost + Move Default chip). */
+    @Composable
+    private fun PostActionReply(copy: Copy) {
+        val pending = PendingChoice(
+            choice = ChatChoice(
+                prompt = "",
+                options = listOf(
+                    ChoiceOption(id = "undo", label = copy.undo, role = ChoiceRole.Escape, action = ChoiceAction.Dismiss),
+                    ChoiceOption(id = "move", label = copy.move, role = ChoiceRole.Default, action = ChoiceAction.Dismiss),
+                ),
+            ),
+        )
+        ChatMessageBubble(
+            message = ChatMessage(id = "post", role = ChatRole.Assistant, content = copy.postReply, timestamp = 0L),
+            showAvatar = true,
+            attachedActions = { AttachedChoiceActions(pending = pending, onSelect = {}) },
+        )
+    }
 
     @Composable
     private fun PlaneLabel(text: String, modifier: Modifier = Modifier) {

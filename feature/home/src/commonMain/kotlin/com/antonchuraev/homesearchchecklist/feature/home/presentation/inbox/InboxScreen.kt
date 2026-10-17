@@ -180,6 +180,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.ImportantSta
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSectionStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureScrimBottomPx
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
@@ -483,6 +484,10 @@ fun InboxScreen(
                         // is what guarantees the offsets belong to THIS string — see its KDoc; both
                         // capture hosts derive it exactly this way and neither computes offsets.
                         highlightRange = content.draft.smartAddHighlightRange(),
+                        // Owner decision O3: the keyboard goes down while the planner is open (it
+                        // and the planner do not fit a 360×800 window together) and comes back on
+                        // Done. UI-local — the dock owns focus, the draft is untouched.
+                        inputSuspended = content.due.plannerExpanded,
                         // The THIRD tile of the scrim, and the one that is easy to forget because
                         // nothing about it is dim: it is painted BEHIND an opaque dock, so the only
                         // pixels it ever reaches are the two the dock's `SheetTop` clips away. Those
@@ -511,7 +516,11 @@ fun InboxScreen(
                         //
                         // The Smart-Add token preview goes with the old row on purpose — the leading
                         // chip is now the single answer to "when" and shows the parsed phrase itself.
-                        aboveInput = {
+                        //
+                        // Inside the composer card since redesign B pass 2, under the text row: the
+                        // date is a property of the task being typed, so it shares the task's card.
+                        // 8dp edge inset — the card already sits 12dp in from the plate.
+                        attributes = {
                             DueRailSection(
                                 draft = content.draft,
                                 due = content.due,
@@ -520,6 +529,7 @@ fun InboxScreen(
                                 // list behind it about whether a time has passed — and so a
                                 // screenshot can pin it.
                                 nowMillis = content.nowMillis,
+                                horizontalPadding = AppDimens.SpacingSm,
                             )
                         },
                         // Important, in the input row beside the "+" since 2026-09-03 — it used to be
@@ -563,6 +573,7 @@ fun InboxScreen(
                             CollapsibleSourceRow(collapsed = content.due.plannerExpanded) {
                                 SourceRowSection(
                                     title = stringResource(Res.string.capture_dock_ai_entry_title),
+                                    style = SourceRowSectionStyle.Dock,
                                     onSelect = { kind ->
                                         onIntent(
                                             InboxIntent.OnAiSourceTapped(

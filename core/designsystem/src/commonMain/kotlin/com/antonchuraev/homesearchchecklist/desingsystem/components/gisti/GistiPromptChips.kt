@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Schedule
@@ -445,11 +446,14 @@ fun <T> GistiSelectableChipRow(
     onChipClick: (T) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = AppDimens.ScreenPaddingHorizontal),
+    style: GistiSelectableChipStyle = GistiSelectableChipStyle.Outlined,
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        horizontalArrangement = Arrangement.spacedBy(
+            if (style == GistiSelectableChipStyle.Soft) AppDimens.SpacingXs else AppDimens.SpacingSm,
+        ),
     ) {
         items(chips) { chip ->
             SelectablePromptChipItem(
@@ -457,10 +461,25 @@ fun <T> GistiSelectableChipRow(
                 label = chip.label,
                 selected = chip.selected,
                 onClick = { onChipClick(chip.action) },
+                style = style,
             )
         }
     }
 }
+
+/**
+ * How a [GistiSelectableChipRow] draws its chips.
+ *
+ * - [Outlined] — the chat-dock look: [AppChatColors.raised] fill + `controlOutline` ring, selected =
+ *   solid `primary`. Every caller that does not opt in.
+ * - [Soft] — redesign B pass 2, for chips inside the capture dock's composer card: borderless
+ *   [AppChatColors.chipFill], selected = `primaryContainer` with a check glyph in place of the leading
+ *   icon (same 16dp, so selection never changes the chip's width).
+ */
+enum class GistiSelectableChipStyle { Outlined, Soft }
+
+/** Visible height of a [GistiSelectableChipStyle.Soft] chip inside its 48dp target. */
+private val SoftChipVisualHeight = 32.dp
 
 /**
  * ONE selectable chip, for a host that places it inside a layout of its own.
@@ -511,7 +530,9 @@ private fun SelectablePromptChipItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     labelVisible: Boolean = true,
+    style: GistiSelectableChipStyle = GistiSelectableChipStyle.Outlined,
 ) {
+    val soft = style == GistiSelectableChipStyle.Soft
     // Percentage-based rather than a hardcoded 19dp: identical at the 38dp resting height, and it
     // stays a pill once ru/hi copy or a large font scale grows the chip past that.
     val shape = AppShapeTokens.Pill
@@ -525,13 +546,24 @@ private fun SelectablePromptChipItem(
     // words with no button under them. Now the fill carries the separation and the outline is the
     // second channel; both resolve against the plane the chip is drawn on (see AppChatColors).
     // A selected chip still fills solid `primary` — the blue active state is unchanged.
-    val containerColor = if (selected) MaterialTheme.colorScheme.primary else AppChatColors.raised()
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+    val containerColor = when {
+        soft && selected -> MaterialTheme.colorScheme.primaryContainer
+        soft -> AppChatColors.chipFill()
+        selected -> MaterialTheme.colorScheme.primary
+        else -> AppChatColors.raised()
     }
-    val border = if (selected) {
+    val contentColor = when {
+        soft && selected -> MaterialTheme.colorScheme.onPrimaryContainer
+        soft -> MaterialTheme.colorScheme.onSurface
+        selected -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val iconTint = when {
+        soft && selected -> MaterialTheme.colorScheme.primary
+        soft -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> contentColor
+    }
+    val border = if (selected || soft) {
         null
     } else {
         BorderStroke(1.dp, AppChatColors.controlOutline())
@@ -558,8 +590,8 @@ private fun SelectablePromptChipItem(
             // heightIn, never height: a fixed 38dp clips Devanagari (matras sit above *and* below
             // the baseline) and clips any label at fontScale >= 1.3. The chip is allowed to grow.
             // minimumInteractiveComponentSize() stays — it is what keeps the touch target at 48dp
-            // while the visible pill rests at 38dp.
-            .heightIn(min = 38.dp)
+            // while the visible pill rests at 38dp (32dp in the soft style).
+            .heightIn(min = if (soft) SoftChipVisualHeight else 38.dp)
             .minimumInteractiveComponentSize(),
     ) {
         val centeredLineHeight = LineHeightStyle(
@@ -574,9 +606,10 @@ private fun SelectablePromptChipItem(
             modifier = Modifier.padding(horizontal = if (labelVisible) 14.dp else 16.dp),
         ) {
             Icon(
-                imageVector = icon,
+                // Soft + selected: a check replaces the leading glyph (same 16dp — no width change).
+                imageVector = if (soft && selected) Icons.Filled.Check else icon,
                 contentDescription = null,
-                tint = contentColor,
+                tint = iconTint,
                 modifier = Modifier.size(16.dp),
             )
             if (labelVisible) {

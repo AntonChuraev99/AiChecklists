@@ -67,6 +67,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AttachedChoiceActions
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -503,6 +504,11 @@ fun ChatMessageList(
         state.messages.lastOrNull { it.role == ChatRole.Assistant }?.id
     }
     var revealedActionsFor by remember { mutableStateOf<String?>(null) }
+    // B pass 2 "actions inside the turn": a BLANK-prompt choice (D1 Undo / Move, AI answer options)
+    // belongs to the reply that already said the outcome or asked the question, so its actions
+    // render inside that reply's bubble instead of as a second, context-free block under it. Only
+    // when the newest message IS that assistant reply — otherwise the stand-alone block stays.
+    val attachChoiceTo = attachedChoiceMessageId(state.messages, state.pendingChoice)
 
     LazyColumn(
         modifier = modifier
@@ -522,7 +528,7 @@ fun ChatMessageList(
             }
         }
 
-        state.pendingChoice?.let { pending ->
+        state.pendingChoice?.takeIf { attachChoiceTo == null }?.let { pending ->
             item(key = "choice_block") {
                 AiChoiceResponse(
                     pending = pending,
@@ -566,6 +572,16 @@ fun ChatMessageList(
                 onToggleActions = {
                     revealedActionsFor = if (revealedActionsFor == message.id) null else message.id
                 },
+                attachedActions = state.pendingChoice?.takeIf { message.id == attachChoiceTo }?.let { pending ->
+                    {
+                        AttachedChoiceActions(
+                            pending = pending,
+                            onSelect = { id -> onIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                            onEditChange = { onIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                            onEditConfirm = { onIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                        )
+                    }
+                },
             )
         }
 
@@ -575,6 +591,17 @@ fun ChatMessageList(
             }
         }
     }
+}
+
+/**
+ * Id of the reply a BLANK-prompt [pending] choice renders inside (B pass 2): the newest message,
+ * when it is an assistant one. Null → no pending choice, a prompt-carrying one (it has its own
+ * bubble), or nothing to attach to (the stand-alone block renders instead).
+ */
+fun attachedChoiceMessageId(messages: List<ChatMessage>, pending: PendingChoice?): String? {
+    if (pending == null || pending.choice.prompt.isNotBlank()) return null
+    val newest = messages.lastOrNull() ?: return null
+    return newest.id.takeIf { newest.role == ChatRole.Assistant }
 }
 
 /**
@@ -645,6 +672,7 @@ private val mockChoice = PendingChoice(
             role = ChoiceRole.Escape,
             action = ChoiceAction.FreeForm("add milk to shopping"),
         ),
+        kind = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceKind.AddItems,
     ),
 )
 

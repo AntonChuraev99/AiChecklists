@@ -34,5 +34,5 @@ v2 Inbox, checklist detail, AI chat and the design tokens move to direction B, p
 
 ## Не сделано
 
-- Interactive onboarding toggle and the MCP server (`mcp-server/src/mutate.ts`) still create lists with `separateCompleted = false` — owner decision pending.
+- The MCP server (`mcp-server/src/mutate.ts`) still creates lists with `separateCompleted = false` — owner's choice (2026-10-17); the interactive onboarding toggle now starts ON.
 - Not verified on a device or on the wasmJs dev server: keyboard lifting the capture plate, tap on chat bubble text, mic permission flow.

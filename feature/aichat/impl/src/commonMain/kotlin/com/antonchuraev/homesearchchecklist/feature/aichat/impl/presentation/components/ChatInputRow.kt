@@ -20,6 +20,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -73,6 +74,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -224,6 +226,9 @@ fun ChatInputRow(
     // Track drag-cancel locally to drive the Crossfade icon state
     var isDragCancel by remember { mutableStateOf(false) }
 
+    // UI-local: drives the focus ring on the pill (the host callback below is unchanged).
+    var isFieldFocused by remember { mutableStateOf(false) }
+
     // Scale animation: 1.0f → 1.2f when recording (spec §2)
     val micIconScale by animateFloatAsState(
         targetValue = if (isRecording) 1.2f else 1.0f,
@@ -265,7 +270,14 @@ fun ChatInputRow(
             // in the dock rather than a pill on it. `outline`, not `outlineVariant`, because this is
             // a tappable target. See AppChatColors.
             color = AppChatColors.raised(),
-            border = BorderStroke(1.dp, AppChatColors.controlOutline()),
+            // B pass 2 §2.1: 2dp primary ring while the field has focus — the same rule as the
+            // capture dock's composer card — 1dp control outline otherwise. The 28dp radius on a
+            // 56dp minimum IS the pill at one line and stays 28 as the field grows.
+            border = if (isFieldFocused) {
+                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            } else {
+                BorderStroke(1.dp, AppChatColors.controlOutline())
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp),
@@ -336,25 +348,22 @@ fun ChatInputRow(
                 if (newValue.text != text) onTextChange(newValue.text)
             },
             placeholder = {
-                // Force the hint to a single line regardless of the field being multiline
-                // (singleLine=false / maxLines=4 below). Without this the wider RU string
-                // "Сообщение Gisti" wraps to 2 lines in the narrow weight(1f) slot. Ellipsis is a
-                // safety net only — the hint is short enough to fit; typed text still grows to 4 lines.
+                // Up to TWO lines (B pass 2 §2.1, iteration-10 open item): at 320dp the RU hint
+                // "Сообщение Gisti" beside the credits chip truncated to "Сооб…" on one line — a
+                // wrapped hint reads, a clipped one does not. The pill grows (heightIn, never a fixed
+                // height). Ellipsis only past the second line; typed text still grows to 4 lines.
                 // While transcribing the hint is a STATUS, not an invitation to type: full-strength
                 // onSurface (the idle hint is the weaker onSurfaceVariant) and a polite live region so
                 // TalkBack announces it once instead of leaving a silent disabled field.
-                androidx.compose.material3.Text(
+                // The status may wrap to a second line at large font scales — a cut-off
+                // «Recogni…» is not a status; the idle hint gets the same two lines (see above).
+                ChatInputPlaceholder(
                     text = placeholder,
-                    style = MaterialTheme.typography.bodyLarge,
                     color = if (isTranscribing) {
                         MaterialTheme.colorScheme.onSurface
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    // The status may wrap to a second line at large font scales — a cut-off
-                    // «Recogni…» is not a status. The idle hint stays single-line (see above).
-                    maxLines = if (isTranscribing) 2 else 1,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = if (isTranscribing) {
                         Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     } else {
@@ -368,7 +377,10 @@ fun ChatInputRow(
             modifier = Modifier
                 .weight(1f)
                 .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base }
-                .onFocusChanged { onFocusChanged?.invoke(it.isFocused) },
+                .onFocusChanged {
+                    isFieldFocused = it.isFocused
+                    onFocusChanged?.invoke(it.isFocused)
+                },
             // Item-create (simpleSendOnly): Enter/Done adds the item (parity with the removed inline
             // field) and the first letter auto-capitalizes (Sentences). AI-chat path is unchanged.
             keyboardOptions = KeyboardOptions(
@@ -612,6 +624,41 @@ fun ChatInputRow(
         }  // end Row
         }  // end Surface
     }  // end Column
+}
+
+/**
+ * The field hint: up to TWO lines, but only ever broken BETWEEN words.
+ *
+ * At 320dp × fontScale 1.5 the RU word «Сообщение» alone is wider than the slot left between the
+ * credits chip and attach / mic, so a plain `maxLines = 2` broke it mid-word («Сообщ / ение …») —
+ * worse than the old one-line «Сооб…». When every word fits the slot the hint wraps on words (2
+ * lines); when one does not, it falls back to a single ellipsised line. Measured against the slot's
+ * own constraints, so the decision follows the real width, font scale and locale.
+ */
+@Composable
+private fun ChatInputPlaceholder(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val style = MaterialTheme.typography.bodyLarge
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier = modifier) {
+        val maxWidthPx = constraints.maxWidth
+        val bounded = constraints.hasBoundedWidth
+        val wrapsOnWords = remember(text, style, maxWidthPx, bounded) {
+            !bounded || text.split(' ').filter { it.isNotEmpty() }.all { word ->
+                measurer.measure(text = word, style = style, maxLines = 1, softWrap = false).size.width <= maxWidthPx
+            }
+        }
+        Text(
+            text = text,
+            style = style,
+            color = color,
+            maxLines = if (wrapsOnWords) 2 else 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /** Content of [ChatInputRow]'s leading slot (redesign B §2.10). */

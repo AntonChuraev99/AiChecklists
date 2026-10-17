@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSectionStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.captureDockScrimColor
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
@@ -395,7 +396,9 @@ class V2ShellBottomBarScreenshotTest {
                     // The scrim's third tile, exactly as both hosts pass it: behind the dock, so its
                     // clipped `SheetTop` shoulders read as the DIMMED page instead of the raw one.
                     modifier = Modifier.background(captureDockScrimColor()),
-                    aboveInput = {
+                    // Inside the composer card, where both hosts mount their date row since
+                    // redesign B pass 2.
+                    attributes = {
                         Text(
                             text = "Today   Tomorrow   Important",
                             style = MaterialTheme.typography.labelMedium,
@@ -415,6 +418,7 @@ class V2ShellBottomBarScreenshotTest {
                         SourceRowSection(
                             title = stringResource(Res.string.capture_dock_ai_entry_title),
                             onSelect = {},
+                            style = SourceRowSectionStyle.Dock,
                         )
                     },
                 )

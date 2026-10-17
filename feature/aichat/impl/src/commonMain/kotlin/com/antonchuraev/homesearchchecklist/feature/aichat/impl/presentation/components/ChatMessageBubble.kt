@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -131,6 +132,9 @@ internal fun AssistantAvatarSlot(showAvatar: Boolean, modifier: Modifier = Modif
  *                          the bubble is not clickable.
  * @param onPaywallCta Invoked by the "Become Pro" CTA shown inside an out-of-credits reply.
  * @param onRetry Invoked by the "Retry" chip on a recoverable-error reply (re-sends `retryText`).
+ * @param attachedActions Assistant only: the actions of a blank-prompt pending choice that belongs to
+ *                  THIS reply (D1 Undo / Move, AI answer options), rendered inside the bubble under
+ *                  the divider — build it with [AttachedChoiceActions]. Null → the reply's own chips only.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -147,6 +151,7 @@ fun ChatMessageBubble(
     isLatestAssistant: Boolean = true,
     actionsRevealed: Boolean = false,
     onToggleActions: (() -> Unit)? = null,
+    attachedActions: (@Composable () -> Unit)? = null,
 ) {
     if (message.role == ChatRole.User) {
         UserBubble(message = message, modifier = modifier)
@@ -163,6 +168,7 @@ fun ChatMessageBubble(
             showAvatar = showAvatar,
             showActions = isLatestAssistant || actionsRevealed,
             onToggleActions = if (isLatestAssistant) null else onToggleActions,
+            attachedActions = attachedActions,
         )
     }
 }
@@ -232,6 +238,7 @@ private fun AssistantBubble(
     showAvatar: Boolean,
     showActions: Boolean,
     onToggleActions: (() -> Unit)?,
+    attachedActions: (@Composable () -> Unit)?,
 ) {
     val clipboardManager = LocalClipboardManager.current
     val showRetry = message.retryText != null && onRetry != null
@@ -278,14 +285,25 @@ private fun AssistantBubble(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                         )
                     }
-                    // Action chips INSIDE the bubble (B §2.9): real AiChoiceChip buttons that hug
-                    // their content, in a wrapping FlowRow. The CTA label is a full sentence, so
-                    // maxLines = 2 lets a long localisation wrap instead of clipping.
+                    // Action chips INSIDE the bubble (B §2.9), under an inner divider (B pass 2,
+                    // "actions inside the turn"): real AiChoiceChip buttons that hug their content,
+                    // in a wrapping FlowRow. The CTA label is a full sentence, so maxLines = 2 lets
+                    // a long localisation wrap instead of clipping. A blank-prompt choice that
+                    // belongs to this reply (Undo / Move, AI answer options) renders right after,
+                    // in the same actions area ([attachedActions]).
+                    if (hasChips || attachedActions != null) {
+                        HorizontalDivider(thickness = 1.dp, color = AppChatColors.contentOutline())
+                    }
                     if (hasChips) {
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
                             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            modifier = Modifier.padding(
+                                start = AppDimens.SpacingMd,
+                                end = AppDimens.SpacingMd,
+                                top = 10.dp,
+                                bottom = if (attachedActions != null) 0.dp else AppDimens.SpacingMd,
+                            ),
                         ) {
                             if (onOpenChecklist != null) {
                                 AiChoiceChip(
@@ -332,6 +350,7 @@ private fun AssistantBubble(
                             }
                         }
                     }
+                    attachedActions?.invoke()
                 }
             }
         }

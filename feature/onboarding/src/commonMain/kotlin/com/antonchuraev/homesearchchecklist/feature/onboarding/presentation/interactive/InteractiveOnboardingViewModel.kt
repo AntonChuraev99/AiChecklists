@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
@@ -488,7 +489,7 @@ class InteractiveOnboardingViewModel(
                         selectedTemplate = null,
                         customizedItems = emptyList(),
                         checklistName = "",
-                        separateCompleted = false,
+                        separateCompleted = NEW_CHECKLIST_SEPARATE_COMPLETED,
                         autoDeleteCompleted = false,
                         wasTemplateStepSkipped = false
                     )

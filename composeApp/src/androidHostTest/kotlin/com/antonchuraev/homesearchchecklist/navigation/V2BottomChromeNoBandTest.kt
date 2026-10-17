@@ -20,6 +20,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSection
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceRowSectionStyle
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
@@ -271,7 +272,8 @@ class V2BottomChromeNoBandTest {
                     modifier = Modifier.onGloballyPositioned {
                         dockTopPx = it.positionInRoot().y.toInt()
                     },
-                    aboveInput = {
+                    // Inside the composer card, where both hosts mount it since redesign B pass 2.
+                    attributes = {
                         Text(
                             text = "Today   Tomorrow   Important",
                             style = MaterialTheme.typography.labelMedium,
@@ -291,6 +293,7 @@ class V2BottomChromeNoBandTest {
                         SourceRowSection(
                             title = stringResource(Res.string.capture_dock_ai_entry_title),
                             onSelect = {},
+                            style = SourceRowSectionStyle.Dock,
                         )
                     },
                 )
