@@ -460,6 +460,9 @@ fun V2ChatDockOverlay(
             hazeState = hazeState,
             bottomPadding = AppDimens.SpacingSm,
             containerColor = dockColor,
+            // No top hairline: this sheet is only mounted over its own scrim (V2ChatMotion.ScrimAlpha),
+            // and the scrim plus the SheetTop rounding already carry the edge.
+            showTopHairline = false,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 // Capped BEFORE fillMaxWidth (a max after a fixed width is ignored): the dock is one

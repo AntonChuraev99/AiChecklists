@@ -58,13 +58,14 @@ val LocalChatSurfaceTone = staticCompositionLocalOf { ChatSurfaceTone.Page }
  * plane no longer needs the loud line.
  *
  * ## Two outline roles, and the difference is what the element IS
- * Measured 2026-10-18 (redesign B palette). Light: page and chat sheet are both `#F4EFE7`, the
- * capture-dock chrome is `#DCE2EC`. Dark: page `#161412`, chat sheet `#221F1B`, chrome `#191D25`.
+ * Measured 2026-10-18 (redesign B palette, bottom chrome variant A). Light: page and chat sheet are
+ * both `#F4EFE7`, the capture-dock chrome is `#E4DCD0`. Dark: page `#161412`; chat sheet and chrome
+ * are both `#221F1B` (a coincidence of the palette — two accessors, two decisions).
  *
- * | | Role | Light page·sheet / chrome | Dark page / sheet / chrome | Used by |
+ * | | Role | Light page·sheet / chrome | Dark page / sheet·chrome | Used by |
  * |---|---|---|---|---|
- * | [controlOutline] | `outline` | 4.15 / 3.64 : 1 | 5.18 / 4.63 / 4.76 : 1 | anything TAPPABLE — chips, the input pill, the dock bar |
- * | [contentOutline] | `outlineVariant` | 1.17 / 1.03 : 1 | 1.45 / 1.29 / 1.33 : 1 | the AI bubble — content, already separated by its own fill |
+ * | [controlOutline] | `outline` | 4.15 / 3.49 : 1 | 5.18 / 4.63 : 1 | anything TAPPABLE — chips, the input pill, the dock bar |
+ * | [contentOutline] | `outlineVariant` | 1.17 / 1.02 : 1 | 1.45 / 1.29 : 1 | the AI bubble — content, already separated by its own fill |
  *
  * The bubble keeps the soft line on purpose: it is not a target, it does not have to announce a hit
  * area, and a firm ring around every answer turns a conversation into a stack of framed cards. Its
@@ -100,10 +101,10 @@ object AppChatColors {
      * |---|---|---|---|
      * | Light, page | `#F4EFE7` | `#FFFDF9` | +4.7 |
      * | Light, chat sheet | `#F4EFE7` | `#FFFDF9` | +4.7 |
-     * | Light, capture chrome | `#DCE2EC` | `#FFFDF9` | +9.7 |
+     * | Light, capture chrome | `#E4DCD0` | `#FFFDF9` | +11.3 |
      * | Dark, page | `#161412` | `#221F1B` | +5.5 |
      * | Dark, chat sheet | `#221F1B` | `#2D2924` | +4.9 |
-     * | Dark, capture chrome | `#191D25` | `#2D2924` | +6.2 |
+     * | Dark, capture chrome | `#221F1B` | `#2D2924` | +4.9 |
      */
     @Composable
     @ReadOnlyComposable
@@ -129,8 +130,8 @@ object AppChatColors {
      * | Dark, page | `#161412` | `#221F1B`, ΔL\* +5.5 | `surfaceContainerHigh` `#2D2924`, ΔL\* +10.4 |
      * | Light, chat sheet | `#F4EFE7` | `#FFFDF9`, ΔL\* +4.7 | same, +4.7 |
      * | Dark, chat sheet | `#221F1B` | `#2D2924`, ΔL\* +4.9 | same, +4.9 |
-     * | Light, capture chrome | `#DCE2EC` | `#FFFDF9`, ΔL\* +9.7 | same, +9.7 |
-     * | Dark, capture chrome | `#191D25` | `#2D2924`, ΔL\* +6.2 | same, +6.2 |
+     * | Light, capture chrome | `#E4DCD0` | `#FFFDF9`, ΔL\* +11.3 | same, +11.3 |
+     * | Dark, capture chrome | `#221F1B` | `#2D2924`, ΔL\* +4.9 | same, +4.9 |
      *
      * The page row is why this exists: on the pre-B near-white page (`#FBFAF8`) [raised] was ΔL\*
      * +1.7, and recorded with it the cost badge's pill vanished under the user bubble and left a

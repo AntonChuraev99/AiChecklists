@@ -220,6 +220,10 @@ fun GistiChatDock(
  * @param containerColor Fill of the dock. Defaults to the bottom-chrome tone ([gistiDockColor]); the
  *                      v2 chat sheet passes [AppSurface.chatSheet] (variant A, warm). Content inside
  *                      keeps `ChatSurfaceTone.BottomChrome` either way — see AppSurface.chatSheet.
+ * @param showTopHairline Whether to trace the top edge and top corners with the 1dp seam line.
+ *                      Default `true` (MainScreen / ChecklistDetailScreen, where the dock sits on the
+ *                      page). The v2 chat sheet passes `false`: it is only ever mounted over its own
+ *                      scrim, so the scrim and the rounded `SheetTop` already carry the edge.
  */
 @Composable
 fun GistiGlassChatDock(
@@ -227,6 +231,7 @@ fun GistiGlassChatDock(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = AppDimens.SpacingLg,
     containerColor: Color = gistiDockColor(),
+    showTopHairline: Boolean = true,
     // Optional slot rendered as the TOPMOST element of the dock (above the chips) — the drag grabber.
     grabberContent: (@Composable () -> Unit)? = null,
     chipsContent: (@Composable () -> Unit)? = null,
@@ -244,6 +249,9 @@ fun GistiGlassChatDock(
     // other two bottom surfaces it is seen stacked with. Identical arithmetic on Android and Skiko.
     // ([hazeState] is retained for call-site/source compatibility but is no longer sampled — the dock
     // no longer blurs behind it.)
+    // The v2 chat sheet opts out of the hairline ([showTopHairline] = false): it is mounted only over
+    // its own scrim, which together with the `SheetTop` rounding separates it from the page, and the
+    // owner asked for the line to go there. The control-arm docks above keep both channels.
     val dockColor = containerColor
     // The SAME seam token QuickCaptureDock traces its top edge with — these two docks are seen in one
     // frame and their top edges are the same edge of the same app. `outlineVariant` measured `#E2E0DB`
@@ -271,12 +279,13 @@ fun GistiGlassChatDock(
         // edge, which is why this survived: every frame in the suite was a phone until
         // `mainGlassDock_840dp_light/dark` were added to record the geometry that shows it.
         //
-        // Suppressed in the legacy debug variant (the old dock had no border at all).
+        // Suppressed in the legacy debug variant (the old dock had no border at all) and when the
+        // caller opts out via [showTopHairline] (v2 chat sheet).
         modifier = modifier
             .fillMaxWidth()
             .drawWithContent {
                 drawContent()
-                if (!legacyDock) {
+                if (!legacyDock && showTopHairline) {
                     val stroke = 1.dp.toPx()
                     val r = AppShapeTokens.BottomChromeCorner.toPx()
                     val inset = stroke / 2f

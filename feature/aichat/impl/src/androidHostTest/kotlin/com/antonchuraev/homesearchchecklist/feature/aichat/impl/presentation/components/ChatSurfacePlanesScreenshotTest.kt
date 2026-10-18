@@ -469,6 +469,7 @@ class ChatSurfacePlanesScreenshotTest {
             GistiGlassChatDock(
                 hazeState = hazeState,
                 containerColor = AppSurface.chatSheet(),
+                showTopHairline = false,
                 chipsContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
                         PlaneLabel(

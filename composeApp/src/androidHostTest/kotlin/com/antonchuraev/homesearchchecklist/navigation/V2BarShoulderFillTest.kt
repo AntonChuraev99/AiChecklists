@@ -488,9 +488,10 @@ class V2BarShoulderFillTest {
      * dark: a card row above the bar read `#1A1C20` exactly like the bar did, so the check failed on
      * a correct frame, and a guard that cannot tell two planes apart in one theme is not a guard.
      *
-     * That collision is GONE since 2026-09-03 — the chrome is its own literal (`GistiColors.chrome`,
-     * `#191D25` dark / `#DCE2EC` light) while `card()` stays on the palette's neutrals, so the two
-     * differ in both themes again. The check is still not reinstated here, deliberately: this method
+     * The collision went away on 2026-09-03 (a cool chrome literal) and is BACK since 2026-10-18:
+     * bottom chrome variant A is `surfaceContainerHighest` `#E4DCD0` light / `surfaceContainerLow`
+     * `#221F1B` dark, so in dark `card() == bottomChrome()` once more. That is expected, and it is one
+     * more reason the one-pixel check stays out. It is still not reinstated here, deliberately: this method
      * validates a RULER, and "what is above it" is the subject of [assertShoulderIsThePage], which
      * already names both colours and scans the whole strip rather than sampling one pixel. Adding a
      * second, weaker copy of that claim here would only give the next reader two places to edit.

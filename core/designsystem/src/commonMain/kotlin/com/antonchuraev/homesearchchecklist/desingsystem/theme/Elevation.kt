@@ -182,7 +182,9 @@ object AppSurface {
      * own tone (ΔL\* 0.0) and the bubbles would vanish into it.
      *
      * ⛔ Not [bottomChrome]: the v2 bar, the quick-capture dock and the control-arm docks stay on the
-     * cool chrome. Only the chat sheet moved, so it owns its own accessor.
+     * chrome (variant A, 2026-10-18: light `#E4DCD0`, a rung below this sheet). Only the chat sheet
+     * moved, so it owns its own accessor. In dark the two bodies agree today (`#221F1B`) — a
+     * coincidence of the palette, not a link: re-tuning one must not drag the other.
      */
     @Composable
     @ReadOnlyComposable
@@ -214,52 +216,58 @@ object AppSurface {
      * the v1 `AppNavigationBar`. Those four are approved as they are and must not move; lifting
      * [docked] to satisfy the bottom chrome would move all of them.
      *
-     * ## The measurements this encodes
-     * ⚠️ **Pre-B tables.** The rows below were measured against the "variant D" cream page `#FBFAF8`
-     * and the cool dark page `#121317`. Redesign B (2026-10-16) moved the page to sand `#F4EFE7` /
-     * warm dark `#161412` and kept the chrome frozen: chrome ↔ page is now ΔL\* −4.9 in light (was
-     * −8.6) and +4.2 in dark, so the 28dp `SheetTop` corners carry more of the edge. Do not "fix"
-     * that with a shadow or a chrome re-tune — both are rejected decisions (see below).
+     * ## The value: variant A «Песок на ступень темнее» (2026-10-18)
+     * Light `surfaceContainerHighest` `#E4DCD0`, dark `surfaceContainerLow` `#221F1B`. The chrome
+     * leaves the cool literal it had owned since 2026-09-03 (`#DCE2EC` / `#191D25`, a blue lean that
+     * matched the pre-B blue-black page) and rejoins the warm sand ramp of redesign B, one rung DOWN
+     * from the page in light and one rung UP in dark — the ladder's documented asymmetry (see below).
      *
      * Contrast RATIO is close to useless for judging two near-black or two near-white surfaces — the
      * WCAG formula compresses the whole dark ramp into a hair's breadth. The number that matches what
      * an eye sees is **ΔL\*** (CIE lightness), so both are quoted and ΔL\* is the one that decides.
      *
+     * | Relationship (B palette) | Cool literal (2026-09-03) | **Variant A** | Verdict |
+     * |---|---|---|---|
+     * | chrome ↔ page, light (`#F4EFE7`) | −4.9 · 1.14 : 1 | **−6.5 · 1.19 : 1** | a firmer edge, plus the 28dp corners |
+     * | chrome ↔ page, dark (`#161412`) | +4.2 · 1.09 : 1 | **+5.5 · 1.12 : 1** | same step as a card off the page |
+     * | [bottomChromeRaised] ↔ chrome, light (`#FFFDF9`) | +9.7 | **+11.3** | pills / field / cells still lifted |
+     * | [bottomChromeRaised] ↔ chrome, dark (`#2D2924`) | +6.2 | **+4.9** | plus the 1dp `controlOutline` |
+     * | seam [bottomChromeSeam] on chrome, light | 3.64 : 1 | **3.49 : 1** | ≥3 : 1 |
+     * | seam on chrome, dark (`outlineVariant`) | ΔL\* +10.4 | **ΔL\* +9.1** | unchanged role |
+     * | idle nav label ([onBottomChrome] @0.92) light | 4.79 : 1 | **4.58 : 1** | AA — thin, see the alpha |
+     * | idle nav label dark @0.75 | 5.77 : 1 | **5.68 : 1** | AA |
+     * | [bottomChromeAccent] pill / FAB on chrome, light | 4.41 : 1 | **4.23 : 1** | ≥3 : 1 (1.4.11) |
+     * | accent on chrome, dark | 9.65 : 1 | **9.38 : 1** | fine |
+     *
+     * ⚠️ Light has almost no room left on the idle label: 4.58 : 1 is at `BOTTOM_CHROME_IDLE_ALPHA_LIGHT`
+     * 0.92, and dropping that alpha — or darkening this tone further — falls under AA 4.5 : 1.
+     *
+     * ⚠️ In dark this tone IS [card] (both `surfaceContainerLow`) — and [chatSheet] — again. Neither
+     * coincidence is a link: the three answer different questions and are re-tuned separately, which
+     * is why this body names the role itself instead of forwarding to either of them. What it costs:
+     * anything drawn on the chrome in dark must step off it through [bottomChromeRaised], never [card]
+     * (ΔL\* 0.0 there) — the reason [bottomChromeRaised] exists at all.
+     *
+     * ## History — the rejected candidates, measured on the PRE-B page
+     * Kept because they record WHY each direction was refused; the absolute ΔL\* values were taken
+     * against the "variant D" cream page `#FBFAF8` and the cool dark page `#121317`, not today's.
+     *
      * | Light: candidate ↔ page `#FBFAF8` (L\* 98.3) | ΔL\* | ratio |
      * |---|---|---|
      * | `surfaceContainerLowest` `#FFFFFF` — the REJECTED bar | +1.7 | 1.04 : 1 |
-     * | `surfaceContainerHighest` `#E6E4DF` | −7.7 | 1.22 : 1 |
-     * | **[GistiColors.chrome] `#DCE2EC` — chosen 2026-09-03** | **−8.6** | **1.25 : 1** |
-     * | `surfaceDim` `#DEDCD6` — the REJECTED warm grey | −10.5 | 1.31 : 1 |
+     * | cool literal `#DCE2EC` — chosen 2026-09-03, replaced 2026-10-18 | −8.6 | 1.25 : 1 |
+     * | `surfaceDim` `#DEDCD6` — the REJECTED (cool) grey of that palette | −10.5 | 1.31 : 1 |
      * | `inverseSurface` `#322F35` — the REJECTED ink plinth | −78.4 | 12.63 : 1 |
      *
      * | Dark: candidate ↔ page `#121317` (L\* 5.9) | ΔL\* | ratio |
      * |---|---|---|
      * | `surfaceContainerLowest` `#0D0E11` | −2.0 | 1.04 : 1 |
-     * | `surfaceContainerLow` `#1A1C20` — the previous value | +4.3 | 1.09 : 1 |
-     * | **[GistiColors.chrome] `#191D25` — chosen 2026-09-03** | **+4.85** | **1.10 : 1** |
-     * | `surfaceContainerHigh` `#26282E` | +10.2 | 1.26 : 1 |
+     * | cool literal `#191D25` — chosen 2026-09-03, replaced 2026-10-18 | +4.85 | 1.10 : 1 |
      * | `surfaceContainerHighest` `#2D2F35` — the REJECTED pale slab | +13.5 | 1.39 : 1 |
      *
-     * ## Why a literal, and what the 2026-09-03 re-tune had to survive
-     * The owner rejected the family as GREY, not as mis-levelled ("мне не нравится текущий серый
-     * цвет"), so the axis of this re-tune is CHROMA and no Material role can supply it: every neutral
-     * in this palette at this lightness is a warm grey of chroma ~3. [GistiColors.chrome] is therefore
-     * the one hex the bottom chrome owns, and it is spent on hue while every relationship the family
-     * was tuned for is kept inside a rounding error of where it was:
-     *
-     * | Relationship | Before | After | Verdict |
-     * |---|---|---|---|
-     * | raised ↔ chrome, light (`#FFFFFF`) | +12.2 | +10.3 | pills / field / cells still read as lifted |
-     * | raised ↔ chrome, dark (`#26282E`) | +5.9 | +5.35 | plus the 1dp `controlOutline`, unchanged |
-     * | seam [bottomChromeSeam] on chrome, light | 3.33 : 1 | 3.50 : 1 | better |
-     * | idle nav label ([onBottomChrome] @0.82) light | 4.50 : 1 | ≈4.75 : 1 | AA, with more headroom |
-     * | idle nav label dark @0.75 | 6.18 : 1 | ≈6.07 : 1 | AA |
-     * | [bottomChromeAccent] pill / FAB on chrome, light | 4.19 : 1 | 4.42 : 1 | ≥3 : 1 (1.4.11), room |
-     * | accent on chrome, dark | 9.75 : 1 | 9.58 : 1 | fine |
-     *
-     * **Nothing measured gets worse in light; dark moves by ≤0.2 of a ratio point.** That is the whole
-     * safety argument for changing a colour four screenshot suites are pinned to.
+     * The 2026-09-03 literal answered "мне не нравится текущий серый цвет" with CHROMA, because the
+     * pre-B neutrals at that lightness were all a flat grey. Redesign B gave the palette a warm sand
+     * ramp with chroma of its own, so a role can carry the hue again and the literal is gone.
      *
      * ## Why dark goes UP and light goes DOWN — and why "mirror the light fix" is arithmetically wrong
      * The instinct after the light fix is to mirror it: if light gets a plinth DARKER than the page,
@@ -293,7 +301,11 @@ object AppSurface {
      */
     @Composable
     @ReadOnlyComposable
-    fun bottomChrome(): Color = GistiColors.chrome
+    fun bottomChrome(): Color = if (LocalIsDarkTheme.current) {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
 
     /**
      * Colour of the 1dp line tracing the TOP edge of a [bottomChrome] surface — the chat dock's
@@ -303,7 +315,9 @@ object AppSurface {
      * ΔL\* +1.4 (1.04 : 1), an edge-tracing line the colour of the edge it traces, leaving the whole
      * separation to the chrome's own −10.5 step off the page. Light is therefore lifted to `outline`
      * (3.33 : 1 on this surface); dark keeps `outlineVariant`, which was already ΔL\* +9.2 there and
-     * needed no help.
+     * needed no help. (Pre-B palette.) On variant A (2026-10-18) the argument holds harder still:
+     * light `outlineVariant` `#E6DED1` on the `#E4DCD0` chrome is ΔL\* +0.7, `outline` `#7A7266` is
+     * 3.49 : 1; dark `outlineVariant` `#37322B` on `#221F1B` is ΔL\* +9.1.
      *
      * ## Why it is its own accessor and not [dockedSeam]
      * The two bodies are identical TODAY and that is a coincidence of the current palette, exactly as
@@ -348,14 +362,14 @@ object AppSurface {
      * component inside the bottom chrome has [bottomChrome] behind it, so the step that has to be
      * visible is the one off THAT surface, and it is a different arithmetic in each theme:
      *
-     * | | Chrome | This | ΔL\* | ratio |
+     * | | Chrome (variant A, 2026-10-18) | This | ΔL\* | ratio |
      * |---|---|---|---|---|
-     * | Light | `surfaceDim` `#DEDCD6` (L\* 87.8) | `surfaceContainerLowest` `#FFFFFF` (L\* 100) | **+12.2** | 1.31 : 1 |
-     * | Dark | `surfaceContainerLow` `#1A1C20` (L\* 10.2) | `surfaceContainerHigh` `#26282E` (L\* 16.1) | **+5.9** | 1.16 : 1 |
+     * | Light | `surfaceContainerHighest` `#E4DCD0` | `surfaceContainerLowest` `#FFFDF9` | **+11.3** | 1.34 : 1 |
+     * | Dark | `surfaceContainerLow` `#221F1B` | `surfaceContainerHigh` `#2D2924` | **+4.9** | 1.14 : 1 |
      *
-     * Dark had to move: [card] resolves to the chrome's OWN tone there (both `surfaceContainerLow`),
-     * i.e. ΔL\* 0.0, and `surfaceContainerLowest` — what the chat shipped — is `#0D0E11`, ΔL\* −6.2
-     * BELOW the chrome. A surface darker than the slab it rests on reads as a hole punched in the
+     * Dark had to move: [card] resolves to the chrome's OWN tone there (both `surfaceContainerLow` —
+     * true when this was written, untrue under the 2026-09-03 cool literal, true again under variant
+     * A), i.e. ΔL\* 0.0, and `surfaceContainerLowest` — what the chat shipped — sat BELOW the chrome. A surface darker than the slab it rests on reads as a hole punched in the
      * dock, not as a control lying on it, and it breaks [AppSurface]'s own rule that the dark ladder
      * only runs up.
      *
@@ -481,11 +495,11 @@ object AppSurface {
      * hole again, just a dark one. Dropping the fill entirely is worse still and in the opposite
      * direction — measured `#FAFAFA` in BOTH themes, the window backdrop, i.e. the original defect.
      *
-     * ## What the run down the edge looks like now
+     * ## What the run down the edge looks like now (variant A, 2026-10-18)
      * | | Shoulder | Chrome | Reads as |
      * |---|---|---|---|
-     * | Light | `#FBFAF8` (L\* 98.3) | `#DEDCD6` (L\* 87.8) | the page continuing behind a dim slab |
-     * | Dark | `#121317` (L\* 5.9) | `#1A1C20` (L\* 10.2) | the page continuing behind a lifted slab |
+     * | Light | `#F4EFE7` | `#E4DCD0` (ΔL\* −6.5) | the page continuing behind a dim slab |
+     * | Dark | `#161412` | `#221F1B` (ΔL\* +5.5) | the page continuing behind a lifted slab |
      *
      * page → shoulder → chrome, with the first two now EQUAL and nothing brighter than the page in
      * either theme. That equality is the assertion (`V2BarShoulderFillTest.theShoulderIsThePage_*`) and
@@ -509,8 +523,9 @@ object AppSurface {
      * Idle destination content, light theme.
      *
      * Redesign B (2026-10-16): 0.82 → 0.92. The warmer `onSurfaceVariant` `#5B554C` at 0.82 on the
-     * frozen chrome `#DCE2EC` blends to 3.87:1 and fails AA; at 0.92 it is ≈4.75:1. The "4.50 : 1 at
-     * 0.82" figure in [onBottomChrome]'s KDoc is the pre-B palette.
+     * then-frozen chrome `#DCE2EC` blends to 3.87:1 and fails AA; at 0.92 it is ≈4.75:1. On the
+     * variant-A chrome `#E4DCD0` (2026-10-18) it is 4.58:1 — still AA, with less room: do not lower
+     * this. The "4.50 : 1 at 0.82" figure in [onBottomChrome]'s KDoc is the pre-B palette.
      */
     private const val BOTTOM_CHROME_IDLE_ALPHA_LIGHT = 0.92f
 
