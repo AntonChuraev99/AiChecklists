@@ -163,6 +163,35 @@ object AppSurface {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
 
+    /**
+     * Background of the AI-chat SHEET — the v2 chat dock that rises from the AI button, its
+     * full-screen "third floor" overlay, and the system-nav strip painted under the dock.
+     *
+     * Variant A «Тёплый лист» (owner's pick, 2026-10-18): the sheet leaves the cool bottom-chrome
+     * family and joins the warm family of the theme, like the page-hosted `ChatScreen` after
+     * redesign B. Light is the sand page itself, dark is one tonal step up off the dark page:
+     *
+     * | | This | vs page | raised (AI bubble) on it |
+     * |---|---|---|---|
+     * | Light | `surface` `#F4EFE7` | same plane — separated by the scrim + 28dp corners | `#FFFDF9`, ΔL\* +4.7 |
+     * | Dark | `surfaceContainerLow` `#221F1B` | `#161412`, ΔL\* +5.5 | `#2D2924`, ΔL\* +4.9 |
+     *
+     * ⚠️ Content on the sheet keeps `LocalChatSurfaceTone = BottomChrome`. In dark this colour IS
+     * [card], so a `Page` tone would resolve [AppChatColors.raised][
+     * com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors.raised] to the sheet's
+     * own tone (ΔL\* 0.0) and the bubbles would vanish into it.
+     *
+     * ⛔ Not [bottomChrome]: the v2 bar, the quick-capture dock and the control-arm docks stay on the
+     * cool chrome. Only the chat sheet moved, so it owns its own accessor.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun chatSheet(): Color = if (LocalIsDarkTheme.current) {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Level 2′ — BOTTOM CHROME. One family for every surface at the window's
     // bottom edge, kept SEPARATE from [docked] / [dockedSeam].

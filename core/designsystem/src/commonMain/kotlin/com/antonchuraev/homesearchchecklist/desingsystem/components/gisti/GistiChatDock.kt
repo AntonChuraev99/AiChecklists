@@ -217,12 +217,16 @@ fun GistiChatDock(
  *                      horizontal padding (the chips inset themselves). Pass `null` for pill only.
  * @param pillContent   The command bar (e.g. [AskGistiBar] / [GistiChatDock]); the caller insets it
  *                      horizontally so the pill stays padded while the chips above stay edge-to-edge.
+ * @param containerColor Fill of the dock. Defaults to the bottom-chrome tone ([gistiDockColor]); the
+ *                      v2 chat sheet passes [AppSurface.chatSheet] (variant A, warm). Content inside
+ *                      keeps `ChatSurfaceTone.BottomChrome` either way — see AppSurface.chatSheet.
  */
 @Composable
 fun GistiGlassChatDock(
     hazeState: HazeState,
     modifier: Modifier = Modifier,
     bottomPadding: Dp = AppDimens.SpacingLg,
+    containerColor: Color = gistiDockColor(),
     // Optional slot rendered as the TOPMOST element of the dock (above the chips) — the drag grabber.
     grabberContent: (@Composable () -> Unit)? = null,
     chipsContent: (@Composable () -> Unit)? = null,
@@ -240,7 +244,7 @@ fun GistiGlassChatDock(
     // other two bottom surfaces it is seen stacked with. Identical arithmetic on Android and Skiko.
     // ([hazeState] is retained for call-site/source compatibility but is no longer sampled — the dock
     // no longer blurs behind it.)
-    val dockColor = gistiDockColor()
+    val dockColor = containerColor
     // The SAME seam token QuickCaptureDock traces its top edge with — these two docks are seen in one
     // frame and their top edges are the same edge of the same app. `outlineVariant` measured `#E2E0DB`
     // on today's `#DEDCD6` chrome, ΔL* +1.4: an edge-tracing line the colour of the edge it traces.

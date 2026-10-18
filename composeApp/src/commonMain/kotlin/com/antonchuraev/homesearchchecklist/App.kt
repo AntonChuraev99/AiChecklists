@@ -74,6 +74,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -240,6 +241,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAn
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiExpandableDockContent
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiFullChatOverlay
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiAgendaPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
@@ -1855,6 +1857,14 @@ fun App() {
                     state = fullState,
                     dockStartHeightPx = dockHeightPx,
                     onCollapse = { scope.launch { fullState.close() } },
+                    // The overlay grows out of the dock, so it takes the dock's own fill: the warm
+                    // chat sheet under the v2 overlay (variant A), the bottom chrome under the
+                    // control-arm docks of MainScreen / ChecklistDetailScreen.
+                    containerColor = if (navVariant == NavVariant.V2) {
+                        AppSurface.chatSheet()
+                    } else {
+                        gistiDockColor()
+                    },
                     historyContent = {
                         // ChatBody (not ChatMessageList directly) so the FULL overlay shows the SAME
                         // localized empty-state (greeting + suggestion cards that prefill the composer)

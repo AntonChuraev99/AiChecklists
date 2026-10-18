@@ -10,7 +10,7 @@ paths:
 
 Located in `core/designsystem/`. Always use design system components instead of raw Material3 when available (e.g. `AppSwitch` not `Switch`).
 
-**Colors (`theme/Color.kt`, redesign B 2026-10-16):** brand blue `#2196F3` (accent/icon) with `primary` role `#1565C0`; light page `#F4EFE7` (warm sand), card `#FFFDF9`; dark page `#161412`, dark card `#221F1B`. Bottom chrome stays cool (`GistiColors.chrome` `#DCE2EC` / `#191D25`). Never hardcode a hex in a screen — read `MaterialTheme.colorScheme` / `GistiColors` / `AppSurface`; the source of truth is `Color.kt`, this line is only orientation.
+**Colors (`theme/Color.kt`, redesign B 2026-10-16):** brand blue `#2196F3` (accent/icon) with `primary` role `#1565C0`; light page `#F4EFE7` (warm sand), card `#FFFDF9`; dark page `#161412`, dark card `#221F1B`. Bottom chrome stays cool (`GistiColors.chrome` `#DCE2EC` / `#191D25`), except the v2 AI-chat sheet: `AppSurface.chatSheet()` (`surface` / `surfaceContainerLow`), user bubble `AppChatColors.userBubble()` — `docs/decisions/2026-10-18-chat-sheet-warm-palette.md`. Never hardcode a hex in a screen — read `MaterialTheme.colorScheme` / `GistiColors` / `AppSurface`; the source of truth is `Color.kt`, this line is only orientation.
 
 **Grouped lists (B):** section rows sit in ONE rounded group (`Modifier.groupSegment(position)` + `GroupPosition`, `AppShapeTokens.Group` 24dp) with inset dividers, round checkboxes (`AppRoundCheckbox`), section headers via `AppSectionHeader`. Do not wrap each row in its own outlined card.
 

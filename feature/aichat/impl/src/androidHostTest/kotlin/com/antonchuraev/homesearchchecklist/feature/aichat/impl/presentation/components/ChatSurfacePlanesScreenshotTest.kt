@@ -65,8 +65,9 @@ import java.util.Locale
  * The chat rendered on BOTH of its planes, in one frame.
  *
  * ## Why this test exists as its own file
- * The chat has no single background. `ChatScreen` paints `colorScheme.surface`; the chat dock, the
- * full-screen chat overlay and the quick-capture dock paint `AppSurface.bottomChrome()`, and
+ * The chat has no single background. `ChatScreen` paints `colorScheme.surface`; in v2 the chat dock
+ * and the full-screen chat overlay paint `AppSurface.chatSheet()`, the quick-capture dock paints
+ * `AppSurface.bottomChrome()`, and
  * `App.kt` hands the overlay the SAME `ChatBody` the page renders. So every chat component is drawn
  * on two different surfaces, and a component spelled with one absolute colour role can only be
  * correct on one of them.
@@ -200,6 +201,8 @@ class ChatSurfacePlanesScreenshotTest {
                 state = state,
                 dockStartHeightPx = 0,
                 onCollapse = {},
+                // What App.kt passes under the v2 chat sheet (variant A) — the live arm.
+                containerColor = AppSurface.chatSheet(),
                 historyContent = {
                     Column(
                         modifier = Modifier
@@ -210,7 +213,7 @@ class ChatSurfacePlanesScreenshotTest {
                             ),
                         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
                     ) {
-                        PlaneLabel("BOTTOM-CHROME plane — GistiFullChatOverlay")
+                        PlaneLabel("CHAT-SHEET plane — GistiFullChatOverlay")
                         ChatDayDivider()
                         ChatMessageBubble(
                             message = ChatMessage(id = "a4", role = ChatRole.Assistant, content = copy.aiCode, timestamp = 0L),
@@ -461,12 +464,15 @@ class ChatSurfacePlanesScreenshotTest {
             )
 
             // ── PLANE 2: the bottom chrome. The SAME components inside the real dock hosts. ──
+            // Painted with the v2 chat sheet's warm fill, as V2ChatDockOverlay mounts it (variant A).
+            // The cool bottom chrome stays covered by the QuickCaptureDock half below.
             GistiGlassChatDock(
                 hazeState = hazeState,
+                containerColor = AppSurface.chatSheet(),
                 chipsContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
                         PlaneLabel(
-                            text = "BOTTOM-CHROME plane — GistiGlassChatDock",
+                            text = "CHAT-SHEET plane — GistiGlassChatDock",
                             modifier = Modifier.padding(
                                 horizontal = AppDimens.ScreenPaddingHorizontal,
                             ),
