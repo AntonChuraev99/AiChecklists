@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -47,6 +48,7 @@ import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,10 +61,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.isTraversalGroup
@@ -70,6 +83,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
@@ -96,9 +110,14 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.sqrt
 
 /**
  * The four top-level destinations of the v2 (Todoist-style) navigation arm.
@@ -504,9 +523,18 @@ private fun V2ShellCompactBar(
  *
  * ## Why this is not `AppNavigationBar`
  * Same `AppNavBarItem` descriptors, same `alwaysShowLabel`, same M3 container — but this bar sits
- * inside the plate and paints the bottom-chrome tone (`AppSurface.bottomChrome`), with the hand-rolled
- * spring pill below; `AppNavigationBar` stays on the level-2 `docked` tone the v1 layout reads
- * correctly in, and stays byte-identical for every other caller.
+ * inside the plate and paints the bottom-chrome tone (`AppSurface.bottomChrome`), with one hand-rolled
+ * pill that slides from tab to tab; `AppNavigationBar` stays on the level-2 `docked` tone the v1
+ * layout reads correctly in, and stays byte-identical for every other caller.
+ *
+ * ## The tab change is a slide, not a morph
+ * M3's own indicator cross-fades on a fixed 100ms tween, which at this size reads as a colour
+ * appearing; the next version grew a pill out of each icon on the `spatialDefault` spring, and its
+ * ~2% bounce read as wobble (owner, 2026-10-18). Now a single pill travels to the new tab on
+ * `spatialDefaultTween` — the same decelerating curve with no overshoot — so the eye follows one
+ * object from where it was to where it went. Each icon's tint follows the pill's coverage of its tab
+ * (white exactly where the pill is under it); the labels, which sit below the pill, keep their own
+ * `effectsDefault` fade.
  *
  * The shape (28dp top corners) and the shoulder backdrop are the PLATE's, not this bar's: clipping
  * here would round the corners between the pill and the tabs.
@@ -529,36 +557,96 @@ private fun V2SplitNavigationBar(
     val accent = AppSurface.bottomChromeAccent()
     val onAccent = AppSurface.onBottomChromeAccent()
 
+    val selectedIndex = items.indexOfFirst { it.id == selectedItemId }
+
+    // ONE pill for the whole bar, sliding from the old tab to the new one (owner's pick 2026-10-18,
+    // replacing a per-tab pill that grew out of each icon on the bouncy `spatialDefault` spring —
+    // "мне не нравится анимация"). The value is a FRACTIONAL TAB INDEX, not an x: the draw below
+    // turns it into pixels from the tabs' real measured centres, so unequal tabs, RTL (index 0 on
+    // the right) and a window resize mid-flight all come out right without re-targeting anything.
+    // Starts AT the selected tab, so a cold start shows the pill in place, never sliding in.
+    val pillPosition = remember { Animatable(selectedIndex.coerceAtLeast(0).toFloat()) }
+    // Where the pill was last shown; -1 = hidden (the current route is not one of these tabs).
+    val lastShownIndex = remember { intArrayOf(selectedIndex) }
+    val reducedMotion = LocalReducedMotion.current
+    LaunchedEffect(selectedIndex) {
+        val from = lastShownIndex[0]
+        lastShownIndex[0] = selectedIndex
+        if (selectedIndex < 0) return@LaunchedEffect // nothing to point at: the draw hides the pill
+        val target = selectedIndex.toFloat()
+        if (from < 0 || reducedMotion) {
+            // Re-appearing after a non-tab route, or the user asked for less motion: land in place.
+            pillPosition.snapTo(target)
+        } else {
+            // The tween twin of `spatialDefault`: its decelerating curve with NO overshoot — the
+            // spring's ~2% bounce was the part that read as wobble. Interrupting mid-flight (a second
+            // tap) re-targets from wherever the pill is. `animateTo` honours MotionDurationScale, so
+            // animations switched off in the system also land at once.
+            pillPosition.animateTo(target, AppMotion.spatialDefaultTween())
+        }
+    }
+    // Each tab's icon centre in ROOT coordinates, plus the bar's own origin: the draw subtracts one
+    // from the other. Written from `onGloballyPositioned`, which runs after layout and before draw of
+    // the same frame, and only changes when something actually moves — never per animation frame.
+    val iconCentres = remember(items.size) { List(items.size) { mutableStateOf(Offset.Unspecified) } }
+    var barOrigin by remember { mutableStateOf(Offset.Zero) }
+
+    // The pill's centre in ROOT coordinates, or Unspecified when there is nothing to point at.
+    // Called only from draw lambdas, so every state it reads subscribes the DRAW, not composition.
+    fun pillCentreInRoot(): Offset {
+        if (selectedIndex < 0 || iconCentres.isEmpty()) return Offset.Unspecified
+        val position = pillPosition.value.coerceIn(0f, iconCentres.lastIndex.toFloat())
+        val lower = floor(position).toInt()
+        val from = iconCentres[lower].value
+        val to = iconCentres[ceil(position).toInt()].value
+        if (!from.isSpecified || !to.isSpecified) return Offset.Unspecified
+        return lerp(from, to, position - lower)
+    }
+
     NavigationBar(
-        containerColor = AppSurface.bottomChrome(),
+        // Transparent, and the chrome tone is painted by the modifier instead: the pill must sit
+        // ABOVE the container and BELOW every tab, which only a draw on the bar's own node between
+        // its background and its content can do. Same colour, same rect — identical pixels at rest.
+        containerColor = Color.Transparent,
         contentColor = idle,
         tonalElevation = 0.dp,
-        modifier = modifier,
+        modifier = modifier
+            .onGloballyPositioned { barOrigin = it.positionInRoot() }
+            .background(AppSurface.bottomChrome())
+            // Draw phase only: the slide reads `pillPosition` here and nowhere in composition, so
+            // the bar does not recompose per frame. Nothing here is measured either — the bar's
+            // height is read by the shell as the plate height, and the pill must never move it.
+            .drawBehind {
+                val centre = pillCentreInRoot()
+                if (!centre.isSpecified) return@drawBehind
+                val pill = pillRect(centre - barOrigin)
+                drawRoundRect(
+                    color = accent,
+                    topLeft = pill.topLeft,
+                    size = pill.size,
+                    cornerRadius = CornerRadius(pill.height / 2f),
+                )
+            },
     ) {
         items.forEachIndexed { index, item ->
             val isSelected = item.id == selectedItemId
             val traversal = index.toFloat()
 
-            // 0 = no pill, 1 = full pill. The bar's only movement, and the reason it is hand-rolled
-            // rather than left to M3's `indicatorColor`: M3 cross-fades its indicator on a fixed
-            // 100ms tween, which at this size reads as a colour appearing rather than as a shape
-            // arriving. `spatialDefault` is the app's token for "something moved into place", and a
-            // spring is also what makes the tab change feel answered rather than switched.
-            val pill by animateFloatAsState(
-                targetValue = if (isSelected) 1f else 0f,
-                animationSpec = AppMotion.spatialDefault,
-                label = "v2NavPill",
+            // The ICON colour follows the pill, not a clock, and per pixel: the part of the glyph the
+            // pill is under is `onAccent`, the rest is `idle`, so the glyph is legible on whichever
+            // surface each of its pixels sits on. On its own timer it was a ghost — white on the sand
+            // chrome (dark: dark on the dark chrome) for the frames the departing pill had already
+            // left it; a blended "coverage" tint was a ghost too, grey on both surfaces at once.
+            // Painted in the DRAW phase from the vector itself; see the Icon below.
+            val iconPainter = rememberVectorPainter(
+                if (isSelected) item.selectedIcon else item.unselectedIcon,
             )
-            // Colour is an EFFECT, so it rides the critically damped token: an icon colour that
-            // overshoots is a flicker. Both the selected and unselected slots receive the SAME
-            // animated value on purpose — `NavigationBarItem` picks between its two colour slots by
-            // the `selected` flag, so handing it two different colours makes the transition snap on
-            // the frame the flag flips, whatever spec is attached to it.
-            val iconColor by animateColorAsState(
-                targetValue = if (isSelected) onAccent else idle,
-                animationSpec = AppMotion.effectsDefaultAs(),
-                label = "v2NavIcon",
-            )
+            val pillClip = remember { Path() }
+
+            // The label sits under the pill, not on it, so it keeps its own EFFECT timing — the
+            // critically damped token, because a colour that overshoots is a flicker. Both slots get
+            // the SAME animated value on purpose: `NavigationBarItem` picks a slot by the `selected`
+            // flag, so two different colours would snap on the frame the flag flips.
             val labelColor by animateColorAsState(
                 targetValue = if (isSelected) activeLabel else idle,
                 animationSpec = AppMotion.effectsDefaultAs(),
@@ -570,30 +658,48 @@ private fun V2SplitNavigationBar(
                 onClick = { onItemSelected(item.id) },
                 icon = {
                     Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                        painter = iconPainter,
                         contentDescription = item.contentDescription ?: item.label,
-                        // Painted BEHIND the icon and deliberately outside its bounds: Compose does
-                        // not clip a node's drawing to its layout size, so the pill costs nothing in
-                        // measurement — and measurement is exactly what must not move here (the bar's
-                        // height is read by the shell as the plate height). Same geometry
-                        // M3's own indicator uses, so at rest the bar is pixel-identical to a stock
-                        // one; only the motion differs. Both reads happen in the DRAW phase, so the
-                        // spring animates without recomposing the bar.
-                        modifier = Modifier.drawBehind {
-                            val progress = pill
-                            if (progress <= 0f) return@drawBehind
-                            val height = PlinthPillHeight.toPx()
-                            val width = PlinthPillWidth.toPx() * progress
-                            drawRoundRect(
-                                color = accent,
-                                topLeft = Offset(
-                                    x = (size.width - width) / 2f,
-                                    y = (size.height - height) / 2f,
-                                ),
-                                size = Size(width, height),
-                                cornerRadius = CornerRadius(height / 2f),
-                            )
-                        },
+                        // Transparent: `Icon` keeps the size, the semantics and the slot, and paints
+                        // nothing; the glyph is drawn by `drawBehind` below with the SAME painter,
+                        // size and tint filter `Icon` uses, so at rest the pixels are its own.
+                        tint = Color.Transparent,
+                        modifier = Modifier
+                            // Reports where the pill should sit under this tab: centred on the icon,
+                            // the geometry M3's own indicator uses.
+                            .onGloballyPositioned { coordinates ->
+                                iconCentres[index].value = coordinates.positionInRoot() + Offset(
+                                    x = coordinates.size.width / 2f,
+                                    y = coordinates.size.height / 2f,
+                                )
+                            }
+                            .drawBehind {
+                                val pillRoot = pillCentreInRoot()
+                                val me = iconCentres[index].value
+                                val bounds = Rect(Offset.Zero, size)
+                                val pill = if (pillRoot.isSpecified && me.isSpecified) {
+                                    pillRect(pillRoot - me + size.center)
+                                } else {
+                                    null
+                                }
+                                fun glyph(color: Color) = with(iconPainter) {
+                                    draw(size, colorFilter = ColorFilter.tint(color))
+                                }
+                                when {
+                                    // At rest every icon takes one of these two branches, which
+                                    // are exactly `Icon`'s own tinted draw.
+                                    pill == null || !pill.overlaps(bounds) -> glyph(idle)
+                                    pillCovers(pill, bounds) -> glyph(onAccent)
+                                    else -> {
+                                        pillClip.reset()
+                                        pillClip.addRoundRect(
+                                            RoundRect(pill, CornerRadius(pill.height / 2f)),
+                                        )
+                                        clipPath(pillClip, ClipOp.Difference) { glyph(idle) }
+                                        clipPath(pillClip) { glyph(onAccent) }
+                                    }
+                                }
+                            },
                     )
                 },
                 label = { V2TabLabel(text = item.label) },
@@ -602,8 +708,6 @@ private fun V2SplitNavigationBar(
                     // Transparent: the pill above is the indicator now. M3 still lays its own out,
                     // which is what keeps the icon in the same place as in a stock bar.
                     indicatorColor = Color.Transparent,
-                    selectedIconColor = iconColor,
-                    unselectedIconColor = iconColor,
                     selectedTextColor = labelColor,
                     unselectedTextColor = labelColor,
                 ),
@@ -643,6 +747,31 @@ private fun V2TabLabel(text: String) {
 /** The active destination's pill — M3's own indicator size, so the resting bar is unchanged. */
 private val PlinthPillWidth: Dp = 56.dp
 private val PlinthPillHeight: Dp = 32.dp
+
+/** The pill's rect centred on [centre], in whatever coordinate space [centre] is in. */
+private fun Density.pillRect(centre: Offset): Rect {
+    val halfWidth = PlinthPillWidth.toPx() / 2f
+    val halfHeight = PlinthPillHeight.toPx() / 2f
+    return Rect(
+        left = centre.x - halfWidth,
+        top = centre.y - halfHeight,
+        right = centre.x + halfWidth,
+        bottom = centre.y + halfHeight,
+    )
+}
+
+/**
+ * Whether the stadium-shaped [pill] covers the whole of [bounds] — the straight part of the rect, i.e.
+ * inset at each end by how far the end cap curves in at the height [bounds] spans. Conservative: a
+ * `false` only costs a clipped draw, a wrong `true` would paint a glyph corner white on the chrome.
+ */
+private fun pillCovers(pill: Rect, bounds: Rect): Boolean {
+    val radius = pill.height / 2f
+    val halfSpan = maxOf(abs(bounds.top - pill.center.y), abs(bounds.bottom - pill.center.y))
+    if (halfSpan > radius) return false
+    val capInset = radius - sqrt(radius * radius - halfSpan * halfSpan)
+    return bounds.left >= pill.left + capInset && bounds.right <= pill.right - capInset
+}
 
 /**
  * Medium: NavigationRail carrying the same four destinations, chat FAB in the rail header.
