@@ -109,7 +109,8 @@ internal fun AssistantAvatarSlot(showAvatar: Boolean, modifier: Modifier = Modif
 /**
  * Renders a single chat message bubble — redesign B "Soft & tactile" (§2.9).
  *
- * - **User (sent)** — right-aligned, `primaryContainer` fill, corners 20/20/8/20 (tail bottom-end).
+ * - **User (sent)** — right-aligned, [AppChatColors.userBubble] fill (light `#D6E4F7`, dark
+ *   `primaryContainer`) with [AppChatColors.onUserBubble] text, corners 20/20/8/20 (tail bottom-end).
  *   Max width 320dp. The cost badge sits under it.
  * - **Assistant (received)** — no sender label. `Row(Bottom)`: a 28dp sparkle avatar (only on the
  *   LAST message of a consecutive assistant run — [showAvatar]; otherwise a 28dp spacer keeps the
@@ -183,12 +184,13 @@ private fun UserBubble(message: ChatMessage, modifier: Modifier) {
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
         ) {
-            // User (sent) keeps the `primaryContainer` accent fill — it reads as "my message", and it
-            // is deliberately NOT plane-relative: it differs from the assistant bubble by hue and
-            // alignment as well as by tone, so it is legible on either plane as it is.
+            // User (sent) takes the blue accent fill — it reads as "my message", and it is
+            // deliberately NOT plane-relative: it differs from the assistant bubble by hue and
+            // alignment as well as by tone, so one value is legible on every plane. Light has its own
+            // `#D6E4F7` (variant A): `primaryContainer` `#E3F2FD` sat at ΔL* +0.1 on the sand page.
             Surface(
                 shape = UserBubbleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = AppChatColors.userBubble(),
                 modifier = Modifier.widthIn(max = 320.dp),
             ) {
                 // Attachments above text (M3 chat media-inset pattern).
@@ -208,7 +210,7 @@ private fun UserBubble(message: ChatMessage, modifier: Modifier) {
                             Text(
                                 text = message.content,
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = AppChatColors.onUserBubble(),
                                 modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }

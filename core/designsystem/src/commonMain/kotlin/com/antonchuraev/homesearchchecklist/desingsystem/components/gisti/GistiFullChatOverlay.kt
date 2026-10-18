@@ -45,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -133,6 +134,9 @@ fun rememberDockFullExpandState(): DockFullExpandState {
  * @param onCollapse       Called by the chevron / drag-settle-to-Docked to collapse (host also
  *                          re-seats the dock at Expanded under the shrinking overlay).
  * @param recordingOverlay Optional slot rendered above the input while recording (zero height idle).
+ * @param containerColor   Fill of the overlay. MUST match the dock it grows out of: bottom chrome
+ *                          ([gistiDockColor], default) under the control-arm docks, `AppSurface.chatSheet()`
+ *                          under the v2 chat sheet.
  */
 @Composable
 fun GistiFullChatOverlay(
@@ -143,6 +147,7 @@ fun GistiFullChatOverlay(
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
     recordingOverlay: (@Composable () -> Unit)? = null,
+    containerColor: Color = gistiDockColor(),
 ) {
     val snapSpec = remember {
         spring<Float>(
@@ -156,7 +161,7 @@ fun GistiFullChatOverlay(
         animationSpec = snapSpec,
     )
     val collapseLabel = stringResource(Res.string.chat_panel_collapse)
-    val dockColor = gistiDockColor()
+    val dockColor = containerColor
 
     // Composition gate: mount the (heavy) history + input only while the overlay is visible (offset
     // below the Docked anchor). Driven off a snapshotFlow so reading the frequently-changing offset

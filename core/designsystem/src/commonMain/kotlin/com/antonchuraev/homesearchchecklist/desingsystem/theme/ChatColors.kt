@@ -11,12 +11,13 @@ import androidx.compose.ui.graphics.Color
  *
  * The chat has no single background. The SAME composables render in two places:
  *  - [Page] — the full `ChatScreen`, whose scaffold paints `colorScheme.surface`;
- *  - [BottomChrome] — the chat dock, the full-screen chat overlay and the quick-capture dock, all
- *    of which paint [AppSurface.bottomChrome].
+ *  - [BottomChrome] — the chat dock, the full-screen chat overlay and the quick-capture dock. The
+ *    capture dock paints [AppSurface.bottomChrome]; the v2 chat sheet (dock + overlay) paints
+ *    [AppSurface.chatSheet] since variant A (2026-10-18).
  *
- * Those two are ~11 L\* apart in light and ~4 L\* apart in dark, in OPPOSITE directions, so a chip
- * spelled with one absolute colour role is only ever correct on one of them. This enum is what lets
- * one component be correct on both.
+ * The planes differ in tone (and in dark the chat sheet IS the page's card tone), so a chip spelled
+ * with one absolute colour role is only ever correct on one of them. This enum is what lets one
+ * component be correct on all of them.
  */
 enum class ChatSurfaceTone {
     /** The page: `ChatScreen`, and anything else drawn straight on `colorScheme.surface`. */
@@ -47,28 +48,33 @@ val LocalChatSurfaceTone = staticCompositionLocalOf { ChatSurfaceTone.Page }
  * ## The defect this exists to close
  * An unselected reminder chip was `Color.Transparent` + a 1dp `outlineVariant` hairline: with no
  * fill, that single line was the ONLY thing separating the control from its background. On the old
- * white dock the line measured 1.32 : 1 against it and the chip read as a button. On today's
- * `surfaceDim` `#DEDCD6` chrome the same line measures **1.04 : 1** — while the label stays at
+ * white dock the line measured 1.32 : 1 against it and the chip read as a button. On the then
+ * `surfaceDim` `#DEDCD6` chrome the same line measured **1.04 : 1** — while the label stayed at
  * 6.82 : 1. The result is the exact report: *"the In 1 hour buttons blend into the background"* —
- * legible text with no visible button under it.
+ * legible text with no visible button under it. (Historical palette; today's values are below.)
  *
  * A transparent control therefore does not get a firmer hairline; it gets a FILL. The hairline is
  * then the second channel rather than the only one, and a chip whose fill already steps off the
  * plane no longer needs the loud line.
  *
  * ## Two outline roles, and the difference is what the element IS
- * | | Role | Light on `surfaceDim` | Dark on `#1A1C20` | Used by |
+ * Measured 2026-10-18 (redesign B palette, bottom chrome variant A). Light: page and chat sheet are
+ * both `#F4EFE7`, the capture-dock chrome is `#E4DCD0`. Dark: page `#161412`; chat sheet and chrome
+ * are both `#221F1B` (a coincidence of the palette — two accessors, two decisions).
+ *
+ * | | Role | Light page·sheet / chrome | Dark page / sheet·chrome | Used by |
  * |---|---|---|---|---|
- * | [controlOutline] | `outline` | 3.33 : 1 | 5.47 : 1 | anything TAPPABLE — chips, the input pill, the dock bar |
- * | [contentOutline] | `outlineVariant` | 1.04 : 1 | 1.11 : 1 | the AI bubble — content, already separated by its own fill |
+ * | [controlOutline] | `outline` | 4.15 / 3.49 : 1 | 5.18 / 4.63 : 1 | anything TAPPABLE — chips, the input pill, the dock bar |
+ * | [contentOutline] | `outlineVariant` | 1.17 / 1.02 : 1 | 1.45 / 1.29 : 1 | the AI bubble — content, already separated by its own fill |
  *
  * The bubble keeps the soft line on purpose: it is not a target, it does not have to announce a hit
  * area, and a firm ring around every answer turns a conversation into a stack of framed cards. Its
  * separation comes from [raised] stepping off the plane; the hairline only closes the shape.
  *
  * ## There is deliberately NO accessor for the plane's own colour
- * The plane is painted by the HOST — `ChatScreen`'s scaffold paints `colorScheme.surface`, the three
- * docks paint `gistiDockColor()` → [AppSurface.bottomChrome] — and the host is also what PROVIDES
+ * The plane is painted by the HOST — `ChatScreen`'s scaffold paints `colorScheme.surface`, the
+ * capture dock paints `gistiDockColor()` → [AppSurface.bottomChrome], the v2 chat sheet paints
+ * [AppSurface.chatSheet] — and the host is also what PROVIDES
  * [LocalChatSurfaceTone]. An accessor reading that local could therefore only be called after the
  * provider, i.e. never at the `color =` argument of the very Surface that paints it: `QuickCaptureDock`
  * provides the local INSIDE its Surface, so a `plane()` there would silently resolve to the `Page`
@@ -93,10 +99,12 @@ object AppChatColors {
      *
      * | | Plane | This | ΔL\* |
      * |---|---|---|---|
-     * | Light, page | `#FBFAF8` | `#FFFFFF` | +1.7 (plus the hairline; the page is nearly white) |
-     * | Light, chrome | `#DEDCD6` | `#FFFFFF` | +12.2 |
-     * | Dark, page | `#121317` | `#1A1C20` | +4.3 |
-     * | Dark, chrome | `#1A1C20` | `#26282E` | +5.9 |
+     * | Light, page | `#F4EFE7` | `#FFFDF9` | +4.7 |
+     * | Light, chat sheet | `#F4EFE7` | `#FFFDF9` | +4.7 |
+     * | Light, capture chrome | `#E4DCD0` | `#FFFDF9` | +11.3 |
+     * | Dark, page | `#161412` | `#221F1B` | +5.5 |
+     * | Dark, chat sheet | `#221F1B` | `#2D2924` | +4.9 |
+     * | Dark, capture chrome | `#221F1B` | `#2D2924` | +4.9 |
      */
     @Composable
     @ReadOnlyComposable
@@ -118,13 +126,16 @@ object AppChatColors {
      *
      * | | Plane | [raised] would give | this gives |
      * |---|---|---|---|
-     * | Light, page | `#FBFAF8` | `#FFFFFF`, ΔL\* **+1.7** (gone) | `surfaceContainer`, ΔL\* −3.9 |
-     * | Dark, page | `#121317` | `#1A1C20`, ΔL\* +4.3 | `surfaceContainerHigh`, ΔL\* +10.2 |
-     * | Light, chrome | `#DEDCD6` | `#FFFFFF`, ΔL\* +12.2 | same, +12.2 |
-     * | Dark, chrome | `#1A1C20` | `#26282E`, ΔL\* +5.9 | same, +5.9 |
+     * | Light, page | `#F4EFE7` | `#FFFDF9`, ΔL\* +4.7 | `surfaceContainer` `#EFE9DF`, ΔL\* −2.1 |
+     * | Dark, page | `#161412` | `#221F1B`, ΔL\* +5.5 | `surfaceContainerHigh` `#2D2924`, ΔL\* +10.4 |
+     * | Light, chat sheet | `#F4EFE7` | `#FFFDF9`, ΔL\* +4.7 | same, +4.7 |
+     * | Dark, chat sheet | `#221F1B` | `#2D2924`, ΔL\* +4.9 | same, +4.9 |
+     * | Light, capture chrome | `#E4DCD0` | `#FFFDF9`, ΔL\* +11.3 | same, +11.3 |
+     * | Dark, capture chrome | `#221F1B` | `#2D2924`, ΔL\* +4.9 | same, +4.9 |
      *
-     * The light page row is not theoretical: recorded with [raised], the cost badge's pill vanished
-     * under the user bubble and left a floating sparkle and a digit.
+     * The page row is why this exists: on the pre-B near-white page (`#FBFAF8`) [raised] was ΔL\*
+     * +1.7, and recorded with it the cost badge's pill vanished under the user bubble and left a
+     * floating sparkle and a digit.
      */
     @Composable
     @ReadOnlyComposable
@@ -153,10 +164,10 @@ object AppChatColors {
      *
      * | | Bubble ([raised]) | This | ΔL\* |
      * |---|---|---|---|
-     * | Light, page | `#FFFFFF` | `surfaceContainerHigh` `#ECEAE6` | −7.3 |
-     * | Dark, page | `#1A1C20` | `surfaceContainerHigh` `#26282E` | +5.9 |
-     * | Light, chrome | `#FFFFFF` | `surfaceContainerHighest` `#E6E4DF` | −9.4 |
-     * | Dark, chrome | `#26282E` | `surfaceContainerHighest` `#2D2F35` | +3.3 |
+     * | Light, page | `#FFFDF9` | `surfaceContainerHigh` `#EAE3D8` | −8.9 |
+     * | Dark, page | `#221F1B` | `surfaceContainerHigh` `#2D2924` | +4.9 |
+     * | Light, chrome / sheet | `#FFFDF9` | `surfaceContainerHighest` `#E4DCD0` | −11.3 |
+     * | Dark, chrome / sheet | `#2D2924` | `surfaceContainerHighest` `#35302A` | +3.3 |
      *
      * The dark-chrome row is the smallest step in this object, and it is the largest one AVAILABLE:
      * `surfaceContainerHighest` is the top of the container ramp, and the bubble is already one rung
@@ -221,4 +232,33 @@ object AppChatColors {
     @Composable
     @ReadOnlyComposable
     fun contentOutline(): Color = MaterialTheme.colorScheme.outlineVariant
+
+    /**
+     * Fill of the USER's own (sent) bubble.
+     *
+     * NOT plane-relative: it differs from the AI bubble by hue and alignment as well as tone, so one
+     * value reads on both planes. Light gets its own blue because `primaryContainer` `#E3F2FD`
+     * nearly vanished on the sand page and the warm chat sheet — and that ROLE cannot simply move,
+     * the credits pill, the due-rail answer chip and the selected cards all read it.
+     *
+     * | | This | on `#F4EFE7` (page / sheet) | text [onUserBubble] |
+     * |---|---|---|---|
+     * | Light | `#D6E4F7` | ΔL\* −4.5 | `#001C37`, 13.35 : 1 |
+     * | Dark | `primaryContainer` `#004880` | — | `#BBDEFB` |
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun userBubble(): Color = if (LocalIsDarkTheme.current) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        UserBubbleLight
+    }
+
+    /** Text on [userBubble]. `onPrimaryContainer` in both themes (light `#001C37`, dark `#BBDEFB`). */
+    @Composable
+    @ReadOnlyComposable
+    fun onUserBubble(): Color = MaterialTheme.colorScheme.onPrimaryContainer
+
+    /** Light user-bubble fill — variant A «Тёплый лист» (2026-10-18). No scheme role carries it. */
+    private val UserBubbleLight = Color(0xFFD6E4F7)
 }

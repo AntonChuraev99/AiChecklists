@@ -48,10 +48,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAn
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.dockProgress
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.rememberDockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
@@ -404,7 +404,10 @@ fun V2ChatDockOverlay(
         Dp.Unspecified
     }
 
-    val dockColor = gistiDockColor()
+    // Variant A «Тёплый лист»: the chat sheet is warm (the theme's own family), not the cool bottom
+    // chrome the bar and the capture dock keep. The dock below and the nav strip read the SAME value
+    // so the gesture bar continues the sheet. See AppSurface.chatSheet.
+    val dockColor = AppSurface.chatSheet()
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Tap-to-dismiss scrim. No ripple: the feedback is the dock sliding away, and an indication
@@ -456,6 +459,10 @@ fun V2ChatDockOverlay(
         GistiGlassChatDock(
             hazeState = hazeState,
             bottomPadding = AppDimens.SpacingSm,
+            containerColor = dockColor,
+            // No top hairline: this sheet is only mounted over its own scrim (V2ChatMotion.ScrimAlpha),
+            // and the scrim plus the SheetTop rounding already carry the edge.
+            showTopHairline = false,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 // Capped BEFORE fillMaxWidth (a max after a fixed width is ignored): the dock is one
