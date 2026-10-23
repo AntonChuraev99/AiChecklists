@@ -1915,7 +1915,7 @@ fun App() {
             NavDisplay(
                 backStack = navigator.backStack,
                 onBack = { navigator.onBack() },
-                sceneStrategy = sceneStrategy,
+                sceneStrategies = listOf(sceneStrategy),
                 entryProvider = entryProvider {
 
                     entry<AppNavRoute.Splash> {

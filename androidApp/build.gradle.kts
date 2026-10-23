@@ -144,7 +144,7 @@ dependencies {
 
     // Android UI essentials
     implementation(libs.androidx.activity.compose)
-    debugImplementation("androidx.compose.ui:ui-tooling:1.7.8")
+    debugImplementation(libs.androidx.compose.ui.tooling)
 
     // Glance for App Widgets (widget code lives in androidApp)
     implementation(libs.glance)
@@ -181,14 +181,14 @@ dependencies {
     // Android UI Tests
     androidTestImplementation(libs.androidx.testExt.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.7.8")
-    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.8")
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.uiautomator)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     // Test Orchestrator - runs each test in isolated process
-    androidTestUtil("androidx.test:orchestrator:1.5.0")
+    androidTestUtil(libs.androidx.test.orchestrator)
 
     // MockK - mocking library for Kotlin
-    androidTestImplementation("io.mockk:mockk-android:1.13.8")
-    androidTestImplementation("io.mockk:mockk-agent:1.13.8")
+    androidTestImplementation(libs.mockk.android)
+    androidTestImplementation(libs.mockk.agent)
 }

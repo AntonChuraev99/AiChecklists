@@ -1,45 +1,56 @@
 [versions]
-agp = "9.2.0"
-ktor = "3.4.3"
+agp = "9.3.1"
+ktor = "3.6.0"
 
-android-compileSdk = "36"
+# compileSdk 37: required by AAR metadata of Compose 1.12 / CMP 1.12, core 1.19, coil 3.6.
+# targetSdk stays 36 — compileSdk does not change runtime behaviour.
+android-compileSdk = "37"
 android-minSdk = "24"
 android-targetSdk = "36"
 
 androidx-activity = "1.13.0"
-androidx-appcompat = "1.7.1"
-androidx-core = "1.18.0"
+androidx-appcompat = "1.8.0"
+androidx-core = "1.19.1"
 androidx-espresso = "3.7.0"
-androidx-lifecycle = "2.10.0"
+androidx-lifecycle = "2.11.0"
 androidx-testExt = "1.3.0"
+androidx-testOrchestrator = "1.6.1"
+androidx-uiautomator = "2.4.0"
+mockk = "1.14.11"
 
-composeMultiplatform = "1.11.0"
+composeMultiplatform = "1.12.2"
 junit = "4.13.2"
-kotlin = "2.3.20"
+kotlin = "2.4.21"
 navigationCompose = "2.9.2"
-kotlinxSerializationCore = "1.11.0"
-koin = "4.2.1"
-koinCompose = "4.2.1"
-koinComposeViewModel = "4.2.1"
-room = "2.8.4"
-room3 = "3.0.0"
-sqlite = "2.6.2"
-sqlite3 = "2.7.0"
+kotlinxSerializationCore = "1.12.0"
+koin = "4.2.2"
+koinCompose = "4.2.2"
+koinComposeViewModel = "4.2.2"
+room = "2.8.5"
+room3 = "3.0.3"
+sqlite = "2.7.1"
+sqlite3 = "2.7.1"
 kotlinxCoroutines = "1.11.0"
-datastore = "1.3.0-alpha08"
-ksp = "2.3.7"
-glance = "1.1.1"
-workmanager = "2.11.2"
-revenuecat = "3.0.0"
-googleServices = "4.4.4"
-firebaseBom = "34.13.0"
-firebaseCrashlytics = "3.0.7"
+datastore = "1.3.0"
+ksp = "2.3.12"
+glance = "1.2.0"
+workmanager = "2.12.0"
+revenuecat = "3.15.0"
+# RevenueCat 3.15.0 → purchases-android 10.28.1 pulls billing 8.3.0; the explicit declaration is
+# needed to compile feature/paywall androidMain (AndroidBillingPlatformPreCheck). Keep it equal to the
+# RevenueCat transitive. Check on every RevenueCat bump:
+# `:androidApp:dependencies --configuration releaseRuntimeClasspath` — billing must not be upgraded by conflict.
+billing = "8.3.0"
+kotlinxBrowser = "0.5.0"
+googleServices = "4.5.0"
+firebaseBom = "35.0.2"
+firebaseCrashlytics = "3.0.8"
 playReview = "2.0.2"
 appUpdate = "2.1.0"
 kotlinxDatetime = "0.8.0"
 kotlinxDatetimeWasm = "0.8.0"
 # Core library desugaring — backports java.time.* (API 26+) down to minSdk 24.
-# 2.1.x requires AGP 8.0+ (we run 9.2.0). Do NOT swap for desugar_jdk_libs_minimal:
+# 2.1.x requires AGP 8.0+ (we run 9.3.1). Do NOT swap for desugar_jdk_libs_minimal:
 # minimal ships only java.util.function + concurrent-collection fixes, NOT java.time.
 desugarJdk = "2.1.5"
 # ⛔ HARD FLOOR 1.26.1 — do NOT downgrade below it, a downgrade makes the phantom-session fix a
@@ -48,20 +59,25 @@ desugarJdk = "2.1.5"
 # only SESSIONS autocapture selected, the SDK never registered them and its foreground flag stayed
 # false forever), and 1.26.1 stops an out-of-session event from itself opening a session — which is
 # exactly what Analytics.eventOutOfSession relies on.
-amplitude = "1.30.1"
+# Since 1.34.0 the foreground flag comes from androidx ProcessLifecycleOwner (not activity callbacks),
+# which is started by androidx.startup's ProcessLifecycleInitializer — never remove the whole
+# InitializationProvider in the manifest (only individual initializers like WorkManager's).
+amplitude = "1.36.0"
 # Play Install Referrer Library — 2.2 (2021) is the current stable API release, NOT deprecated.
 # Only source of the encoded install `referrer` (utm_* + gclid) Play attaches to ad/store installs.
 installreferrer = "2.2"
 reorderable = "3.1.0"
-roborazzi = "1.63.0"
-robolectric = "4.16.1"
-coil3 = "3.4.0"
-composeAdaptive = "1.3.0-alpha02"
-androidxWindow = "1.4.0"
-credentialManager = "1.5.0"
-googleid = "1.1.1"
+roborazzi = "1.77.0"
+robolectric = "4.17"
+coil3 = "3.6.3"
+composeAdaptive = "1.3.0"
+androidxWindow = "1.5.1"
+credentialManager = "1.6.0"
+googleid = "1.2.1"
+# Held on 21.6.0 (latest 21.x): 22.0.0 removes com.google.android.gms.auth.api.signin.GoogleSignIn,
+# which the legacy fallback in AndroidGoogleAuthProvider still uses. Bump together with removing it.
 playServicesAuth = "21.6.0"
-haze = "1.7.2"
+haze = "1.7.3"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -70,6 +86,10 @@ junit = { module = "junit:junit", version.ref = "junit" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-testExt-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-testExt" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
+androidx-test-orchestrator = { module = "androidx.test:orchestrator", version.ref = "androidx-testOrchestrator" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-uiautomator" }
+mockk-android = { module = "io.mockk:mockk-android", version.ref = "mockk" }
+mockk-agent = { module = "io.mockk:mockk-agent", version.ref = "mockk" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "androidx-activity" }
@@ -99,6 +119,8 @@ sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sql
 # Room 3.0 compatible sqlite artifacts (2.7.x series, paired with room3)
 sqlite3-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite3" }
 sqlite3-web = { module = "androidx.sqlite:sqlite-web", version.ref = "sqlite3" }
+# org.w3c.dom.* for wasmJs — the version sqlite-web 2.7.1 requires on its runtime classpath.
+kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinxBrowser" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 # .await() extension for Play Services Task<T> (Firebase Storage put/get/delete). Same version as coroutines-core.
@@ -111,6 +133,8 @@ datastore-core-okio = { module = "androidx.datastore:datastore-core-okio", versi
 revenuecat-purchases-core = { module = "com.revenuecat.purchases:purchases-kmp-core", version.ref = "revenuecat" }
 revenuecat-purchases-ui = { module = "com.revenuecat.purchases:purchases-kmp-ui", version.ref = "revenuecat" }
 revenuecat-purchases-result = { module = "com.revenuecat.purchases:purchases-kmp-result", version.ref = "revenuecat" }
+# Google Play Billing — pinned to the RevenueCat transitive, see the `billing` version comment.
+billing = { module = "com.android.billingclient:billing", version.ref = "billing" }
 
 # Firebase
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
@@ -179,7 +203,7 @@ reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reo
 # Coil 3 — image loading for Android and Compose Multiplatform
 coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3" }
 
-# Haze 1.7.2 (stable) — backdrop blur for Compose Multiplatform (Android + wasmJs/Skiko, no expect/actual).
+# Haze 1.7.x (stable) — backdrop blur for Compose Multiplatform (Android + wasmJs/Skiko, no expect/actual).
 # Single module: blur + HazeStyle/HazeTint live in `haze` core (hazeSource/hazeEffect(state, style=...)).
 # NOT 2.0-alpha — that split blur into a separate haze-blur module + blurEffect{} DSL whose backdrop
 # sampling did not render in this project (reverted 2026-06-07).
@@ -205,9 +229,9 @@ roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "robora
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 # Compose UI tooling (Android, needed by Robolectric Compose tests)
-androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version = "1.8.3" }
-androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version = "1.8.3" }
-androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version = "1.8.3" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version = "1.12.1" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version = "1.12.1" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version = "1.12.1" }
 
 [bundles]
 koin-feature = [
