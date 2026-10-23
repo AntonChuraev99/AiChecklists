@@ -11,10 +11,13 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRendererImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -85,6 +88,30 @@ class ChatPreviewContentTest {
         previewRenderer = realRenderer,
     )
 
+    /**
+     * Sends [text] and waits until the VM has posted its question.
+     *
+     * Since Compose Multiplatform 1.12 a Compose Resources read no longer runs in the caller's
+     * context: `AsyncCache.getOrLoad` (ResourceCaches.kt) starts the load with
+     * `cacheScope.async` on its own `CoroutineScope(SupervisorJob())`, i.e. on Dispatchers.Default.
+     * Every `getString` the VM makes while building the question therefore really suspends, and
+     * the question lands on [ChatScreenState.pendingChoice] after `send` has returned. Up to 1.11
+     * the load ran inside the caller's `coroutineScope` (UnconfinedTestDispatcher here), so a
+     * synchronous read right after `send` used to see it.
+     *
+     * The wait runs on a REAL clock (`withContext(Dispatchers.Default)`): a `withTimeout` on the
+     * test scheduler would skip virtual time and fire before the background read finishes. On
+     * timeout it returns quietly so the test's own assertion reports what is missing.
+     */
+    private suspend fun VmRig.sendAndAwaitQuestion(text: String) {
+        send(text)
+        withContext(Dispatchers.Default) {
+            withTimeoutOrNull(QUESTION_TIMEOUT_MS) {
+                viewModel.screenState.first { it.pendingChoice != null }
+            }
+        }
+    }
+
     private fun ChatScreenState.rows(): List<ChoiceObjectRow> {
         val pending = pendingChoice
         assertNotNull("no pendingChoice shown — the question was never asked", pending)
@@ -112,7 +139,7 @@ class ChatPreviewContentTest {
             lists = listOf("Покупки", "Работа"),
         )
 
-        rig.send("удали молоко из покупок")
+        rig.sendAndAwaitQuestion("удали молоко из покупок")
 
         val state = rig.viewModel.screenState.value
         assertEquals("the row must name the item being deleted", "Молоко", state.row(RowKind.Item).value)
@@ -142,7 +169,7 @@ class ChatPreviewContentTest {
             lists = listOf("Покупки"),
         )
 
-        rig.send("напомни про молоко завтра в 9")
+        rig.sendAndAwaitQuestion("напомни про молоко завтра в 9")
 
         val state = rig.viewModel.screenState.value
         assertEquals("Молоко", state.row(RowKind.Item).value)
@@ -169,7 +196,7 @@ class ChatPreviewContentTest {
             lists = listOf("Покупки"),
         )
 
-        rig.send("перенеси все напоминания с завтра на послезавтра")
+        rig.sendAndAwaitQuestion("перенеси все напоминания с завтра на послезавтра")
 
         val range = rig.viewModel.screenState.value.row(RowKind.DateRange).value
         assertTrue("the range must show the source day: '$range'", range.contains("DAY($from)"))
@@ -185,7 +212,7 @@ class ChatPreviewContentTest {
             lists = emptyList(),
         )
 
-        rig.send("создай список отпуск с паспортом и билетами")
+        rig.sendAndAwaitQuestion("создай список отпуск с паспортом и билетами")
 
         val state = rig.viewModel.screenState.value
         assertEquals("the row must name the new list", "Отпуск", state.row(RowKind.Name).value)
@@ -208,7 +235,7 @@ class ChatPreviewContentTest {
             lists = listOf("Покупки", "Работа"),
         )
 
-        rig.send("добавь молоко")
+        rig.sendAndAwaitQuestion("добавь молоко")
 
         assertEquals(
             "the which-list picker must keep the object visible",
@@ -230,7 +257,7 @@ class ChatPreviewContentTest {
      */
     @Test
     fun showWriteChoice_createChecklistWithItems_confirmChipCountsTheItems() = runTest {
-        fun labelFor(itemCount: Int): String {
+        suspend fun labelFor(itemCount: Int): String {
             val rig = rigFor(
                 intent = ChatIntent.CreateChecklist("Отпуск"),
                 toolCall = ToolCall.CreateChecklist(
@@ -239,7 +266,7 @@ class ChatPreviewContentTest {
                 ),
                 lists = emptyList(),
             )
-            rig.send("создай список отпуск")
+            rig.sendAndAwaitQuestion("создай список отпуск")
             val options = rig.viewModel.screenState.value.pendingChoice?.choice?.options.orEmpty()
             val execute = options.first { it.action is com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction.Execute }
             return execute.label
@@ -274,7 +301,7 @@ class ChatPreviewContentTest {
             lists = listOf("Покупки"),
         )
 
-        rig.send("напомни про молоко завтра в 9")
+        rig.sendAndAwaitQuestion("напомни про молоко завтра в 9")
         val state = rig.viewModel.screenState.value
 
         state.rows().forEach { row ->
@@ -333,7 +360,7 @@ class ChatPreviewContentTest {
         )
         rig.viewModel.sendIntent(ChatScreenIntent.OnAttachmentPicked(attachment))
 
-        rig.send("прикрепи это к молоку")
+        rig.sendAndAwaitQuestion("прикрепи это к молоку")
 
         val file = rig.viewModel.screenState.value.row(RowKind.File)
         assertEquals("scan.pdf", file.value)
@@ -355,7 +382,7 @@ class ChatPreviewContentTest {
             lists = listOf("Покупки"),
         )
 
-        rig.send("удали молоко из покупок")
+        rig.sendAndAwaitQuestion("удали молоко из покупок")
 
         val state = rig.viewModel.screenState.value
         val spoken = state.rows().joinToString(" ") { it.contentDescription }
@@ -367,5 +394,10 @@ class ChatPreviewContentTest {
             "«Item: …» is the EN string — the RU block must come from values-ru: '$spoken'",
             !spoken.contains("Item:"),
         )
+    }
+
+    private companion object {
+        /** Real-time ceiling for the background resource reads behind one question. */
+        const val QUESTION_TIMEOUT_MS = 10_000L
     }
 }

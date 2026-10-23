@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-10-18_
+_Last updated: 2026-10-23_
 
-Быстрый поиск по 83 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 84 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-10-23 | pattern | upgrade, migration, compose-multiplatform, getString, MutableStateFlow.update, race-condition, kotlin-2.4, play-services-auth | [Апгрейд на Kotlin 2.4 и CMP 1.12: что ломается и чем закрыто](build-system/kotlin-2-4-cmp-1-12-upgrade-2026-10-23.md) |
 | 2026-10-18 | decision | theme, darkmode, chat-sheet, bottom-chrome, AppSurface.bottomChrome, AppSurface.chatSheet, AppChatColors.userBubble | [Шторка AI-чата и нижний хром в тёплой палитре темы](../decisions/2026-10-18-chat-sheet-warm-palette.md) |
 | 2026-10-16 | decision | redesign, soft-tactile, design-tokens, ask-pill, voice-entry, separateCompleted, grouped-list | [Redesign B "Soft & tactile" for Inbox, detail and AI chat](../decisions/2026-10-16-redesign-b-soft-tactile.md) |
 | 2026-10-14 | bug-fix | push, send_promotions_batch, reengagement, mark_active, lastActiveAt, no_reaction_stop | [Re-engagement push: dormancy window, no-reaction stop, foreground-only activity](reengagement-push-dormancy-window-and-stop-2026-10-14.md) |

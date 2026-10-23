@@ -73,6 +73,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.DateTimeUnit
@@ -1168,19 +1169,28 @@ class ChatViewModel(
         // The question is argument-less; the OBJECT of the action rides in typed rows under it
         // (D2). A one-slot prompt could only ever name one of item/list — which is how
         // "Add to Shopping?" shipped never saying what.
+        //
+        // Every suspend value is resolved BEFORE the write: since CMP 1.12 a resource read really
+        // suspends (off the Main thread), so a `_screenState.value.copy(x = suspendCall())` would
+        // snapshot the state, wait, and then overwrite whatever the init collectors wrote in the
+        // meantime (a fresh creditBalance, isPremium, …) with that stale snapshot.
+        val prompt = choiceString(toolCall.questionRes())
+        val objectRows = buildObjectRows(toolCall)
         _choiceSourceLayer = sourceLayer
-        _screenState.value = _screenState.value.copy(
-            pendingChoice = PendingChoice(
-                choice = ChatChoice(
-                    prompt = choiceString(toolCall.questionRes()),
-                    options = options,
-                    escape = escape,
-                    objectRows = buildObjectRows(toolCall),
-                    kind = toolCall.choiceKind(),
+        _screenState.update {
+            it.copy(
+                pendingChoice = PendingChoice(
+                    choice = ChatChoice(
+                        prompt = prompt,
+                        options = options,
+                        escape = escape,
+                        objectRows = objectRows,
+                        kind = toolCall.choiceKind(),
+                    ),
                 ),
-            ),
-            isProcessing = false,
-        )
+                isProcessing = false,
+            )
+        }
         trackPreviewShown(toolCall)
         trackResponseReceived(sourceLayer, outcome = "preview")
     }
@@ -1418,24 +1428,27 @@ class ChatViewModel(
         // Memory of choice is offered ONLY here, and only for an add: "always add to this list" is
         // a routing default a user can sensibly hold. "Always delete from this list" is not.
         val isAdd = sourceToolCall is ToolCall.AddItem || sourceToolCall is ToolCall.AddItems
+        // "Which list?" must still say WHAT is going into it — without these rows the user picks a
+        // destination for an unnamed thing. Resolved before the write (suspend; see showWriteChoice).
+        val objectRows = buildObjectRows(sourceToolCall)
         _choiceSourceLayer = sourceLayer
-        _screenState.value = _screenState.value.copy(
-            pendingChoice = PendingChoice(
-                choice = ChatChoice(
-                    prompt = prompt,
-                    options = options,
-                    escape = escape,
-                    // "Which list?" must still say WHAT is going into it — without these rows the
-                    // user picks a destination for an unnamed thing.
-                    objectRows = buildObjectRows(sourceToolCall),
-                    kind = ChoiceKind.PickList,
+        _screenState.update {
+            it.copy(
+                pendingChoice = PendingChoice(
+                    choice = ChatChoice(
+                        prompt = prompt,
+                        options = options,
+                        escape = escape,
+                        objectRows = objectRows,
+                        kind = ChoiceKind.PickList,
+                    ),
+                    showMemoryToggle = isAdd,
+                    // Never pre-checked — see PendingChoice.rememberChoice.
+                    rememberChoice = false,
                 ),
-                showMemoryToggle = isAdd,
-                // Never pre-checked — see PendingChoice.rememberChoice.
-                rememberChoice = false,
-            ),
-            isProcessing = false,
-        )
+                isProcessing = false,
+            )
+        }
         // PREVIEW_SHOWN keeps the shown->confirmed funnel intact for the which-list picker: a chip
         // tap fires PREVIEW_CONFIRMED via executeChoice, so without this the confirms are orphaned.
         trackPreviewShown(sourceToolCall)
@@ -1736,21 +1749,25 @@ class ChatViewModel(
                 } else {
                     choiceString(Res.string.chat_choice_which_list)
                 }
-                _screenState.value = _screenState.value.copy(
-                    pendingChoice = PendingChoice(
-                        choice = ChatChoice(
-                            prompt = prompt,
-                            options = options,
-                            escape = ChoiceOption(
-                                id = CHOICE_ESCAPE,
-                                label = choiceString(Res.string.chat_choice_cancel),
-                                role = ChoiceRole.Escape,
-                                action = ChoiceAction.Dismiss,
+                // Resolved before the write (suspend; see showWriteChoice).
+                val cancelLabel = choiceString(Res.string.chat_choice_cancel)
+                _screenState.update {
+                    it.copy(
+                        pendingChoice = PendingChoice(
+                            choice = ChatChoice(
+                                prompt = prompt,
+                                options = options,
+                                escape = ChoiceOption(
+                                    id = CHOICE_ESCAPE,
+                                    label = cancelLabel,
+                                    role = ChoiceRole.Escape,
+                                    action = ChoiceAction.Dismiss,
+                                ),
+                                kind = ChoiceKind.Move,
                             ),
-                            kind = ChoiceKind.Move,
                         ),
-                    ),
-                )
+                    )
+                }
             }.onFailure { e ->
                 logger.error(TAG, "showMoveTargets failed", e)
                 _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_generic_error"))
@@ -2889,21 +2906,25 @@ class ChatViewModel(
                             action = ChoiceAction.SendMessage(label),
                         )
                     }
+                    // Resolved before the write (suspend; see showWriteChoice).
+                    val cancelLabel = choiceString(Res.string.chat_choice_cancel)
                     _choiceSourceLayer = null
-                    _screenState.value = _screenState.value.copy(
-                        pendingChoice = PendingChoice(
-                            choice = ChatChoice(
-                                prompt = stepResult.prompt,
-                                options = options,
-                                escape = ChoiceOption(
-                                    id = CHOICE_ESCAPE,
-                                    label = choiceString(Res.string.chat_choice_cancel),
-                                    role = ChoiceRole.Escape,
-                                    action = ChoiceAction.Dismiss,
+                    _screenState.update {
+                        it.copy(
+                            pendingChoice = PendingChoice(
+                                choice = ChatChoice(
+                                    prompt = stepResult.prompt,
+                                    options = options,
+                                    escape = ChoiceOption(
+                                        id = CHOICE_ESCAPE,
+                                        label = cancelLabel,
+                                        role = ChoiceRole.Escape,
+                                        action = ChoiceAction.Dismiss,
+                                    ),
                                 ),
                             ),
-                        ),
-                    )
+                        )
+                    }
                     return
                 }
 

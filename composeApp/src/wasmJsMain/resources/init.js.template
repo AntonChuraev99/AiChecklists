@@ -11,14 +11,14 @@
 //   FIREBASE_WEB_MESSAGING_SENDER_ID=27698629989
 //   FIREBASE_WEB_APP_ID=<from Firebase Console → Project Settings → Web app>
 //   FIREBASE_WEB_MEASUREMENT_ID=<G-XXXXXXX, from Firebase Console → Project Settings → Web app; required for GA4 web analytics>
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import {
     getRemoteConfig,
     fetchAndActivate,
     getValue,
-} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-remote-config.js';
+} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-remote-config.js';
 import { getFunctions, httpsCallable }
-    from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-functions.js';
+    from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-functions.js';
 import {
     getAuth,
     signInWithPopup,
@@ -28,7 +28,7 @@ import {
     GoogleAuthProvider as JsGoogleAuthProvider,
     onAuthStateChanged,
     signOut as jsFirebaseSignOut,
-} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
+} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {
     getFirestore,
     collection,
@@ -41,26 +41,26 @@ import {
     where,
     onSnapshot,
     writeBatch,
-} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
+} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import {
     getStorage,
     ref as storageRef,
     uploadBytes,
     getBytes,
     deleteObject,
-} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js';
+} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
 import {
     getAnalytics,
     logEvent,
     setUserId as fbSetUserId,
     setUserProperties as fbSetUserProperties,
     isSupported as analyticsIsSupported,
-} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js';
+} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-analytics.js';
 // Amplitude Browser SDK 2 (ESM via esm.sh). Static import — resolved before the app
 // starts, same as the Firebase modules above (no CSP on this origin: verified _headers
 // + index.html). `init`, `track`, `setUserId`, `identify` and the `Identify` class are
 // all named exports of the package's main entry, so the namespace import exposes them.
-import * as amplitude from 'https://esm.sh/@amplitude/analytics-browser@2.44.1';
+import * as amplitude from 'https://esm.sh/@amplitude/analytics-browser@2.48.1';
 
 // If ?clear-data is active, the page is reloading — don't start the app
 if (window.__clearingData) {

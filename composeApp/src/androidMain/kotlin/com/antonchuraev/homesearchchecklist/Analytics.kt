@@ -60,17 +60,24 @@ object Analytics : AnalyticsTracker {
      * Must be called after AppContextHolder.init() in GistiAndroidApplication.
      * Safe to call multiple times (no-op if already initialized with same key).
      *
-     * Construction MUST stay this early (Application.onCreate). The SDK registers its
-     * ActivityLifecycleCallbacks when the instance is built, so a later construction misses the
-     * foreground transition and never opens the real session — verified and disproven as a fix, see
-     * `docs/todos/2026-07-29-amplitude-no-init-in-background-processes.md`.
+     * Construction lives in Application.onCreate, but since SDK 1.34.0 (PR #566, "use process
+     * lifecycle for Android foreground tracking") that timing no longer decides whether the real
+     * session opens. In 1.36.0 the always-installed `AndroidLifecyclePlugin.setup` subscribes a
+     * `ProcessLifecycleObserver`, whose `start()` calls
+     * `ProcessLifecycleOwner.get().lifecycle.addObserver(...)` on the main thread. AndroidX replays
+     * ON_START to an observer added while the process is already started, so an instance built after
+     * the first Activity still gets `onEnterForeground`. The timestamp is the attach time, not the
+     * real Activity start. Foreground tracking depends on androidx.startup's
+     * ProcessLifecycleInitializer (never remove the whole InitializationProvider), and background is
+     * reported about 700 ms after the last Activity stops (ProcessLifecycleOwner's debounce).
+     * The "construct later" approach in
+     * `docs/todos/2026-07-29-amplitude-no-init-in-background-processes.md` was refuted on the old
+     * activity-callback mechanism; it has not been re-checked live on 1.36.0.
      *
-     * `autocapture` replaces the deprecated `trackingSessionEvents` flag: passing the flag selects a
-     * @Deprecated secondary constructor, and on the SDK version this app used to pin (1.22.4) SESSIONS
-     * was NOT in `REQUIRES_ACTIVITY_CALLBACKS`, so a SESSIONS-only config skipped
-     * `registerActivityLifecycleCallbacks` altogether — the SDK's `foreground` flag stayed false for
-     * the whole process life and sessions were cut by timeout even while the user was on screen.
-     * Fixed upstream in 1.25.2 (PR #355), which always registers the callbacks.
+     * `autocapture` replaces the deprecated `trackingSessionEvents` flag (the flag selects a
+     * @Deprecated secondary constructor). History: on 1.22.4 a SESSIONS-only config never registered
+     * activity callbacks, so the SDK's `foreground` flag stayed false and sessions were cut by
+     * timeout while the user was on screen. Fixed upstream in 1.25.2 (PR #355).
      */
     fun initialize(amplitudeKey: String) {
         if (amplitudeKey.isBlank()) return

@@ -161,9 +161,9 @@ internal fun buildVmRig(
     prefs: FakeAiChatPreferences = FakeAiChatPreferences(initial = false),
     repository: AiChatRepository = ScriptedAiChatRepository(classification),
     dateFormatter: ChatDateFormatter = TokenDateFormatter(),
+    userRepo: HarnessUserDataRepository = HarnessUserDataRepository("u1"),
 ): VmRig {
     val dispatcher = RecordingToolCallDispatcher(dispatchOutcome, undoOutcome, moveOutcome)
-    val userRepo = HarnessUserDataRepository("u1")
     val viewModel = ChatViewModel(
         aiChatRepository = repository,
         toolCallDispatcher = dispatcher,

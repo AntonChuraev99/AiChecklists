@@ -68,6 +68,10 @@ kotlin {
         wasmJsMain.dependencies {
             // WebWorkerSQLiteDriver for web — OPFS persistence via sqlite-wasm worker
             implementation(libs.sqlite3.web)
+            // org.w3c.dom.Worker (WebWorkerSQLiteDriver's ctor param). sqlite-web 2.7.1 moved the
+            // browser declarations to kotlinx-browser and exposes it only on its RUNTIME variant,
+            // so the compile classpath needs it declared explicitly.
+            implementation(libs.kotlinx.browser)
         }
 
         commonTest.dependencies {
