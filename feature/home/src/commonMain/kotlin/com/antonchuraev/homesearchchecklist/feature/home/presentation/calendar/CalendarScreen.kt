@@ -126,6 +126,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveCont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.checklistDisplayName
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.AddTaskRow
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayBody
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayScreenState
@@ -990,9 +991,11 @@ private fun CalendarReminderRow(
     modifier: Modifier = Modifier,
 ) {
     val isItemLevel = info is TodayReminderInfo.ItemLevel
+    // Localized for the system Inbox — see [TodayReminderInfo.isInbox].
+    val checklistName = checklistDisplayName(info.checklistName, info.isInbox)
     val primaryText = when (info) {
         is TodayReminderInfo.ItemLevel -> info.itemText
-        is TodayReminderInfo.ChecklistLevel -> info.checklistName
+        is TodayReminderInfo.ChecklistLevel -> checklistName
     }
     val timeLabel = formatReminderTime(info.reminderAt)
 
@@ -1003,7 +1006,7 @@ private fun CalendarReminderRow(
             append(primaryText)
             append(" in ")
         }
-        append(info.checklistName)
+        append(checklistName)
         if (info.isRecurring) append(", recurring")
     }
 
@@ -1059,7 +1062,7 @@ private fun CalendarReminderRow(
                     // Show parent checklist name only for per-item reminders
                     if (isItemLevel) {
                         Text(
-                            text = info.checklistName,
+                            text = checklistName,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

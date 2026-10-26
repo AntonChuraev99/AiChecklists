@@ -46,6 +46,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.displayName
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -133,7 +134,7 @@ private fun FillsListContent(
 
                 item {
                     Text(
-                        text = state.checklist.name,
+                        text = state.checklist.displayName(),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -171,7 +172,7 @@ private fun FillsListContent(
                     span = { GridItemSpan(maxLineSpan) },
                 ) {
                     Text(
-                        text = state.checklist.name,
+                        text = state.checklist.displayName(),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(bottom = AppDimens.SpacingXs),

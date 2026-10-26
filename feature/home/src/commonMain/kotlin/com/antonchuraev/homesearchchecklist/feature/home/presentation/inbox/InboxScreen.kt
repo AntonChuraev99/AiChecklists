@@ -11,6 +11,7 @@ import aichecklists.core.designsystem.generated.resources.inbox_project_rename_t
 import aichecklists.core.designsystem.generated.resources.delete
 import aichecklists.core.designsystem.generated.resources.inbox_project_delete
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
+import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
 import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_display_options
 import aichecklists.core.designsystem.generated.resources.inbox_empty_description
@@ -146,6 +147,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWin
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerResult
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.checklistDisplayName
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.checklistDisplayName as resolveChecklistDisplayName
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
@@ -600,7 +603,10 @@ fun InboxScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     InboxHeader(
                         nowMillis = content?.nowMillis,
-                        title = currentPage?.title ?: stringResource(Res.string.inbox_title),
+                        // Via checklistDisplayName: the Inbox's stored title is frozen in the
+                        // language that created it, so the system Inbox shows the localized name.
+                        title = currentPage?.let { checklistDisplayName(it.title, it.isInbox) }
+                            ?: stringResource(Res.string.inbox_title),
                         // Open tasks only, matching Todoist: a count that includes finished ones
                         // answers "how much have I ever put here" instead of "how much is left".
                         subtitle = currentPage?.let { page ->
@@ -1343,12 +1349,16 @@ private fun InboxContent(
             // project → its palette dot (the same hue as its avatar tile on Projects). Every dot
             // behaviour is the chip row's: hidden on one page, Role.Tab + selected, auto-centre on
             // every page change, tap → animate the pager.
+            // Resolved outside the map: stringResource is @Composable and the lambda is not. The
+            // pure rule then keeps the Inbox chip in the current UI language.
+            val inboxName = stringResource(Res.string.inbox_checklist_name)
             AppPageChipRow(
                 pages = pages.map { page ->
+                    val chipTitle = resolveChecklistDisplayName(page.title, page.isInbox, inboxName)
                     if (page.isInbox) {
-                        PageChip(title = page.title, leadingIcon = Icons.Outlined.Inbox)
+                        PageChip(title = chipTitle, leadingIcon = Icons.Outlined.Inbox)
                     } else {
-                        PageChip(title = page.title, dotColor = GistiColors.avatarContent(page.checklistId))
+                        PageChip(title = chipTitle, dotColor = GistiColors.avatarContent(page.checklistId))
                     }
                 },
                 selectedIndex = pagerState.currentPage,

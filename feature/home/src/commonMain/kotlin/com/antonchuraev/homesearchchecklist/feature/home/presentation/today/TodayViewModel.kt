@@ -556,6 +556,7 @@ class TodayViewModel(
                 timeLabel = formatTime(reminderAt),
                 isPastDue = reminderAt < nowMs,
                 isRecurring = isRecurring,
+                isInbox = isInbox,
             )
             is TodayReminderInfo.ItemLevel -> TodayReminderItem(
                 id = "il_${fillId}_${itemId}_${reminderAt}",
@@ -566,6 +567,7 @@ class TodayViewModel(
                 timeLabel = formatTime(reminderAt),
                 isPastDue = reminderAt < nowMs,
                 isRecurring = isRecurring,
+                isInbox = isInbox,
             )
         }
     }

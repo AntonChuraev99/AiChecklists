@@ -263,6 +263,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.DueLabelStyle
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.displayName
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.dueLabelSpec
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.label
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.containsRepeat
@@ -390,24 +391,28 @@ fun ChecklistDetailScreen(
             onBack = { viewModel.sendIntent(ChecklistDetailIntent.OnBackClick) },
             onDelete = { viewModel.sendIntent(ChecklistDetailIntent.OnDeleteCorruptedChecklist) },
         )
-        is ChecklistDetailState.Content -> ChecklistDetailContent(
-            state = currentState,
-            onIntent = viewModel::sendIntent,
-            focusItemId = focusItemId,
-            onOpenChatSheet = onOpenChatSheet?.let { cb ->
-                { cb(currentState.checklist.id, currentState.checklist.name) }
-            },
-            onChatCollapse = onChatCollapse,
-            chatInputBlank = chatInputBlank,
-            routeCollapseSignal = routeCollapseSignal,
-            chatDockContent = chatDockContent,
-            chatFullContent = chatFullContent,
-            onChecklistQuickAction = onChecklistQuickAction?.let { cb ->
-                { action -> cb(currentState.checklist.id, currentState.checklist.name, action) }
-            },
-            useInlineAddRow = useInlineAddRow,
-            onOpenChat = onOpenChat,
-        )
+        is ChecklistDetailState.Content -> {
+            // Display name, not the stored one: the chat shows it as the list it is talking about.
+            val checklistTitle = currentState.checklist.displayName()
+            ChecklistDetailContent(
+                state = currentState,
+                onIntent = viewModel::sendIntent,
+                focusItemId = focusItemId,
+                onOpenChatSheet = onOpenChatSheet?.let { cb ->
+                    { cb(currentState.checklist.id, checklistTitle) }
+                },
+                onChatCollapse = onChatCollapse,
+                chatInputBlank = chatInputBlank,
+                routeCollapseSignal = routeCollapseSignal,
+                chatDockContent = chatDockContent,
+                chatFullContent = chatFullContent,
+                onChecklistQuickAction = onChecklistQuickAction?.let { cb ->
+                    { action -> cb(currentState.checklist.id, checklistTitle, action) }
+                },
+                useInlineAddRow = useInlineAddRow,
+                onOpenChat = onOpenChat,
+            )
+        }
     }
 }
 
@@ -587,6 +592,9 @@ private fun ChecklistDetailContent(
     weeklyTodayWeekday: Int? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    // The name every title slot below prints. The system Inbox opens here like any checklist, and
+    // its stored name is frozen in the language that created it — show the current-locale one.
+    val checklistTitle = state.checklist.displayName()
     // v2 (redesign B) Standard view: the list is grouped, the add-task input is the bottom capture
     // plate and the chat entry is the "Ask Gisti about this list" row. Weekly keeps today's v2 layout.
     val v2Standard = useInlineAddRow && state.checklist.viewMode == ChecklistViewMode.Standard
@@ -1091,8 +1099,8 @@ private fun ChecklistDetailContent(
         // shows it only once that card has scrolled away. v2 Weekly keeps the name + open-task count
         // in the bar (it has no header card). v1 keeps title = null, so its bar is untouched.
         title = when {
-            v2Standard -> if (headerScrolledOff) state.currentFolderTitle ?: state.checklist.name else null
-            useInlineAddRow -> state.currentFolderTitle ?: state.checklist.name
+            v2Standard -> if (headerScrolledOff) state.currentFolderTitle ?: checklistTitle else null
+            useInlineAddRow -> state.currentFolderTitle ?: checklistTitle
             else -> null
         },
         subtitle = if (useInlineAddRow && !v2Standard) {
@@ -1506,7 +1514,7 @@ private fun ChecklistDetailContent(
                             // progress ring. Replaces the bar title/subtitle and the progress line.
                             AppChecklistHeaderCard(
                                 seed = state.checklist.id,
-                                title = state.currentFolderTitle ?: state.checklist.name,
+                                title = state.currentFolderTitle ?: checklistTitle,
                                 subtitle = stringResource(
                                     Res.string.detail_header_progress,
                                     openTaskCount,
@@ -1561,7 +1569,7 @@ private fun ChecklistDetailContent(
                         } else {
                             ProgressHeader(
                                 items = visibleFillItems,
-                                name = state.currentFolderTitle ?: state.checklist.name,
+                                name = state.currentFolderTitle ?: checklistTitle,
                             )
                         }
                         if (!useInlineAddRow) notificationsBanner()
@@ -2063,7 +2071,7 @@ private fun ChecklistDetailContent(
     // Delete confirmation dialog
     if (state.showDeleteConfirmation) {
         DeleteConfirmationDialog(
-            checklistName = state.checklist.name,
+            checklistName = checklistTitle,
             onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteChecklist) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteConfirmation) }
         )

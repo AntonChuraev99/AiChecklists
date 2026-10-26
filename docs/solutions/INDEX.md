@@ -2,10 +2,11 @@
 
 _Last updated: 2026-10-26_
 
-Быстрый поиск по 86 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 87 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-10-26 | bug-fix | localization, i18n, inbox, isInbox, checklistDisplayName, stringResource, sync | [Имя системного Inbox — из ресурсов при показе, а не из БД](system-row-name-localized-at-display-2026-10-26.md) |
 | 2026-10-26 | bug-fix | crash, database, UnsatisfiedLinkError, libsqliteJni, BundledSQLiteDriver, AndroidSQLiteDriver, SqliteDriverSelector | [libsqliteJni.so не найден: fallback на системный SQLite](bundled-sqlite-missing-so-fallback-2026-10-26.md) |
 | 2026-10-26 | bug-fix | consent, gdpr, anr, TelephonyManager, simCountryIso, ConsentManager, binder | [EEA-определение в ConsentManager: binder-ANR и пустой ISO-код](consent-eea-telephony-anr-and-empty-iso-2026-10-26.md) |
 | 2026-10-23 | pattern | upgrade, migration, compose-multiplatform, getString, MutableStateFlow.update, race-condition, kotlin-2.4, play-services-auth | [Апгрейд на Kotlin 2.4 и CMP 1.12: что ломается и чем закрыто](build-system/kotlin-2-4-cmp-1-12-upgrade-2026-10-23.md) |
