@@ -52,6 +52,10 @@ open class GistiApplication : Application() {
         // override startKoinIfNeeded() to add androidApp-specific modules.
         startKoinIfNeeded()
 
+        // Fresh EEA/UK detection for this process (telephony binder IPC, off the main thread) —
+        // after Koin so a telephony failure reaches AppLogger/Crashlytics, not logcat only.
+        consentManager.startRegionResolution()
+
         initRevenueCat()
 
         // Create notification channels (required on Android 8+).
@@ -340,9 +344,12 @@ open class GistiApplication : Application() {
     /**
      * Apply consent defaults synchronously.
      * Uses SharedPreferences (not DataStore) for instant synchronous read.
+     * The EEA/UK region check (telephony binder IPC) is never done here: the decision uses the
+     * region cached by the previous process (none → DENIED); the fresh per-process detection is
+     * started by [ConsentManager.startRegionResolution] after Koin.
      */
     private fun initConsent() {
-        consentManager = ConsentManager(this)
+        consentManager = ConsentManager(this, applicationScope)
         consentManager.applyConsentDefaults()
     }
 

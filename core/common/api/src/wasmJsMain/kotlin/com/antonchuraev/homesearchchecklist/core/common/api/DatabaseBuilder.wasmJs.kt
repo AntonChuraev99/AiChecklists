@@ -12,7 +12,12 @@ import org.w3c.dom.Worker
 fun createSqliteWorker(): Worker =
     js("""new Worker(new URL("sqlite-wasm-worker/worker.js", import.meta.url))""")
 
-actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(databaseName: String): RoomDatabase.Builder<T> {
+// onDriverFallback is unused: the web has a single driver (WebWorkerSQLiteDriver over OPFS).
+@Suppress("UNUSED_PARAMETER")
+actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(
+    databaseName: String,
+    noinline onDriverFallback: (Throwable) -> Unit,
+): RoomDatabase.Builder<T> {
     return Room.databaseBuilder<T>(
         name = "$databaseName.db"
     ).setDriver(WebWorkerSQLiteDriver(createSqliteWorker()))

@@ -205,10 +205,13 @@ class MainActivity : ComponentActivity() {
                 googleAuthRepository.setActivityContext(activity)
             }
 
-            // Show consent dialog for EEA/UK users on first launch
+            // Show consent dialog for EEA/UK users on first launch. The region check is a
+            // telephony binder call, so it runs off the main thread (inside isConsentRequired)
+            // and the dialog appears as soon as it resolves.
             val consentManager = GistiApplication.consentManager
-            var showConsentDialog by remember {
-                mutableStateOf(consentManager.isConsentRequired())
+            var showConsentDialog by remember { mutableStateOf(false) }
+            LaunchedEffect(consentManager) {
+                if (consentManager.isConsentRequired()) showConsentDialog = true
             }
             if (showConsentDialog) {
                 ConsentDialog(
