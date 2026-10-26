@@ -8,22 +8,29 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
+import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.NEW_CHECKLIST_SEPARATE_COMPLETED
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_default_checklist_name
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -37,6 +44,10 @@ class WelcomeOnboardingViewModel(
     private val activationCoordinator: ActivationCoordinator,
     private val analyticsTracker: AnalyticsTracker,
     private val logger: AppLogger,
+    // Branch 3 (empty input) depends on the shell: the v2 shell has a system Inbox to drop the
+    // getting-started tips into, the classic (v1) shell does not — see [resolveFirstChecklist].
+    private val navExperimentResolver: NavExperimentResolver,
+    private val ensureInbox: EnsureInboxUseCase,
     private val isDebugBuild: Boolean = false,
     // Defaults to the production Compose Resources `getString`; overridden in tests where that
     // path is not resolvable on the JVM host (see [WelcomeStringResolver]).
@@ -51,6 +62,11 @@ class WelcomeOnboardingViewModel(
     // ChatViewModel). The Screen collects it to show snackbars / resolve string keys.
     private val _sideEffect = MutableSharedFlow<WelcomeOnboardingSideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<WelcomeOnboardingSideEffect> = _sideEffect.asSharedFlow()
+
+    // True once the getting-started tips are in the Inbox (both template and fill). Makes the
+    // final-step retry idempotent — see [appendTipsToInbox]. Process-scoped on purpose: after process
+    // death the VM is rebuilt and the onboarding flag is what decides whether this step re-runs.
+    private var inboxTipsWritten = false
 
     init {
         if (!isDebugBuild) {
@@ -130,17 +146,22 @@ class WelcomeOnboardingViewModel(
     }
 
     /**
-     * Final step. Resolves the user's intent and either creates a pre-seeded checklist (chip or
-     * default starter) or generates one from a free-text prompt via AI, then completes onboarding
-     * and drops the user into the freshly created checklist (the activation "aha" moment). Three
+     * Final step. Resolves the user's intent and either creates a pre-seeded checklist (chip),
+     * generates one from a free-text prompt via AI, or seeds the getting-started tips, then completes
+     * onboarding and drops the user where that content lives (the activation "aha" moment). Three
      * branches:
      *  1. A starter chip is selected → create a checklist pre-filled from the chip's hardcoded
      *     preset items (NO AI — fast, no credit/network), land on its detail screen.
      *  2. No chip, but text was typed → generate a checklist from that text via AI *in place*
      *     (full-screen loading, no Analyze hand-off, no preview), create it, and land on its detail
      *     screen — see [generateFirstChecklistFromText].
-     *  3. No chip, empty text → create a checklist from the default getting-started starter so the
-     *     mandatory final step is never blank.
+     *  3. No chip, empty text → seed the default getting-started tips so the mandatory final step is
+     *     never blank. Where they go depends on the shell:
+     *     - v2 (default): appended as tasks to the system **Inbox**, then land on the main screen
+     *       (which is the Inbox tab in v2) — see [appendTipsToInbox]. The tips are "how to use the
+     *       app", not a themed list, so a separate "My Checklist" project was noise in Projects.
+     *     - v1 (classic layout, opt-in): there is no Inbox in that shell, so it still creates a
+     *       separate "My Checklist" from the tips and lands on its detail screen.
      *
      * Empty input never blocks the CTA: branch 3 keeps the step actionable (the whole point of
      * closing the no-checklist activation leak). Because the input field is hidden once a chip is
@@ -158,14 +179,15 @@ class WelcomeOnboardingViewModel(
             when (val action = resolveFirstChecklist()) {
                 is FirstChecklistAction.Seed -> createSeededChecklist(action)
                 is FirstChecklistAction.AiAnalyze -> generateFirstChecklistFromText(action.prompt)
+                is FirstChecklistAction.InboxTips -> appendTipsToInbox(action)
             }
         }
     }
 
     /**
-     * Branches 1 & 3: create a checklist from a hardcoded preset (chip) or the default getting-started
-     * starter (empty input). No AI/network — uses the CTA spinner ([WelcomeOnboardingState.isCreating]),
-     * then lands on the created checklist's detail screen.
+     * Branch 1, and branch 3 in the v1 shell: create a checklist from a hardcoded preset (chip) or the
+     * default getting-started starter (empty input). No AI/network — uses the CTA spinner
+     * ([WelcomeOnboardingState.isCreating]), then lands on the created checklist's detail screen.
      */
     private suspend fun createSeededChecklist(action: FirstChecklistAction.Seed) {
         _screenState.update { it.copy(isCreating = true, error = null) }
@@ -187,6 +209,61 @@ class WelcomeOnboardingViewModel(
             navigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
         } catch (e: Exception) {
             logger.error(TAG, "seeded first checklist creation failed: ${e.message}", e)
+            _screenState.update { it.copy(isCreating = false, error = ERROR_KEY) }
+            _sideEffect.emit(WelcomeOnboardingSideEffect.ShowSnackbar(ERROR_KEY))
+        }
+    }
+
+    /**
+     * Branch 3 in the v2 shell: append the getting-started tips to the system Inbox as ordinary
+     * tasks, then land on the main screen (the Inbox tab in v2). No checklist is created.
+     *
+     * Each tip is written as a template + fill PAIR — template item first so the fill row carries
+     * its stable [ChecklistFillItem.templateItemId] from birth, and BOTH halves persisted (rule
+     * `checklist-domain`: writing one half only is the template↔fill desync). Same shape as the
+     * Inbox quick-add (`InboxViewModel.addTask`), minus due dates / reminders.
+     *
+     * Any failure (Inbox could not be ensured, row or default fill missing, a write threw) keeps the
+     * user on the final step with the create-failure snackbar — never a silent no-op.
+     */
+    private suspend fun appendTipsToInbox(action: FirstChecklistAction.InboxTips) {
+        _screenState.update { it.copy(isCreating = true, error = null) }
+        try {
+            // A retry after a failure LATER in this function (e.g. completeOnboardingUseCase) must
+            // not append the tips a second time — ensureInbox returns the same id, so without this
+            // latch the Inbox would end up with every tip twice.
+            if (!inboxTipsWritten) {
+                // EnsureInboxUseCase logs its own failure; null here means "no Inbox to write into".
+                val inboxId = ensureInbox(stringResolver.resolve(Res.string.inbox_checklist_name))
+                    ?: error("Inbox could not be ensured")
+                val inbox = checklistRepository.getChecklistById(inboxId)
+                    ?: error("Inbox checklist $inboxId not found")
+                val fill = checklistRepository.getDefaultFillByChecklistId(inboxId).first()
+                    ?: error("No default fill for Inbox $inboxId")
+
+                val templateItems = action.texts.map { ChecklistItem(text = it) }
+                val fillItems = templateItems.map { item ->
+                    ChecklistFillItem(text = item.text, checked = false, templateItemId = item.id)
+                }
+                checklistRepository.updateFill(fill.copy(items = fill.items + fillItems))
+                checklistRepository.updateChecklistTemplate(inbox.copy(items = inbox.items + templateItems))
+                // Set only once BOTH halves landed. Known gap (out of scope): a template write that
+                // fails after the fill write leaves the latch down, so a retry re-appends to the fill.
+                inboxTipsWritten = true
+            }
+
+            // checklist_created=false: the Inbox is a system row, not a user checklist (same reason
+            // EnsureInboxUseCase does not fire Checklist.CREATED). seed="inbox" separates this path
+            // from the v1 "default" seed in the funnel.
+            trackCompleted(checklistCreated = false, seedOverride = SEED_INBOX)
+            completeOnboardingUseCase()
+            // Main screen = Inbox tab in v2; cleared back stack so system back exits, not re-enters
+            // onboarding.
+            navigator.navigateToMainScreen(clearBackStack = true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.error(TAG, "onboarding tips → Inbox failed: ${e.message}", e)
             _screenState.update { it.copy(isCreating = false, error = ERROR_KEY) }
             _sideEffect.emit(WelcomeOnboardingSideEffect.ShowSnackbar(ERROR_KEY))
         }
@@ -291,6 +368,10 @@ class WelcomeOnboardingViewModel(
      * Resolves what the final step should do across the three branches described on
      * [handleCreateFirstChecklist]. Resource keys come from the contract; text is resolved here via
      * the suspend `getString` (never in the domain layer).
+     *
+     * Branch 3 reads the shell via [NavExperimentResolver.ensureResolved] (not the non-suspending
+     * `currentArm()`, which reports the v2 default before the stored choice is read — a v1 user
+     * would then get tips written into an Inbox their shell never shows).
      */
     private suspend fun resolveFirstChecklist(): FirstChecklistAction {
         val state = _screenState.value
@@ -304,17 +385,24 @@ class WelcomeOnboardingViewModel(
             )
             // 2. No chip, text typed — hand the prompt to the AI Analyze flow.
             typed.isNotEmpty() -> FirstChecklistAction.AiAnalyze(prompt = typed)
-            // 3. No chip, empty text — default name + getting-started starter (never blank).
-            else -> FirstChecklistAction.Seed(
-                name = stringResolver.resolve(Res.string.onboarding_welcome_default_checklist_name),
-                items = WelcomeStarterTemplate.DEFAULT_STARTER_ITEMS
-                    .map { ChecklistItem(text = stringResolver.resolve(it)) },
-            )
+            // 3. No chip, empty text — getting-started tips (never blank): into the Inbox in v2,
+            //    as a separate default-named checklist in v1 (no Inbox there).
+            else -> {
+                val tips = WelcomeStarterTemplate.DEFAULT_STARTER_ITEMS.map { stringResolver.resolve(it) }
+                if (navExperimentResolver.ensureResolved() == NavVariant.V2) {
+                    FirstChecklistAction.InboxTips(texts = tips)
+                } else {
+                    FirstChecklistAction.Seed(
+                        name = stringResolver.resolve(Res.string.onboarding_welcome_default_checklist_name),
+                        items = tips.map { ChecklistItem(text = it) },
+                    )
+                }
+            }
         }
     }
 
     private sealed interface FirstChecklistAction {
-        /** Branches 1 & 3: create a pre-seeded checklist, then land on its detail screen. */
+        /** Branch 1, and branch 3 in v1: create a pre-seeded checklist, then land on its detail screen. */
         data class Seed(
             val name: String,
             val items: List<ChecklistItem>,
@@ -322,6 +410,9 @@ class WelcomeOnboardingViewModel(
 
         /** Branch 2: hand the free-text prompt to the AI Analyze flow (it creates the checklist). */
         data class AiAnalyze(val prompt: String) : FirstChecklistAction
+
+        /** Branch 3 in v2: append the resolved tip texts to the system Inbox, then land on main. */
+        data class InboxTips(val texts: List<String>) : FirstChecklistAction
     }
 
     private fun seedKind(): String = when {
@@ -361,6 +452,9 @@ class WelcomeOnboardingViewModel(
         // Funnel "seed" value for the "More ways to start" card (Analyze hub); the typed/chip/default
         // seeds come from seedKind(), which reads state — this card path has neither chip nor text.
         private const val SEED_MULTIMODAL = "multimodal"
+        // Funnel "seed" value for branch 3 in the v2 shell (tips appended to the Inbox, no checklist
+        // created); the v1 shell keeps seedKind()'s "default".
+        private const val SEED_INBOX = "inbox"
         // Resolved to onboarding_welcome_create_error in the Screen (string-key indirection so the
         // ViewModel never imports Compose Resources for snackbar text).
         const val ERROR_KEY = "onboarding_welcome_create_error"

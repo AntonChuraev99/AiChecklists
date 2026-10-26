@@ -174,7 +174,7 @@
     <string name="onboarding_welcome_items_todo_5">कल की समीक्षा करें</string>
     <!-- Default starter items (empty input, no chip): getting-started tips. -->
     <string name="onboarding_welcome_default_item_1">अपना आइटम जोड़ने के लिए + पर टैप करें</string>
-    <string name="onboarding_welcome_default_item_2">चीज़ों को चेक करने के लिए स्वाइप करें</string>
+    <string name="onboarding_welcome_default_item_2">चीज़ों को चेक करने के लिए गोले पर टैप करें</string>
     <string name="onboarding_welcome_default_item_3">रिमाइंडर सेट करें ताकि आप न भूलें</string>
     <string name="onboarding_welcome_default_item_4">किसी सूची को भरवाने के लिए AI आज़माएं</string>
 

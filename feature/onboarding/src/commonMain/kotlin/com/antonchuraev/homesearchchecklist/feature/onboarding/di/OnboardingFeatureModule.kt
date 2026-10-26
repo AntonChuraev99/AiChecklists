@@ -40,6 +40,8 @@ val onboardingFeatureModule = module {
             activationCoordinator = get(),
             analyticsTracker = get(),
             logger = get(),
+            navExperimentResolver = get(),
+            ensureInbox = get(),
             isDebugBuild = get(named("isDebugBuild")),
         )
     }

@@ -174,7 +174,7 @@
     <string name="onboarding_welcome_items_todo_5">Review tomorrow</string>
     <!-- Default starter items (empty input, no chip): getting-started tips. -->
     <string name="onboarding_welcome_default_item_1">Tap + to add your own item</string>
-    <string name="onboarding_welcome_default_item_2">Swipe to check things off</string>
+    <string name="onboarding_welcome_default_item_2">Tap the circle to check things off</string>
     <string name="onboarding_welcome_default_item_3">Set a reminder so you don't forget</string>
     <string name="onboarding_welcome_default_item_4">Try AI to fill a list for you</string>
 
