@@ -5,9 +5,12 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
+import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -18,11 +21,13 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.An
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -93,18 +98,32 @@ class WelcomeOnboardingViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): WelcomeOnboardingViewModel = WelcomeOnboardingViewModel(
-        savedStateHandle = SavedStateHandle(),
-        navigator = fakeNavigator,
-        completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
-        checklistRepository = fakeChecklistRepository,
-        analyzeRepository = fakeAnalyzeRepository,
-        activationCoordinator = fakeActivationCoordinator,
-        analyticsTracker = fakeAnalyticsTracker,
-        logger = NoOpLogger(),
-        isDebugBuild = true,
-        stringResolver = fakeStringResolver,
-    )
+    /**
+     * Defaults to the CLASSIC (v1) shell: the pre-existing branch-3 tests pin the "separate default
+     * checklist + detail" contract, which is still exactly what v1 does (it has no Inbox). The v2
+     * Inbox path is covered by the `*_v2_*` tests below, which pass [NavVariant.V2] explicitly.
+     */
+    private fun createViewModel(
+        variant: NavVariant = NavVariant.CONTROL,
+        // Analytics fire only outside debug builds; the funnel tests pass false to record them.
+        isDebugBuild: Boolean = true,
+    ): WelcomeOnboardingViewModel =
+        WelcomeOnboardingViewModel(
+            savedStateHandle = SavedStateHandle(),
+            navigator = fakeNavigator,
+            completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
+            checklistRepository = fakeChecklistRepository,
+            analyzeRepository = fakeAnalyzeRepository,
+            activationCoordinator = fakeActivationCoordinator,
+            analyticsTracker = fakeAnalyticsTracker,
+            logger = NoOpLogger(),
+            navExperimentResolver = FixedNavResolver(variant),
+            // Real use case over the fake repository, so the test drives the true ensure path
+            // (including its null-on-failure contract) rather than a stub.
+            ensureInbox = EnsureInboxUseCase(fakeChecklistRepository, fakeAnalyticsTracker, NoOpLogger()),
+            isDebugBuild = isDebugBuild,
+            stringResolver = fakeStringResolver,
+        )
 
     // --- Initial state & step navigation ---
 
@@ -380,6 +399,228 @@ class WelcomeOnboardingViewModelTest {
         assertFalse(fakeNavigator.navigatedToChecklistDetail)
     }
 
+    // --- Final step, branch 3 in the v2 shell: tips go into the Inbox ---
+
+    @Test
+    fun createFirstChecklist_v2_emptyInput_appendsTipsToInboxAndOpensMain() = runTest {
+        val vm = createViewModel(NavVariant.V2)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertInboxGotTipsAndLandedOnMain()
+    }
+
+    /**
+     * The activation funnel reads `onboarding_completed.checklist_created` as "the user left
+     * onboarding with starter content". The v2 Inbox tips are that content just as v1's "My
+     * Checklist" is, so both report `true`; only `seed` tells the two shells apart.
+     */
+    @Test
+    fun createFirstChecklist_v2_emptyInput_completedEventCountsStarterContent() = runTest {
+        val vm = createViewModel(NavVariant.V2, isDebugBuild = false)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val params = completedEventParams()
+        assertEquals("true", params["checklist_created"])
+        assertEquals("inbox", params["seed"])
+    }
+
+    @Test
+    fun createFirstChecklist_v1_emptyInput_completedEventKeepsDefaultSeed() = runTest {
+        val vm = createViewModel(NavVariant.CONTROL, isDebugBuild = false)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val params = completedEventParams()
+        assertEquals("true", params["checklist_created"])
+        assertEquals("default", params["seed"])
+    }
+
+    private fun completedEventParams(): Map<String, Any> {
+        val completed = fakeAnalyticsTracker.events.filter { it.first == AnalyticsEvents.Onboarding.COMPLETED }
+        assertEquals(1, completed.size, "expected exactly one onboarding_completed, got $completed")
+        return completed.single().second
+    }
+
+    @Test
+    fun createFirstChecklist_v2_whitespaceOnly_treatedAsEmptyAppendsTipsToInbox() = runTest {
+        val vm = createViewModel(NavVariant.V2)
+        vm.onIntent(WelcomeOnboardingIntent.OnInputChanged("   "))
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertInboxGotTipsAndLandedOnMain()
+        // Whitespace must not divert to the AI branch either.
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount)
+    }
+
+    @Test
+    fun createFirstChecklist_v2_appendsAfterExistingInboxTasks() = runTest {
+        // An Inbox that already holds a task (e.g. synced from another device) keeps it: the tips
+        // are appended, never written over the existing items.
+        val existingTemplate = ChecklistItem(text = "Existing")
+        fakeChecklistRepository.inboxChecklist = Checklist(
+            id = FakeChecklistRepository.INBOX_ID,
+            name = "Inbox",
+            items = listOf(existingTemplate),
+            isInbox = true,
+        )
+        fakeChecklistRepository.inboxFill = ChecklistFill(
+            id = FakeChecklistRepository.INBOX_FILL_ID,
+            checklistId = FakeChecklistRepository.INBOX_ID,
+            name = "Inbox",
+            items = listOf(
+                ChecklistFillItem(text = "Existing", checked = false, templateItemId = existingTemplate.id),
+            ),
+            isDefault = true,
+        )
+        val vm = createViewModel(NavVariant.V2)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val tips = WelcomeStarterTemplate.DEFAULT_STARTER_ITEMS.size
+        val template = assertNotNull(fakeChecklistRepository.inboxChecklist)
+        val fill = assertNotNull(fakeChecklistRepository.inboxFill)
+        assertEquals(1 + tips, template.items.size)
+        assertEquals(1 + tips, fill.items.size)
+        assertEquals("Existing", template.items.first().text)
+        assertEquals("Existing", fill.items.first().text)
+    }
+
+    @Test
+    fun createFirstChecklist_v2_ensureInboxFails_snackbarsAndStaysOnStep() = runTest {
+        // EnsureInboxUseCase turns the repository failure into null; the VM must surface it.
+        fakeChecklistRepository.ensureInboxThrows = true
+        val vm = createViewModel(NavVariant.V2)
+        val effects = mutableListOf<WelcomeOnboardingSideEffect>()
+        val collectJob = launch { vm.sideEffect.collect { effects.add(it) } }
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTipsFailureKeptUserOnStep(vm, effects)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun createFirstChecklist_v2_inboxHasNoDefaultFill_snackbarsAndStaysOnStep() = runTest {
+        fakeChecklistRepository.inboxCreatesFill = false
+        val vm = createViewModel(NavVariant.V2)
+        val effects = mutableListOf<WelcomeOnboardingSideEffect>()
+        val collectJob = launch { vm.sideEffect.collect { effects.add(it) } }
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTipsFailureKeptUserOnStep(vm, effects)
+        // Neither half was written — no template-only orphan.
+        assertTrue(assertNotNull(fakeChecklistRepository.inboxChecklist).items.isEmpty())
+        collectJob.cancel()
+    }
+
+    @Test
+    fun createFirstChecklist_v2_completeFailsAfterWrites_retryDoesNotDuplicateTips() = runTest {
+        // The tips land, then marking onboarding passed fails → snackbar, user taps the CTA again.
+        // The retry must finish the flow without writing the tips a second time.
+        fakeUserDataRepository.throwOnNextUpdate = true
+        val vm = createViewModel(NavVariant.V2)
+        val effects = mutableListOf<WelcomeOnboardingSideEffect>()
+        val collectJob = launch { vm.sideEffect.collect { effects.add(it) } }
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // First tap: failure surfaced, user still on the step.
+        assertFalse(vm.screenState.value.isCreating)
+        assertEquals(WelcomeOnboardingViewModel.ERROR_KEY, vm.screenState.value.error)
+        assertTrue(effects.any { it is WelcomeOnboardingSideEffect.ShowSnackbar })
+        assertFalse(fakeNavigator.navigatedToMainScreen)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Second tap: exactly one copy of the tips, and the flow completed.
+        assertInboxGotTipsAndLandedOnMain()
+        collectJob.cancel()
+    }
+
+    @Test
+    fun createFirstChecklist_v2_chipSelected_stillCreatesSeparateChecklist() = runTest {
+        // Regression guard: only the empty-input branch moved to the Inbox. A chip is a themed list
+        // and stays its own project with its own detail screen.
+        val vm = createViewModel(NavVariant.V2)
+        vm.onIntent(WelcomeOnboardingIntent.OnTemplateSelected(WelcomeStarterTemplate.TRIP.key))
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, fakeChecklistRepository.addChecklistCallCount)
+        val saved = assertNotNull(fakeChecklistRepository.lastAddedChecklist)
+        assertEquals(WelcomeStarterTemplate.TRIP.itemRes.size, saved.items.size)
+        assertTrue(fakeNavigator.navigatedToChecklistDetail)
+        assertFalse(fakeNavigator.navigatedToMainScreen)
+        assertEquals(0, fakeChecklistRepository.ensureInboxCallCount)
+    }
+
+    @Test
+    fun createFirstChecklist_control_emptyInput_neverTouchesInbox() = runTest {
+        // v1 has no Inbox screen: writing tips there would strand them where the shell never looks.
+        val vm = createViewModel(NavVariant.CONTROL)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, fakeChecklistRepository.ensureInboxCallCount)
+        assertEquals(1, fakeChecklistRepository.addChecklistCallCount)
+        assertTrue(fakeNavigator.navigatedToChecklistDetail)
+    }
+
+    private fun assertInboxGotTipsAndLandedOnMain() {
+        val tips = WelcomeStarterTemplate.DEFAULT_STARTER_ITEMS.size
+        // No separate checklist.
+        assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
+        // Both halves of the pair were written, and every fill row links to its template item.
+        val template = assertNotNull(fakeChecklistRepository.inboxChecklist)
+        val fill = assertNotNull(fakeChecklistRepository.inboxFill)
+        assertEquals(tips, template.items.size)
+        assertEquals(tips, fill.items.size)
+        assertTrue(template.items.all { it.text.isNotBlank() })
+        assertEquals(template.items.map { it.id }, fill.items.map { it.templateItemId })
+        assertEquals(template.items.map { it.text }, fill.items.map { it.text })
+        assertTrue(fill.items.none { it.checked })
+        assertTrue(fill.items.all { it.reminderAt == null && it.repeatRule == null })
+        // Landed on main (= Inbox tab in v2), not on a detail screen; onboarding is done.
+        assertTrue(fakeNavigator.navigatedToMainScreen)
+        assertTrue(fakeNavigator.lastMainClearBackStack)
+        assertFalse(fakeNavigator.navigatedToChecklistDetail)
+        assertTrue(fakeUserDataRepository.onboardingMarkedPassed)
+    }
+
+    private fun assertTipsFailureKeptUserOnStep(
+        vm: WelcomeOnboardingViewModel,
+        effects: List<WelcomeOnboardingSideEffect>,
+    ) {
+        val state = vm.screenState.value
+        assertFalse(state.isCreating)
+        assertEquals(WelcomeOnboardingViewModel.ERROR_KEY, state.error)
+        assertTrue(
+            effects.any {
+                it is WelcomeOnboardingSideEffect.ShowSnackbar &&
+                    it.messageKey == WelcomeOnboardingViewModel.ERROR_KEY
+            },
+        )
+        assertFalse(fakeNavigator.navigatedToMainScreen)
+        assertFalse(fakeNavigator.navigatedToChecklistDetail)
+        assertFalse(fakeUserDataRepository.onboardingMarkedPassed)
+        assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
+    }
+
     // --- More ways to start (multimodal → Analyze hub) ---
 
     @Test
@@ -462,7 +703,35 @@ class WelcomeOnboardingViewModelTest {
         var blockAddUntilReleased = false
         val releaseAddGate = CompletableDeferred<Unit>()
 
+        // --- System Inbox (v2 branch 3) ---
+        // Mirrors the real ensureInbox: creates the flagged row + its empty default fill once.
+        var inboxChecklist: Checklist? = null
+        var inboxFill: ChecklistFill? = null
+        var ensureInboxThrows = false
+        var inboxCreatesFill = true
+        var ensureInboxCallCount = 0
+
         override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
+
+        override fun observeInbox(): Flow<Checklist?> = flowOf(inboxChecklist)
+
+        override suspend fun ensureInbox(name: String): Long {
+            ensureInboxCallCount++
+            if (ensureInboxThrows) throw RuntimeException("Room write error")
+            if (inboxChecklist == null) {
+                inboxChecklist = Checklist(id = INBOX_ID, name = name, items = emptyList(), isInbox = true)
+                if (inboxCreatesFill) {
+                    inboxFill = ChecklistFill(
+                        id = INBOX_FILL_ID,
+                        checklistId = INBOX_ID,
+                        name = name,
+                        items = emptyList(),
+                        isDefault = true,
+                    )
+                }
+            }
+            return INBOX_ID
+        }
 
         override suspend fun addChecklist(checklist: Checklist): Long {
             addChecklistCallCount++
@@ -474,11 +743,16 @@ class WelcomeOnboardingViewModelTest {
         }
 
         override suspend fun updateChecklist(checklist: Checklist) {}
-        override suspend fun updateChecklistTemplate(checklist: Checklist) {}
+        override suspend fun updateChecklistTemplate(checklist: Checklist) {
+            if (checklist.id == INBOX_ID) inboxChecklist = checklist
+        }
         override suspend fun deleteChecklist(checklist: Checklist) {}
 
-        override suspend fun getChecklistById(id: Long): Checklist? =
-            if (id == savedChecklistId) lastAddedChecklist?.copy(id = id) else null
+        override suspend fun getChecklistById(id: Long): Checklist? = when (id) {
+            INBOX_ID -> inboxChecklist
+            savedChecklistId -> lastAddedChecklist?.copy(id = id)
+            else -> null
+        }
         override fun observeChecklistById(id: Long): Flow<Checklist?> =
             flowOf(if (id == savedChecklistId) lastAddedChecklist?.copy(id = id) else null)
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
@@ -490,12 +764,15 @@ class WelcomeOnboardingViewModelTest {
         override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()
         override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? = null
         override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = flowOf(emptyList())
-        override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> = flowOf(null)
+        override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> =
+            flowOf(if (checklistId == INBOX_ID) inboxFill else null)
         override fun getAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = flowOf(emptyList())
         override suspend fun getFillById(id: Long): ChecklistFill? = null
         override suspend fun getFillCountByChecklistId(checklistId: Long): Int = 0
         override suspend fun addFill(fill: ChecklistFill): Long = 1L
-        override suspend fun updateFill(fill: ChecklistFill) {}
+        override suspend fun updateFill(fill: ChecklistFill) {
+            if (fill.checklistId == INBOX_ID) inboxFill = fill
+        }
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) {}
         override suspend fun setRepeatSchedule(
@@ -519,10 +796,25 @@ class WelcomeOnboardingViewModelTest {
         override suspend fun getWeeklyChecklistCount(): Int = 0
         override val weeklyChecklistCount: Flow<Int> = flowOf(0)
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
+
+        companion object {
+            const val INBOX_ID = 900L
+            const val INBOX_FILL_ID = 901L
+        }
+    }
+
+    /** Fixed shell for the test — `ensureResolved()` is the only member the VM reads. */
+    private class FixedNavResolver(private val variant: NavVariant) : NavExperimentResolver {
+        override fun currentArm(): NavVariant = variant
+        override suspend fun ensureResolved(): NavVariant = variant
+        override suspend fun setVariant(variant: NavVariant) {}
+        override suspend fun clearVariant() {}
+        override fun isArmAssigned(): Boolean = true
     }
 
     private class FakeAppNavigator : AppNavigator {
         var navigatedToMainScreen = false
+        var lastMainClearBackStack = false
         var navigatedToChecklistDetail = false
         var lastDetailChecklistId: Long? = null
         var lastDetailClearBackStack = false
@@ -541,6 +833,7 @@ class WelcomeOnboardingViewModelTest {
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {
             navigatedToMainScreen = true
+            lastMainClearBackStack = clearBackStack
         }
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
@@ -585,10 +878,17 @@ class WelcomeOnboardingViewModelTest {
         private val dataFlow = MutableStateFlow(UserData())
         var onboardingMarkedPassed = false
 
+        // When set, the next update() throws once (a failed DataStore write), then behaves normally.
+        var throwOnNextUpdate = false
+
         override fun getUserDataFlow(): StateFlow<UserData> = dataFlow
         override suspend fun getUserData(): UserData = dataFlow.value
 
         override suspend fun update(userData: UserData) {
+            if (throwOnNextUpdate) {
+                throwOnNextUpdate = false
+                throw RuntimeException("DataStore write error")
+            }
             if (userData.isOnboardingPassed) onboardingMarkedPassed = true
             dataFlow.value = userData
         }
@@ -606,7 +906,7 @@ class WelcomeOnboardingViewModelTest {
     }
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {
-        private val events = mutableListOf<Pair<String, Map<String, Any>>>()
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
 
         override fun setUserId(userId: String) {}
         override fun setUserProperties(properties: Map<String, Any>) {}
