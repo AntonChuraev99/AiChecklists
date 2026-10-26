@@ -5,6 +5,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -102,7 +103,11 @@ class WelcomeOnboardingViewModelTest {
      * checklist + detail" contract, which is still exactly what v1 does (it has no Inbox). The v2
      * Inbox path is covered by the `*_v2_*` tests below, which pass [NavVariant.V2] explicitly.
      */
-    private fun createViewModel(variant: NavVariant = NavVariant.CONTROL): WelcomeOnboardingViewModel =
+    private fun createViewModel(
+        variant: NavVariant = NavVariant.CONTROL,
+        // Analytics fire only outside debug builds; the funnel tests pass false to record them.
+        isDebugBuild: Boolean = true,
+    ): WelcomeOnboardingViewModel =
         WelcomeOnboardingViewModel(
             savedStateHandle = SavedStateHandle(),
             navigator = fakeNavigator,
@@ -116,7 +121,7 @@ class WelcomeOnboardingViewModelTest {
             // Real use case over the fake repository, so the test drives the true ensure path
             // (including its null-on-failure contract) rather than a stub.
             ensureInbox = EnsureInboxUseCase(fakeChecklistRepository, fakeAnalyticsTracker, NoOpLogger()),
-            isDebugBuild = true,
+            isDebugBuild = isDebugBuild,
             stringResolver = fakeStringResolver,
         )
 
@@ -404,6 +409,41 @@ class WelcomeOnboardingViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertInboxGotTipsAndLandedOnMain()
+    }
+
+    /**
+     * The activation funnel reads `onboarding_completed.checklist_created` as "the user left
+     * onboarding with starter content". The v2 Inbox tips are that content just as v1's "My
+     * Checklist" is, so both report `true`; only `seed` tells the two shells apart.
+     */
+    @Test
+    fun createFirstChecklist_v2_emptyInput_completedEventCountsStarterContent() = runTest {
+        val vm = createViewModel(NavVariant.V2, isDebugBuild = false)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val params = completedEventParams()
+        assertEquals("true", params["checklist_created"])
+        assertEquals("inbox", params["seed"])
+    }
+
+    @Test
+    fun createFirstChecklist_v1_emptyInput_completedEventKeepsDefaultSeed() = runTest {
+        val vm = createViewModel(NavVariant.CONTROL, isDebugBuild = false)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val params = completedEventParams()
+        assertEquals("true", params["checklist_created"])
+        assertEquals("default", params["seed"])
+    }
+
+    private fun completedEventParams(): Map<String, Any> {
+        val completed = fakeAnalyticsTracker.events.filter { it.first == AnalyticsEvents.Onboarding.COMPLETED }
+        assertEquals(1, completed.size, "expected exactly one onboarding_completed, got $completed")
+        return completed.single().second
     }
 
     @Test
@@ -866,7 +906,7 @@ class WelcomeOnboardingViewModelTest {
     }
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {
-        private val events = mutableListOf<Pair<String, Map<String, Any>>>()
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
 
         override fun setUserId(userId: String) {}
         override fun setUserProperties(properties: Map<String, Any>) {}

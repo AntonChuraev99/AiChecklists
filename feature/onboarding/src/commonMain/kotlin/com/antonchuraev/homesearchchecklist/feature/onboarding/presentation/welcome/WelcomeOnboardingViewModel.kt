@@ -252,10 +252,11 @@ class WelcomeOnboardingViewModel(
                 inboxTipsWritten = true
             }
 
-            // checklist_created=false: the Inbox is a system row, not a user checklist (same reason
-            // EnsureInboxUseCase does not fire Checklist.CREATED). seed="inbox" separates this path
-            // from the v1 "default" seed in the funnel.
-            trackCompleted(checklistCreated = false, seedOverride = SEED_INBOX)
+            // checklist_created=true: the funnel reads it as "left onboarding with starter content",
+            // and the tips are that content exactly as v1's "My Checklist" is — false would show v2
+            // as an activation drop. Checklist.CREATED is still NOT fired (the Inbox is a system
+            // row, same as EnsureInboxUseCase). seed="inbox" separates this path from v1's "default".
+            trackCompleted(checklistCreated = true, seedOverride = SEED_INBOX)
             completeOnboardingUseCase()
             // Main screen = Inbox tab in v2; cleared back stack so system back exits, not re-enters
             // onboarding.
@@ -452,8 +453,8 @@ class WelcomeOnboardingViewModel(
         // Funnel "seed" value for the "More ways to start" card (Analyze hub); the typed/chip/default
         // seeds come from seedKind(), which reads state — this card path has neither chip nor text.
         private const val SEED_MULTIMODAL = "multimodal"
-        // Funnel "seed" value for branch 3 in the v2 shell (tips appended to the Inbox, no checklist
-        // created); the v1 shell keeps seedKind()'s "default".
+        // Funnel "seed" value for branch 3 in the v2 shell (tips appended to the Inbox); the v1 shell
+        // keeps seedKind()'s "default".
         private const val SEED_INBOX = "inbox"
         // Resolved to onboarding_welcome_create_error in the Screen (string-key indirection so the
         // ViewModel never imports Compose Resources for snackbar text).
