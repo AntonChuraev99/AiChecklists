@@ -12,6 +12,7 @@ kotlin {
         namespace = "com.antonchuraev.homesearchchecklist.core.common.api"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTest {}
 }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
@@ -41,6 +42,9 @@ kotlin {
         androidMain.dependencies {
             // BundledSQLiteDriver for Android (non-framework SQLite, matches sqlite-bundled KMP)
             implementation(libs.sqlite3.bundled)
+            // AndroidSQLiteDriver (OS SQLite) — SqliteDriverSelector falls back to it when the
+            // bundled driver's libsqliteJni.so cannot be loaded on the device.
+            implementation(libs.sqlite3.framework)
 
             // Firebase Storage SDK for AttachmentCloudStorage.android.kt (cross-device attachment sync).
             // firebase-storage-ktx is gone in BOM 34+ — the base artifact ships the Kotlin APIs.

@@ -118,6 +118,8 @@ room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room
 sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 # Room 3.0 compatible sqlite artifacts (2.7.x series, paired with room3)
 sqlite3-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite3" }
+# AndroidSQLiteDriver (OS SQLite) — fallback when libsqliteJni.so of sqlite-bundled cannot be loaded.
+sqlite3-framework = { module = "androidx.sqlite:sqlite-framework", version.ref = "sqlite3" }
 sqlite3-web = { module = "androidx.sqlite:sqlite-web", version.ref = "sqlite3" }
 # org.w3c.dom.* for wasmJs — the version sqlite-web 2.7.1 requires on its runtime classpath.
 kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinxBrowser" }

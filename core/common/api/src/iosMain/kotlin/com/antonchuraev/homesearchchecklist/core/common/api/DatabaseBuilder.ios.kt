@@ -21,8 +21,13 @@ fun documentDirectory(): String {
 }
 
 
+// onDriverFallback is unused: iOS always uses the bundled driver (statically linked, nothing to load).
 @OptIn(ExperimentalForeignApi::class)
-actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(databaseName: String): RoomDatabase.Builder<T> {
+@Suppress("UNUSED_PARAMETER")
+actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(
+    databaseName: String,
+    noinline onDriverFallback: (Throwable) -> Unit,
+): RoomDatabase.Builder<T> {
     val dbFilePath = documentDirectory() + "/${databaseName}.db"
     return Room.databaseBuilder<T>(
         name = dbFilePath,
