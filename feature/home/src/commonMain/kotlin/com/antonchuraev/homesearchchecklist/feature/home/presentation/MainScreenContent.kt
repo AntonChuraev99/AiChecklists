@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.displayName
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
@@ -408,7 +409,9 @@ private fun ChecklistCard(
     onLongClick: (() -> Unit)? = null,
 ) {
     ChecklistListCard(
-        name = checklistWithProgress.checklist.name,
+        // The system Inbox appears here once it holds tasks; its stored name is frozen in the
+        // language that created it, so it is shown under the current UI language instead.
+        name = checklistWithProgress.checklist.displayName(),
         checkedItems = checklistWithProgress.checkedItems,
         totalItems = checklistWithProgress.totalItems,
         seed = checklistWithProgress.checklist.id,

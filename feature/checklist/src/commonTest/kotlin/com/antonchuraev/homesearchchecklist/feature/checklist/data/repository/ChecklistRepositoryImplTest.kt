@@ -454,6 +454,35 @@ class ChecklistRepositoryImplTest {
         assertEquals(emptyList(), emitted, "a reminder past the window end must stay out of the list")
     }
 
+    /**
+     * Today/Calendar print the parent checklist's name under each reminder. For the system Inbox the
+     * stored name is frozen in the language that created the row, so the screen needs the flag to
+     * swap in the localized name — without it an English UI shows "Входящие" there.
+     */
+    @Test
+    fun observeRemindersInRange_inboxParent_isFlaggedOnBothReminderKinds() = runTest {
+        checklistDao.checklists.add(
+            Checklist(id = 1L, name = "Входящие", items = emptyList()).toEntityRow()
+                .copy(isInbox = true, reminderAt = TONIGHT),
+        )
+        checklistDao.checklists.add(
+            Checklist(id = 2L, name = "Groceries", items = emptyList()).toEntityRow()
+                .copy(reminderAt = TONIGHT),
+        )
+        val due = ChecklistFillItem(text = "Call the dentist", checked = false).withReminderAt(TONIGHT)
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = listOf(due)))
+        fillDao.fills.add(defaultFillRow(id = 20L, checklistId = 2L, items = listOf(due)))
+
+        val emitted = newRepo().observeRemindersInRange(DAY_START, DAY_END).first()
+
+        val inboxRows = emitted.filter { it.checklistId == 1L }
+        val projectRows = emitted.filter { it.checklistId == 2L }
+        assertEquals(2, inboxRows.size, "checklist-level + item-level for the Inbox; got $emitted")
+        assertEquals(2, projectRows.size, "checklist-level + item-level for the project; got $emitted")
+        assertTrue(inboxRows.all { it.isInbox }, "every Inbox reminder must carry the flag; got $inboxRows")
+        assertTrue(projectRows.none { it.isInbox }, "a project must never be flagged; got $projectRows")
+    }
+
     // ─── System under test factory + fakes ───────────────────────────────────
 
     private val checklistDao = FakeChecklistDao()

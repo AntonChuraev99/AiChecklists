@@ -25,12 +25,20 @@ sealed interface TodayReminderInfo {
     /** 0 = normal, 1 = starred. Default 0 keeps existing callers unchanged. */
     val priority: Int
 
+    /**
+     * True when the parent checklist is the system Inbox. [checklistName] is then the STORED name,
+     * frozen in whatever language created the row — display code must show the localized Inbox
+     * name instead (see [checklistDisplayName]).
+     */
+    val isInbox: Boolean
+
     data class ChecklistLevel(
         override val checklistId: Long,
         override val checklistName: String,
         override val reminderAt: Long,
         override val isRecurring: Boolean,
         override val priority: Int = 0,
+        override val isInbox: Boolean = false,
     ) : TodayReminderInfo
 
     data class ItemLevel(
@@ -42,5 +50,6 @@ sealed interface TodayReminderInfo {
         override val reminderAt: Long,
         override val isRecurring: Boolean,
         override val priority: Int = 0,
+        override val isInbox: Boolean = false,
     ) : TodayReminderInfo
 }

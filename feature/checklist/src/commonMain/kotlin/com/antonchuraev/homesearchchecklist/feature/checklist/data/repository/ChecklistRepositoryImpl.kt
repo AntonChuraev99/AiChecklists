@@ -690,7 +690,9 @@ class ChecklistRepositoryImpl(
     //    exactly the same data as before the experiment. Switching to a filtered query would change
     //    the SQL that control runs — the thing the Inbox queries were kept additive to avoid.
     //
-    // The one visible artefact is `checklistName` reading "Inbox" on such a row, which is accurate.
+    // The one visible artefact is the parent name reading "Inbox" on such a row, which is accurate —
+    // as long as the screen prints it via `checklistDisplayName`, keyed on `TodayReminderInfo.isInbox`
+    // (the stored `checklistName` is frozen in the language that created the row).
 
     override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> {
         // We cannot express per-item reminders as a SQL predicate — fill items are stored as one JSON
@@ -750,8 +752,9 @@ class ChecklistRepositoryImpl(
     ): List<TodayReminderInfo> {
         val result = mutableListOf<TodayReminderInfo>()
 
-        // Build name-lookup map once
-        val nameById = checklistEntities.associate { it.id to it.name }
+        // Build the parent lookup once. The Inbox flag rides along so the screens can print the
+        // localized Inbox name — the stored one is frozen in the language that created the row.
+        val parentById = checklistEntities.associateBy { it.id }
 
         // ── Checklist-level reminders ──
         for (entity in checklistEntities) {
@@ -763,6 +766,7 @@ class ChecklistRepositoryImpl(
                     checklistName = entity.name,
                     reminderAt = reminderAt,
                     isRecurring = false,
+                    isInbox = entity.isInbox,
                 )
             }
             // Recurring — expand all occurrences in [fromMs..toMs] using the rule,
@@ -781,6 +785,7 @@ class ChecklistRepositoryImpl(
                         checklistName = entity.name,
                         reminderAt = occurrenceMs,
                         isRecurring = true,
+                        isInbox = entity.isInbox,
                     )
                 }
             }
@@ -788,7 +793,8 @@ class ChecklistRepositoryImpl(
 
         // ── Per-item reminders (from default fills) ──
         for (fillEntity in fillEntities) {
-            val checklistName = nameById[fillEntity.checklistId] ?: continue
+            val parent = parentById[fillEntity.checklistId] ?: continue
+            val checklistName = parent.name
             for (item in fillEntity.items) {
                 // One-shot
                 val reminderAt = item.reminderAt
@@ -802,6 +808,7 @@ class ChecklistRepositoryImpl(
                         reminderAt = reminderAt,
                         isRecurring = false,
                         priority = item.priority,
+                        isInbox = parent.isInbox,
                     )
                 }
                 // Recurring — same expansion pattern as checklist-level.
@@ -823,6 +830,7 @@ class ChecklistRepositoryImpl(
                             reminderAt = occurrenceMs,
                             isRecurring = true,
                             priority = item.priority,
+                            isInbox = parent.isInbox,
                         )
                     }
                 }

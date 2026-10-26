@@ -36,6 +36,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.weekly_add_for_day
 import aichecklists.core.designsystem.generated.resources.weekly_overdue_section_title
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.displayName
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailIntent
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailState
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistItemCard
@@ -131,7 +132,7 @@ internal fun WeeklyChecklistDetailContent(
     ) {
         item(key = "title") {
             Text(
-                text = state.checklist.name,
+                text = state.checklist.displayName(),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier

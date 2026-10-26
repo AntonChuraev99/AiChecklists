@@ -66,6 +66,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.format.checklistDisplayName
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
@@ -111,6 +112,8 @@ import org.jetbrains.compose.resources.stringResource
  * @param timeLabel Human-readable time string, e.g. "14:30" or "09:00".
  * @param isPastDue True if reminderAt < nowMillis within today.
  * @param isRecurring True if this is a recurring reminder (visual indicator only).
+ * @param isInbox True when the parent is the system Inbox: [checklistName] is then the stored name,
+ *   frozen in the creating language, and the row prints the localized Inbox name instead.
  */
 data class TodayReminderItem(
     val id: String,
@@ -121,6 +124,7 @@ data class TodayReminderItem(
     val timeLabel: String,
     val isPastDue: Boolean,
     val isRecurring: Boolean = false,
+    val isInbox: Boolean = false,
 )
 
 /**
@@ -531,6 +535,8 @@ private fun TodayReminderRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Localized for the system Inbox — see [TodayReminderItem.isInbox].
+    val checklistName = checklistDisplayName(item.checklistName, item.isInbox)
     // Compose full contentDescription for screen reader
     val rowDescription = buildString {
         append(item.timeLabel)
@@ -539,7 +545,7 @@ private fun TodayReminderRow(
             append(item.itemName)
             append(" in ")
         }
-        append(item.checklistName)
+        append(checklistName)
         if (item.isRecurring) append(", recurring")
         if (item.isPastDue) append(", past due")
     }
@@ -580,7 +586,7 @@ private fun TodayReminderRow(
             // Text block — takes all remaining width
             Column(modifier = Modifier.weight(1f)) {
                 // Item name (primary line) OR checklist name when reminder is checklist-level
-                val primaryText = item.itemName ?: item.checklistName
+                val primaryText = item.itemName ?: checklistName
                 Text(
                     text = primaryText,
                     style = MaterialTheme.typography.bodyLarge,
@@ -611,7 +617,7 @@ private fun TodayReminderRow(
                     // Show parent checklist only for item-level reminders
                     if (item.itemName != null) {
                         Text(
-                            text = item.checklistName,
+                            text = checklistName,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
