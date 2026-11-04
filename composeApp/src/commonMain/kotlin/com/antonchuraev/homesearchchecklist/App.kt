@@ -2464,17 +2464,15 @@ fun App() {
             ) // end NavDisplay
             } // end renderNav lambda
 
-            // Voice call entry, ready for the Ask pill's call button. Wire it to V2NavigationShell as
-            // `onStartVoiceCall = startVoiceCall` once that parameter lands (branch
-            // feat/chat-pill-attach-call, b7eaea97) — the shell hides the button when it is null.
-            // Null when the platform has no call (web, iOS) or the client flag `voice_call_enabled` is
-            // off (default: on in debug, off in release); otherwise it starts the call overlay below.
+            // Voice call entry: the Ask pill's call button (V2NavigationShell `onStartVoiceCall`; the
+            // shell hides the button when this is null). Null when the platform has no call (web, iOS)
+            // or the client flag `voice_call_enabled` is off (default: on in debug, off in release);
+            // otherwise it starts the call overlay below.
             val voiceCallAvailable = voiceCapabilities.isCallSupported &&
                 remoteConfigProvider.getBoolean(
                     RemoteConfigKeys.VOICE_CALL_ENABLED,
                     RemoteConfigDefaults.voiceCallEnabled(isDebugBuild),
                 )
-            @Suppress("UNUSED_VARIABLE", "unused")
             val startVoiceCall: (() -> Unit)? = if (voiceCallAvailable) {
                 { voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_PILL)) }
             } else {
@@ -2510,6 +2508,7 @@ fun App() {
                     onNavigate = v2OnNavigate,
                     onOpenChatVoice = openChatInVoice,
                     onOpenChatAttach = openChatWithAttach,
+                    onStartVoiceCall = startVoiceCall,
                     onOpenChat = {
                         // Tagged "fab" so it stays distinguishable from the detail screen's top-bar
                         // action, which emits the same event with source="detail_toolbar". Two very

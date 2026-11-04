@@ -33,6 +33,20 @@
 4. Фича: шлюзы хода (цикл `chat_agent` + `ToolCallDispatcher`) и сессии, ViewModel звонка, оверлей вне Nav3, кнопка в пилюле.
 5. UI по DESIGN_SPEC `design-expert`, скриншот-цикл.
 
+## Пауза (2026-11-04)
+
+Остановлено по внешней блокировке: у проекта Gemini API кончилась предоплата (`402 RESOURCE_EXHAUSTED: prepayment credits are depleted`), на карте владельца нет средств для пополнения. С 05:47 UTC AI-чат в проде не отвечает никому — это не регрессия ветки.
+
+Триггер возобновления: `chat_agent` на текстовый ход отвечает успехом (smoke — текстовый ход одноразовой учётки; голосовой — `voice_session` start → `chat_agent` с `voice.session_id` → heartbeat → end).
+
+Что уже в проде: `voice_session` (`voice-session-00001-duw`, smoke PASS), `chat_agent` с голосовым режимом (`chat-agent-00028-quc`). Debug APK с кнопкой звонка стоит на Pixel 9.
+
+Шаги после пополнения:
+1. Smoke текстового и голосового хода `chat_agent`.
+2. Живой звонок на Pixel 9: кнопка звонка → разрешение микрофона → «создай чек-лист …» → карточка действия → тап открывает чек-лист; `adb logcat` без `NoDefinitionFoundException`.
+3. `/task-gate` full, PR в `master`.
+4. Решение владельца: удаление голосом без карточки подтверждения.
+
 ## Лог итераций
 
 ### Итерация 1 — 2026-11-04 — design-expert
@@ -43,6 +57,12 @@ DESIGN_SPEC экрана звонка (шар Gisti, статус, субтит�
 
 ### Итерация 3 — 2026-11-04 — feature-expert (SPEC)
 Новый модуль `:feature:voicecall` (не `feature/aichat/impl`: звонку нужны только интерфейсы из `feature/aichat/api`, `ChatViewModel` > 4000 строк): матрица состояние × событие, `VoiceCallUiState` / `VoiceCallAction` / `VoiceCallEffect`, UI_SKELETON, 36 фикстур, строки EN/RU/HI → сборка Android + wasmJs, 4/4 теста. Решения главного по открытым вопросам: конец без действий показывает итог; «Premium» на баннере завершает звонок и открывает пэйвол; `OutOfCredits` → ошибка сервера с логом; deep-link звонок не прерывает.
+
+### Итерация 10 — 2026-11-04 — главный (деплой и smoke)
+`master` (пилюля, PR #70) влит в ветку, `onStartVoiceCall = startVoiceCall` подключён в `App.kt`. Деплой: `voice_session` → ревизия `voice-session-00001-duw`, smoke PASS (start / heartbeat по серверным часам / чужая сессия — отказ / end идемпотентен); `chat_agent` → `chat-agent-00028-quc` (память и таймаут — как в `deploy.sh`, оба секрета). Голосовой и текстовый ход `chat_agent` падают с `Agent step failed`: корень — Gemini API `RESOURCE_EXHAUSTED: prepayment credits are depleted` (баланс предоплаты AI Studio). Ошибка началась утром на прошлой ревизии `00027`, до деплоя — не регрессия ветки. Переключить Cloud Run обратно на `00027` нельзя: `Container import failed`. Ждёт пополнения баланса владельцем.
+
+### Итерация 9 — 2026-11-04 — feature-expert (IMPLEMENT)
+`VoiceCallViewModel`, маппер `CallEngineState` → `VoiceCallUiState`, `VoiceSessionGatewayImpl` (Ktor к `voice_session`), `ChatAgentVoiceTurnGateway` в `feature/aichat/impl` (≤ 5 раундов, идемпотентность по `clientTurnId`, `DispatchOutcome` → `VoiceAgentAction`), общий `AgentChecklistsSummary`, RC `voice_call_enabled` (debug — вкл, release — выкл), события аналитики `voice_call_*`, оверлей в `App.kt` → voicecall 110 тестов, aichat 627, `VoiceCallKoinGraphTest` 3/3, `assembleDebug` зелёный. В голосе `delete_item` / `clear_completed_items` выполняются без карточки подтверждения — голосовая директива сервера требует подтвердить голосом.
 
 ### Итерация 8 — 2026-11-04 — compose-expert
 Экран звонка по DESIGN_SPEC в `feature/voicecall` (`VoiceCallInCall`, `VoiceCallFullState`, `GistiPresenceOrb`, `CallControls`, `CallTimerPill`, `VoiceCallBanner`, `VoiceTranscript`, бюджет высоты `VoiceCallLayoutMath`); Roborazzi заведён в модуле (`android preview render` не видит KMP-модуль без app-потребителя) → 34/34 кадра, `VoiceCallLayoutMathTest` 12/12. Кадры сняты с reduced motion; живая анимация шара и TalkBack — только на устройстве.
