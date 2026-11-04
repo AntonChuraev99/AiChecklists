@@ -15,7 +15,6 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Repea
  * Remaining callers, all of which have a localized path available:
  *  - `ChecklistDetailViewModel` (3 sites) — already inside `viewModelScope.launch`, so
  *    `getRepeatSummaryLabel(config)` drops straight in;
- *  - `InteractiveOnboardingViewModel` (1 site) — likewise;
  *  - `ChecklistDetailScreen.ItemCreateChipsRow` (1 site) — `@Composable`, so
  *    `resolveRepeatSummaryLabel(it)`.
  *

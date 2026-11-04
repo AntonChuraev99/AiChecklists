@@ -24,7 +24,7 @@ import aichecklists.core.designsystem.generated.resources.voice_call_tool_adding
 import aichecklists.core.designsystem.generated.resources.voice_call_tool_creating_checklist
 import aichecklists.core.designsystem.generated.resources.voice_call_tool_searching
 import androidx.compose.runtime.Composable
-import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.OrbMode
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.OrbMode
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 

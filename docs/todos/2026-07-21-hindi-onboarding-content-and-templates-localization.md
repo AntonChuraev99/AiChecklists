@@ -13,6 +13,10 @@ The Hindi MIN localization (2026-07-21) translated the **UI chrome** — all 123
 keys (buttons, titles, subtitles, errors, paywall, chat, onboarding step labels). It did **not**
 localize the **content layer**, which is English-sourced and lives outside `strings.xml`:
 
+> **Update 2026-11-04:** the `interactive` onboarding arm and `InteractiveOnboardingViewModel`
+> were deleted (`docs/active/onboarding-refresh-2026-11-04.md`), so item 1 below is moot. Item 2
+> (bundled template library) still stands.
+
 1. **Onboarding interactive example items** — hardcoded English literals in
    `feature/onboarding/.../interactive/InteractiveOnboardingViewModel.kt`:
    - `getExtraItems()` — ~30 example checklist items across 10 categories (e.g. "Emergency snack

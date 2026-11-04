@@ -294,10 +294,7 @@ class AnalyzeViewModel(
         val entrySourceParam = entrySource?.wire ?: "none"
         analyticsTracker.event(
             AnalyticsEvents.Analyze.STARTED,
-            mapOf(
-                AnalyticsParams.INPUT_TYPE to inputType,
-                AnalyticsParams.SOURCE to entrySourceParam,
-            ),
+            AnalyzeEventParams.started(inputType, entrySourceParam),
         )
 
         viewModelScope.launch {
@@ -319,16 +316,10 @@ class AnalyzeViewModel(
                     // users. Guarded/deduped inside the tracker; never throws.
                     aiModelExperimentTracker?.report(result.modelVariant, result.modelId, result.aiFlow)
 
-                    analyticsTracker.event(AnalyticsEvents.Analyze.COMPLETED, buildMap {
-                        put(AnalyticsParams.INPUT_TYPE, inputType)
-                        put(AnalyticsParams.SOURCE, entrySourceParam)
-                        put("item_count", result.suggestedItems.size)
-                        // Guardrail dimensions — present only when the server sent an arm; omitted
-                        // otherwise so the event schema stays clean (matches ai_chat_response_received).
-                        result.modelVariant?.let { put(AnalyticsParams.AI_MODEL_VARIANT, it) }
-                        result.modelId?.let { put(AnalyticsParams.AI_MODEL_ID, it) }
-                        result.aiFlow?.let { put(AnalyticsParams.AI_FLOW, it) }
-                    })
+                    analyticsTracker.event(
+                        AnalyticsEvents.Analyze.COMPLETED,
+                        AnalyzeEventParams.completed(inputType, entrySourceParam, result),
+                    )
 
                     // FILL flows (fill an existing checklist / apply to its default fill) keep going
                     // through the editable preview — there the user confirms which AI items land in
@@ -358,12 +349,10 @@ class AnalyzeViewModel(
                     // Coarse machine reason so Amplitude can group ai_analyze_failed without regex
                     // over free text; keep the raw error string alongside for the long tail.
                     val reason = AiFailureReason.classify(error)
-                    analyticsTracker.event(AnalyticsEvents.Analyze.FAILED, mapOf(
-                        AnalyticsParams.INPUT_TYPE to inputType,
-                        AnalyticsParams.SOURCE to entrySourceParam,
-                        AnalyticsParams.FAILURE_REASON to reason.wireValue,
-                        AnalyticsParams.ERROR to (error.message ?: "unknown")
-                    ))
+                    analyticsTracker.event(
+                        AnalyticsEvents.Analyze.FAILED,
+                        AnalyzeEventParams.failed(inputType, entrySourceParam, reason, error),
+                    )
                     _screenState.update {
                         it.copy(
                             isAnalyzing = false,

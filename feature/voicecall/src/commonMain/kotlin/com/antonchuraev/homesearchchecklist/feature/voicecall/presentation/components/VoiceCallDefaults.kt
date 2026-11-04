@@ -6,6 +6,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiOrbHaloExtent
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 
 /**
@@ -27,7 +28,7 @@ object VoiceCallDefaults {
     val DotSize: Dp = 56.dp
 
     /** How far the speaking halo reaches past the orb: the layout reserves `D × HaloExtent`. */
-    const val HaloExtent: Float = 1.3f
+    const val HaloExtent: Float = GistiOrbHaloExtent
 
     val ControlDisc: Dp = 56.dp
     val EndDisc: Dp = 72.dp

@@ -209,8 +209,6 @@ class CreditsEntryPointTest {
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
         override fun setDefaultRootRoute(route: AppNavRoute) {}
-        override fun navigateToOnboarding() {}
-        override fun navigateToInteractiveOnboarding() {}
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}

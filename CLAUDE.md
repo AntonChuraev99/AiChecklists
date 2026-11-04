@@ -112,7 +112,7 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 - **Widget** (`composeApp/androidMain/widget/`) — Glance, binds a checklist, WorkManager sync, deep-links to detail.
 - **CSAT** (`composeApp/commonMain/csat/`) — `CsatManager` survey + Play in-app review (`InAppReviewLauncher`).
 - **Debug** (`feature/debug/`) — debug builds; unlock Volume Up→Down→Up.
-- **Onboarding** (`feature/onboarding/`) — 4 arms via RC `onboarding`: `default` (slides+paywall) · `interactive` · `none` · `ai_welcome`. ⚠️ RC-fail fallback is `ai_welcome` since 1.18.6, which **has no paywall step** (deliberate, [ADR 07-28]).
+- **Onboarding** (`feature/onboarding/`) — one flow, `ai_welcome` (2 steps: Showcase → Try it; sample note → real checklist without AI; own file → Analyze; chat / call → Inbox shell), on every platform. RC `onboarding`: `none` skips it; any other value (incl. legacy `default` / `interactive`, removed 2026-11-04) → `ai_welcome`. **No paywall step** (deliberate, [ADR 07-28], [ADR 09-17]). Spec: `docs/designs/onboarding-refresh-2026-11-04/`.
 - **MCP** (`mcp-server/` + `composeApp/commonMain/mcp/`) — remote Cloudflare Worker, 16 tools, Google OAuth; in-app connection screen. Reference: `mcp-server/README.md`.
 - **Retention / push** (`composeApp/androidMain/retention/`, `push/`) — day-1 comeback + habit nudges, `PushTimingResolver`. Note `push_timing_arm` exists in **no** RC template → everyone runs `behavioral`.
 - **Gallery deep-link** (`composeApp/commonMain/deeplink/`) — SEO page → create-from-template via App Link `app.gisti-ai.com`. `gisti://` is **internal only**, not in the manifest.

@@ -53,8 +53,6 @@ class ScreenCatalogViewModel(
             ScreenCatalogIntent.SeedWithFreeLimit -> seedWithData(checklistCount = 4, isPremium = false, aiCredits = 10)
             ScreenCatalogIntent.SeedAsPremium -> seedWithData(checklistCount = 3, isPremium = true, aiCredits = 300)
 
-            ScreenCatalogIntent.NavigateOnboarding -> appNavigator.navigateToOnboarding()
-            ScreenCatalogIntent.NavigateInteractiveOnboarding -> appNavigator.navigateToInteractiveOnboarding()
             ScreenCatalogIntent.NavigateMain -> appNavigator.navigateToMainScreen()
 
             ScreenCatalogIntent.NavigateTemplates -> appNavigator.navigateToTemplatesScreen()

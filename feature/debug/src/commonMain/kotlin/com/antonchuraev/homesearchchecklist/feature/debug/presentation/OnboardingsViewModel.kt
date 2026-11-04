@@ -17,8 +17,6 @@ class OnboardingsViewModel(
         when (intent) {
             is OnboardingsIntent.OnBack -> appNavigator.onBack()
             is OnboardingsIntent.LaunchVariant -> when (intent.variant) {
-                OnboardingVariant.Interactive -> appNavigator.navigateToInteractiveOnboarding()
-                OnboardingVariant.Slides -> appNavigator.navigateToOnboarding()
                 OnboardingVariant.AiWelcome -> appNavigator.navigateToWelcomeOnboarding()
             }
         }

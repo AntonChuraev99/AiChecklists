@@ -263,8 +263,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarRoute
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayRoute
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.InteractiveOnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.welcome.WelcomeOnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewScreen
@@ -300,6 +298,8 @@ import com.antonchuraev.homesearchchecklist.feature.onboarding.isWidgetSupported
 import kotlinx.datetime.plus
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.navigation.api.ShellLaunch
+import com.antonchuraev.homesearchchecklist.core.navigation.api.ShellLaunchRequests
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceCapabilities
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.VoiceCallAction
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.VoiceCallRoute
@@ -1408,9 +1408,21 @@ fun App() {
             // "Ask about <list>", or a capture input aimed at a page that is no longer showing).
             // Mirrors the control arm's routeCollapseSignal, which collapses each screen's own dock
             // back to Peek for the same reason.
+            //
+            // One exception: the route a shell hand-off (ShellLaunch.OpenChat, below) opened the chat
+            // dock ON. The hand-off is acted on in the frame the v2 root is re-applied, i.e. the same
+            // frame this effect re-keys on the new top route — and the launch order of two effects
+            // keyed in one frame is not something to lean on. The spared route makes it irrelevant:
+            // whichever of the two runs first, the dock opened on THIS route stays open, and the
+            // marker is spent on the first route change it survives.
+            var v2DockLaunchRoute by remember { mutableStateOf<Any?>(null) }
             LaunchedEffect(currentTopRoute) {
-                v2ChatDockOpen = false
-                v2CreateDockOpen = false
+                val spareDock = v2DockLaunchRoute != null && v2DockLaunchRoute == currentTopRoute
+                v2DockLaunchRoute = null
+                if (!spareDock) {
+                    v2ChatDockOpen = false
+                    v2CreateDockOpen = false
+                }
             }
 
             // Only Compact has a bottom bar + FAB to clear; the rail and the permanent drawer sit
@@ -1978,6 +1990,16 @@ fun App() {
                 )
             }
 
+            // Voice call availability — ONE definition for every call entry: the Ask pill's call
+            // button (below) and the onboarding's Call (passed into its route). False when the
+            // platform has no call (web, iOS) or the client flag `voice_call_enabled` is off
+            // (default: on in debug, off in release).
+            val voiceCallAvailable = voiceCapabilities.isCallSupported &&
+                remoteConfigProvider.getBoolean(
+                    RemoteConfigKeys.VOICE_CALL_ENABLED,
+                    RemoteConfigDefaults.voiceCallEnabled(isDebugBuild),
+                )
+
             val renderNav: @Composable (DrawerState?) -> Unit = { drawerState ->
             NavDisplay(
                 backStack = navigator.backStack,
@@ -1989,16 +2011,8 @@ fun App() {
                         SplashScreen()
                     }
 
-                    entry<AppNavRoute.Onboarding> {
-                        OnboardingScreen()
-                    }
-
-                    entry<AppNavRoute.InteractiveOnboarding> {
-                        InteractiveOnboardingScreen()
-                    }
-
                     entry<AppNavRoute.WelcomeOnboarding> {
-                        WelcomeOnboardingScreen()
+                        WelcomeOnboardingScreen(isCallAvailable = voiceCallAvailable)
                     }
 
                     entry<AppNavRoute.Main>(
@@ -2484,18 +2498,58 @@ fun App() {
             } // end renderNav lambda
 
             // Voice call entry: the Ask pill's call button (V2NavigationShell `onStartVoiceCall`; the
-            // shell hides the button when this is null). Null when the platform has no call (web, iOS)
-            // or the client flag `voice_call_enabled` is off (default: on in debug, off in release);
-            // otherwise it starts the call overlay below.
-            val voiceCallAvailable = voiceCapabilities.isCallSupported &&
-                remoteConfigProvider.getBoolean(
-                    RemoteConfigKeys.VOICE_CALL_ENABLED,
-                    RemoteConfigDefaults.voiceCallEnabled(isDebugBuild),
-                )
+            // shell hides the button when this is null). Null when `voiceCallAvailable` (above the
+            // NavDisplay) is false; otherwise it starts the call overlay below.
             val startVoiceCall: (() -> Unit)? = if (voiceCallAvailable) {
                 { voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_PILL)) }
             } else {
                 null
+            }
+
+            // Shell hand-offs requested by a feature that cannot reach the shell (today: the
+            // onboarding's Chat / Call exits). A sticky request, acted on once a shell is mounted —
+            // the request is made in the frame that navigates to main, before this subtree exists.
+            val shellLaunchRequests: ShellLaunchRequests = koinInject()
+            val pendingShellLaunch by shellLaunchRequests.pending.collectAsState()
+            val v2InboxRooted = navigator.backStack.any { it is AppNavRoute.Inbox }
+            LaunchedEffect(pendingShellLaunch, armResolved, showV2Shell, showShell, v2RootApplied, v2InboxRooted, currentTopRoute) {
+                val request = pendingShellLaunch ?: return@LaunchedEffect
+                // Shell not stable yet: wait for the next key change. In v2 that also means the one-shot
+                // Inbox re-root (above) has already happened — before it, the stack is still [Main]
+                // and the re-root is about to swap the top route, which closes any dock opened now.
+                if (!isShellStableForLaunch(armResolved, showShell, showV2Shell, v2RootApplied, v2InboxRooted)) {
+                    return@LaunchedEffect
+                }
+                when (request) {
+                    is ShellLaunch.OpenChat -> {
+                        analyticsTracker.event(
+                            AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                            mapOf(AnalyticsParams.SOURCE to SHELL_LAUNCH_SOURCE_ONBOARDING),
+                        )
+                        if (showV2Shell) {
+                            // Same as the Ask pill's plain tap (onOpenChat): no checklist context,
+                            // capture dock closed, chat dock open.
+                            chatSheetContextId = null
+                            chatSheetContextLabel = null
+                            v2CreateDockOpen = false
+                            v2ChatDockOpen = true
+                            // Spare THIS route from the route-change dock closer (see v2DockLaunchRoute).
+                            v2DockLaunchRoute = currentTopRoute
+                        } else {
+                            // The classic (v1) shell has no dock: the chat is a screen there.
+                            navigator.navigateToAiChat()
+                        }
+                        // Into the composer, NOT sent: sending spends credits, the user confirms it.
+                        request.prefill?.let { chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(it)) }
+                    }
+                    ShellLaunch.StartVoiceCall ->
+                        if (voiceCallAvailable) {
+                            voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_ONBOARDING))
+                        } else {
+                            logger.warning("ShellLaunch", "voice call requested while unavailable: ignored")
+                        }
+                }
+                shellLaunchRequests.consume(request)
             }
 
             // Shell mount. The v2 branch is checked FIRST and the control branch below is a literal
@@ -2903,6 +2957,24 @@ fun App() {
     }
 }
 
+/**
+ * Whether a pending [ShellLaunch] may be acted on now. The arm must be resolved and a shell mounted;
+ * the v2 shell must also have applied its one-shot Inbox re-root, with the Inbox in the stack —
+ * before that, onboarding's `navigateToMainScreen(clearBackStack = true)` leaves `[Main]` and the
+ * re-root is about to swap the top route, which would close a chat dock opened in that frame.
+ */
+internal fun isShellStableForLaunch(
+    armResolved: Boolean,
+    showShell: Boolean,
+    showV2Shell: Boolean,
+    v2RootApplied: Boolean,
+    v2InboxRooted: Boolean,
+): Boolean = when {
+    !armResolved -> false
+    showV2Shell -> v2RootApplied && v2InboxRooted
+    else -> showShell
+}
+
 // ─── v2 shell route predicates (single definition — they replaced four inline copies) ──────────
 
 /**
@@ -2978,3 +3050,9 @@ private const val WIDGET_PROMO_MIN_CHECKLISTS = 2
 
 /** Analytics `surface` of a voice call started from the Ask pill (and `source` of "Ask in chat" from it). */
 private const val VOICE_CALL_SURFACE_PILL = "pill_call"
+
+// `surface` of voice_call_* when the onboarding's Call started it (vs the Ask pill's button).
+private const val VOICE_CALL_SURFACE_ONBOARDING = "onboarding"
+
+// `source` of nav_chat_fab_tapped when the onboarding's Chat opened the chat.
+private const val SHELL_LAUNCH_SOURCE_ONBOARDING = "onboarding"

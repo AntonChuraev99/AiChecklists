@@ -72,14 +72,6 @@ class AppNavigatorImpl : AppNavigator {
         if (backStack.size > 1) backStack.removeAt(backStack.size - 1)
     }
 
-    override fun navigateToOnboarding() {
-        replaceStack(AppNavRoute.Onboarding)
-    }
-
-    override fun navigateToInteractiveOnboarding() {
-        replaceStack(AppNavRoute.InteractiveOnboarding)
-    }
-
     override fun navigateToWelcomeOnboarding() {
         replaceStack(AppNavRoute.WelcomeOnboarding)
     }

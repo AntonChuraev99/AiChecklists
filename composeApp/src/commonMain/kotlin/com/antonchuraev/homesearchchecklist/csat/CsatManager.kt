@@ -1,6 +1,10 @@
 package com.antonchuraev.homesearchchecklist.csat
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -110,6 +114,12 @@ class CsatManager(
         // the milestone/composite paths have no single source event, so they carry a synthetic label.
         private const val TRIGGER_CHECKLIST_MILESTONE = "checklist_milestone"
         private const val TRIGGER_REMINDER_COMPLETED = "reminder_completed"
+
+        // `source` values of the onboarding's own checklist_created emits (sample / chip / typed /
+        // plain list). NOT AiEntrySource.ONBOARDING: that one also attributes an Analyze screen opened
+        // from onboarding, whose ai_analyze_completed is a real analysis of the user's own file.
+        private val ONBOARDING_CHECKLIST_SOURCES: Set<String> =
+            ChecklistSource.entries.filter { it.isOnboarding }.map { it.wire }.toSet()
 
         const val OUTCOME_SUBMITTED = "submitted"
         const val OUTCOME_DISMISSED = "dismissed"
@@ -246,7 +256,12 @@ class CsatManager(
      * carries weight. `inbox_quick_added` is not observed at all, and a bare `checklist_created`
      * scores only at the 3rd/5th milestone — so the survey can still only come due on a completion.
      */
-    internal suspend fun processEvent(eventName: String): String? {
+    internal suspend fun processEvent(eventName: String, params: Map<String, Any> = emptyMap()): String? {
+        // Onboarding is not engagement: its sample / chip / typed-goal creates (and the typed goal's
+        // in-place ai_analyze_completed) used to emit nothing, so they never moved the score. The refreshed
+        // onboarding (2026-11-04) emits them for the funnel; skipping them here keeps a day-0 survey
+        // from being earned by onboarding alone (3 onboarding creates would otherwise be a milestone).
+        if (isOnboardingEmit(eventName, params)) return null
         val weight = EVENT_WEIGHTS[eventName]
         return when {
             weight != null -> {
@@ -280,6 +295,20 @@ class CsatManager(
     }
 
     /**
+     * One of the two scored events the onboarding emits ITSELF — nothing else is skipped, so an
+     * unrelated event that happens to carry the same `source` still counts:
+     * - `checklist_created` with an onboarding [ChecklistSource];
+     * - `ai_analyze_completed` from the typed goal, run in place: `surface = onboarding`. The Analyze
+     *   screen never sets `surface`, so its analysis of a file picked in onboarding (`source =
+     *   onboarding`, [AiEntrySource.ONBOARDING]) keeps its weight of 5.
+     */
+    private fun isOnboardingEmit(eventName: String, params: Map<String, Any>): Boolean = when (eventName) {
+        EVENT_CHECKLIST_CREATED -> params[AnalyticsParams.SOURCE] in ONBOARDING_CHECKLIST_SOURCES
+        EVENT_AI_ANALYZE_COMPLETED -> params[AnalyticsParams.SURFACE] == AnalyticsEvents.Analyze.SURFACE_ONBOARDING
+        else -> false
+    }
+
+    /**
      * Observes analytics events and feeds each into [processEvent]; when an event makes the survey
      * due, invokes [onShouldShow] with the trigger-source label and the current (decayed) score.
      */
@@ -291,7 +320,7 @@ class CsatManager(
         val observable = analyticsTracker as? ObservableAnalyticsTracker ?: return
         scope.launch {
             observable.events.collect { event ->
-                val trigger = processEvent(event.name)
+                val trigger = processEvent(event.name, event.params)
                 if (trigger != null) onShouldShow(trigger, decayedScoreToday().roundToInt())
             }
         }

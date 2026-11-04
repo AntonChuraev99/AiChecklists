@@ -16,77 +16,21 @@
 
     <!-- Onboarding -->
     <string name="onboarding_skip">छोड़ें</string>
-    <string name="onboarding_continue">जारी रखें</string>
     <!-- Onboarding Page 1 - AI Chat -->
-    <string name="onboarding_page1_title">बस Gisti को बताएं आपको क्या चाहिए</string>
-    <string name="onboarding_page1_description">आइटम जोड़ें, रिमाइंडर सेट करें, अपने हफ़्ते की योजना बनाएं — सब कुछ AI चैट से।</string>
 
     <!-- Onboarding Page 2 - Create from Anything -->
-    <string name="onboarding_page2_title">कोई भी कंटेंट → चेकलिस्ट</string>
-    <string name="onboarding_page2_description">फ़ोटो, PDF, वॉइस, टेक्स्ट या लिंक — AI इसे एक साफ़ चेकलिस्ट में बदल देता है।</string>
 
     <!-- Onboarding Page 3 - Reminders & Calendar -->
-    <string name="onboarding_page3_title">कुछ भी न भूलें</string>
-    <string name="onboarding_page3_description">हर आइटम के लिए रिमाइंडर, दोहराने वाले शेड्यूल, और कैलेंडर व्यू।</string>
 
     <!-- Onboarding Page 4 - Works Everywhere -->
-    <string name="onboarding_page4_title">आपकी सूचियां आपके साथ चलती हैं</string>
-    <string name="onboarding_page4_description">फ़ोन, टैबलेट या ब्राउज़र — वही चेकलिस्ट, वही AI।</string>
 
     <!-- Onboarding Get Started (last feature page CTA) -->
-    <string name="onboarding_get_started">शुरू करें</string>
 
     <!-- Interactive Onboarding -->
-    <string name="onboarding_interactive_category_title">आप क्या व्यवस्थित करना चाहते हैं?</string>
-    <string name="onboarding_interactive_category_subtitle">शुरू करने के लिए एक चुनें</string>
-    <string name="onboarding_interactive_category_travel">यात्रा</string>
-    <string name="onboarding_interactive_category_home">घर और शिफ़्टिंग</string>
-    <string name="onboarding_interactive_category_shopping">शॉपिंग</string>
-    <string name="onboarding_interactive_category_work">काम और प्रोजेक्ट</string>
-    <string name="onboarding_interactive_category_health">स्वास्थ्य</string>
-    <string name="onboarding_interactive_category_education">शिक्षा</string>
-    <string name="onboarding_interactive_category_fitness">फ़िटनेस</string>
-    <string name="onboarding_interactive_category_cooking">खाना बनाना</string>
-    <string name="onboarding_interactive_category_finance">फ़ाइनेंस</string>
-    <string name="onboarding_interactive_category_events">इवेंट्स</string>
-    <string name="onboarding_interactive_style_title">आप अपनी सूचियां कैसी पसंद करते हैं?</string>
-    <string name="onboarding_interactive_style_subtitle">इससे आपकी पहली चेकलिस्ट तय होती है</string>
-    <string name="onboarding_interactive_style_minimalist">मिनिमल</string>
-    <string name="onboarding_interactive_style_minimalist_desc">बस ज़रूरी चीज़ें</string>
-    <string name="onboarding_interactive_style_detailed">विस्तृत</string>
-    <string name="onboarding_interactive_style_detailed_desc">हर कदम शामिल</string>
-    <string name="onboarding_interactive_style_chaotic">सब कुछ और ज़्यादा</string>
-    <string name="onboarding_interactive_style_chaotic_desc">एक्स्ट्रा टिप्स जो आप भूल सकते हैं</string>
-    <string name="onboarding_interactive_template_title">एक चेकलिस्ट चुनें</string>
-    <string name="onboarding_interactive_template_subtitle">अपना शुरुआती बिंदु चुनें</string>
-    <string name="onboarding_interactive_template_items_count">%1$d आइटम</string>
-    <string name="onboarding_interactive_customize_title">इसे अपना बनाएं</string>
-    <string name="onboarding_interactive_customize_subtitle">जो नहीं चाहिए उसे बंद कर दें</string>
-    <string name="onboarding_interactive_customize_continue">जारी रखें</string>
-    <string name="onboarding_interactive_creating_title">आपकी चेकलिस्ट बन रही है…</string>
-    <string name="onboarding_interactive_creating_social">Gisti से 12,000+ चेकलिस्ट बनाई गईं</string>
-    <string name="onboarding_interactive_preview_title">आपकी चेकलिस्ट तैयार है!</string>
-    <string name="onboarding_interactive_preview_subtitle">आइटम पर टैप करके उन्हें चेक करें</string>
-    <string name="onboarding_interactive_preview_button">सहेजें और जारी रखें</string>
-    <string name="onboarding_preview_all_checked">सब चेक हो गया!</string>
 
     <!-- Discover More Step -->
-    <string name="onboarding_discover_title">आपकी चेकलिस्ट तैयार है!</string>
-    <string name="onboarding_discover_subtitle">इसे अपने काम का बनाएं</string>
 
-    <string name="onboarding_discover_reminder_title">रिमाइंडर सेट करें</string>
-    <string name="onboarding_discover_reminder_subtitle">सही समय पर याद दिलाया जाए</string>
-    <string name="onboarding_discover_widget_title">विजेट जोड़ें</string>
-    <string name="onboarding_discover_widget_subtitle">होम स्क्रीन से तुरंत एक्सेस</string>
-    <string name="onboarding_discover_share_title">चेकलिस्ट शेयर करें</string>
-    <string name="onboarding_discover_share_subtitle">तुरंत एक्सपोर्ट या शेयर करें</string>
 
-    <string name="onboarding_discover_reminder_sheet_title">क्विक रिमाइंडर</string>
-    <string name="onboarding_discover_reminder_tonight">आज रात, 9 PM</string>
-    <string name="onboarding_discover_reminder_daily">रोज़ाना, 9 AM</string>
-    <string name="onboarding_discover_reminder_weekly">साप्ताहिक, सोमवार</string>
-    <string name="onboarding_discover_reminder_custom">कस्टम…</string>
-    <string name="onboarding_discover_reminder_done">रिमाइंडर सेट हो गया!</string>
 
     <string name="onboarding_discover_widget_sheet_title">होम स्क्रीन पर विजेट जोड़ें</string>
     <string name="onboarding_discover_widget_step1">अपनी होम स्क्रीन पर देर तक दबाएं</string>
@@ -94,7 +38,6 @@
     <string name="onboarding_discover_widget_step3">विजेट को अपनी होम स्क्रीन पर खींचें</string>
     <string name="onboarding_discover_widget_done">समझ गया</string>
 
-    <string name="onboarding_discover_maybe_later">शायद बाद में</string>
 
     <!-- Retention: recurring-list nudge (checklist detail) -->
     <string name="recurring_nudge_title">इस सूची को हर हफ़्ते दोहराएं?</string>
@@ -111,36 +54,15 @@
     <string name="widget_promo_feature3">स्ट्रीक जारी रखने के लिए रोज़ाना एक रिमाइंडर</string>
     <string name="widget_promo_add">विजेट जोड़ें</string>
     <string name="widget_promo_skip">अभी नहीं</string>
-    <string name="onboarding_discover_completed">%2$d में से %1$d पूरे हुए</string>
 
     <!-- AI Welcome onboarding (Toki style) — Android-only variant -->
-    <string name="onboarding_welcome_continue">जारी रखें</string>
-    <string name="onboarding_welcome_create_cta">मेरी पहली सूची बनाएं</string>
     <string name="onboarding_welcome_create_error">आपकी सूची नहीं बन पाई। फिर से आज़माएं।</string>
     <string name="onboarding_welcome_default_checklist_name">मेरी चेकलिस्ट</string>
     <string name="onboarding_welcome_generating">आपकी चेकलिस्ट बन रही है…</string>
     <!-- Step 1: Welcome -->
-    <string name="onboarding_welcome_title_lead">मिलिए अपने AI</string>
-    <string name="onboarding_welcome_title_accent">चेकलिस्ट असिस्टेंट से</string>
-    <string name="onboarding_welcome_testimonial_quote">"यह एक ही मैसेज में मेरे पूरे हफ़्ते की योजना बना देता है। मैं बस बोलता हूं, यह सब व्यवस्थित कर देता है।"</string>
-    <string name="onboarding_welcome_testimonial_author">माया, शुरुआती यूज़र</string>
     <!-- Step 2: Capture -->
-    <string name="onboarding_welcome_capture_title_lead">बस चैट करें।</string>
-    <string name="onboarding_welcome_capture_title_accent">हो गया।</string>
-    <string name="onboarding_welcome_capture_lead">Gisti को आसान शब्दों में बताएं आपको क्या चाहिए। यह सूची बनाता है, रिमाइंडर सेट करता है, और सब कुछ व्यवस्थित रखता है।</string>
-    <string name="onboarding_welcome_chat_bubble_user">समुद्र तट पर मेरी वीकेंड ट्रिप प्लान करो</string>
-    <string name="onboarding_welcome_chat_bubble_done">ट्रिप चेकलिस्ट तैयार</string>
     <!-- Step 3: Value -->
-    <string name="onboarding_welcome_value_title_lead">फ़ोटो लें।</string>
-    <string name="onboarding_welcome_value_title_accent">सूची बनाएं।</string>
-    <string name="onboarding_welcome_value_lead">किसी फ़ोटो, PDF या छोटे नोट को कुछ ही सेकंड में तैयार चेकलिस्ट में बदलें।</string>
     <!-- Step 4: First checklist -->
-    <string name="onboarding_welcome_first_title_lead">मैं क्या</string>
-    <string name="onboarding_welcome_first_title_accent">पहले व्यवस्थित करूं?</string>
-    <string name="onboarding_welcome_first_lead">नीचे टाइप करें, या कोई स्टार्टर चुनें।</string>
-    <string name="onboarding_welcome_first_input_placeholder">कोई काम या लक्ष्य बताएं…</string>
-    <string name="onboarding_welcome_more_ways_title">शुरू करने के और तरीके</string>
-    <string name="onboarding_welcome_more_ways_sub">फ़ोटो, PDF, वॉइस या लिंक</string>
     <string name="onboarding_welcome_chip_groceries">किराना</string>
     <string name="onboarding_welcome_chip_trip">ट्रिप पैकिंग</string>
     <string name="onboarding_welcome_chip_workout">वर्कआउट प्लान</string>
@@ -177,6 +99,67 @@
     <string name="onboarding_welcome_default_item_2">चीज़ों को चेक करने के लिए चेकबॉक्स पर टैप करें</string>
     <string name="onboarding_welcome_default_item_3">रिमाइंडर सेट करें ताकि आप न भूलें</string>
     <string name="onboarding_welcome_default_item_4">किसी सूची को भरवाने के लिए AI आज़माएं</string>
+
+    <!-- Onboarding refresh (Showcase -> Try it), DESIGN_SPEC docs/designs/onboarding-refresh-2026-11-04 -->
+    <string name="onboarding_progress_a11y">%2$d में से चरण %1$d</string>
+    <string name="onboarding_showcase_title_lead">किसी भी चीज़ को</string>
+    <string name="onboarding_showcase_title_accent">चेकलिस्ट में बदलें</string>
+    <string name="onboarding_showcase_subtitle">लिखें, फ़ोटो लें या बस बोलें — Gisti उसे सूची में बदल देगा।</string>
+    <string name="onboarding_showcase_write_title">लक्ष्य लिखें</string>
+    <string name="onboarding_showcase_write_caption">क़दम-दर-क़दम सूची पाएँ</string>
+    <string name="onboarding_showcase_attach_title">फ़ोटो या फ़ाइल</string>
+    <string name="onboarding_showcase_attach_caption">फ़ोटो, PDF, लिंक या आवाज़ — सूची में</string>
+    <string name="onboarding_showcase_talk_title">Gisti से बात करें</string>
+    <string name="onboarding_showcase_talk_caption_call">चैट या कॉल — अपने कामों के बारे में</string>
+    <string name="onboarding_showcase_talk_caption_chat">चैट में अपने कामों के बारे में बात करें</string>
+    <string name="onboarding_showcase_cta">आज़माएँ</string>
+    <string name="onboarding_demo_write_prompt">बीच ट्रिप</string>
+    <string name="onboarding_demo_write_item_1">सनस्क्रीन</string>
+    <string name="onboarding_demo_write_item_2">तौलिए</string>
+    <string name="onboarding_demo_write_item_3">स्नैक्स</string>
+    <string name="onboarding_demo_talk_user">डेंटिस्ट शुक्र को?</string>
+    <string name="onboarding_demo_talk_reply">हो गया</string>
+    <string name="onboarding_try_title">अपनी पहली सूची बनाएँ</string>
+    <string name="onboarding_sample_title">पास में कोई फ़ाइल नहीं?</string>
+    <string name="onboarding_sample_body">देखें, Gisti इस नोट को सूची में कैसे बदलता है।</string>
+    <string name="onboarding_sample_cta">इस नोट से आज़माएँ</string>
+    <string name="onboarding_sample_badge">नमूना</string>
+    <string name="onboarding_sample_image_a11y">नमूना फ़ोटो: हाथ से लिखा नोट, जिसमें छह काम हैं</string>
+    <string name="onboarding_sample_note_title">इस हफ़्ते!!</string>
+    <string name="onboarding_sample_note_1">माँ को फ़ोन — रविवार</string>
+    <string name="onboarding_sample_note_2">दूध, दही, ब्रेड</string>
+    <string name="onboarding_sample_note_3">डेंटिस्ट मंगल 3 बजे</string>
+    <string name="onboarding_sample_note_4">बिजली बिल 15 से पहले</string>
+    <string name="onboarding_sample_note_5">लाइब्रेरी की किताबें!</string>
+    <string name="onboarding_sample_note_struck">जिम</string>
+    <string name="onboarding_sample_note_6">योगा गुरु</string>
+    <string name="onboarding_sample_reading">नोट पढ़ रहा हूँ…</string>
+    <string name="onboarding_sample_ready">आपकी सूची तैयार है</string>
+    <string name="onboarding_sample_list_meta">नमूना नोट से</string>
+    <string name="onboarding_sample_checklist_name">इस हफ़्ते</string>
+    <string name="onboarding_sample_item_1">रविवार के बारे में माँ को फ़ोन करें</string>
+    <string name="onboarding_sample_item_2">दूध, दही और ब्रेड ख़रीदें</string>
+    <string name="onboarding_sample_item_3">मंगलवार दोपहर 3 बजे डेंटिस्ट</string>
+    <string name="onboarding_sample_item_4">15 तारीख़ से पहले बिजली का बिल भरें</string>
+    <string name="onboarding_sample_item_5">लाइब्रेरी की किताबें लौटाएँ</string>
+    <string name="onboarding_sample_item_6">गुरुवार को योगा क्लास</string>
+    <string name="onboarding_try_own_file_title">अपनी फ़ाइल</string>
+    <string name="onboarding_try_type_title">जो चाहिए, लिखें</string>
+    <string name="onboarding_try_type_placeholder">जैसे: छुट्टियों की पैकिंग</string>
+    <string name="onboarding_try_type_empty_hint">पहले लक्ष्य लिखें — या नीचे कोई आइडिया चुनें</string>
+    <string name="onboarding_try_send_a11y">AI से सूची बनाएँ</string>
+    <string name="onboarding_try_talk_title">Gisti से बात करें</string>
+    <string name="onboarding_try_talk_caption_call">आवाज़ से या चैट में दिन की योजना बनाएँ — Gisti काम ख़ुद जोड़ देगा।</string>
+    <string name="onboarding_try_talk_caption_chat">चैट में दिन की योजना बनाएँ — Gisti काम ख़ुद जोड़ देगा।</string>
+    <string name="onboarding_try_talk_caption_typed">चैट आपके टेक्स्ट से शुरू होगी।</string>
+    <string name="onboarding_try_chat">चैट</string>
+    <string name="onboarding_try_call">कॉल</string>
+    <string name="onboarding_try_ai_error">Gisti अभी AI से नहीं जुड़ पा रहा। नमूना आज़माएँ या अपना टेक्स्ट सूची के रूप में सेव करें।</string>
+    <string name="onboarding_try_ai_signin">यहाँ AI के लिए Google से साइन इन करें। तब तक नमूना आज़माएँ या टेक्स्ट को सूची के रूप में सेव करें।</string>
+    <string name="onboarding_try_ai_error_sample">नमूना आज़माएँ</string>
+    <string name="onboarding_try_ai_error_save">सादी सूची सेव करें</string>
+    <string name="onboarding_try_generating_slow">अभी काम चल रहा है…</string>
+    <string name="onboarding_try_generating_prompt">“%1$s”</string>
 
     <!-- Navigation Drawer -->
     <string name="drawer_section_navigate">नेविगेट करें</string>
@@ -583,11 +566,7 @@
     <string name="paywall_no_subscription_found">कोई सक्रिय सदस्यता नहीं मिली</string>
     <string name="paywall_restore_failed">खरीदारी रिस्टोर नहीं हो सकी। कृपया अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
     <string name="paywall_purchase_failed">खरीदारी पूरी नहीं हो सकी। कृपया फिर से आज़माएं।</string>
-    <string name="paywall_days_free">%1$d-दिन का फ्री ट्रायल</string>
     <string name="paywall_go_premium">प्रीमियम लें</string>
-    <string name="paywall_then_price">फिर %1$s / माह</string>
-    <string name="paywall_price_per_month">%1$s / माह</string>
-    <string name="paywall_start_free_trial">फ्री ट्रायल शुरू करें</string>
     <string name="paywall_subscribe_now">अभी सब्सक्राइब करें</string>
     <string name="paywall_retry">फिर से आज़माएं</string>
     <string name="paywall_load_error">सदस्यता विकल्प लोड नहीं हो सके।\nकृपया अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
@@ -596,7 +575,6 @@
     <string name="paywall_billing_unavailable">इस डिवाइस पर अभी खरीदारी उपलब्ध नहीं है।</string>
     <string name="paywall_no_payment_now">अभी कोई भुगतान नहीं</string>
     <string name="paywall_cancel_anytime">कभी भी रद्द करें</string>
-    <string name="paywall_auto_renew_notice">ऑटो-रिन्यू होता है। कभी भी रद्द करें।</string>
     <string name="paywall_timeline_today">आज</string>
     <string name="paywall_timeline_due">%1$s को देय</string>
     <string name="paywall_timeline_free">फ्री ट्रायल</string>
@@ -845,7 +823,6 @@
     <!-- Common Accessibility -->
     <string name="back">वापस</string>
     <string name="feedback">फ़ीडबैक</string>
-    <string name="completed_label">पूर्ण</string>
 
     <!-- Checklist Detail - Undo -->
     <string name="checklist_item_deleted">"%1$s" हटाया गया</string>
@@ -854,7 +831,6 @@
     <string name="share_items_progress">%1$d/%2$d आइटम</string>
 
     <!-- Onboarding - Interactive - Customize Step -->
-    <string name="onboarding_interactive_settings">सेटिंग्स</string>
 
     <!-- Consent Dialog -->
     <string name="consent_title">गोपनीयता और डेटा उपयोग</string>
@@ -979,8 +955,6 @@
     <string name="debug_repeat_rule_presets_description">Preview the 8 smart repeat presets sheet</string>
     <string name="debug_show_csat">Show CSAT Survey</string>
     <string name="debug_show_csat_description">Force show CSAT bottom sheet for testing</string>
-    <string name="debug_interactive_onboarding">Interactive Onboarding</string>
-    <string name="debug_interactive_onboarding_description">Open the new interactive onboarding flow</string>
     <string name="debug_dock_legacy_title">Legacy chat dock</string>
     <string name="debug_dock_legacy_description">Revert to the old flat-grey dock (no hairline) for comparison</string>
 
@@ -988,10 +962,6 @@
     <string name="debug_onboardings_title">Onboardings</string>
     <string name="debug_onboardings_description">Launch any onboarding variant</string>
     <string name="debug_onboardings_section_variants">Variants</string>
-    <string name="debug_onboardings_interactive_title">Interactive Onboarding</string>
-    <string name="debug_onboardings_interactive_desc">Multi-step: category → style → template</string>
-    <string name="debug_onboardings_slides_title">Slides Onboarding</string>
-    <string name="debug_onboardings_slides_desc">3 pager slides + paywall</string>
     <string name="debug_onboardings_ai_welcome_title">AI Welcome (Toki)</string>
     <string name="debug_onboardings_ai_welcome_desc">4 steps: AI-agent hook → create first list</string>
 
@@ -1017,10 +987,6 @@
     <string name="debug_catalog_state_free_limit_desc">4 checklists, free user — shows upsell button</string>
     <string name="debug_catalog_state_premium">Premium User</string>
     <string name="debug_catalog_state_premium_desc">3 checklists, premium, 300 credits</string>
-    <string name="debug_catalog_onboarding">Onboarding</string>
-    <string name="debug_catalog_onboarding_desc">Static onboarding pager</string>
-    <string name="debug_catalog_interactive_onboarding">Interactive Onboarding</string>
-    <string name="debug_catalog_interactive_onboarding_desc">Animated interactive onboarding flow</string>
     <string name="debug_catalog_main">Main</string>
     <string name="debug_catalog_main_desc">Home screen with checklist list</string>
     <string name="debug_catalog_templates">Templates</string>
@@ -1569,11 +1535,6 @@
     <string name="chat_panel_scrim_description">चैट बंद करने के लिए टैप करें</string>
 
     <!-- First checklist (A/B auto-create) -->
-    <string name="first_checklist_title">आपकी पहली चेकलिस्ट</string>
-    <string name="first_checklist_item_1">किसी आइटम को चेक ऑफ़ करने के लिए गोले पर टैप करें</string>
-    <string name="first_checklist_item_2">किसी भी आइटम को संपादित करने के लिए उस पर टैप करें</string>
-    <string name="first_checklist_item_3">अपना खुद का जोड़ने के लिए + बटन इस्तेमाल करें</string>
-    <string name="first_checklist_item_4">अपने AI असिस्टेंट से मिलें — स्क्रीन के नीचे मौजूद चैट बार। आइटम जोड़ने, रिमाइंडर सेट करने, या पूरी चेकलिस्ट बनाने के लिए आसान शब्दों में पूछें (आज़माएं «दूध जोड़ो» या «शुक्रवार शाम 6 बजे याद दिलाना»), या बोलने के लिए माइक पर टैप करें।</string>
 
     <!-- Add to existing checklist picker (ACTION_PROCESS_TEXT "Add to checklist" action) -->
     <string name="add_to_checklist_title">चेकलिस्ट में जोड़ें</string>

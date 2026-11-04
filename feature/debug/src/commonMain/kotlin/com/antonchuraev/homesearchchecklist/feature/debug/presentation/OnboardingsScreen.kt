@@ -39,22 +39,6 @@ fun OnboardingsScreen(
             SectionHeader(stringResource(Res.string.debug_onboardings_section_variants))
 
             CatalogItem(
-                testTag = "onboardings_variant_interactive",
-                title = stringResource(Res.string.debug_onboardings_interactive_title),
-                subtitle = stringResource(Res.string.debug_onboardings_interactive_desc),
-                isDisabled = false,
-                onClick = { viewModel.sendIntent(OnboardingsIntent.LaunchVariant(OnboardingVariant.Interactive)) }
-            )
-
-            CatalogItem(
-                testTag = "onboardings_variant_slides",
-                title = stringResource(Res.string.debug_onboardings_slides_title),
-                subtitle = stringResource(Res.string.debug_onboardings_slides_desc),
-                isDisabled = false,
-                onClick = { viewModel.sendIntent(OnboardingsIntent.LaunchVariant(OnboardingVariant.Slides)) }
-            )
-
-            CatalogItem(
                 testTag = "onboardings_variant_ai_welcome",
                 title = stringResource(Res.string.debug_onboardings_ai_welcome_title),
                 subtitle = stringResource(Res.string.debug_onboardings_ai_welcome_desc),

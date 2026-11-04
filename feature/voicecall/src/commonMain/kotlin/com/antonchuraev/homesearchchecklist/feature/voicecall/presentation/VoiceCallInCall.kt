@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSoftIconButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPresenceOrb
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppElevation
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
@@ -94,7 +95,6 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotio
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.CallControlDock
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.CallDockLabels
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.CallTimerPill
-import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.GistiPresenceOrb
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.ReplyCaptions
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.StagePlan
 import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.components.UserPartialBubble

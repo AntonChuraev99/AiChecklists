@@ -26,7 +26,7 @@ Located in `core/designsystem/`. Always use design system components instead of 
 
 **Components:** `AppButton`/`AppButtonSecondary`/`AppButtonText`/`AppButtonDestructive`; `AppCard` (flat tonal container, 1px `outlineVariant` hairline, no shadow, `AppShapes.medium` 16dp); `AppSwitch` (visible unchecked track = outlineVariant); `AppTextField` (outlined + keyboard options); `EmptyState`; `AddItemInputField`; `AppScaffold` (auto-handles system insets).
 
-**System insets (edge-to-edge) — MANDATORY.** Screens **with** `AppScaffold`: automatic via `WindowInsets`, nothing to do. Screens **without** `AppScaffold` (`OnboardingScreen`, `PaywallScreen`, `SplashScreen`) MUST add:
+**System insets (edge-to-edge) — MANDATORY.** Screens **with** `AppScaffold`: automatic via `WindowInsets`, nothing to do. Screens **without** `AppScaffold` (`WelcomeOnboardingScreen`, `PaywallScreen`, `SplashScreen`) MUST add:
 
 ```kotlin
 Column(

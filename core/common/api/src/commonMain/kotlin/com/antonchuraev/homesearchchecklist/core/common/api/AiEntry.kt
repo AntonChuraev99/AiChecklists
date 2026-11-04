@@ -92,4 +92,10 @@ enum class AiEntrySource(val wire: String) {
 
     /** CTA in the Templates "search matched nothing" empty state — carries the query. */
     TEMPLATES_EMPTY_SEARCH("templates_empty_search"),
+
+    /**
+     * The onboarding's Try-it step: an own-file pill (→ Analyze with that material) and the typed
+     * goal it turns into a list in place (it emits `ai_analyze_*` itself with this source).
+     */
+    ONBOARDING("onboarding"),
 }

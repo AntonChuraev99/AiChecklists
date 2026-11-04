@@ -16,77 +16,59 @@
 
     <!-- Онбординг -->
     <string name="onboarding_skip">Пропустить</string>
-    <string name="onboarding_continue">Продолжить</string>
+    <!-- Онбординг: чипы-пресеты, стартовые подсказки, ошибки (раньше падали на английский) -->
+    <string name="onboarding_welcome_create_error">Не получилось создать список. Попробуйте ещё раз.</string>
+    <string name="onboarding_welcome_default_checklist_name">Мой чек-лист</string>
+    <string name="onboarding_welcome_generating">Создаём чек-лист…</string>
+    <string name="onboarding_welcome_chip_groceries">Продукты</string>
+    <string name="onboarding_welcome_chip_trip">Сборы в поездку</string>
+    <string name="onboarding_welcome_chip_workout">Тренировка</string>
+    <string name="onboarding_welcome_chip_todo">Дела на день</string>
+    <string name="onboarding_welcome_checklist_groceries">Продукты</string>
+    <string name="onboarding_welcome_checklist_trip">Сборы в поездку</string>
+    <string name="onboarding_welcome_checklist_workout">План тренировки</string>
+    <string name="onboarding_welcome_checklist_todo">Дела на день</string>
+    <string name="onboarding_welcome_items_trip_1">Паспорт и билеты</string>
+    <string name="onboarding_welcome_items_trip_2">Телефон и зарядка</string>
+    <string name="onboarding_welcome_items_trip_3">Средства гигиены</string>
+    <string name="onboarding_welcome_items_trip_4">Лекарства</string>
+    <string name="onboarding_welcome_items_trip_5">Одежда</string>
+    <string name="onboarding_welcome_items_trip_6">Пауэрбанк и переходник</string>
+    <string name="onboarding_welcome_items_groceries_1">Молоко</string>
+    <string name="onboarding_welcome_items_groceries_2">Хлеб</string>
+    <string name="onboarding_welcome_items_groceries_3">Яйца</string>
+    <string name="onboarding_welcome_items_groceries_4">Фрукты</string>
+    <string name="onboarding_welcome_items_groceries_5">Овощи</string>
+    <string name="onboarding_welcome_items_groceries_6">Кофе</string>
+    <string name="onboarding_welcome_items_workout_1">Разминка</string>
+    <string name="onboarding_welcome_items_workout_2">Кардио</string>
+    <string name="onboarding_welcome_items_workout_3">Силовая</string>
+    <string name="onboarding_welcome_items_workout_4">Растяжка</string>
+    <string name="onboarding_welcome_items_workout_5">Заминка</string>
+    <string name="onboarding_welcome_items_todo_1">Самое важное дело</string>
+    <string name="onboarding_welcome_items_todo_2">Ответить на письма</string>
+    <string name="onboarding_welcome_items_todo_3">Спланировать день</string>
+    <string name="onboarding_welcome_items_todo_4">Короткий перерыв</string>
+    <string name="onboarding_welcome_items_todo_5">Посмотреть планы на завтра</string>
+    <string name="onboarding_welcome_default_item_1">Нажмите +, чтобы добавить свой пункт</string>
+    <string name="onboarding_welcome_default_item_2">Отмечайте пункты галочкой</string>
+    <string name="onboarding_welcome_default_item_3">Поставьте напоминание, чтобы не забыть</string>
+    <string name="onboarding_welcome_default_item_4">Попросите AI заполнить список за вас</string>
     <!-- Страница 1 — AI Чат -->
-    <string name="onboarding_page1_title">Просто скажи Gisti, что нужно</string>
-    <string name="onboarding_page1_description">Добавляй пункты, ставь напоминания, планируй неделю — всё через ИИ-чат.</string>
 
     <!-- Страница 2 — Создание из любого контента -->
-    <string name="onboarding_page2_title">Любой контент → чек-лист</string>
-    <string name="onboarding_page2_description">Фото, PDF, голос, текст или ссылка — ИИ превращает в чёткий чек-лист.</string>
 
     <!-- Страница 3 — Напоминания и календарь -->
-    <string name="onboarding_page3_title">Ничего не забудешь</string>
-    <string name="onboarding_page3_description">Напоминания на каждый пункт, повторяющееся расписание и календарь.</string>
 
     <!-- Страница 4 — Везде -->
-    <string name="onboarding_page4_title">Твои списки всегда с тобой</string>
-    <string name="onboarding_page4_description">Телефон, планшет или браузер — те же чек-листы, тот же ИИ.</string>
 
     <!-- Кнопка «Начать» (последняя страница фич) -->
-    <string name="onboarding_get_started">Начать</string>
 
     <!-- Интерактивный онбординг -->
-    <string name="onboarding_interactive_category_title">Что хотите организовать?</string>
-    <string name="onboarding_interactive_category_subtitle">Выберите одно, чтобы начать</string>
-    <string name="onboarding_interactive_category_travel">Путешествия</string>
-    <string name="onboarding_interactive_category_home">Дом &amp; Переезд</string>
-    <string name="onboarding_interactive_category_shopping">Покупки</string>
-    <string name="onboarding_interactive_category_work">Работа &amp; Проекты</string>
-    <string name="onboarding_interactive_category_health">Здоровье</string>
-    <string name="onboarding_interactive_category_education">Учёба</string>
-    <string name="onboarding_interactive_category_fitness">Фитнес</string>
-    <string name="onboarding_interactive_category_cooking">Кулинария</string>
-    <string name="onboarding_interactive_category_finance">Финансы</string>
-    <string name="onboarding_interactive_category_events">Мероприятия</string>
-    <string name="onboarding_interactive_style_title">Какой формат списка предпочитаете?</string>
-    <string name="onboarding_interactive_style_subtitle">Это определит ваш первый чек-лист</string>
-    <string name="onboarding_interactive_style_minimalist">Минималистичный</string>
-    <string name="onboarding_interactive_style_minimalist_desc">Только самое важное</string>
-    <string name="onboarding_interactive_style_detailed">Подробный</string>
-    <string name="onboarding_interactive_style_detailed_desc">Каждый шаг расписан</string>
-    <string name="onboarding_interactive_style_chaotic">Всё и ещё больше</string>
-    <string name="onboarding_interactive_style_chaotic_desc">Дополнительные подсказки, о которых легко забыть</string>
-    <string name="onboarding_interactive_template_title">Выберите чек-лист</string>
-    <string name="onboarding_interactive_template_subtitle">Выберите отправную точку</string>
-    <string name="onboarding_interactive_template_items_count">%1$d элементов</string>
-    <string name="onboarding_interactive_customize_title">Настройте под себя</string>
-    <string name="onboarding_interactive_customize_subtitle">Отключите то, что не нужно</string>
-    <string name="onboarding_interactive_customize_continue">Продолжить</string>
-    <string name="onboarding_interactive_creating_title">Создаём ваш чек-лист…</string>
-    <string name="onboarding_interactive_creating_social">Более 12 000 чек-листов создано с Gisti</string>
-    <string name="onboarding_interactive_preview_title">Ваш чек-лист готов!</string>
-    <string name="onboarding_interactive_preview_subtitle">Нажмите на элементы, чтобы отметить их</string>
-    <string name="onboarding_interactive_preview_button">Сохранить &amp; Продолжить</string>
-    <string name="onboarding_preview_all_checked">Всё отмечено!</string>
 
     <!-- Шаг «Узнать больше» -->
-    <string name="onboarding_discover_title">Ваш чек-лист готов!</string>
-    <string name="onboarding_discover_subtitle">Настройте под себя</string>
 
-    <string name="onboarding_discover_reminder_title">Настроить напоминания</string>
-    <string name="onboarding_discover_reminder_subtitle">Получайте напоминания в нужный момент</string>
-    <string name="onboarding_discover_widget_title">Добавить виджет</string>
-    <string name="onboarding_discover_widget_subtitle">Быстрый доступ с главного экрана</string>
-    <string name="onboarding_discover_share_title">Поделиться чек-листом</string>
-    <string name="onboarding_discover_share_subtitle">Экспортируйте или поделитесь мгновенно</string>
 
-    <string name="onboarding_discover_reminder_sheet_title">Быстрое напоминание</string>
-    <string name="onboarding_discover_reminder_tonight">Сегодня вечером, 21:00</string>
-    <string name="onboarding_discover_reminder_daily">Ежедневно, 9:00</string>
-    <string name="onboarding_discover_reminder_weekly">Еженедельно, понедельник</string>
-    <string name="onboarding_discover_reminder_custom">Настроить…</string>
-    <string name="onboarding_discover_reminder_done">Напоминание установлено!</string>
 
     <string name="onboarding_discover_widget_sheet_title">Добавить виджет на главный экран</string>
     <string name="onboarding_discover_widget_step1">Нажмите и удерживайте главный экран</string>
@@ -94,8 +76,67 @@
     <string name="onboarding_discover_widget_step3">Перетащите виджет на главный экран</string>
     <string name="onboarding_discover_widget_done">Понятно</string>
 
-    <string name="onboarding_discover_maybe_later">Позже</string>
-    <string name="onboarding_discover_completed">%1$d из %2$d выполнено</string>
+    <!-- Onboarding refresh (Showcase -> Try it), DESIGN_SPEC docs/designs/onboarding-refresh-2026-11-04 -->
+    <string name="onboarding_progress_a11y">Шаг %1$d из %2$d</string>
+    <string name="onboarding_showcase_title_lead">Превратите что угодно</string>
+    <string name="onboarding_showcase_title_accent">в чек-лист</string>
+    <string name="onboarding_showcase_subtitle">Напишите, сфотографируйте или просто скажите — Gisti разложит по пунктам.</string>
+    <string name="onboarding_showcase_write_title">Напишите цель</string>
+    <string name="onboarding_showcase_write_caption">Получите план по шагам</string>
+    <string name="onboarding_showcase_attach_title">Фото или файл</string>
+    <string name="onboarding_showcase_attach_caption">Снимок, PDF, ссылка или голос — в список</string>
+    <string name="onboarding_showcase_talk_title">Обсудите с Gisti</string>
+    <string name="onboarding_showcase_talk_caption_call">Чат или звонок — про ваши дела</string>
+    <string name="onboarding_showcase_talk_caption_chat">Пишите в чат про ваши дела</string>
+    <string name="onboarding_showcase_cta">Попробовать</string>
+    <string name="onboarding_demo_write_prompt">Пляж</string>
+    <string name="onboarding_demo_write_item_1">SPF-крем</string>
+    <string name="onboarding_demo_write_item_2">Полотенца</string>
+    <string name="onboarding_demo_write_item_3">Перекус</string>
+    <string name="onboarding_demo_talk_user">Стоматолога на пт?</string>
+    <string name="onboarding_demo_talk_reply">Готово</string>
+    <string name="onboarding_try_title">Соберите первый список</string>
+    <string name="onboarding_sample_title">Нет файла под рукой?</string>
+    <string name="onboarding_sample_body">Посмотрите, как Gisti превратит эту записку в список.</string>
+    <string name="onboarding_sample_cta">Попробовать на записке</string>
+    <string name="onboarding_sample_badge">Пример</string>
+    <string name="onboarding_sample_image_a11y">Пример фото: записка от руки с шестью делами</string>
+    <string name="onboarding_sample_note_title">на неделе!!</string>
+    <string name="onboarding_sample_note_1">маме позвонить про вс</string>
+    <string name="onboarding_sample_note_2">молоко, яйца, хлеб</string>
+    <string name="onboarding_sample_note_3">зубной вт 15:00</string>
+    <string name="onboarding_sample_note_4">свет оплатить до 15-го</string>
+    <string name="onboarding_sample_note_5">книги в библиотеку!</string>
+    <string name="onboarding_sample_note_struck">зал</string>
+    <string name="onboarding_sample_note_6">йога чт</string>
+    <string name="onboarding_sample_reading">Читаю записку…</string>
+    <string name="onboarding_sample_ready">Список готов</string>
+    <string name="onboarding_sample_list_meta">Из записки-примера</string>
+    <string name="onboarding_sample_checklist_name">На этой неделе</string>
+    <string name="onboarding_sample_item_1">Позвонить маме насчёт воскресенья</string>
+    <string name="onboarding_sample_item_2">Купить молоко, яйца и хлеб</string>
+    <string name="onboarding_sample_item_3">Стоматолог во вторник в 15:00</string>
+    <string name="onboarding_sample_item_4">Оплатить электричество до 15-го</string>
+    <string name="onboarding_sample_item_5">Вернуть книги в библиотеку</string>
+    <string name="onboarding_sample_item_6">Йога в четверг</string>
+    <string name="onboarding_try_own_file_title">Свой файл</string>
+    <string name="onboarding_try_type_title">Напишите, что нужно</string>
+    <string name="onboarding_try_type_placeholder">Например: собраться на море</string>
+    <string name="onboarding_try_type_empty_hint">Сначала напишите цель — или выберите идею ниже</string>
+    <string name="onboarding_try_send_a11y">Создать список с ИИ</string>
+    <string name="onboarding_try_talk_title">Обсудите с Gisti</string>
+    <string name="onboarding_try_talk_caption_call">Спланируйте день голосом или в чате — Gisti сам добавит задачи.</string>
+    <string name="onboarding_try_talk_caption_chat">Спланируйте день в чате — Gisti сам добавит задачи.</string>
+    <string name="onboarding_try_talk_caption_typed">Чат начнётся с вашего текста.</string>
+    <string name="onboarding_try_chat">Чат</string>
+    <string name="onboarding_try_call">Звонок</string>
+    <string name="onboarding_try_ai_error">Gisti сейчас не может подключиться к ИИ. Попробуйте пример или сохраните текст списком.</string>
+    <string name="onboarding_try_ai_signin">Чтобы пользоваться ИИ здесь, войдите через Google. А пока попробуйте пример или сохраните текст списком.</string>
+    <string name="onboarding_try_ai_error_sample">Попробовать пример</string>
+    <string name="onboarding_try_ai_error_save">Сохранить как список</string>
+    <string name="onboarding_try_generating_slow">Ещё работаю…</string>
+    <string name="onboarding_try_generating_prompt">«%1$s»</string>
+
 
     <!-- Боковое меню -->
     <string name="drawer_section_navigate">Навигация</string>
@@ -460,11 +501,7 @@
     <string name="paywall_no_subscription_found">Активная подписка не найдена</string>
     <string name="paywall_restore_failed">Не удалось восстановить покупки. Проверьте соединение и попробуйте снова.</string>
     <string name="paywall_purchase_failed">Не удалось завершить покупку. Попробуйте снова.</string>
-    <string name="paywall_days_free">%1$d-дневный пробный период</string>
     <string name="paywall_go_premium">Перейти на Премиум</string>
-    <string name="paywall_then_price">затем %1$s / месяц</string>
-    <string name="paywall_price_per_month">%1$s / месяц</string>
-    <string name="paywall_start_free_trial">Начать бесплатный период</string>
     <string name="paywall_subscribe_now">Подписаться сейчас</string>
     <string name="paywall_retry">Попробовать снова</string>
     <string name="paywall_load_error">Не удалось загрузить варианты подписки.\nПроверьте соединение и попробуйте снова.</string>
@@ -473,7 +510,6 @@
     <string name="paywall_billing_unavailable">Покупки на этом устройстве сейчас недоступны.</string>
     <string name="paywall_no_payment_now">Оплата сейчас не требуется</string>
     <string name="paywall_cancel_anytime">Отмена в любое время</string>
-    <string name="paywall_auto_renew_notice">Автопродление. Отмена в любое время.</string>
     <string name="paywall_timeline_today">Сегодня</string>
     <string name="paywall_timeline_due">%1$s</string>
     <string name="paywall_timeline_free">Пробный период</string>
@@ -728,7 +764,6 @@
     <!-- Общие метки доступности -->
     <string name="back">Назад</string>
     <string name="feedback">Обратная связь</string>
-    <string name="completed_label">Выполнено</string>
 
     <!-- Детали чек-листа — отмена удаления -->
     <string name="checklist_item_deleted">«%1$s» удалён</string>
@@ -737,7 +772,6 @@
     <string name="share_items_progress">%1$d/%2$d элементов</string>
 
     <!-- Онбординг — интерактивный — шаг настройки -->
-    <string name="onboarding_interactive_settings">Настройки</string>
 
     <!-- Диалог согласия -->
     <string name="consent_title">Конфиденциальность &amp; Данные</string>
@@ -832,17 +866,11 @@
     <string name="debug_repeat_rule_presets_description">Предпросмотр шторки с 8 умными пресетами повтора</string>
     <string name="debug_show_csat">Показать CSAT-опрос</string>
     <string name="debug_show_csat_description">Принудительно показать CSAT-шторку для тестирования</string>
-    <string name="debug_interactive_onboarding">Интерактивный онбординг</string>
-    <string name="debug_interactive_onboarding_description">Открыть новый интерактивный онбординг</string>
 
     <!-- Экран онбордингов (debug) -->
     <string name="debug_onboardings_title">Онбординги</string>
     <string name="debug_onboardings_description">Запустить любой вариант онбординга</string>
     <string name="debug_onboardings_section_variants">Варианты</string>
-    <string name="debug_onboardings_interactive_title">Интерактивный онбординг</string>
-    <string name="debug_onboardings_interactive_desc">Шаги: категория → стиль → шаблон</string>
-    <string name="debug_onboardings_slides_title">Слайдовый онбординг</string>
-    <string name="debug_onboardings_slides_desc">3 слайда + paywall</string>
 
     <!-- Debug — предпросмотр шторки причины отмены -->
     <string name="debug_cancel_reason_title">Тест: шторка причины отмены</string>
@@ -866,10 +894,6 @@
     <string name="debug_catalog_state_free_limit_desc">4 чек-листа, бесплатный — показывает кнопку апсейла</string>
     <string name="debug_catalog_state_premium">Премиум-пользователь</string>
     <string name="debug_catalog_state_premium_desc">3 чек-листа, Премиум, 300 кредитов</string>
-    <string name="debug_catalog_onboarding">Онбординг</string>
-    <string name="debug_catalog_onboarding_desc">Статичный онбординг-пейджер</string>
-    <string name="debug_catalog_interactive_onboarding">Интерактивный онбординг</string>
-    <string name="debug_catalog_interactive_onboarding_desc">Анимированный интерактивный онбординг</string>
     <string name="debug_catalog_main">Главная</string>
     <string name="debug_catalog_main_desc">Главный экран со списком чек-листов</string>
     <string name="debug_catalog_templates">Шаблоны</string>
@@ -1424,11 +1448,6 @@
     <string name="chat_panel_scrim_description">Нажмите, чтобы закрыть чат</string>
 
     <!-- Первый чеклист (A/B авто-создание) -->
-    <string name="first_checklist_title">Ваш первый чеклист</string>
-    <string name="first_checklist_item_1">Нажмите на кружок, чтобы отметить пункт</string>
-    <string name="first_checklist_item_2">Нажмите на пункт, чтобы изменить его</string>
-    <string name="first_checklist_item_3">Нажмите +, чтобы добавить свой пункт</string>
-    <string name="first_checklist_item_4">Познакомьтесь с ИИ-ассистентом — это строка чата внизу экрана. Попросите обычными словами добавить пункты, поставить напоминания или собрать целый чеклист («добавь молоко» или «напомни в пятницу в 18:00»), или нажмите микрофон, чтобы сказать голосом.</string>
 
     <!-- Выбор чек-листа для добавления (действие ACTION_PROCESS_TEXT «Добавить в чек-лист») -->
     <string name="add_to_checklist_title">Добавить в чек-лист</string>

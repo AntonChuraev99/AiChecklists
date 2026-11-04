@@ -10,7 +10,6 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
-import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
@@ -31,13 +30,7 @@ val userFeatureModule = module {
     } bind UserDataRepository::class
 
     factory { CompleteOnboardingUseCase(get()) }
-    factory {
-        GetOnboardingVariantUseCase(
-            remoteConfigProvider = get(),
-            logger = get(),
-            isAndroid = get(named("isAndroid")),
-        )
-    }
+    factory { GetOnboardingVariantUseCase(remoteConfigProvider = get(), logger = get()) }
     factory { GetFirstChecklistVariantUseCase(remoteConfigProvider = get(), logger = get()) }
 
     // `single`, not `factory`: the resolver's stickiness lives in per-process @Volatile fields

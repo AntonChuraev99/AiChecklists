@@ -34,8 +34,6 @@ class UpdateFeedDeepLinkHandlerTest {
         var requestCreateWeeklyChecklistCount = 0
 
         override fun onBack() { backCallCount++ }
-        override fun navigateToOnboarding() {}
-        override fun navigateToInteractiveOnboarding() {}
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) { mainScreenCallCount++ }
         override fun navigateToDebugMenu() {}
