@@ -431,6 +431,19 @@ private fun AskPillShowcase(c: Copy) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Full shape (2026-11-04): "+" · one-line label · neutral mic · filled call circle.
+        AskGistiBar(
+            placeholder = c.askPill,
+            onClick = {},
+            onMicClick = {},
+            micContentDescription = "Voice input",
+            onAttachClick = {},
+            attachContentDescription = "Attach a file",
+            onCallClick = {},
+            callContentDescription = "Voice call",
+            style = AskGistiBarStyle.ChromePill,
+        )
+        // No attach entry: the sparkle keeps the leading edge.
         AskGistiBar(
             placeholder = c.askPill,
             onClick = {},

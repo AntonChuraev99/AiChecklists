@@ -127,6 +127,7 @@ class V2ShellBottomBarScreenshotTest {
         barVisible: Boolean = true,
         captureOpen: Boolean = false,
         listUnderBar: Boolean = false,
+        withCall: Boolean = false,
     ) {
         // BOTH, and neither alone is enough. `setQualifiers` moves the Android resource
         // configuration, which is what Robolectric measures against; Compose Resources
@@ -155,6 +156,10 @@ class V2ShellBottomBarScreenshotTest {
                         // Non-null so the pill's mic is drawn — the production shape once the host
                         // wires the voice entry (redesign B, owner decision 2026-10-16).
                         onOpenChatVoice = {},
+                        // The production shape since 2026-11-04: App.kt wires the "+" (attach);
+                        // the call button only once the voice-call feature lands, hence opt-in.
+                        onOpenChatAttach = {},
+                        onStartVoiceCall = if (withCall) ({}) else null,
                         content = {
                             InboxStub(captureOpen = captureOpen, listUnderBar = listUnderBar)
                         },
@@ -238,6 +243,26 @@ class V2ShellBottomBarScreenshotTest {
     @Test
     fun compactBar_320dp_light_ru_fontScale13() =
         shoot("ru-rRU-w320dp-h568dp", fontScale = 1.3f, locale = Locale("ru", "RU"))
+
+    // ── Ask pill with the call button (voice-call feature, wired separately) ──
+    //
+    // "+" · one-line label · mic · filled call circle. The pill stays ONE row: the label ellipsizes,
+    // the plate never grows for it.
+
+    @Test
+    fun compactBar_360dp_light_withCall() = shoot("w360dp-h640dp", withCall = true)
+
+    @Test
+    fun compactBar_360dp_dark_withCall() = shoot("w360dp-h640dp", dark = true, withCall = true)
+
+    /** Narrowest window, RU, 1.3: three trailing/leading targets leave the label the least room. */
+    @Test
+    fun compactBar_320dp_light_ru_fontScale13_withCall() =
+        shoot("ru-rRU-w320dp-h568dp", fontScale = 1.3f, locale = Locale("ru", "RU"), withCall = true)
+
+    @Test
+    fun compactBar_412dp_light_hi_fontScale15_withCall() =
+        shoot("hi-rIN-w412dp-h891dp", fontScale = 1.5f, locale = Locale("hi", "IN"), withCall = true)
 
     // ── The two states the chrome changes shape in ───────────────────────────
 
