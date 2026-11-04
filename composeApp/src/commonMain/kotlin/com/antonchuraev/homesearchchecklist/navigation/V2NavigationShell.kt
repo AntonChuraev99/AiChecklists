@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -61,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -120,7 +122,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -189,6 +193,13 @@ object V2ShellMetrics {
      */
     val FabBandPadding: Dp = AppDimens.SpacingSm
 }
+
+/**
+ * Upper bound on how long the Compact shell keeps the keyboard consumed for the hosted screen after
+ * the chat dock starts closing (see `freezeHostedIme` in [V2ShellCompactBar]). Longer than the IME
+ * hide animation, short enough that a screen field taking the keyboard over is lifted promptly.
+ */
+private const val ChatKeyboardReleaseTimeoutMs = 500L
 
 /**
  * The v2 (Todoist-style) navigation shell: Inbox · Calendar · Projects · Overview, plus a floating
@@ -457,6 +468,39 @@ private fun V2ShellCompactBar(
     // "Which parts of the chrome are on" has ONE answer per frame: pill and bar leave together.
     val chromeVisible = barVisible && !captureOpen
 
+    // While the chat dock owns the keyboard, the hosted screen must not follow it.
+    //
+    // The dock lifts itself (its own imePadding, in [overlayContent], a sibling of the content box).
+    // The screen underneath does not need to move — it is behind a modal scrim — but every screen
+    // on AppScaffold wraps its bottomBar slot in windowInsetsPadding(ime ∪ navigationBars) whether
+    // or not that slot draws anything. The keyboard is taller than the plate this box already
+    // consumes, so on every frame of the keyboard animation that EMPTY slot grew by a few px, the
+    // content slot shrank by as much, and the whole tab (header, pager, task list) was re-measured
+    // and re-positioned under the scrim: 8-25 ms of `measureAndLayout` per frame of opening Ask
+    // Gisti and of each BACK out of it (Perfetto, Pixel 9 AVD, 2026-11-04). Consuming `ime` here
+    // pins that padding at 0 for the duration, so the per-frame work stays inside the dock.
+    //
+    // Latched past `chatOpen`: the host drops `chatOpen` at the START of the dock's exit, while the
+    // keyboard is often still on its way down, and releasing then would snap the hosted screen's
+    // slot to the keyboard's height for one frame and animate it back. Released once the keyboard
+    // is down — or after [ChatKeyboardReleaseTimeoutMs], so a screen field that takes the keyboard
+    // straight over from the chat is lifted with at most that much delay — and at once when the
+    // capture dock opens, because that dock lives IN the hosted screen and rides the keyboard.
+    val imeInsets = WindowInsets.ime
+    var chatOwnsKeyboard by remember { mutableStateOf(chatOpen) }
+    LaunchedEffect(chatOpen) {
+        if (chatOpen) {
+            chatOwnsKeyboard = true
+            return@LaunchedEffect
+        }
+        if (!chatOwnsKeyboard) return@LaunchedEffect
+        withTimeoutOrNull(ChatKeyboardReleaseTimeoutMs) {
+            snapshotFlow { imeInsets.getBottom(density) }.first { it == 0 }
+        }
+        chatOwnsKeyboard = false
+    }
+    val freezeHostedIme = chatOwnsKeyboard && !captureOpen
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -477,7 +521,9 @@ private fun V2ShellCompactBar(
                             captureOpen -> Modifier.consumeWindowInsets(WindowInsets.navigationBars)
                             else -> Modifier.consumeWindowInsets(WindowInsets(bottom = plateHeight))
                         }
-                    ),
+                    )
+                    // See `freezeHostedIme` above. After the plate consume, so both stack.
+                    .then(if (freezeHostedIme) Modifier.consumeWindowInsets(WindowInsets.ime) else Modifier),
             ) {
                 content(null)
             }

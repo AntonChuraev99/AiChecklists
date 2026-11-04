@@ -11,16 +11,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -37,7 +33,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -147,6 +142,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTextStyles
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.RowContainer
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.rememberEditModeWiggle
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.TaskDraft
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.create.smartAddHighlightRange
 import kotlin.math.roundToInt
@@ -189,6 +185,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -999,17 +996,8 @@ private fun ChecklistDetailContent(
         }
     }
 
-    // Wiggle animation for edit mode
-    val wiggleTransition = rememberInfiniteTransition(label = "wiggle")
-    val wiggleAngle by wiggleTransition.animateFloat(
-        initialValue = -0.8f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 150),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "wiggleAngle"
-    )
+    // Wiggle animation for edit mode — a draw-phase provider; no transition runs outside edit mode.
+    val wiggleAngle = rememberEditModeWiggle(active = isEditMode)
 
     // ── Item-create scrim state (shared by BOTH scrims) ──────────────────────────────────────────
     // A single alpha drives two tiled scrims so the WHOLE screen dims in lockstep while item-create
@@ -1023,11 +1011,16 @@ private fun ChecklistDetailContent(
     // v2 (useInlineAddRow): forced to 0f. Both scrims are driven by state.itemCreateMode ALONE, not
     // by showDock — so with the dock removed they would still dim the entire screen with nothing
     // bright left to justify the dimming. There is no scrim in the inline-row design.
-    val scrimAlpha by animateFloatAsState(
+    //
+    // The alpha is kept as a State and read ONLY in the scrims' drawBehind (draw phase); composition
+    // sees just the derived "is any scrim visible" boolean, so the 220 ms fade no longer recomposes
+    // the screen on every frame.
+    val scrimAlphaState = animateFloatAsState(
         targetValue = if (state.itemCreateMode && !useInlineAddRow) 0.5f else 0f,
         animationSpec = tween(durationMillis = 220),
         label = "item_create_scrim",
     )
+    val scrimVisible by remember { derivedStateOf { scrimAlphaState.value > 0.001f } }
     var contentTopPx by remember { mutableStateOf(0f) }
 
     // ── Level counters — ONE source for the bar subtitle, the progress line, the empty state and the
@@ -1308,11 +1301,15 @@ private fun ChecklistDetailContent(
             // gets exactly enough bottom contentPadding to scroll clear of the dock (single owner).
             val hazeState = rememberHazeState()
             val density = LocalDensity.current
-            val dockHeight = with(density) { dockHeightPx.toDp() }
-            val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-            val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            // Insets and the measured dock height are read ONLY inside derivedStateOf below, never in
+            // this body: a direct read here invalidated the whole scaffold content on every frame of
+            // the keyboard animation. Composition now changes only when a derived value changes.
+            val imeInsets = WindowInsets.ime
+            val navInsets = WindowInsets.navigationBars
+            val statusInsets = WindowInsets.statusBars
             // IME is "open" when its inset exceeds the nav-bar inset by a margin (closed ime == navbar).
-            val imeVisible by remember { derivedStateOf { imeBottom > navBottom + 8.dp } }
+            // Snapshot-backed: follows the live keyboard (the old capture-in-remember froze it).
+            val imeVisible by rememberImeOpenState(imeInsets, navInsets)
             // Show the dock unless editing. The `!imeVisible` gate only suppresses it for the LIST's
             // inline add-item field (dockExpanded==false): focusing the chat input expands the dock
             // (dockExpanded==true), so the chat keeps the dock visible and lifts it above the keyboard
@@ -1322,13 +1319,21 @@ private fun ChecklistDetailContent(
             // Single owner of the bottom inset. Content now runs edge-to-edge behind the navbar, so
             // the no-dock branch (edit mode) adds the navbar inset itself; when the dock is shown its
             // measured dockHeight already includes its own navigationBarsPadding.
-            val listBottomPadding = when {
+            val itemCreateMode = state.itemCreateMode
+            val listBottomPadding by remember(itemCreateMode, v2Standard, showDock, density, imeInsets, navInsets) {
+              derivedStateOf {
+              val dockHeight = with(density) { dockHeightPx.toDp() }
+              val imeBottom = with(density) { imeInsets.getBottom(density).toDp() }
+              val navBottom = with(density) { navInsets.getBottom(density).toDp() }
+              when {
                 // Keyboard up AND the dock is expanded above it (item-create chips OR the AI chat
                 // panel — both float above the keyboard via their own imePadding). The list's
                 // Modifier.imePadding() reserves the keyboard, so here we ADDITIONALLY reserve the
                 // dock body height ABOVE the keyboard (measured dock height minus the ime inset the
                 // list already handled) — otherwise the last items stay hidden under the expanded dock.
-                imeVisible && (state.itemCreateMode || dockExpanded) ->
+                // The difference stays ~constant while the keyboard animates (the dock carries the
+                // ime inside its own height), so this branch does not recompose per keyboard frame.
+                imeVisible && (itemCreateMode || dockExpanded) ->
                     (dockHeight - imeBottom).coerceAtLeast(0.dp) + AppDimens.SpacingXxl
                 // IME open (plain chat over the list): the list's Modifier.imePadding() already shrinks
                 // the viewport above the keyboard (restoring the pre-dock adjustResize "content lifts"
@@ -1341,15 +1346,27 @@ private fun ChecklistDetailContent(
                 showDock -> dockHeight + AppDimens.SpacingXxl
                 // v2 Weekly and edit mode land here (no dock; content runs behind the navbar).
                 else -> navBottom + AppDimens.SpacingLg
+              }
+              }
             }
             // FIX B: answer cap (status bar → keyboard top), computed HERE at the host where the ime
-            // inset is reliable. Unspecified when the keyboard is down (use the design cap).
-            val statusTopDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            val containerHDp = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
-            val dockAvailableDp = if (imeVisible) {
-                (containerHDp - imeBottom - statusTopDp).coerceAtLeast(0.dp)
-            } else {
-                Dp.Unspecified
+            // inset is reliable. Unspecified when the keyboard is down (use the design cap). It does
+            // follow the keyboard frame by frame, so it is read ONLY inside the dock's pillContent
+            // lambda — only that scope recomposes, not the whole screen.
+            val windowInfo = LocalWindowInfo.current
+            val dockAvailableDp by remember(density, imeInsets, statusInsets, windowInfo) {
+                derivedStateOf {
+                    if (imeVisible) {
+                        with(density) {
+                            val containerHDp = windowInfo.containerSize.height.toDp()
+                            val imeBottom = imeInsets.getBottom(density).toDp()
+                            val statusTopDp = statusInsets.getTop(density).toDp()
+                            (containerHDp - imeBottom - statusTopDp).coerceAtLeast(0.dp)
+                        }
+                    } else {
+                        Dp.Unspecified
+                    }
+                }
             }
 
             Box(
@@ -1813,13 +1830,13 @@ private fun ChecklistDetailContent(
               // nav strip is visually part of the dock — same gistiDockColor() — so it must NOT be dimmed;
               // see the bottom-nav-must-match-dock fix). Being later in the Box, the dock also keeps its
               // touch priority so the scrim never steals its taps. The TOP-BAR scrim (root Box, below)
-              // dims the app bar in lockstep via the shared [scrimAlpha]. Tapping the scrim collapses the
+              // dims the app bar in lockstep via the shared [scrimAlphaState]. Tapping the scrim collapses the
               // dock to Peek → exits item-create via the settledValue==Peek gate above.
-              if (scrimAlpha > 0.001f) {
+              if (scrimVisible) {
                   Box(
                       modifier = Modifier
                           .matchParentSize()
-                          .background(Color.Black.copy(alpha = scrimAlpha))
+                          .drawBehind { drawRect(Color.Black, alpha = scrimAlphaState.value) }
                           .then(
                               if (state.itemCreateMode) {
                                   Modifier.clickable(
@@ -1953,17 +1970,17 @@ private fun ChecklistDetailContent(
     }
 
         // Top-bar scrim — the second tile, dimming the app-bar zone (status bar + pinned app bar) that
-        // the AppScaffold owns, in lockstep with the content scrim via the shared [scrimAlpha]. Its
+        // the AppScaffold owns, in lockstep with the content scrim via the shared [scrimAlphaState]. Its
         // height is the measured [contentTopPx], so its bottom edge meets the content scrim's top edge
         // exactly — no double-dark seam, no bright gap. Interactive only while item-create is active;
         // a tap collapses the dock to Peek → exits item-create (same as tapping the content scrim).
-        if (scrimAlpha > 0.001f && contentTopPx > 0.5f) {
+        if (scrimVisible && contentTopPx > 0.5f) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .height(with(LocalDensity.current) { contentTopPx.toDp() })
-                    .background(Color.Black.copy(alpha = scrimAlpha))
+                    .drawBehind { drawRect(Color.Black, alpha = scrimAlphaState.value) }
                     .then(
                         if (state.itemCreateMode) {
                             Modifier.clickable(
@@ -2702,7 +2719,8 @@ internal fun ChecklistItemCard(
     item: ChecklistFillItem,
     isDragging: Boolean,
     isEditMode: Boolean,
-    wiggleAngle: Float,
+    /** Read in the draw phase (graphicsLayer) so the per-frame wiggle never recomposes the card. */
+    wiggleAngle: () -> Float,
     onCheckedChange: (Boolean) -> Unit,
     onItemTap: () -> Unit,
     onLongClick: () -> Unit,
@@ -2749,7 +2767,7 @@ internal fun ChecklistItemCard(
         .fillMaxWidth()
         .graphicsLayer {
             if (isEditMode && !isDragging) {
-                rotationZ = wiggleAngle
+                rotationZ = wiggleAngle()
             }
             scaleX = completionScale.value
             scaleY = completionScale.value

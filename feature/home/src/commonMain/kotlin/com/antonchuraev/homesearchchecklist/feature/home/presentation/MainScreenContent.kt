@@ -1,9 +1,5 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -188,17 +184,8 @@ private fun MainScreenContentLazyColumn(
         }
     }
 
-    // Wiggle animation for edit mode
-    val wiggleTransition = rememberInfiniteTransition(label = "wiggle")
-    val wiggleAngle by wiggleTransition.animateFloat(
-        initialValue = -0.8f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 150),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "wiggleAngle"
-    )
+    // Wiggle animation for edit mode — a draw-phase provider; no transition runs outside edit mode.
+    val wiggleAngle = rememberEditModeWiggle(active = isEditMode)
 
     LazyColumn(
         state = lazyListState,
@@ -252,7 +239,7 @@ private fun MainScreenContentLazyColumn(
                         .fillMaxWidth()
                         .graphicsLayer {
                             if (isEditMode && !isDragging) {
-                                rotationZ = wiggleAngle
+                                rotationZ = wiggleAngle()
                             }
                         }
                         .then(
