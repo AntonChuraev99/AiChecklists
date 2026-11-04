@@ -98,6 +98,8 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.chat_dock_mic_description
 import aichecklists.core.designsystem.generated.resources.nav_add_task_fab_content_description
+import aichecklists.core.designsystem.generated.resources.nav_ask_pill_attach_description
+import aichecklists.core.designsystem.generated.resources.nav_ask_pill_call_description
 import aichecklists.core.designsystem.generated.resources.nav_ask_pill_label
 import aichecklists.core.designsystem.generated.resources.nav_chat_fab_content_description
 import aichecklists.core.designsystem.generated.resources.nav_tab_inbox
@@ -272,6 +274,10 @@ private const val ChatKeyboardReleaseTimeoutMs = 500L
  * @param onOpenChatVoice Compact only: the Ask pill's mic — opens the chat dock already recording.
  *   Null (the default) draws NO mic: a mic that does nothing is a dead affordance, and the host
  *   wires the "start in voice" entry separately (feature work, owner decision 2026-10-16).
+ * @param onOpenChatAttach Compact only: the Ask pill's leading "+" — opens the chat with the
+ *   attachment source picker. Null keeps the sparkle tile in its place (no dead "+").
+ * @param onStartVoiceCall Compact only: the Ask pill's trailing filled call button. Null (the
+ *   default) draws no call button.
  * @param content the NavDisplay renderer; always receives `null` for the drawer state.
  */
 @Composable
@@ -288,6 +294,8 @@ fun V2NavigationShell(
     captureOpen: Boolean = false,
     overlayContent: (@Composable () -> Unit)? = null,
     onOpenChatVoice: (() -> Unit)? = null,
+    onOpenChatAttach: (() -> Unit)? = null,
+    onStartVoiceCall: (() -> Unit)? = null,
     content: @Composable (drawerState: DrawerState?) -> Unit,
 ) {
     // Same 500ms guard as AdaptiveNavigationShell: a rapid double-tap on a tab otherwise races the
@@ -321,6 +329,8 @@ fun V2NavigationShell(
                 onNavigate = ::guardedNavigate,
                 onOpenChat = onOpenChat,
                 onOpenChatVoice = onOpenChatVoice,
+                onOpenChatAttach = onOpenChatAttach,
+                onStartVoiceCall = onStartVoiceCall,
                 barVisible = barVisible,
                 chatOpen = chatOpen,
                 captureOpen = captureOpen,
@@ -386,7 +396,9 @@ fun V2NavigationShell(
  *
  * ## The pill and the chat dock
  * Tap anywhere on the pill → [onOpenChat]; the mic (drawn only when [onOpenChatVoice] is non-null)
- * → [onOpenChatVoice]. While [chatOpen] the pill hands off to the dock: alpha 1→0 on the draw phase
+ * → [onOpenChatVoice]; the leading "+" (only with [onOpenChatAttach], else the sparkle) →
+ * [onOpenChatAttach]; the filled call circle (only with [onStartVoiceCall]) → [onStartVoiceCall].
+ * The pill is one row tall: its label ellipsizes rather than growing the plate. While [chatOpen] the pill hands off to the dock: alpha 1→0 on the draw phase
  * (no scale — the pill is wide, a scaled pill reads as a zoom glitch), out of the a11y tree, and back
  * on `ButtonReturnMs` as soon as the dock begins its exit. It stays composed meanwhile, under
  * [overlayContent], whose scrim takes every touch.
@@ -406,6 +418,8 @@ private fun V2ShellCompactBar(
     onNavigate: (String) -> Boolean,
     onOpenChat: () -> Unit,
     onOpenChatVoice: (() -> Unit)?,
+    onOpenChatAttach: (() -> Unit)?,
+    onStartVoiceCall: (() -> Unit)?,
     barVisible: Boolean,
     chatOpen: Boolean,
     captureOpen: Boolean,
@@ -427,6 +441,8 @@ private fun V2ShellCompactBar(
     val pillLabel = stringResource(Res.string.nav_ask_pill_label)
     // Reused from the chat dock's own mic — one action, one name.
     val micDescription = stringResource(Res.string.chat_dock_mic_description)
+    val attachDescription = stringResource(Res.string.nav_ask_pill_attach_description)
+    val callDescription = stringResource(Res.string.nav_ask_pill_call_description)
 
     val density = LocalDensity.current
     val seedPlateHeightPx = with(density) {
@@ -525,6 +541,10 @@ private fun V2ShellCompactBar(
                         onClick = onOpenChat,
                         onMicClick = onOpenChatVoice,
                         micContentDescription = micDescription,
+                        onAttachClick = onOpenChatAttach,
+                        attachContentDescription = attachDescription,
+                        onCallClick = onStartVoiceCall,
+                        callContentDescription = callDescription,
                         style = AskGistiBarStyle.ChromePill,
                         modifier = Modifier
                             .padding(

@@ -1342,6 +1342,40 @@ fun App() {
                 }
             }
 
+            // The v2 Ask pill's leading "+": open the chat dock AND the attachment source picker in
+            // one tap. Pass it to V2NavigationShell as `onOpenChatAttach`.
+            //
+            // The picker is the same App-level `ChatAttachmentSourceSheet` the paperclip inside the
+            // open chat raises (a ModalBottomSheet — its own window, so it sits above the dock that
+            // opens under it), and the chosen source goes through the same
+            // `ChatScreenIntent.OnPickAttachment` into the singleton chat ViewModel the dock renders.
+            // Analytics: the pill's event, told apart by `source`.
+            val openChatWithAttach: () -> Unit = {
+                analyticsTracker.event(
+                    AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                    mapOf(AnalyticsParams.SOURCE to "pill_attach"),
+                )
+                // Same context reset and capture-dock close as the pill's plain tap (onOpenChat).
+                chatSheetContextId = null
+                chatSheetContextLabel = null
+                v2CreateDockOpen = false
+                v2ChatDockOpen = true
+                // A pending QUESTION hides the dock's input row (chips are the only interaction, see
+                // the dock content below), so a file picked now would land in pendingAttachments with
+                // nothing on screen to show or send it. Same rule as the pill mic: open the dock onto
+                // the question and let its chips be the visible reason. A post-action offer keeps the
+                // input, so it does not block the picker.
+                val question = chatUiState.pendingChoice?.takeUnless { it.isPostAction }
+                if (question == null) {
+                    chatSheetAttachmentSheet = true
+                } else {
+                    logger.info(
+                        "ChatAttach",
+                        "Pill + opened the dock without the picker: a question is pending",
+                    )
+                }
+            }
+
             /**
              * Checklist the Inbox pager is settled on, held HERE rather than inside the Inbox entry.
              *
@@ -2463,6 +2497,7 @@ fun App() {
                     selectedTab = v2SelectedTab,
                     onNavigate = v2OnNavigate,
                     onOpenChatVoice = openChatInVoice,
+                    onOpenChatAttach = openChatWithAttach,
                     onOpenChat = {
                         // Tagged "fab" so it stays distinguishable from the detail screen's top-bar
                         // action, which emits the same event with source="detail_toolbar". Two very

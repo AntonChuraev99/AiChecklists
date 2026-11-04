@@ -1821,6 +1821,8 @@
     <string name="activation_sheet_reminder_failed">रिमाइंडर सेट नहीं हो सका। सूची से सेट करें।</string>
     <!-- Redesign B "Soft & tactile" (2026-10-16) -->
     <string name="nav_ask_pill_label">Gisti से पूछें या टास्क जोड़ें</string>
+    <string name="nav_ask_pill_attach_description">फ़ाइल अटैच करें</string>
+    <string name="nav_ask_pill_call_description">Gisti के साथ वॉइस कॉल</string>
     <string name="inbox_header_date">%1$s, %3$d %2$s</string>
     <string name="detail_header_progress">%1$d बाकी · %3$d में से %2$d पूरे</string>
     <string name="detail_ask_about_list">इस सूची के बारे में Gisti से पूछें</string>
