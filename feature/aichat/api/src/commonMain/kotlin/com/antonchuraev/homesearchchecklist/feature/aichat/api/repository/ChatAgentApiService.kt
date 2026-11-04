@@ -31,6 +31,10 @@ interface ChatAgentApiService {
      *   AI replies, forwarded as top-level `response_language`. `null` (the default) is Auto — the
      *   server matches the message language. Additive: null is omitted from the payload
      *   (explicitNulls=false), so the legacy request stays byte-identical.
+     * @param voice Voice-call mode, sent as top-level `voice: {session_id}`: the turn rides on the
+     *   call's minutes (no chat credit), the reply is short spoken text and never `options`. Only the
+     *   voice call sends it; `null` (the default) omits the key, so the text chat is byte-identical.
+     *   A refused voice turn comes back as [AgentStepResult.VoiceRefused].
      */
     suspend fun step(
         userId: String,
@@ -41,8 +45,12 @@ interface ChatAgentApiService {
         screenSnapshot: ChatScreenSnapshot? = null,
         requestId: String? = null,
         responseLanguage: String? = null,
+        voice: AgentVoiceContext? = null,
     ): AgentStepResult
 }
+
+/** The live voice-call session a `chat_agent` round belongs to (server `voice_session`). */
+data class AgentVoiceContext(val sessionId: String)
 
 /**
  * One round of the agent loop as seen by the caller.
@@ -120,4 +128,20 @@ sealed interface AgentStepResult {
      * instead of hiding behind copy that already fits.
      */
     data class InvalidRequest(val reason: String?) : AgentStepResult
+
+    /**
+     * Voice mode only (a request sent with `voice`): the server refused the turn because of the call
+     * session, before running the agent or charging anything.
+     *
+     * @property error the server's `error` (`voice_session_invalid` / `voice_rate_limited`).
+     * @property reason `voice_session_invalid` only: `malformed` (400) or `not_found` / `closed` /
+     *   `expired` / `exhausted` / `disabled` (409).
+     * @property retryAfterSeconds `voice_rate_limited` (429) only.
+     */
+    data class VoiceRefused(
+        val httpStatus: Int,
+        val error: String,
+        val reason: String? = null,
+        val retryAfterSeconds: Double? = null,
+    ) : AgentStepResult
 }

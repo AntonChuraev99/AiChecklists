@@ -3,7 +3,18 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ConnectivityManager default-network callback of the voice call (AndroidVoiceNetworkMonitor). Was only
+         merged in from a library before; declared here so dropping that library cannot break the callback. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Voice input in the AI chat and the voice call with the agent (SpeechRecognizer + barge-in
+         AudioRecord). Runtime permission. The call runs only while its screen is open: no microphone
+         foreground service. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- RECORD_AUDIO implies a required microphone, and Google Play would hide the app from devices
+         without one. Voice is optional: the text chat works everywhere. -->
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -13,6 +24,17 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Required for Google Ads attribution on Android 13+ (API 33) -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
+    <!-- Package visibility on API 30+: without these SpeechRecognizer cannot see the recognition
+         service and TextToSpeech cannot bind the engine (voice call, :core:voice:impl). -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:name="com.antonchuraev.homesearchchecklist.GistiAndroidApplication"

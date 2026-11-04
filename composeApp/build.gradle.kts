@@ -118,6 +118,10 @@ kotlin {
             implementation(projects.core.navigation.impl)
             implementation(projects.core.remoteconfig.api)
             implementation(projects.core.remoteconfig.impl)
+            // Voice call with the agent: contracts + platform audio (Android) / "unavailable" stub (web, iOS).
+            implementation(projects.core.voice.api)
+            implementation(projects.core.voice.impl)
+            implementation(projects.feature.voicecall)
             implementation(projects.core.auth.api)
             implementation(projects.core.auth.impl)
 

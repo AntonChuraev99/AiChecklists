@@ -1830,4 +1830,107 @@
     <string name="chat_header_subtitle">आपका चेकलिस्ट सहायक</string>
     <string name="chat_message_show_actions">कार्रवाइयाँ दिखाएँ</string>
     <string name="checklist_card_no_items">अभी कोई आइटम नहीं</string>
+
+    <!-- Voice call with Gisti (feature/voicecall) -->
+    <string name="voice_call_pane_title">Gisti से कॉल</string>
+    <string name="voice_call_status_connecting">कनेक्ट हो रहा है…</string>
+    <string name="voice_call_status_listening">सुन रही हूँ</string>
+    <string name="voice_call_hint_listening_first">कोई टास्क जोड़ने या सूची बनाने को कहें</string>
+    <string name="voice_call_status_thinking">सोच रही हूँ…</string>
+    <string name="voice_call_status_thinking_slow">बस एक पल…</string>
+    <string name="voice_call_status_thinking_very_slow">इसमें सामान्य से ज़्यादा समय लग रहा है</string>
+    <string name="voice_call_action_cancel_turn">रद्द करें</string>
+    <string name="voice_call_tool_creating_checklist">चेकलिस्ट बना रही हूँ…</string>
+    <string name="voice_call_tool_adding_tasks">टास्क जोड़ रही हूँ…</string>
+    <string name="voice_call_tool_searching">आपकी सूचियाँ देख रही हूँ…</string>
+    <string name="voice_call_status_speaking">Gisti बोल रही है</string>
+    <string name="voice_call_hint_speaking_interrupt">बीच में रोकने के लिए टैप करें</string>
+    <string name="voice_call_status_muted">माइक्रोफ़ोन बंद है</string>
+    <string name="voice_call_hint_muted">बात करने के लिए इसे चालू करें</string>
+    <string name="voice_call_status_reconnecting">फिर से कनेक्ट हो रहा है…</string>
+    <string name="voice_call_banner_reconnecting">कनेक्शन टूट गया। कॉल %1$d सेकंड में खत्म होगी</string>
+    <string name="voice_call_banner_reconnecting_a11y">कनेक्शन टूट गया। फिर से कनेक्ट हो रहा है</string>
+    <string name="voice_call_status_paused">रुकी हुई है</string>
+    <string name="voice_call_hint_paused_background">ऐप बैकग्राउंड में था, इसलिए कॉल रुक गई</string>
+    <string name="voice_call_hint_paused_interruption">कोई दूसरा ऐप या कॉल ऑडियो इस्तेमाल कर रहा है</string>
+    <string name="voice_call_action_resume">जारी रखें</string>
+    <string name="voice_call_action_kind_checklist_created">चेकलिस्ट बनाई</string>
+    <string name="voice_call_action_kind_task_added">टास्क जोड़ा</string>
+    <plurals name="voice_call_action_kind_items_added">
+        <item quantity="one">%1$d आइटम जोड़ा</item>
+        <item quantity="other">%1$d आइटम जोड़े</item>
+    </plurals>
+    <string name="voice_call_action_kind_updated">अपडेट किया</string>
+    <string name="voice_call_action_open_a11y">%1$s खोलें। कॉल खत्म हो जाएगी</string>
+    <plurals name="voice_call_banner_limit_free">
+        <item quantity="one">%1$d मुफ़्त मिनट बचा है</item>
+        <item quantity="other">%1$d मुफ़्त मिनट बचे हैं</item>
+    </plurals>
+    <plurals name="voice_call_banner_limit_daily">
+        <item quantity="one">आज कॉल का %1$d मिनट बचा है</item>
+        <item quantity="other">आज कॉल के %1$d मिनट बचे हैं</item>
+    </plurals>
+    <string name="voice_call_action_get_premium">Premium लें</string>
+    <string name="voice_call_timer_left">%1$s बचे</string>
+    <string name="voice_call_timer_a11y">%1$s बीते, %2$s बचे</string>
+    <string name="voice_call_control_mic">माइक</string>
+    <string name="voice_call_control_mic_state_on">चालू</string>
+    <string name="voice_call_control_mic_state_off">बंद</string>
+    <string name="voice_call_control_end">खत्म</string>
+    <string name="voice_call_control_end_a11y">कॉल खत्म करें</string>
+    <string name="voice_call_control_captions">कैप्शन</string>
+    <string name="voice_call_control_captions_state_on">चालू</string>
+    <string name="voice_call_control_captions_state_off">बंद</string>
+    <string name="voice_call_speed_title">बोलने की गति</string>
+    <string name="voice_call_speed_normal">सामान्य</string>
+    <string name="voice_call_speed_slower">धीमी</string>
+    <string name="voice_call_orb_interrupt_a11y">Gisti को बीच में रोकें</string>
+    <string name="voice_call_orb_finish_a11y">भेजें</string>
+    <string name="voice_call_orb_finish_hint_a11y">बोलना खत्म होने पर दो बार टैप करें</string>
+    <string name="voice_call_perm_title">Gisti को माइक्रोफ़ोन चाहिए</string>
+    <string name="voice_call_perm_body">ताकि आप टाइप करने के बजाय Gisti से बात कर सकें।</string>
+    <string name="voice_call_perm_allow">माइक्रोफ़ोन की अनुमति दें</string>
+    <string name="voice_call_perm_blocked_body">फ़ोन की सेटिंग में माइक्रोफ़ोन की अनुमति बंद है।</string>
+    <string name="voice_call_perm_open_settings">सेटिंग खोलें</string>
+    <string name="voice_call_not_now">अभी नहीं</string>
+    <string name="voice_call_err_no_recognizer_title">बोली पहचानना उपलब्ध नहीं है</string>
+    <string name="voice_call_err_no_recognizer_body">इस डिवाइस पर बोली पहचानने की सेवा नहीं है। आप चैट में Gisti से पूछ सकते हैं।</string>
+    <string name="voice_call_err_no_voice_title">जवाब के लिए कोई आवाज़ नहीं</string>
+    <string name="voice_call_err_no_voice_body">फ़ोन की सेटिंग में टेक्स्ट-टू-स्पीच आवाज़ इंस्टॉल करें।</string>
+    <string name="voice_call_err_no_voice_action">आवाज़ की सेटिंग</string>
+    <string name="voice_call_err_offline_title">इंटरनेट कनेक्शन नहीं है</string>
+    <string name="voice_call_err_offline_body">जवाब देने के लिए Gisti को इंटरनेट चाहिए।</string>
+    <string name="voice_call_err_server_title">Gisti अभी जवाब नहीं दे रही</string>
+    <string name="voice_call_err_server_body">एक मिनट बाद फिर कोशिश करें या चैट में लिखें।</string>
+    <string name="voice_call_err_flag_off_title">कॉल अभी उपलब्ध नहीं हैं</string>
+    <string name="voice_call_err_flag_off_body">बाद में कोशिश करें या चैट में Gisti को लिखें।</string>
+    <string name="voice_call_action_retry">फिर कोशिश करें</string>
+    <string name="voice_call_action_open_chat">चैट में पूछें</string>
+    <string name="voice_call_action_close">बंद करें</string>
+    <string name="voice_call_summary_title">कॉल खत्म हुई</string>
+    <string name="voice_call_summary_dropped_title">कॉल कट गई</string>
+    <plurals name="voice_call_summary_meta">
+        <item quantity="one">%1$s · %2$d कार्रवाई</item>
+        <item quantity="other">%1$s · %2$d कार्रवाइयाँ</item>
+    </plurals>
+    <string name="voice_call_summary_nothing">इस कॉल में कुछ नहीं बना</string>
+    <string name="voice_call_summary_done">हो गया</string>
+    <string name="voice_call_summary_call_again">फिर कॉल करें</string>
+    <string name="voice_call_summary_call_back">दोबारा कॉल करें</string>
+    <string name="voice_call_summary_free_left">मुफ़्त कॉल के %1$s बचे हैं</string>
+    <string name="voice_call_limit_free_title">मुफ़्त कॉल मिनट खत्म हो गए</string>
+    <string name="voice_call_limit_free_body">Premium में हर दिन कॉल मिनट मिलते हैं। इस कॉल में Gisti ने जो बनाया, वह सेव है।</string>
+    <string name="voice_call_limit_try_premium">Premium आज़माएँ</string>
+    <string name="voice_call_limit_daily_title">आज के कॉल मिनट खत्म हो गए</string>
+    <string name="voice_call_limit_daily_body">ये %1$s पर फिर से मिलेंगे।</string>
+    <string name="voice_call_snackbar_call_ended">कॉल खत्म हुई · %1$s</string>
+    <string name="voice_call_settings_unavailable">सेटिंग्स नहीं खुल सकीं। फ़ोन के सेटिंग्स ऐप से खोलें।</string>
+    <plurals name="voice_call_duration_minutes">
+        <item quantity="one">%1$d मिनट</item>
+        <item quantity="other">%1$d मिनट</item>
+    </plurals>
+    <plurals name="voice_call_duration_seconds">
+        <item quantity="one">%1$d सेकंड</item>
+        <item quantity="other">%1$d सेकंड</item>
+    </plurals>
 </resources>

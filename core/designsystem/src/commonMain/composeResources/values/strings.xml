@@ -1988,4 +1988,107 @@
     <string name="chat_header_subtitle">Your checklist helper</string>
     <string name="chat_message_show_actions">Show actions</string>
     <string name="checklist_card_no_items">No items yet</string>
+
+    <!-- Voice call with Gisti (feature/voicecall) -->
+    <string name="voice_call_pane_title">Call with Gisti</string>
+    <string name="voice_call_status_connecting">Connecting…</string>
+    <string name="voice_call_status_listening">Listening</string>
+    <string name="voice_call_hint_listening_first">Ask me to add a task or make a list</string>
+    <string name="voice_call_status_thinking">Thinking…</string>
+    <string name="voice_call_status_thinking_slow">Just a moment…</string>
+    <string name="voice_call_status_thinking_very_slow">This is taking longer than usual</string>
+    <string name="voice_call_action_cancel_turn">Cancel</string>
+    <string name="voice_call_tool_creating_checklist">Creating a checklist…</string>
+    <string name="voice_call_tool_adding_tasks">Adding tasks…</string>
+    <string name="voice_call_tool_searching">Looking through your lists…</string>
+    <string name="voice_call_status_speaking">Gisti is speaking</string>
+    <string name="voice_call_hint_speaking_interrupt">Tap to interrupt</string>
+    <string name="voice_call_status_muted">Microphone is off</string>
+    <string name="voice_call_hint_muted">Turn it on to talk</string>
+    <string name="voice_call_status_reconnecting">Reconnecting…</string>
+    <string name="voice_call_banner_reconnecting">Connection lost. The call ends in %1$d s</string>
+    <string name="voice_call_banner_reconnecting_a11y">Connection lost. Reconnecting</string>
+    <string name="voice_call_status_paused">Paused</string>
+    <string name="voice_call_hint_paused_background">The call paused while the app was in the background</string>
+    <string name="voice_call_hint_paused_interruption">Another app or call is using audio</string>
+    <string name="voice_call_action_resume">Resume</string>
+    <string name="voice_call_action_kind_checklist_created">Created a checklist</string>
+    <string name="voice_call_action_kind_task_added">Added a task</string>
+    <plurals name="voice_call_action_kind_items_added">
+        <item quantity="one">Added %1$d item</item>
+        <item quantity="other">Added %1$d items</item>
+    </plurals>
+    <string name="voice_call_action_kind_updated">Updated</string>
+    <string name="voice_call_action_open_a11y">Open %1$s. The call will end</string>
+    <plurals name="voice_call_banner_limit_free">
+        <item quantity="one">%1$d free minute left</item>
+        <item quantity="other">%1$d free minutes left</item>
+    </plurals>
+    <plurals name="voice_call_banner_limit_daily">
+        <item quantity="one">%1$d minute of calls left today</item>
+        <item quantity="other">%1$d minutes of calls left today</item>
+    </plurals>
+    <string name="voice_call_action_get_premium">Get Premium</string>
+    <string name="voice_call_timer_left">%1$s left</string>
+    <string name="voice_call_timer_a11y">%1$s elapsed, %2$s left</string>
+    <string name="voice_call_control_mic">Mic</string>
+    <string name="voice_call_control_mic_state_on">On</string>
+    <string name="voice_call_control_mic_state_off">Off</string>
+    <string name="voice_call_control_end">End</string>
+    <string name="voice_call_control_end_a11y">End call</string>
+    <string name="voice_call_control_captions">Captions</string>
+    <string name="voice_call_control_captions_state_on">On</string>
+    <string name="voice_call_control_captions_state_off">Off</string>
+    <string name="voice_call_speed_title">Speech speed</string>
+    <string name="voice_call_speed_normal">Normal</string>
+    <string name="voice_call_speed_slower">Slower</string>
+    <string name="voice_call_orb_interrupt_a11y">Interrupt Gisti</string>
+    <string name="voice_call_orb_finish_a11y">Send</string>
+    <string name="voice_call_orb_finish_hint_a11y">Double-tap when you finish speaking</string>
+    <string name="voice_call_perm_title">Gisti needs the microphone</string>
+    <string name="voice_call_perm_body">So you can talk to Gisti instead of typing.</string>
+    <string name="voice_call_perm_allow">Allow microphone</string>
+    <string name="voice_call_perm_blocked_body">Microphone access is turned off in phone settings.</string>
+    <string name="voice_call_perm_open_settings">Open settings</string>
+    <string name="voice_call_not_now">Not now</string>
+    <string name="voice_call_err_no_recognizer_title">Speech recognition isn't available</string>
+    <string name="voice_call_err_no_recognizer_body">This device has no speech recognition service. You can still ask Gisti in the chat.</string>
+    <string name="voice_call_err_no_voice_title">No voice for replies</string>
+    <string name="voice_call_err_no_voice_body">Install a text-to-speech voice in phone settings.</string>
+    <string name="voice_call_err_no_voice_action">Voice settings</string>
+    <string name="voice_call_err_offline_title">No internet connection</string>
+    <string name="voice_call_err_offline_body">Gisti needs the internet to answer.</string>
+    <string name="voice_call_err_server_title">Gisti isn't answering right now</string>
+    <string name="voice_call_err_server_body">Try again in a minute or write in the chat.</string>
+    <string name="voice_call_err_flag_off_title">Calls are unavailable right now</string>
+    <string name="voice_call_err_flag_off_body">Try later or write to Gisti in the chat.</string>
+    <string name="voice_call_action_retry">Try again</string>
+    <string name="voice_call_action_open_chat">Ask in chat</string>
+    <string name="voice_call_action_close">Close</string>
+    <string name="voice_call_summary_title">Call ended</string>
+    <string name="voice_call_summary_dropped_title">Call dropped</string>
+    <plurals name="voice_call_summary_meta">
+        <item quantity="one">%1$s · %2$d action</item>
+        <item quantity="other">%1$s · %2$d actions</item>
+    </plurals>
+    <string name="voice_call_summary_nothing">Nothing was created in this call</string>
+    <string name="voice_call_summary_done">Done</string>
+    <string name="voice_call_summary_call_again">Call again</string>
+    <string name="voice_call_summary_call_back">Call back</string>
+    <string name="voice_call_summary_free_left">%1$s of free calls left</string>
+    <string name="voice_call_limit_free_title">Free call minutes are used up</string>
+    <string name="voice_call_limit_free_body">Premium includes call minutes every day. What Gisti made in this call is saved.</string>
+    <string name="voice_call_limit_try_premium">Try Premium</string>
+    <string name="voice_call_limit_daily_title">Today's call minutes are used up</string>
+    <string name="voice_call_limit_daily_body">They'll renew at %1$s.</string>
+    <string name="voice_call_snackbar_call_ended">Call ended · %1$s</string>
+    <string name="voice_call_settings_unavailable">Couldn't open settings. Open them from your phone's Settings app.</string>
+    <plurals name="voice_call_duration_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="voice_call_duration_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
 </resources>

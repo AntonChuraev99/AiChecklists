@@ -447,6 +447,46 @@ object AnalyticsEvents {
         const val VOICE_TRANSCRIBE_FAILED = "ai_chat_voice_transcribe_failed"
     }
 
+    // ─── Voice call with Gisti (feature/voicecall, Android) ──────────────────
+    // Not the chat's voice INPUT above (one dictated message): a live spoken conversation with the
+    // agent. None of these carries the text of an utterance. Funnel: tapped → (permission) →
+    // started → turn* → ended, with failed / limit_reached as the exits that never got going.
+    // Deliberately NOT routed into CSAT's scored events: a call is not a confirmed preview.
+    object VoiceCall {
+        /** Entry button tapped; `surface`. */
+        const val TAPPED = "voice_call_tapped"
+
+        /** Answer of the RECORD_AUDIO dialog; `granted`, `blocked`. */
+        const val PERMISSION_RESULT = "voice_call_permission_result"
+
+        /** Session open and listening; `surface`, `plan`, `seconds_left`, `stt` (on_device / network). */
+        const val STARTED = "voice_call_started"
+
+        /** The call could not start or was lost with nothing created; `kind`. */
+        const val FAILED = "voice_call_failed"
+
+        /** One answered turn; `latency_ms`, `actions`, `replayed`, `reply_chars`. */
+        const val TURN = "voice_call_turn"
+
+        /** The user cut Gisti off; `method` (tap / voice). */
+        const val BARGE_IN = "voice_call_barge_in"
+
+        /** Audio stopped until resume; `reason` (background / interrupted_by_system). */
+        const val PAUSED = "voice_call_paused"
+
+        /** The minutes ran out; `plan`, `during_call`. */
+        const val LIMIT_REACHED = "voice_call_limit_reached"
+
+        /** A failed stage of a turn or the session; `stage`, `code`. */
+        const val ERROR = "voice_call_error"
+
+        /** The call ended; `reason`, `duration_sec`, `turns`, `interruptions`, `errors`, `actions`. */
+        const val ENDED = "voice_call_ended"
+
+        /** An action card opened its checklist (ends the call); `kind`, `from` (in_call / summary). */
+        const val ACTION_OPENED = "voice_call_action_opened"
+    }
+
     // ─── Paywall & purchase funnel ───────────────────────────────────────────
     object Paywall {
         /**

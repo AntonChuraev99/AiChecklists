@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Agen
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentVoiceContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import io.ktor.client.*
@@ -56,6 +57,12 @@ internal class ChatAgentApiServiceImpl(
          *  choice-chip cap (ChatViewModel.MAX_CHOICE_OPTIONS); the adaptive FlowRow wraps. */
         private const val MAX_OPTIONS = 6
 
+        /** `error` of a voice turn refused by the session verdict (400 malformed / 409). */
+        internal const val VOICE_SESSION_INVALID = "voice_session_invalid"
+
+        /** `error` of a voice turn refused by the per-session turn rate (429). */
+        internal const val VOICE_RATE_LIMITED = "voice_rate_limited"
+
         private val sharedJson = Json {
             ignoreUnknownKeys = true
             isLenient = true
@@ -84,8 +91,9 @@ internal class ChatAgentApiServiceImpl(
         screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
+        voice: AgentVoiceContext?,
     ): AgentStepResult = runCatching {
-        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} screen=${screenSnapshot?.kind ?: "none"} requestId=${requestId ?: "none"} responseLanguage=${responseLanguage ?: "auto"}")
+        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} screen=${screenSnapshot?.kind ?: "none"} requestId=${requestId ?: "none"} responseLanguage=${responseLanguage ?: "auto"} voice=${voice != null}")
 
         val response: HttpResponse = httpClient.post(AGENT_URL) {
             contentType(ContentType.Application.Json)
@@ -137,15 +145,28 @@ internal class ChatAgentApiServiceImpl(
                     // Backward-compat gate: the server only emits type:"options" (present_options
                     // tool) when the client advertises support. Older clients omit this flag and
                     // never receive an "options" response they couldn't render.
-                    supportsOptions = true,
+                    // A voice call cannot render chips (the server never offers them in voice mode
+                    // anyway); the text chat keeps advertising them exactly as before.
+                    supportsOptions = voice == null,
                     // Explicit reply-language override only; null (Auto) is dropped by
                     // explicitNulls=false so the server keeps deciding the language itself.
                     responseLanguage = responseLanguage,
+                    // Voice-call mode; null (every text-chat request) is dropped by explicitNulls=false.
+                    voice = voice?.let { VoiceDto(sessionId = it.sessionId) },
                 )
             )
         }
 
         logger.debug(TAG, "step: response status=${response.status.value}")
+
+        // A voice turn the server refused because of the call session: never run, never charged.
+        // Only for requests that sent `voice`, so the text chat's status mapping is unchanged.
+        if (voice != null) {
+            response.voiceRefusalOrNull()?.let { refusal ->
+                logger.warning(TAG, "step: voice turn refused status=${refusal.httpStatus} error=${refusal.error} reason=${refusal.reason}")
+                return@runCatching refusal
+            }
+        }
 
         when (response.status.value) {
             402 -> {
@@ -278,6 +299,31 @@ internal class ChatAgentApiServiceImpl(
         sharedJson.decodeFromString<ErrorEnvelopeDto>(bodyAsText()).error?.takeIf { it.isNotBlank() }
     }.getOrNull()
 
+    /**
+     * The voice-session refusal of a voice-mode round (400/409 `voice_session_invalid`, 429
+     * `voice_rate_limited`), or null for any other answer — which then goes through the ordinary
+     * status mapping (a 400 that is not about the session stays [AgentStepResult.InvalidRequest]).
+     */
+    private suspend fun HttpResponse.voiceRefusalOrNull(): AgentStepResult.VoiceRefused? {
+        val code = status.value
+        if (code != 400 && code != 409 && code != 429) return null
+        val envelope = runCatching { sharedJson.decodeFromString<VoiceErrorDto>(bodyAsText()) }.getOrNull()
+        val error = envelope?.error
+        return when {
+            error == VOICE_SESSION_INVALID ->
+                AgentStepResult.VoiceRefused(httpStatus = code, error = error, reason = envelope?.reason)
+            error == VOICE_RATE_LIMITED || code == 429 ->
+                AgentStepResult.VoiceRefused(
+                    httpStatus = code,
+                    error = VOICE_RATE_LIMITED,
+                    retryAfterSeconds = envelope?.retryAfterSeconds,
+                )
+            // 409 is only ever the session verdict in voice mode, even when the body is unreadable.
+            code == 409 -> AgentStepResult.VoiceRefused(httpStatus = code, error = VOICE_SESSION_INVALID, reason = envelope?.reason)
+            else -> null
+        }
+    }
+
     // ─── Transcript mapping ───────────────────────────────────────────────────
 
     private fun AgentTranscriptEntry.toDto(): TranscriptEntryDto = when (this) {
@@ -331,6 +377,22 @@ internal class ChatAgentApiServiceImpl(
         // Optional: present only when the user pinned an explicit AI reply language (not Auto).
         // Server contract: top-level `response_language: "<bcp47>"`. Dropped when null.
         @SerialName("response_language") val responseLanguage: String? = null,
+        // Optional: voice-call mode only. Server contract: top-level `voice: {"session_id": "…"}`.
+        // Dropped when null, so the text chat's request stays byte-identical.
+        val voice: VoiceDto? = null,
+    )
+
+    @Serializable
+    private data class VoiceDto(
+        @SerialName("session_id") val sessionId: String,
+    )
+
+    /** Error body of a refused voice turn (`_voice_error_response`); every field defaulted. */
+    @Serializable
+    private data class VoiceErrorDto(
+        val error: String? = null,
+        val reason: String? = null,
+        @SerialName("retry_after_seconds") val retryAfterSeconds: Double? = null,
     )
 
     @Serializable

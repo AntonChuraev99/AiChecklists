@@ -53,6 +53,12 @@ object RemoteConfigKeys {
     // user-set reminders always fire at the time the user chose.
     const val PUSH_TIMING_ARM = "push_timing_arm"
 
+    // Voice call with Gisti (Android): the client gate of the entry button. The server has its own
+    // kill switch (`voice_call_enabled` in remote_config/current, answered as 503 voice_disabled);
+    // this one hides the button so a switched-off call is never offered. Default: see
+    // RemoteConfigDefaults.voiceCallEnabled.
+    const val VOICE_CALL_ENABLED = "voice_call_enabled"
+
     // NOTE: `activation_bundle_v1` was removed on 2026-10-14 — the new-user activation bundle (no
     // static seed, AI first-run hero, reminder opt-in after the first checklist) is the only code
     // path now. The console parameter is the owner's to delete; no client reads it.
@@ -130,4 +136,13 @@ object RemoteConfigDefaults {
     // client namespace, so adding it to the *server* template would silently do nothing; and
     // (2) attach a condition for the split. Until then, treat any timing comparison as invalid.
     const val PUSH_TIMING_ARM = "behavioral"
+
+    /**
+     * [RemoteConfigKeys.VOICE_CALL_ENABLED] before the console parameter exists or the first fetch
+     * lands: ON in debug builds (the call is testable without the console), OFF in release (a store
+     * build never shows the call until the owner turns it on). A function, not a constant, because the
+     * build type is only known at runtime; the provider also pushes it into the SDK's in-app defaults,
+     * since Firebase's getBoolean ignores the caller's default for a key it does not know.
+     */
+    fun voiceCallEnabled(isDebugBuild: Boolean): Boolean = isDebugBuild
 }
