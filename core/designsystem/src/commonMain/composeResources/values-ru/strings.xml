@@ -1674,6 +1674,8 @@
     <string name="activation_sheet_reminder_failed">Не удалось поставить напоминание. Поставьте его из списка.</string>
     <!-- Redesign B "Soft & tactile" (2026-10-16) -->
     <string name="nav_ask_pill_label">Спросите Gisti или добавьте задачу</string>
+    <string name="nav_ask_pill_attach_description">Прикрепить файл</string>
+    <string name="nav_ask_pill_call_description">Голосовой звонок с Gisti</string>
     <string name="inbox_header_date">%1$s, %3$d %2$s</string>
     <string name="detail_header_progress">Осталось %1$d · готово %2$d из %3$d</string>
     <string name="detail_ask_about_list">Спросить Gisti об этом списке</string>

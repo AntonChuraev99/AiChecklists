@@ -1,24 +1,31 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -29,6 +36,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 
 /** Visual variant of [AskGistiBar]. */
 enum class AskGistiBarStyle {
@@ -61,16 +69,26 @@ enum class AskGistiBarStyle {
  * [AskGistiBarStyle.ChromePill] — redesign B (the v2 shell's Ask pill):
  *  - min height 48dp, shape [AppShapeTokens.Pill]
  *  - container [AppSurface.bottomChromeRaised], 1dp [AppChatColors.controlOutline]
- *  - [SparkleTile] 36dp circle, label `bodyLarge` `onSurfaceVariant`, up to 2 lines + ellipsis
- *  - mic: 48dp target, `primary` glyph (the mock's blue mic)
+ *  - leading: a 48dp "+" target (36dp recessed circle) when [onAttachClick] is set, otherwise the
+ *    36dp [SparkleTile]
+ *  - label `bodyLarge` `onSurfaceVariant`, ONE line + ellipsis
+ *  - trailing: mic (48dp target, neutral `onSurfaceVariant` glyph), then the call button — a 40dp
+ *    `primary` circle with an `onPrimary` sound-wave glyph in a 48dp target
  *
  * @param placeholder Text shown when [value] is null.
- * @param onClick Invoked when the non-mic area is tapped (opens chat).
+ * @param onClick Invoked when the pill body is tapped (opens chat).
  * @param onMicClick Invoked when the mic icon is tapped (starts voice input); null hides the mic.
  * @param value If non-null, shown in place of the placeholder with full `onSurface` color.
  * @param micContentDescription Accessibility label for the mic button — pass the existing chat mic
  *   string; required whenever [onMicClick] is non-null.
  * @param style [AskGistiBarStyle.Card] or [AskGistiBarStyle.ChromePill].
+ * @param onAttachClick ChromePill only: the leading "+" (attach a file). Null keeps the sparkle —
+ *   never a "+" that does nothing. Ignored by [AskGistiBarStyle.Card].
+ * @param attachContentDescription Accessibility label for "+"; required when [onAttachClick] is set.
+ * @param onCallClick ChromePill only: the trailing filled call button. Null draws no call button.
+ *   Ignored by [AskGistiBarStyle.Card].
+ * @param callContentDescription Accessibility label for the call button; required when
+ *   [onCallClick] is set.
  */
 @Composable
 fun AskGistiBar(
@@ -81,6 +99,10 @@ fun AskGistiBar(
     micContentDescription: String = "",
     value: String? = null,
     style: AskGistiBarStyle = AskGistiBarStyle.Card,
+    onAttachClick: (() -> Unit)? = null,
+    attachContentDescription: String = "",
+    onCallClick: (() -> Unit)? = null,
+    callContentDescription: String = "",
 ) {
     when (style) {
         AskGistiBarStyle.Card -> AskGistiCardBar(
@@ -98,6 +120,10 @@ fun AskGistiBar(
             modifier = modifier,
             micContentDescription = micContentDescription,
             value = value,
+            onAttachClick = onAttachClick,
+            attachContentDescription = attachContentDescription,
+            onCallClick = onCallClick,
+            callContentDescription = callContentDescription,
         )
     }
 }
@@ -179,7 +205,12 @@ private fun AskGistiChromePill(
     modifier: Modifier,
     micContentDescription: String,
     value: String?,
+    onAttachClick: (() -> Unit)?,
+    attachContentDescription: String,
+    onCallClick: (() -> Unit)?,
+    callContentDescription: String,
 ) {
+    val hasTrailingAction = onMicClick != null || onCallClick != null
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -192,15 +223,45 @@ private fun AskGistiChromePill(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                // The pill area is ONE button; the mic below is a sibling node with its own role, so
-                // TalkBack reads "Ask Gisti or add a task, button" then "Voice input, button".
+                // The pill area is ONE button; "+", mic and call are sibling nodes with their own
+                // role, so TalkBack reads "Attach a file, button", "Ask Gisti or add a task, button",
+                // "Voice input, button", "Voice call with Gisti, button".
                 .clickable(onClick = onClick, role = Role.Button)
-                .padding(start = 6.dp, end = if (onMicClick != null) 0.dp else 16.dp),
+                .padding(
+                    // A 48dp "+" target already insets its 36dp circle by 6dp — the sparkle's inset.
+                    start = if (onAttachClick != null) 0.dp else 6.dp,
+                    end = if (hasTrailingAction) 0.dp else 16.dp,
+                ),
         ) {
-            SparkleTile(size = 36.dp, cornerRadius = 18.dp)
+            if (onAttachClick != null) {
+                PillIconButton(
+                    onClick = onAttachClick,
+                    contentDescription = attachContentDescription,
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(36.dp)
+                            // A step DOWN from the cream pill, carried by the fill alone. In dark
+                            // `recessed()` equals `bottomChromeRaised()` (the pill), so the top of
+                            // the container ramp is the only rung that still reads.
+                            .background(attachFill(), CircleShape),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = null, // carried by the button node
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(AppDimens.IconSizeMd),
+                        )
+                    }
+                }
+            } else {
+                // Control path (no attach entry wired): keep the brand mark so the leading edge
+                // never goes empty. Part of the pill's own tap target.
+                SparkleTile(size = 36.dp, cornerRadius = 18.dp)
+            }
 
             Text(
                 text = value ?: placeholder,
@@ -210,34 +271,74 @@ private fun AskGistiChromePill(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                // Two lines, not one: measured on the 320dp × 1.5 RU golden, one line cut the label
-                // to "Спросите Gi…" — the brand and the whole promise gone. The pill grows (heightIn)
-                // and the shell plate measures itself, so a second line costs height, not meaning.
-                maxLines = 2,
+                // ONE row, owner decision 2026-11-04 ("ограничение на 1 ряд высоту"). The pill is
+                // an entry point, not a reading surface: at 320dp × large font RU the label ends in
+                // an ellipsis instead of growing the bottom plate.
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = 12.dp),
+                    .padding(horizontal = 10.dp, vertical = 12.dp),
             )
 
             if (onMicClick != null) {
-                IconButton(
-                    onClick = onMicClick,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .semantics {
-                            role = Role.Button
-                            contentDescription = micContentDescription
-                        },
-                ) {
+                PillIconButton(onClick = onMicClick, contentDescription = micContentDescription) {
                     Icon(
                         imageVector = Icons.Filled.Mic,
-                        contentDescription = null, // carried by the button node above
-                        tint = MaterialTheme.colorScheme.primary,
+                        contentDescription = null, // carried by the button node
+                        // Neutral, like the reference: the filled call circle is the one accent.
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(AppDimens.IconSizeMd),
                     )
                 }
             }
+
+            if (onCallClick != null) {
+                PillIconButton(onClick = onCallClick, contentDescription = callContentDescription) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            // primary / onPrimary: the M3 pair built for ≥3:1 in both themes
+                            // (light #1565C0 / white, dark Blue80 / Blue10).
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.GraphicEq,
+                            contentDescription = null, // carried by the button node
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+/** 48dp touch target inside the pill, announced as its own button. */
+@Composable
+private fun PillIconButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+    content: @Composable () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(48.dp)
+            .semantics {
+                role = Role.Button
+                this.contentDescription = contentDescription
+            },
+        content = content,
+    )
+}
+
+@Composable
+@ReadOnlyComposable
+private fun attachFill(): Color = if (LocalIsDarkTheme.current) {
+    MaterialTheme.colorScheme.surfaceContainerHighest
+} else {
+    AppSurface.recessed()
 }
