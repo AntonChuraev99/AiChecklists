@@ -1979,6 +1979,8 @@
     <string name="activation_sheet_reminder_failed">Couldn't set the reminder. Set it from the list instead.</string>
     <!-- Redesign B "Soft & tactile" (2026-10-16) -->
     <string name="nav_ask_pill_label">Ask Gisti or add a task</string>
+    <string name="nav_ask_pill_attach_description">Attach a file</string>
+    <string name="nav_ask_pill_call_description">Voice call with Gisti</string>
     <string name="inbox_header_date">%1$s, %2$s %3$d</string>
     <string name="detail_header_progress">%1$d left · %2$d of %3$d done</string>
     <string name="detail_ask_about_list">Ask Gisti about this list</string>

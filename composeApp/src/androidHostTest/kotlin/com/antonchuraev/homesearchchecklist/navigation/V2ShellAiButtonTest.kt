@@ -4,6 +4,8 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.chat_dock_mic_description
 import aichecklists.core.designsystem.generated.resources.nav_add_task_fab_content_description
+import aichecklists.core.designsystem.generated.resources.nav_ask_pill_attach_description
+import aichecklists.core.designsystem.generated.resources.nav_ask_pill_call_description
 import aichecklists.core.designsystem.generated.resources.nav_ask_pill_label
 import aichecklists.core.designsystem.generated.resources.nav_chat_fab_content_description
 import aichecklists.core.designsystem.generated.resources.nav_tab_inbox
@@ -275,6 +277,81 @@ class V2ShellAiButtonTest {
     }
 
     /**
+     * The leading "+" (2026-11-04) is its own target and its own action: it reaches
+     * `onOpenChatAttach` only — never the plain open, never voice — and is announced as a button.
+     */
+    @Test
+    fun compactShell_tapOnThePlus_opensAttach_only() {
+        var attachLabel = ""
+        var openChatCount = 0
+        var voiceCount = 0
+        var attachCount = 0
+        composeTestRule.setContent {
+            attachLabel = stringResource(Res.string.nav_ask_pill_attach_description)
+            V2ShellUnderTest(
+                onOpenChat = { openChatCount++ },
+                onOpenChatVoice = { voiceCount++ },
+                onOpenChatAttach = { attachCount++ },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(attachLabel)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(1, attachCount, "The + must open the attach entry exactly once")
+        assertEquals(0, openChatCount, "The + must not ALSO fire the plain chat open")
+        assertEquals(0, voiceCount, "The + must not start voice")
+    }
+
+    /** The trailing call circle routes to `onStartVoiceCall` only, and is announced as a button. */
+    @Test
+    fun compactShell_tapOnTheCall_startsTheCall_only() {
+        var callLabel = ""
+        var openChatCount = 0
+        var voiceCount = 0
+        var callCount = 0
+        composeTestRule.setContent {
+            callLabel = stringResource(Res.string.nav_ask_pill_call_description)
+            V2ShellUnderTest(
+                onOpenChat = { openChatCount++ },
+                onOpenChatVoice = { voiceCount++ },
+                onStartVoiceCall = { callCount++ },
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription(callLabel)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(1, callCount, "The call button must start the call exactly once")
+        assertEquals(0, openChatCount, "The call button must not ALSO open the text chat")
+        assertEquals(0, voiceCount, "The call button must not start voice input")
+    }
+
+    /** Null entries draw nothing: no dead "+" and no dead call button. */
+    @Test
+    fun compactShell_withoutAttachOrCallEntries_drawsNeither() {
+        var attachLabel = ""
+        var callLabel = ""
+        composeTestRule.setContent {
+            attachLabel = stringResource(Res.string.nav_ask_pill_attach_description)
+            callLabel = stringResource(Res.string.nav_ask_pill_call_description)
+            V2ShellUnderTest(onOpenChatAttach = null, onStartVoiceCall = null)
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(0, composeTestRule.onAllNodesWithContentDescription(attachLabel).fetchSemanticsNodes().size)
+        assertEquals(0, composeTestRule.onAllNodesWithContentDescription(callLabel).fetchSemanticsNodes().size)
+    }
+
+    /**
      * Catches: the tabs still split around a gap. With the circle gone the four tabs are EQUAL
      * (spec §2.5 R2), and a tap on Calendar's inner edge — the side the old gap sat on — navigates.
      */
@@ -462,6 +539,8 @@ class V2ShellAiButtonTest {
         chatOpen: Boolean = false,
         onOpenChat: () -> Unit = {},
         onOpenChatVoice: (() -> Unit)? = {},
+        onOpenChatAttach: (() -> Unit)? = null,
+        onStartVoiceCall: (() -> Unit)? = null,
         onNavigate: (String) -> Unit = {},
     ) {
         AppTheme(darkTheme = false) {
@@ -478,6 +557,8 @@ class V2ShellAiButtonTest {
                 captureOpen = captureOpen,
                 overlayContent = null,
                 onOpenChatVoice = onOpenChatVoice,
+                onOpenChatAttach = onOpenChatAttach,
+                onStartVoiceCall = onStartVoiceCall,
                 content = {
                     Box(modifier = Modifier.fillMaxSize().testTag(CONTENT_TAG)) {
                         Text(CONTENT_MARKER)
