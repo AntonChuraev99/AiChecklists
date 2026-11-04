@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentVoiceContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
@@ -134,6 +135,7 @@ private class FakeChatAgentApiService : ChatAgentApiService {
         screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
+        voice: AgentVoiceContext?,
     ): AgentStepResult = AgentStepResult.ServiceError
 }
 

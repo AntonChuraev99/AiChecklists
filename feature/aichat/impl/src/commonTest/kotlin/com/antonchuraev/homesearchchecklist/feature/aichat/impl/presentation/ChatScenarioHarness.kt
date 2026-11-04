@@ -17,6 +17,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Undo
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentVoiceContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
@@ -240,6 +241,7 @@ class FakeAgentApi(
         screenSnapshot: ChatScreenSnapshot?,
         requestId: String?,
         responseLanguage: String?,
+        voice: AgentVoiceContext?,
     ): AgentStepResult {
         callCount++
         return result

@@ -43,6 +43,9 @@ kotlin {
             implementation(projects.core.filepicker.api)
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)
+            // Voice call: the agent turn transport (VoiceTurnGateway) is implemented here, over the
+            // same chat_agent loop as the text chat. Contracts only — no audio code.
+            implementation(projects.core.voice.api)
             // FilePicker + AudioRecorder expect/actual for attachment + voice input (Phase 3)
             // Coil 3 for attachment image thumbnails in chat chips and message bubbles (Phase 3)
             implementation(libs.coil3.compose)
