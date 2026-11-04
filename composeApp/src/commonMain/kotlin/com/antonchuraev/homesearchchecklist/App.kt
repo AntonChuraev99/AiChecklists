@@ -85,6 +85,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -633,7 +634,18 @@ fun App() {
             // ChatViewModel singleton for the sheet (same ViewModel survives sheet hide/show,
             // keeping message history intact as required by the spec).
             val chatViewModel: ChatViewModel = koinViewModel()
-            val chatUiState by chatViewModel.screenState.collectAsStateWithLifecycle()
+            // PERF: the State object is kept so composition at THIS level reads only narrow derived
+            // fields (below). `chatUiState` itself may be read freely inside event lambdas, effect
+            // bodies and child composable lambdas (their own scopes) — but a direct read in this
+            // body would recompose the whole App, incl. NavDisplay, on every keystroke in the dock.
+            val chatUiStateHolder = chatViewModel.screenState.collectAsStateWithLifecycle()
+            val chatUiState by chatUiStateHolder
+            val chatIsRecording by remember { derivedStateOf { chatUiStateHolder.value.isRecording } }
+            val chatAttachmentPickerType by remember {
+                derivedStateOf { chatUiStateHolder.value.attachmentPickerType }
+            }
+            val chatInputBlankState = remember { derivedStateOf { chatUiStateHolder.value.inputText.isBlank() } }
+            val chatFeedbackTarget by remember { derivedStateOf { chatUiStateHolder.value.feedbackTarget } }
 
             // WHERE the dock is anchored — derived, never stored (see [chatSurfaceFor]). Keyed on
             // the back stack App.kt already reads for currentTopRoute, so this adds no new
@@ -1124,8 +1136,8 @@ fun App() {
             var chatSheetDragCancel by remember { mutableStateOf(false) }
             var chatSheetAttachmentSheet by remember { mutableStateOf(false) }
             var chatSheetRecordingMs by remember { mutableLongStateOf(0L) }
-            LaunchedEffect(chatUiState.isRecording) {
-                if (chatUiState.isRecording) {
+            LaunchedEffect(chatIsRecording) {
+                if (chatIsRecording) {
                     chatSheetRecordingMs = 0L
                     while (true) {
                         delay(1_000L)
@@ -1162,7 +1174,7 @@ fun App() {
                 chatViewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
             }
             // sheetAudioRecorder is declared above the SideEffect collector — do not re-declare it here.
-            LaunchedEffect(chatUiState.attachmentPickerType) {
+            LaunchedEffect(chatAttachmentPickerType) {
                 when (chatUiState.attachmentPickerType) {
                     AttachmentSource.Image -> sheetImagePicker.launch()
                     AttachmentSource.Pdf -> sheetPdfPicker.launch()
@@ -1545,17 +1557,24 @@ fun App() {
                 // Unknown / ChecklistDetail-without-a-label → the generic placeholder, as today.
                 ChatSurface.Unknown, ChatSurface.ChecklistDetail -> null
             }
-            val lastAssistantMessage = remember(chatUiState.messages) {
-                chatUiState.messages.lastOrNull { it.role == ChatRole.Assistant }
+            // Derived states, read ONLY inside chatDockContent below (its own scope), never here.
+            val lastAssistantMessageState = remember {
+                derivedStateOf { chatUiStateHolder.value.messages.lastOrNull { it.role == ChatRole.Assistant } }
             }
             // hasLastAnswer drives the expanded answer-frame vs empty-greeting switch (order mirrors
             // the lastAnswerContent when-branches: pending choice / typing / last assistant bubble).
-            val hasLastAnswer = chatUiState.pendingChoice != null ||
-                chatUiState.isProcessing ||
-                lastAssistantMessage != null
+            val hasLastAnswerState = remember {
+                derivedStateOf {
+                    chatUiStateHolder.value.pendingChoice != null ||
+                        chatUiStateHolder.value.isProcessing ||
+                        lastAssistantMessageState.value != null
+                }
+            }
 
             val chatDockContent: @Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?, () -> Unit) -> Unit =
                 { dockState, peekPlaceholder, dockAvailableDp, chips, itemCreateOverride, onOpenFull ->
+                    val lastAssistantMessage = lastAssistantMessageState.value
+                    val hasLastAnswer = hasLastAnswerState.value
                     GistiExpandableDockContent(
                         state = dockState,
                         // Item-create mode hides the chat answer/greeting frame (it shows the item-create
@@ -1915,7 +1934,7 @@ fun App() {
             NavDisplay(
                 backStack = navigator.backStack,
                 onBack = { navigator.onBack() },
-                sceneStrategies = listOf(sceneStrategy),
+                sceneStrategies = remember(sceneStrategy) { listOf(sceneStrategy) },
                 entryProvider = entryProvider {
 
                     entry<AppNavRoute.Splash> {
@@ -1963,7 +1982,7 @@ fun App() {
                                 onChatExpandedChanged = { expandedNow ->
                                     if (expandedNow) onOpenChatSheet(null, null) else chatSheetOpen = false
                                 },
-                                chatInputBlank = chatUiState.inputText.isBlank(),
+                                chatInputBlank = chatInputBlankState.value,
                                 routeCollapseSignal = routeCollapseSignal,
                                 // Each prompt chip drives its own chat flow (photo/pdf picker,
                                 // link/remind prefill, plan-day prefill+send) via the singleton
@@ -2126,7 +2145,7 @@ fun App() {
                             // regression, not a simplification.
                             chatDockContent = if (navVariant == NavVariant.V2) null else chatDockContent,
                             chatFullContent = if (navVariant == NavVariant.V2) null else chatFullContent,
-                            chatInputBlank = chatUiState.inputText.isBlank(),
+                            chatInputBlank = chatInputBlankState.value,
                             routeCollapseSignal = routeCollapseSignal,
                             onChecklistQuickAction = { checklistId, checklistName, action ->
                                 onChecklistQuickAction(checklistId, checklistName, action)
@@ -2646,7 +2665,7 @@ fun App() {
             // keeps its own host (independent render site) — both read the same singleton
             // ViewModel state, and only one chat surface is on screen at a time, so there
             // is no double-sheet. Mirrors ChatScreen's previousUserQuestion lookup.
-            chatUiState.feedbackTarget?.let { target ->
+            chatFeedbackTarget?.let { target ->
                 val previousUserQuestion = remember(chatUiState.messages, target.id) {
                     val idx = chatUiState.messages.indexOfFirst { it.id == target.id }
                     chatUiState.messages

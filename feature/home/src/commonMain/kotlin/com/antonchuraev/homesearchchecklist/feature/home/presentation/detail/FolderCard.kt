@@ -82,7 +82,8 @@ internal fun FolderCard(
     isEditMode: Boolean = false,
     isDragging: Boolean = false,
     cardDragModifier: Modifier = Modifier,
-    wiggleAngle: Float = 0f,
+    /** Read in the draw phase (graphicsLayer) so the per-frame wiggle never recomposes the row. */
+    wiggleAngle: () -> Float = { 0f },
     /**
      * [RowContainer.Card] (default) keeps the [AppCard] rendering byte-for-byte. [RowContainer.Grouped]
      * (v2 Standard, redesign B) draws no container — the caller paints the row's `groupSegment` — and
@@ -119,7 +120,7 @@ internal fun FolderCard(
             .graphicsLayer {
                 // Match the leaf wiggle in edit mode; freeze the rotation while this card is dragged.
                 if (isEditMode && !isDragging) {
-                    rotationZ = wiggleAngle
+                    rotationZ = wiggleAngle()
                 }
             }
             .then(if (isEditMode) cardDragModifier else Modifier),
@@ -191,7 +192,7 @@ private fun GroupedFolderRow(
     isEditMode: Boolean,
     isDragging: Boolean,
     cardDragModifier: Modifier,
-    wiggleAngle: Float,
+    wiggleAngle: () -> Float,
 ) {
     Box(
         modifier = modifier
@@ -209,7 +210,7 @@ private fun GroupedFolderRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = AppDensity.RowMinHeightComfortable)
-                .graphicsLayer { if (isEditMode && !isDragging) rotationZ = wiggleAngle }
+                .graphicsLayer { if (isEditMode && !isDragging) rotationZ = wiggleAngle() }
                 .padding(
                     start = AppDensity.GroupRowPaddingHorizontal - FolderTileOverhang,
                     end = AppDimens.SpacingMd,

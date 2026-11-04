@@ -10,7 +10,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
@@ -23,13 +22,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -57,6 +59,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -143,6 +146,13 @@ object V2ChatMotion {
 private const val DockRisenFraction: Float = 0.25f
 
 /**
+ * Frames the dock's measured height must hold unchanged before the FULL overlay is given it (see
+ * `rawDockHeightPx` in [V2ChatDockOverlay]). Two, not one: a value can repeat for a single frame at
+ * the turn of a spring, and the overlay only ever opens from a dock that has come to rest.
+ */
+private const val DockHeightSettleFrames: Int = 2
+
+/**
  * The v2 arm's chat dock, hosted by the SHELL instead of by each screen.
  *
  * ## Why it moved up here
@@ -221,7 +231,27 @@ fun V2ChatDockOverlay(
     // shell, and none is needed.
     val hazeState = rememberHazeState()
 
-    var dockHeightPx by remember { mutableStateOf(0) }
+    // The dock's measured height, in two layers.
+    //
+    // [rawDockHeightPx] is written by `onSizeChanged` on every frame the dock's height moves — the
+    // Peek→Expanded reveal grows it, and with the field focused the keyboard re-caps the answer
+    // frame — and nothing in composition reads it. [dockHeightPx], the value handed to the FULL
+    // overlay below, is published only once the raw value has held still for [DockHeightSettleFrames]
+    // frames. Before this split the overlay function read the raw value directly, so every frame of
+    // the reveal and of the keyboard recomposed this function, re-ran `chatFullContent`, and
+    // restarted GistiFullChatOverlay's two `LaunchedEffect`s (an `updateAnchors` and a fresh
+    // snapshotFlow collector) — for an overlay that is closed during both animations and only needs
+    // the height of a dock at rest: it opens from a settled Expanded dock and collapses back onto it.
+    val rawDockHeightPx = remember { mutableIntStateOf(0) }
+    var dockHeightPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { rawDockHeightPx.intValue }.collectLatest { height ->
+            // collectLatest cancels this wait whenever the height moves again, so a value is only
+            // published after it survived whole frames unchanged.
+            repeat(DockHeightSettleFrames) { withFrameNanos { } }
+            dockHeightPx = height
+        }
+    }
 
     // The container's emergence: scrim opacity, dock alpha and dock scale all ride this ONE value, so
     // they cannot drift apart. Kept out of composition — every consumer reads it inside a draw-phase
@@ -394,14 +424,26 @@ fun V2ChatDockOverlay(
 
     // Answer-height cap: status bar → keyboard top. Computed HERE (the host) because a deep read
     // inside the dock returns 0 once an ancestor has applied imePadding. Unspecified = keyboard down.
-    val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    val navBottomDp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val statusTopDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val containerHDp = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val dockAvailableDp = if (imeBottomDp > navBottomDp + 8.dp) {
-        (containerHDp - imeBottomDp - statusTopDp).coerceAtLeast(0.dp)
-    } else {
-        Dp.Unspecified
+    // The insets are read inside derivedStateOf, and the result only inside pillContent below, so the
+    // keyboard animation recomposes the dock's content scope — not this whole overlay — per frame.
+    val imeInsets = WindowInsets.ime
+    val navInsets = WindowInsets.navigationBars
+    val statusInsets = WindowInsets.statusBars
+    val windowInfo = LocalWindowInfo.current
+    val dockAvailableDp by remember(imeInsets, navInsets, statusInsets, windowInfo, density) {
+        derivedStateOf {
+            with(density) {
+                val imeBottomDp = imeInsets.getBottom(density).toDp()
+                val navBottomDp = navInsets.getBottom(density).toDp()
+                if (imeBottomDp > navBottomDp + 8.dp) {
+                    val containerHDp = windowInfo.containerSize.height.toDp()
+                    val statusTopDp = statusInsets.getTop(density).toDp()
+                    (containerHDp - imeBottomDp - statusTopDp).coerceAtLeast(0.dp)
+                } else {
+                    Dp.Unspecified
+                }
+            }
+        }
     }
 
     // Variant A «Тёплый лист»: the chat sheet is warm (the theme's own family), not the cool bottom
@@ -489,7 +531,7 @@ fun V2ChatDockOverlay(
                     alpha = progress
                     transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
                 }
-                .onSizeChanged { dockHeightPx = it.height },
+                .onSizeChanged { rawDockHeightPx.intValue = it.height },
             pillContent = {
                 chatDockContent(
                     dockState,

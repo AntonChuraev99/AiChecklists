@@ -56,7 +56,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -108,8 +107,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,15 +118,18 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.Role
@@ -206,6 +210,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.components
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.RowContainer
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.TaskRow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
@@ -216,6 +221,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.roundToInt
 import kotlin.time.Instant
 
 /**
@@ -447,6 +453,7 @@ fun InboxScreen(
     // tile at a stale offset — a bright band across the toolbar for one frame.
     val dockTopPx = remember(captureDockRenders) { mutableFloatStateOf(CaptureDockTopUnmeasured) }
     val captureScrimColor = captureDockScrimColor()
+    val contentSlotHeight = rememberSettlingSlotHeight()
 
     // Root box so the TOP scrim can be a sibling ABOVE the scaffold — the app bar is the scaffold's
     // own slot, and nothing inside the content can reach it.
@@ -598,6 +605,10 @@ fun InboxScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    // See [holdContentHeightWhileSlotMoves]: the page keeps one height while the
+                    // capture dock rides the keyboard, and is clipped back to the slot it really has.
+                    .clipToBounds()
+                    .holdContentHeightWhileSlotMoves(contentSlotHeight)
                     .onGloballyPositioned { contentTopPx.floatValue = it.positionInRoot().y },
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -1495,12 +1506,28 @@ private fun InboxPageList(
     }
     val arrivals = rememberSectionArrivals(sections)
 
-    // BoxWithConstraints for ONE number: the page height the empty state is sized against. It has to
-    // come from the page rather than from the list because `fillParentMaxHeight` — the only
-    // list-side option — can set a FIXED height and nothing else, which is the defect below.
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val emptyStateMinHeight = maxHeight * InboxEmptyStateHeightFraction
-
+    // ONE number from the page: its height, which the empty state is sized against. It has to come
+    // from the page rather than from the list because `fillParentMaxHeight` — the only list-side
+    // option — can set a FIXED height and nothing else, which is the defect below.
+    //
+    // Captured in the page's MEASURE pass and read in the empty item's measure pass — never in
+    // composition. This used to be a BoxWithConstraints, and a SubcomposeLayout re-runs its whole
+    // content lambda every time its constraints change: while the capture dock rides the keyboard
+    // the page height changes on every frame, so the entire LazyColumn call (sections, rows,
+    // arrivals) was recomposed inside `measureAndLayout` once per frame of the keyboard animation
+    // — on a page that is not even empty. Now a height change re-measures one Box, and only when
+    // the empty state is on screen. Same pixels: `(maxHeight * fraction).roundToPx()` is
+    // `(maxHeightPx * fraction).roundToInt()`.
+    val pageHeightPx = remember { mutableIntStateOf(0) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .layout { measurable, constraints ->
+                if (constraints.hasBoundedHeight) pageHeightPx.intValue = constraints.maxHeight
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            },
+    ) {
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -1561,7 +1588,15 @@ private fun InboxPageList(
                         if (emptyStateHostsAddTask) ({ onIntent(InboxIntent.OnAddTaskRowClick) }) else null
                     val addTaskLabel = stringResource(Res.string.inbox_add_task_row)
                     Box(
-                        modifier = Modifier.heightIn(min = emptyStateMinHeight),
+                        // `heightIn(min = pageHeight * fraction)`, resolved in the measure pass —
+                        // see `pageHeightPx` above.
+                        modifier = Modifier.layout { measurable, constraints ->
+                            val minHeight = (pageHeightPx.intValue * InboxEmptyStateHeightFraction)
+                                .roundToInt()
+                                .coerceIn(constraints.minHeight, constraints.maxHeight)
+                            val placeable = measurable.measure(constraints.copy(minHeight = minHeight))
+                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                        },
                         contentAlignment = Alignment.Center,
                     ) {
                         if (page.isInbox) {
@@ -2131,3 +2166,76 @@ private val InboxSkeletonWidthFractions = listOf(0.72f, 0.55f, 0.84f, 0.44f, 0.6
 
 /** Error glyph. Small: the sentence is the message, the icon only labels its genre. */
 private val InboxErrorIconSize = 20.dp
+
+/**
+ * The content slot's height, as seen by [holdContentHeightWhileSlotMoves].
+ *
+ * [slotPx] is written in the measure pass and read by nothing in measure or composition — only by
+ * the settle effect in [rememberSettlingSlotHeight]. [settledPx] is the one value measure reads, so
+ * it changes once per resize, at its end. [tallestPx] and [widthPx] are plain fields: they only
+ * shape the NEXT measure and must not schedule one.
+ */
+@Stable
+private class SettlingSlotHeight {
+    var slotPx by mutableIntStateOf(-1)
+    var settledPx by mutableIntStateOf(-1)
+    var tallestPx = -1
+    var widthPx = -1
+}
+
+@Composable
+private fun rememberSettlingSlotHeight(): SettlingSlotHeight {
+    val holder = remember { SettlingSlotHeight() }
+    LaunchedEffect(holder) {
+        snapshotFlow { holder.slotPx }.collectLatest { slot ->
+            // collectLatest cancels the wait whenever the slot moves again, so the height is only
+            // declared settled once it survived whole frames unchanged.
+            repeat(ContentSlotSettleFrames) { withFrameNanos { } }
+            holder.settledPx = slot
+        }
+    }
+    return holder
+}
+
+/**
+ * Keeps the page at ONE height while the scaffold's content slot is resizing, and snaps it to the
+ * slot once the slot has come to rest.
+ *
+ * The capture dock lives in the scaffold's bottomBar slot, which is padded by the keyboard inset,
+ * so while the keyboard animates — and while the dock's own planner folds open — the content slot
+ * changes height on EVERY frame. Laid out directly in that slot, the whole page (header, pager,
+ * task list) was re-measured once per frame: 24 distinct heights in one open, ~90 ms of
+ * `measureAndLayout` on a Pixel 9 AVD (Perfetto, 2026-11-04).
+ *
+ * Now, while the slot moves, the page is measured at the tallest slot height seen, i.e. the
+ * height it had before the keyboard rose, so its constraints do not change from frame to frame;
+ * it is re-measured once more when the slot settles. The node still REPORTS the real slot height and
+ * [clipToBounds] sits outside it, so nothing of the page is drawn or hit below the slot's bottom
+ * edge — that strip belongs to the dock, and the dock's shoulders must keep showing the scaffold
+ * container under their scrim tile, never the page. The visible part of the page is top-anchored,
+ * so it is pixel-identical to the per-frame layout; only content anchored to the page's BOTTOM
+ * (the empty state's 60 % band) reaches its new position at the end of the resize instead of
+ * following it.
+ */
+private fun Modifier.holdContentHeightWhileSlotMoves(state: SettlingSlotHeight): Modifier =
+    layout { measurable, constraints ->
+        if (!constraints.hasBoundedHeight) {
+            val placeable = measurable.measure(constraints)
+            return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }
+        val slot = constraints.maxHeight
+        if (constraints.maxWidth != state.widthPx) {
+            // A new width is a new window (rotation, a resized foldable): heights seen at the old
+            // width say nothing about this one.
+            state.widthPx = constraints.maxWidth
+            state.tallestPx = slot
+        }
+        state.tallestPx = maxOf(state.tallestPx, slot)
+        state.slotPx = slot
+        val height = if (slot == state.settledPx) slot else state.tallestPx
+        val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+        layout(placeable.width, slot) { placeable.place(0, 0) }
+    }
+
+/** Frames the content slot must hold still before [holdContentHeightWhileSlotMoves] snaps to it. */
+private const val ContentSlotSettleFrames = 2

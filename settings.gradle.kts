@@ -35,6 +35,7 @@ dependencyResolutionManagement {
 }
 
 include(":androidApp")
+include(":baselineprofile")
 include(":composeApp")
 include(":core:common:api")
 include(":core:common:impl")
