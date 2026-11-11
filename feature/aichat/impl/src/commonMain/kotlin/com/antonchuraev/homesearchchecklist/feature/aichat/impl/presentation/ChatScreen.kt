@@ -37,6 +37,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
@@ -70,6 +72,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AttachedChoiceActions
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -474,19 +478,29 @@ fun ChatMessageList(
 ) {
     // IME scroll-anchor fix: re-run scrollToItem(0) when keyboard opens/closes so the
     // reverseLayout list stays pinned to the bottom after viewport resize.
-    // MUST use imeBottom as a LaunchedEffect key — totalItemCount alone is insufficient.
+    // MUST react to the ime inset — totalItemCount alone is insufficient.
+    //
+    // The inset is observed through snapshotFlow, NOT read in composition: reading it here (as an
+    // effect key) recomposed this whole list on every frame of the keyboard animation. collectLatest
+    // keeps the old semantics exactly — each new (count, inset) cancels the running scroll and starts
+    // a fresh one, so the last keyboard frame still wins.
     val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
+    val imeInsets = WindowInsets.ime
     val hasInitializedScroll = remember { mutableStateOf(false) }
-    LaunchedEffect(totalItemCount, imeBottom) {
-        if (totalItemCount > 0) {
-            if (!hasInitializedScroll.value) {
-                listState.scrollToItem(0)
-                hasInitializedScroll.value = true
-            } else {
-                listState.animateScrollToItem(0)
+    val totalItemCountState = rememberUpdatedState(totalItemCount)
+    LaunchedEffect(listState, imeInsets, density) {
+        snapshotFlow { totalItemCountState.value to imeInsets.getBottom(density) }
+            .distinctUntilChanged()
+            .collectLatest { (count, _) ->
+                if (count > 0) {
+                    if (!hasInitializedScroll.value) {
+                        listState.scrollToItem(0)
+                        hasInitializedScroll.value = true
+                    } else {
+                        listState.animateScrollToItem(0)
+                    }
+                }
             }
-        }
     }
 
     // B §2.9 — UI-local, derived from the message list (no new state):

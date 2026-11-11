@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
@@ -435,7 +434,14 @@ fun MainScreen(
                 // dock is shown, dockHeight already includes the navbar inset (the dock carries its own
                 // navigationBarsPadding), so the list clears both. When hidden (edit mode), add the
                 // navbar inset explicitly so the last row isn't swallowed by the navigation bar.
-                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                // Insets are read inside derivedStateOf only (never in this body), so the keyboard
+                // animation does not recompose the whole Success branch per frame.
+                val imeInsets = WindowInsets.ime
+                val navInsets = WindowInsets.navigationBars
+                val statusInsets = WindowInsets.statusBars
+                val navBottom by remember(navInsets, density) {
+                    derivedStateOf { with(density) { navInsets.getBottom(density).toDp() } }
+                }
                 // extraBottomPadding is ADDED to the existing expression, never replaces a branch:
                 // the dock/navbar math above is control-arm behaviour and must not move. It is 0.dp
                 // in v1, so both branches evaluate exactly as before.
@@ -447,13 +453,23 @@ fun MainScreen(
                 // FIX B: the answer cap (status bar → keyboard top), computed HERE at the host where
                 // WindowInsets.ime is reliable — a deep read inside the dock returns 0 once the host
                 // applies imePadding. Unspecified when the keyboard is down (use the design cap).
-                val imeBottomDp = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                val statusTopDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-                val containerHDp = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
-                val dockAvailableDp = if (imeBottomDp > navBottom + 8.dp) {
-                    (containerHDp - imeBottomDp - statusTopDp).coerceAtLeast(0.dp)
-                } else {
-                    Dp.Unspecified
+                // It follows the keyboard frame by frame, so it is read ONLY inside the dock's
+                // pillContent lambda — just that scope recomposes, not this whole branch.
+                val windowInfo = LocalWindowInfo.current
+                val dockAvailableDp by remember(imeInsets, navInsets, statusInsets, windowInfo, density) {
+                    derivedStateOf {
+                        with(density) {
+                            val imeBottomDp = imeInsets.getBottom(density).toDp()
+                            val navBottomDp = navInsets.getBottom(density).toDp()
+                            if (imeBottomDp > navBottomDp + 8.dp) {
+                                val containerHDp = windowInfo.containerSize.height.toDp()
+                                val statusTopDp = statusInsets.getTop(density).toDp()
+                                (containerHDp - imeBottomDp - statusTopDp).coerceAtLeast(0.dp)
+                            } else {
+                                Dp.Unspecified
+                            }
+                        }
+                    }
                 }
 
                 // The home list/grid. Hoisted into a local composable lambda ONLY so the v2 chip row
