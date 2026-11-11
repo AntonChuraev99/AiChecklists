@@ -24,13 +24,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsSixteenReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsSeventeenReleaseGroups`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 41 posts across 16 main-versions (v1.6-v1.21)
-        assertEquals(16, releases.size)
+        // 43 posts across 17 main-versions (v1.6-v1.21, v1.23; v1.22 had no feed entry)
+        assertEquals(17, releases.size)
     }
 
     @Test
@@ -39,8 +39,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.21 has the highest post timestamp)
-        assertEquals("1.21", releases.first().version)
+        // Newest release first (v1.23 has the highest post timestamp)
+        assertEquals("1.23", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -52,9 +52,30 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
+    }
+
+    @Test
+    fun `getReleases_withDefaultJson_v1_23HasTwoPostsLedByVoiceCallWithStoreDescription`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v123 = releases.first { it.version == "1.23" }
+
+        assertEquals(2, v123.posts.size)
+        // Both posts share one timestamp; the voice-call hero must still lead the card
+        assertEquals("voice_call_v1", v123.posts.first().id, "voice_call_v1 must lead the 1.23 group")
+        assertEquals("ask_bar_attach_v1", v123.posts[1].id)
+        // The call and attach buttons live in the Ask bar, no standalone destination — no CTA
+        v123.posts.forEach { post ->
+            assertTrue(post.actions.isEmpty(), "Post ${post.id} must carry no CTA")
+        }
+        // Perf + Inbox-language lines are not covered by the posts, so the note stays
+        val desc123 = requireNotNull(v123.storeDescription) { "v1.23 storeDescription must not be null" }
+        assertTrue(desc123.contains("Smoother and quicker"))
+        assertTrue(desc123.contains("Inbox in your language"))
     }
 
     @Test
@@ -310,13 +331,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsFortyOne`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsFortyThree`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(41, totalPosts)
+        assertEquals(43, totalPosts)
     }
 
     @Test
