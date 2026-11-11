@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceTurnGateway
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
@@ -9,6 +11,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCo
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.format.ChatDateFormatter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentChecklistsSummary
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.voice.ChatAgentVoiceTurnGateway
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatAgentApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatClassifierApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatCompletionApiServiceImpl
@@ -22,6 +26,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AiCha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.ChatHistoryRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.AgentTranscriptDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -88,6 +94,20 @@ val aiChatFeatureModule = module {
     single<ToolCallPreviewRenderer> {
         ToolCallPreviewRendererImpl(
             dateFormatter = get(),
+        )
+    }
+    // Voice call (feature/voicecall): one gateway PER CALL — it holds that call's conversation and the
+    // replay cache of its turns, so it must never be a single. ToolCallDispatcher is composeApp's.
+    factory<VoiceTurnGateway> {
+        val checklistRepository = get<ChecklistRepository>()
+        val userDataRepository = get<UserDataRepository>()
+        val logger = get<AppLogger>()
+        ChatAgentVoiceTurnGateway(
+            agentApi = get(),
+            dispatcher = get(),
+            userId = { userDataRepository.getUserData().userId },
+            checklistsSummary = { AgentChecklistsSummary.load(checklistRepository, logger, "VoiceTurnGateway") },
+            logger = logger,
         )
     }
     viewModel {

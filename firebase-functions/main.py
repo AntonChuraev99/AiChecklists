@@ -47,6 +47,7 @@ import cors  # local module: CORS origin whitelist (unit-testable without fireba
 from generated_items import MAX_FOLDER_DEPTH, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
 from credits_logic import reservation_decision  # local module: reserve-credits branch (unit-testable)
 from chat_agent_logic import scan_current_turn  # local module: chat_agent turn boundary (unit-testable)
+import voice_logic  # local module: voice-call minutes / session / rate-limit decisions (unit-testable)
 import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
 
 # Module logger — replaces bare print(); logger.exception() in except blocks emits the
@@ -2985,6 +2986,40 @@ def _language_directive(response_language):
     )
 
 
+# Spoken-reply budget of a voice-call answer (characters). The client's TTS reads it whole, so a
+# long answer is a long monologue the user has to interrupt.
+VOICE_REPLY_MAX_CHARS = 350
+
+
+def _voice_directive():
+    """Voice-call block appended AFTER _language_directive when chat_agent runs in voice mode.
+
+    Adapted from AiTeacher voiceBlock.ts (renderVoiceBlock) for a task assistant instead of a
+    tutor: the reply is read aloud by the device's TTS, the tools work exactly as in text chat.
+    The language rule stays the LANGUAGE block's — this block only shapes the form.
+    """
+    return (
+        "\n\n---\n"
+        "VOICE CALL (applies to every reply in this conversation): the user is talking to you in "
+        "a voice call. Your text reply is read aloud by text-to-speech and is never shown on "
+        "screen.\n"
+        f"- Reply conversationally in 1-3 short sentences, {VOICE_REPLY_MAX_CHARS} characters at "
+        "most. Talk the way people speak, not the way they write.\n"
+        "- No markdown, no lists, no headings, no emoji, no links or URLs, and no symbols that "
+        "cannot be read aloud (such as *, #, / or brackets).\n"
+        "- Say numbers, dates and times the way a person says them aloud, e.g. \"tomorrow at nine "
+        "in the morning\", never \"2026-11-05 09:00\".\n"
+        "- Tools work exactly as in text chat: when the user asks for an action, call the tool. "
+        "After the action is done, confirm briefly in one sentence what you did, e.g. \"Added milk "
+        "to Groceries.\"\n"
+        "- If something is unclear, ask ONE short clarifying question in a single sentence.\n"
+        "- Never offer tappable choices or numbered options — the user cannot see the screen. If "
+        "the user must choose, ask by voice and name at most three options in the sentence.\n"
+        "- Describe app buttons or screens only when asked, and then give the shortest path in one "
+        "sentence."
+    )
+
+
 @functions_framework.http
 def chat_completion(request: Request):
     """
@@ -3715,16 +3750,26 @@ def chat_agent(request: Request):
             {"role": "user",  "text": "..."},
             {"role": "model", "tool_calls":   [{"id","name","args"}, ...]},
             {"role": "tool",  "tool_results": [{"id","name","result"}, ...]}
-        ]
+        ],
+        "voice": {"session_id": "..."}          # optional — VOICE CALL mode (see voice_session).
+                                                # Every round: spoken-reply directive appended to
+                                                # the prompt, present_options never offered.
+                                                # First round only: the session is validated and
+                                                # rate-limited, and NO chat credit is reserved
+                                                # (the call's minutes pay for it).
     }
 
     Response:
         200 -> {"success": true, "type": "tool_calls", "tool_calls": [...], "credits_remaining": int}
             -> {"success": true, "type": "final",      "content": "...",   "credits_remaining": int}
             -> {"success": true, "type": "options",     "prompt": "...", "options": ["...", ...], "credits_remaining": int}
-                 (model called present_options — client renders tappable choice chips)
-        400 -> invalid payload
-        402 -> insufficient credits (first round only)
+                 (model called present_options — client renders tappable choice chips; never in voice mode)
+        400 -> invalid payload ({"error": "voice_session_invalid", "reason": "malformed"} for a bad `voice`)
+        402 -> insufficient credits (first round only; never in voice mode)
+        409 -> {"error": "voice_session_invalid", "reason": "not_found|closed|expired|exhausted|disabled"}
+               (voice mode, first round: the turn is refused — neither charged nor run)
+        429 -> {"error": "voice_rate_limited", "retry_after_seconds": float}
+               (voice mode, first round: > 20 turns/min or < 1.5 s since the previous turn)
         500 -> Gemini failure (credits refunded if reserved this round)
 
     Credits: CHAT_AGENT_COST reserved ONCE per turn, on the first round only — i.e. when no
@@ -3748,6 +3793,16 @@ def chat_agent(request: Request):
     # Model resolution: production A/B experiment (server-driven) + eval override precedence.
     model_id, model_arm = resolve_experiment_model(user_id, "chat_agent", CHAT_AGENT_MODEL, data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "chat_agent"}
+
+    # Optional + additive: voice-call mode. Absent (or null) -> the text path, byte-for-byte as
+    # before. Present but unusable -> an explicit error, never a silent fall-back to charging
+    # credits nor a silent free turn.
+    voice_raw = data.get("voice")
+    voice_session_id = None
+    if voice_raw is not None:
+        voice_session_id = voice_raw.get("session_id") if isinstance(voice_raw, dict) else None
+        if not voice_logic.is_valid_session_id(voice_session_id):
+            return _voice_error_response("voice_session_invalid", 400, reason="malformed")
 
     transcript = data.get("transcript")
     if not isinstance(transcript, list) or not transcript:
@@ -3828,7 +3883,25 @@ def chat_agent(request: Request):
     # stable id per turn gets a replay-safe reserve: retrying a dropped 200 no longer pays twice.
     request_id = (data.get("request_id") or "").strip() or None
     reserved_this_round = False
-    if is_first_round:
+    if is_first_round and voice_session_id:
+        # Voice call: the turn rides on the call's minutes (counted by voice_session heartbeats),
+        # so NO chat credit is reserved — but only for a live, unexhausted session of THIS user,
+        # within the per-session turn rate. Later rounds of the turn are free either way and skip
+        # this check, so a turn that started inside the call can finish its tool rounds.
+        try:
+            verdict, retry_after = _claim_voice_turn(user_id, voice_session_id)
+        except Exception:
+            logger.exception("chat_agent: voice turn check failed for user=%s", user_id[:8])
+            return create_error_response("Voice session check failed", 500)
+        if verdict == "rate_limited":
+            return _voice_error_response(
+                "voice_rate_limited", 429, retry_after_seconds=retry_after
+            )
+        if verdict is not None:
+            logger.info("chat_agent: voice turn refused reason=%s user=%s", verdict, user_id[:8])
+            return _voice_error_response("voice_session_invalid", 409, reason=verdict)
+        credits_remaining = get_user_credits(user_id)
+    elif is_first_round:
         if request_id:
             action, new_credits = reserve_chat_agent_credits(user_id, request_id)
         else:
@@ -3889,10 +3962,13 @@ def chat_agent(request: Request):
         features=features_block,
     )
     system_instruction += _language_directive(response_language)
+    if voice_session_id:
+        system_instruction += _voice_directive()
 
     # Capability gate: only clients that advertise `supports_options` can render type:"options",
     # so only they get the present_options tool. Absent/false → base tools (old-client safe).
-    supports_options = data.get("supports_options") is True
+    # Voice mode never gets it: chips cannot be heard — the model asks by voice instead.
+    supports_options = data.get("supports_options") is True and not voice_session_id
     agent_tools = CHAT_AGENT_TOOLS_WITH_OPTIONS if supports_options else CHAT_AGENT_TOOLS
 
     try:
@@ -4016,3 +4092,334 @@ def chat_agent(request: Request):
             else:
                 refund_chat_completion_credits(user_id, reason=reason)
         return create_error_response("Agent step failed", 500)
+
+
+# ============================================================================
+# VOICE CALL — voice_session (minutes) + chat_agent voice mode
+# ============================================================================
+# The Android client runs a voice call as on-device speech recognition -> chat_agent turn
+# (with `voice: {session_id}`) -> system TTS. The call's MINUTES are the tariff, not chat
+# credits: voice_session counts them by heartbeats on the server clock, and chat_agent skips
+# the credit reserve only for a turn that rides on a live session of the same user.
+#
+# Remote Config (Firestore remote_config/current, read via _voice_config):
+#   voice_call_enabled            default True  — server kill switch (the client has its own flag)
+#   voice_free_lifetime_seconds   default 300   — free: voice seconds for the life of the user
+#   voice_premium_daily_seconds   default 1200  — premium: voice seconds per UTC day
+#   voice_max_call_seconds        default 600   — one call, any plan
+#
+# Pure decisions (charge, quota, liveness, rate limit) live in voice_logic.py.
+# ============================================================================
+
+
+def _voice_now() -> float:
+    """Server clock (epoch seconds). The ONLY time source of voice accounting — the client's
+    clock is never read. A function so tests can drive time deterministically."""
+    return time.time()
+
+
+def _voice_config() -> dict:
+    """Voice kill switch + limits from ONE read of remote_config/current.
+
+    Same source and same failure mode as get_remote_config_value (Firestore doc, defaults on
+    any error), but one read instead of four — chat_agent pays this on every voice turn.
+    """
+    raw = {}
+    try:
+        doc = db.collection("remote_config").document("current").get()
+        if doc.exists:
+            raw = doc.to_dict() or {}
+    except Exception:
+        logger.warning("voice: remote_config read failed — using defaults", exc_info=True)
+    enabled = raw.get("voice_call_enabled", True)
+    if not isinstance(enabled, bool):
+        enabled = str(enabled).strip().lower() not in ("false", "0", "no", "off")
+    return {"enabled": enabled, **voice_logic.normalise_limits(raw)}
+
+
+def _voice_session_ref(user_id: str, session_id: str):
+    return (
+        db.collection("users").document(user_id)
+        .collection("voice_sessions").document(session_id)
+    )
+
+
+def _voice_usage_ref(user_id: str):
+    return db.collection("users").document(user_id).collection("voice").document("usage")
+
+
+def _voice_error_response(error: str, status_code: int, **extra):
+    """Error body with machine-readable extras (reason, is_premium, ...) and CORS headers."""
+    return add_cors_headers(make_response(
+        jsonify({"success": False, "error": error, **extra}), status_code
+    ))
+
+
+def _claim_voice_turn(user_id: str, session_id: str) -> tuple[str | None, float]:
+    """Validate + rate-limit ONE chat_agent voice turn (first round) in a transaction.
+
+    Returns (None, 0.0) when the turn may run free of chat credits — and records it on the
+    session — or (verdict, retry_after_seconds):
+        "disabled"     -> server kill switch is off
+        "not_found"    -> no such session under users/{user_id} (another user's id lands here)
+        "closed"       -> session ended / expired
+        "expired"      -> open but no heartbeat for SESSION_IDLE_SEC (closed now, lazily)
+        "exhausted"    -> the wallet or the per-call ceiling is spent
+        "rate_limited" -> > TURN_RATE_MAX_PER_WINDOW turns/min or < TURN_MIN_GAP_SEC apart
+    """
+    config = _voice_config()
+    if not config["enabled"]:
+        return "disabled", 0.0
+    is_premium = get_user_premium_status(user_id)
+    session_ref = _voice_session_ref(user_id, session_id)
+    usage_ref = _voice_usage_ref(user_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        now = _voice_now()
+        snap = session_ref.get(transaction=transaction)
+        usage_snap = usage_ref.get(transaction=transaction)
+        session = snap.to_dict() if snap.exists else None
+        usage = usage_snap.to_dict() if usage_snap.exists else {}
+        remaining = voice_logic.quota_remaining(is_premium, usage, now, config)
+        verdict = voice_logic.voice_turn_verdict(session, now, remaining, config["max_call"])
+        if verdict == "expired":
+            transaction.update(session_ref, {
+                "status": voice_logic.STATUS_EXPIRED,
+                "ended_at": session.get("last_beat_at"),
+                "end_reason": voice_logic.REASON_IDLE,
+            })
+        if verdict is not None:
+            return verdict, 0.0
+        allowed, turn_times, retry_after = voice_logic.turn_rate_decision(
+            session.get("turn_times"), now
+        )
+        if not allowed:
+            return "rate_limited", retry_after
+        transaction.update(session_ref, {
+            "turn_times": turn_times,
+            "turns": int(session.get("turns") or 0) + 1,
+            "last_turn_at": now,
+        })
+        return None, 0.0
+
+    return txn(db.transaction())
+
+
+def _voice_start(user_id: str, data: dict, config: dict):
+    user_data = get_user_data(user_id)
+    if user_data is None:
+        # Same bar as the credit path: no user document, no free minutes for an invented id.
+        return _voice_error_response("user_not_found", 404, reason="no_user")
+    is_premium = bool(user_data.get("is_premium", False))
+    if not config["enabled"]:
+        return _voice_error_response("voice_disabled", 503, is_premium=is_premium)
+
+    raw_sid = data.get("client_session_id")
+    if raw_sid is None:
+        session_id = str(uuid.uuid4())
+    else:
+        session_id = raw_sid.strip() if isinstance(raw_sid, str) else ""
+        if not voice_logic.is_valid_session_id(session_id):
+            return create_error_response(
+                "client_session_id must be 8-64 chars of [A-Za-z0-9_-]", 400
+            )
+
+    session_ref = _voice_session_ref(user_id, session_id)
+    usage_ref = _voice_usage_ref(user_id)
+    max_call = config["max_call"]
+
+    @firestore.transactional
+    def txn(transaction):
+        now = _voice_now()
+        snap = session_ref.get(transaction=transaction)
+        usage_snap = usage_ref.get(transaction=transaction)
+        usage = usage_snap.to_dict() if usage_snap.exists else {}
+        remaining = voice_logic.quota_remaining(is_premium, usage, now, config)
+        if snap.exists:
+            existing = snap.to_dict()
+            # A retried start of the same call answers the same; a closed call is not reopened.
+            if not voice_logic.is_live(existing, now):
+                return "closed", existing, remaining
+            return "started", existing, remaining
+        if voice_logic.call_remaining({}, remaining, max_call) <= 0:
+            return "exhausted", None, 0
+        doc = {
+            "user_id": user_id,
+            "status": voice_logic.STATUS_OPEN,
+            "plan": "premium" if is_premium else "free",
+            "started_at": now,
+            "last_beat_at": now,
+            "charged_seconds": 0,
+            "turns": 0,
+            "turn_times": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        transaction.set(session_ref, doc)
+        return "started", doc, remaining
+
+    outcome, session, remaining = txn(db.transaction())
+    if outcome == "exhausted":
+        logger.info("voice_session: quota exhausted at start user=%s premium=%s",
+                    user_id[:8], is_premium)
+        return _voice_error_response(
+            "voice_quota_exhausted", 402, is_premium=is_premium, remaining_seconds=0
+        )
+    if outcome == "closed":
+        return _voice_error_response(
+            "voice_session_closed", 409, reason=session.get("end_reason") or "closed"
+        )
+    return create_success_response({
+        "session_id": session_id,
+        "remaining_seconds": remaining,
+        "call_remaining_seconds": voice_logic.call_remaining(session, remaining, max_call),
+        "max_call_seconds": max_call,
+        "heartbeat_interval_seconds": voice_logic.HEARTBEAT_INTERVAL_SEC,
+        "is_premium": is_premium,
+    })
+
+
+def _voice_beat(user_id: str, session_id: str, config: dict, closing: bool):
+    """heartbeat (closing=False) / end (closing=True): charge the gap since the last beat by the
+    server clock, then keep the call open or close it. end on a closed session is a no-op."""
+    is_premium = get_user_premium_status(user_id)
+    session_ref = _voice_session_ref(user_id, session_id)
+    usage_ref = _voice_usage_ref(user_id)
+    max_call = config["max_call"]
+
+    @firestore.transactional
+    def txn(transaction):
+        now = _voice_now()
+        snap = session_ref.get(transaction=transaction)
+        usage_snap = usage_ref.get(transaction=transaction)
+        if not snap.exists:
+            return None
+        session = snap.to_dict()
+        usage = usage_snap.to_dict() if usage_snap.exists else {}
+        remaining = voice_logic.quota_remaining(is_premium, usage, now, config)
+        charged = int(session.get("charged_seconds") or 0)
+
+        if session.get("status") != voice_logic.STATUS_OPEN:
+            # Already closed (a repeated end, a heartbeat after the limit): nothing to charge.
+            return {
+                "ended": True,
+                "reason": session.get("end_reason") or "closed",
+                "remaining_seconds": remaining,
+                "call_remaining_seconds": 0,
+                "charged_seconds": charged,
+                "already_closed": True,
+            }
+
+        if voice_logic.is_idle(session, now):
+            # No heartbeat for SESSION_IDLE_SEC: the call ended at its last beat, uncharged since.
+            transaction.update(session_ref, {
+                "status": voice_logic.STATUS_EXPIRED,
+                "ended_at": session.get("last_beat_at"),
+                "end_reason": voice_logic.REASON_IDLE,
+            })
+            return {
+                "ended": True,
+                "reason": voice_logic.REASON_IDLE,
+                "remaining_seconds": remaining,
+                "call_remaining_seconds": 0,
+                "charged_seconds": charged,
+            }
+
+        sec = voice_logic.beat_charge(session, now, remaining, max_call)
+        if sec > 0:
+            transaction.set(usage_ref, voice_logic.apply_charge(usage, sec, now))
+        charged += sec
+        remaining_after = max(0, remaining - sec)
+        reason = voice_logic.end_reason_after_charge(charged, remaining_after, max_call)
+        if reason is None and not config["enabled"]:
+            reason = voice_logic.REASON_DISABLED
+        if reason is None and closing:
+            reason = voice_logic.REASON_CLIENT_END
+
+        update = {"last_beat_at": now, "charged_seconds": charged}
+        if reason is not None:
+            update.update({
+                "status": voice_logic.STATUS_ENDED,
+                "ended_at": now,
+                "end_reason": reason,
+            })
+        transaction.update(session_ref, update)
+        out = {
+            "ended": reason is not None,
+            "remaining_seconds": remaining_after,
+            "call_remaining_seconds": (
+                0 if reason is not None
+                else voice_logic.call_remaining({"charged_seconds": charged}, remaining_after, max_call)
+            ),
+            "charged_seconds": charged,
+        }
+        if reason is not None:
+            out["reason"] = reason
+        return out
+
+    result = txn(db.transaction())
+    if result is None:
+        return _voice_error_response("voice_session_not_found", 404)
+    return create_success_response(result)
+
+
+@functions_framework.http
+def voice_session(request: Request):
+    """
+    Voice-call minutes — start / heartbeat / end (server clock only).
+
+    Request body (all actions): {"user_id": "string", "action": "start" | "heartbeat" | "end", ...}
+
+    start     {"client_session_id": "uuid"?}   # optional; makes a retried start idempotent
+        200 -> {"success": true, "session_id": "...", "remaining_seconds": int,
+                "call_remaining_seconds": int, "max_call_seconds": int,
+                "heartbeat_interval_seconds": 15, "is_premium": bool}
+        402 -> {"success": false, "error": "voice_quota_exhausted", "is_premium": bool,
+                "remaining_seconds": 0}
+        404 -> {"success": false, "error": "user_not_found", "reason": "no_user"}
+        409 -> {"success": false, "error": "voice_session_closed", "reason": "..."}
+               (client_session_id names a call that is already over)
+        503 -> {"success": false, "error": "voice_disabled", "is_premium": bool}
+
+    heartbeat {"session_id": "..."}   — every heartbeat_interval_seconds
+    end       {"session_id": "..."}   — idempotent: a repeated end returns already_closed
+        200 -> {"success": true, "ended": bool, "reason"?: "quota_exhausted" | "max_call_duration"
+                | "idle" | "client_end" | "disabled", "remaining_seconds": int,
+                "call_remaining_seconds": int, "charged_seconds": int, "already_closed"?: true}
+        404 -> {"success": false, "error": "voice_session_not_found"}
+
+    Each heartbeat / end charges min(now - last_beat_at, 20 s), cut to the wallet and the
+    per-call ceiling. A session without a heartbeat for 45 s is closed (reason "idle") by the
+    next request that touches it, charging nothing for the gap. 400 -> invalid payload.
+    """
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
+    data, error = validate_request(request)
+    if error is not None:
+        return create_error_response(error, 400)
+
+    user_id = (data.get("user_id") or "").strip() if isinstance(data.get("user_id"), str) else ""
+    if not user_id:
+        return create_error_response("user_id is required", 400)
+
+    action = data.get("action")
+    action = action.strip().lower() if isinstance(action, str) else ""
+    if action not in ("start", "heartbeat", "end"):
+        return create_error_response("action must be start/heartbeat/end", 400)
+
+    session_id = None
+    if action != "start":
+        session_id = data.get("session_id")
+        session_id = session_id.strip() if isinstance(session_id, str) else ""
+        if not voice_logic.is_valid_session_id(session_id):
+            return create_error_response("session_id is required", 400)
+
+    try:
+        config = _voice_config()
+        if action == "start":
+            return _voice_start(user_id, data, config)
+        return _voice_beat(user_id, session_id, config, closing=(action == "end"))
+    except Exception:
+        logger.exception("voice_session: %s failed for user=%s", action, user_id[:8])
+        return create_error_response("Voice session step failed", 500)

@@ -300,6 +300,14 @@ import com.antonchuraev.homesearchchecklist.feature.onboarding.isWidgetSupported
 import kotlinx.datetime.plus
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceCapabilities
+import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.VoiceCallAction
+import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.VoiceCallRoute
+import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.VoiceCallViewModel
+import com.antonchuraev.homesearchchecklist.feature.voicecall.presentation.formatCallClock
+import aichecklists.core.designsystem.generated.resources.voice_call_snackbar_call_ended
+import org.jetbrains.compose.resources.getString
+import org.koin.core.qualifier.named
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -1187,6 +1195,12 @@ fun App() {
                 }
             }
 
+            // Voice call: one ViewModel for the whole app (Activity-scoped), so a call survives every
+            // navigation below the overlay; its entry gate reads the platform and the client flag.
+            val voiceCallViewModel: VoiceCallViewModel = koinViewModel()
+            val voiceCapabilities: VoiceCapabilities = koinInject()
+            val remoteConfigProvider: RemoteConfigProvider = koinInject()
+            val isDebugBuild: Boolean = koinInject(named("isDebugBuild"))
             Box(modifier = Modifier.fillMaxSize()) {
 
             // Scene strategy is platform-dependent so the web layout differs from Android/iOS:
@@ -2469,6 +2483,21 @@ fun App() {
             ) // end NavDisplay
             } // end renderNav lambda
 
+            // Voice call entry: the Ask pill's call button (V2NavigationShell `onStartVoiceCall`; the
+            // shell hides the button when this is null). Null when the platform has no call (web, iOS)
+            // or the client flag `voice_call_enabled` is off (default: on in debug, off in release);
+            // otherwise it starts the call overlay below.
+            val voiceCallAvailable = voiceCapabilities.isCallSupported &&
+                remoteConfigProvider.getBoolean(
+                    RemoteConfigKeys.VOICE_CALL_ENABLED,
+                    RemoteConfigDefaults.voiceCallEnabled(isDebugBuild),
+                )
+            val startVoiceCall: (() -> Unit)? = if (voiceCallAvailable) {
+                { voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_PILL)) }
+            } else {
+                null
+            }
+
             // Shell mount. The v2 branch is checked FIRST and the control branch below is a literal
             // copy of the pre-experiment `if (showShell) { … }` body — no reordering, no added
             // parameters — so `git diff` shows the control arm's chrome is byte-identical.
@@ -2498,6 +2527,7 @@ fun App() {
                     onNavigate = v2OnNavigate,
                     onOpenChatVoice = openChatInVoice,
                     onOpenChatAttach = openChatWithAttach,
+                    onStartVoiceCall = startVoiceCall,
                     onOpenChat = {
                         // Tagged "fab" so it stays distinguishable from the detail screen's top-bar
                         // action, which emits the same event with source="detail_toolbar". Two very
@@ -2662,6 +2692,48 @@ fun App() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding(),
+            )
+
+            // The voice call overlay: LAST in the root Box, outside Nav3, so a call covers every route
+            // and survives navigation under it. It draws nothing while closed. Leaving the call for
+            // another screen (a card, the paywall, the chat) ends it first; the overlay closes with
+            // the effect, so the destination is never drawn under a live call.
+            VoiceCallRoute(
+                viewModel = voiceCallViewModel,
+                onOpenChecklist = { checklistId, callDurationSec ->
+                    val id = checklistId.toLongOrNull()
+                    if (id == null) {
+                        // Ids come from the dispatcher's Long ids; a miss is a bug, logged with a cause.
+                        logger.error(
+                            "VoiceCall",
+                            "action card carries a non-numeric checklist id: $checklistId",
+                            IllegalStateException("voice call card id $checklistId"),
+                        )
+                    } else {
+                        navigator.navigateToChecklistDetail(id)
+                    }
+                    // The call ended from a card: say so on the screen the user lands on.
+                    if (callDurationSec != null) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                getString(Res.string.voice_call_snackbar_call_ended, formatCallClock(callDurationSec)),
+                            )
+                        }
+                    }
+                },
+                onOpenPaywall = { source -> navigator.navigateToPaywall(source = source) },
+                // "Ask in chat": the same hand-off as the Ask pill's tap (onOpenChat) — a fresh context,
+                // the capture dock closed, the chat dock open.
+                onOpenChatSheet = {
+                    analyticsTracker.event(
+                        AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                        mapOf(AnalyticsParams.SOURCE to VOICE_CALL_SURFACE_PILL),
+                    )
+                    chatSheetContextId = null
+                    chatSheetContextLabel = null
+                    v2CreateDockOpen = false
+                    v2ChatDockOpen = true
+                },
             )
 
             // The expandable chat dock is now rendered PER-SCREEN (inside MainScreen /
@@ -2903,3 +2975,6 @@ private const val WIDGET_PROMO_SHOWN_KEY = "widget_promo_shown"
  * the post-first-checklist activation reminder, so the two retention prompts never stack.
  */
 private const val WIDGET_PROMO_MIN_CHECKLISTS = 2
+
+/** Analytics `surface` of a voice call started from the Ask pill (and `source` of "Ask in chat" from it). */
+private const val VOICE_CALL_SURFACE_PILL = "pill_call"

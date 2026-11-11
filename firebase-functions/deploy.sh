@@ -217,6 +217,20 @@ gcloud functions deploy chat_agent \
     --memory=512MB \
     --timeout=60s
 
+# Deploy voice_session (voice-call minutes: start / heartbeat / end). Firestore + Remote Config
+# only — no Gemini, so no secrets. 512MB for the shared main.py import graph (see the note above).
+echo "Deploying voice_session..."
+gcloud functions deploy voice_session \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=voice_session \
+    --trigger-http \
+    --allow-unauthenticated \
+    --memory=512MB \
+    --timeout=30s
+
 # Deploy transcribe_audio (mic voice input → text)
 echo "Deploying transcribe_audio..."
 gcloud functions deploy transcribe_audio \
@@ -243,6 +257,7 @@ echo "  refill_premium_credits: https://$REGION-$PROJECT_ID.cloudfunctions.net/r
 echo "  classify_chat_intent: https://$REGION-$PROJECT_ID.cloudfunctions.net/classify_chat_intent"
 echo "  chat_completion: https://$REGION-$PROJECT_ID.cloudfunctions.net/chat_completion"
 echo "  chat_agent: https://$REGION-$PROJECT_ID.cloudfunctions.net/chat_agent"
+echo "  voice_session: https://$REGION-$PROJECT_ID.cloudfunctions.net/voice_session"
 echo "  transcribe_audio: https://$REGION-$PROJECT_ID.cloudfunctions.net/transcribe_audio"
 echo "  send_promotions_batch: https://$REGION-$PROJECT_ID.cloudfunctions.net/send_promotions_batch"
 echo "  register_push_token: https://$REGION-$PROJECT_ID.cloudfunctions.net/register_push_token"

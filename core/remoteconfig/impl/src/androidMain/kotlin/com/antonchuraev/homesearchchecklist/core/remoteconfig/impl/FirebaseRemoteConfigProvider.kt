@@ -20,16 +20,18 @@ class FirebaseRemoteConfigProvider(
 
     private val remoteConfig: FirebaseRemoteConfig = FirebaseRemoteConfig.getInstance()
 
+    // Debug builds fetch on every call (0s) so RC values and A/B experiment
+    // assignments are visible immediately during testing; production keeps the
+    // 1h throttle. Detected via the debuggable manifest flag (no DI needed here).
+    // Also picks build-type-dependent in-app defaults (getDefaultsMap).
+    private val isDebuggable: Boolean = try {
+        val ctx = com.google.firebase.FirebaseApp.getInstance().applicationContext
+        (ctx.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    } catch (e: Exception) {
+        false
+    }
+
     init {
-        // Debug builds fetch on every call (0s) so RC values and A/B experiment
-        // assignments are visible immediately during testing; production keeps the
-        // 1h throttle. Detected via the debuggable manifest flag (no DI needed here).
-        val isDebuggable = try {
-            val ctx = com.google.firebase.FirebaseApp.getInstance().applicationContext
-            (ctx.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        } catch (e: Exception) {
-            false
-        }
         val configSettings = FirebaseRemoteConfigSettings.Builder()
             .setMinimumFetchIntervalInSeconds(if (isDebuggable) 0L else 3600L)
             // Dead-network safety ceiling for a SINGLE fetch. Onboarding awaits fetchAndActivate()
@@ -60,6 +62,7 @@ class FirebaseRemoteConfigProvider(
         RemoteConfigKeys.PAYWALL_DEFAULT_PLAN to RemoteConfigDefaults.PAYWALL_DEFAULT_PLAN,
         RemoteConfigKeys.PAYWALL_CONFIG to RemoteConfigDefaults.PAYWALL_CONFIG,
         RemoteConfigKeys.PUSH_TIMING_ARM to RemoteConfigDefaults.PUSH_TIMING_ARM,
+        RemoteConfigKeys.VOICE_CALL_ENABLED to RemoteConfigDefaults.voiceCallEnabled(isDebuggable),
     )
 
     @Volatile

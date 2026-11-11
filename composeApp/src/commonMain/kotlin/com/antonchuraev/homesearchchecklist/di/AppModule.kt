@@ -21,8 +21,12 @@ import com.antonchuraev.homesearchchecklist.feature.sharing.di.sharingFeatureMod
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.di.updateFeedFeatureModule
 import com.antonchuraev.homesearchchecklist.settings.di.settingsModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
+import com.antonchuraev.homesearchchecklist.core.voice.impl.di.voiceModule
 import com.antonchuraev.homesearchchecklist.core.auth.impl.googleAuthModule
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.di.aiChatFeatureModule
+import com.antonchuraev.homesearchchecklist.feature.voicecall.di.VoiceCallLanguage
+import com.antonchuraev.homesearchchecklist.feature.voicecall.di.voiceCallFeatureModule
+import com.antonchuraev.homesearchchecklist.aichat.currentSystemLanguage
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.InitialUploadGate
 import com.antonchuraev.homesearchchecklist.sync.InitialUploadGateImpl
@@ -39,6 +43,7 @@ val appModule = module {
         commonCoreModule,
         navigationCoreModule,
         remoteConfigModule,
+        voiceModule,
         checklistFeatureModule,
         createFeatureModule,
         onboardingFeatureModule,
@@ -54,6 +59,7 @@ val appModule = module {
         datastoreModule,
         aiChatFeatureModule,
         aiChatDispatcherModule,
+        voiceCallFeatureModule,
         googleAuthModule,
         platformModule()
     )
@@ -79,6 +85,8 @@ val appModule = module {
         )
     }
     viewModelOf(::AppViewModel)
+    // The voice call listens and answers in the app language (the same source as the chat's locale).
+    single<VoiceCallLanguage> { VoiceCallLanguage { currentSystemLanguage() } }
     // CsatViewModel as singleton — accessed from App.kt and DebugScreen
     single { CsatViewModel(get(), get()) }
 }

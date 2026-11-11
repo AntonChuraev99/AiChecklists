@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatScreenSnapshot
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentVoiceContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
 import io.ktor.client.*
@@ -20,6 +21,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -852,5 +855,138 @@ class ChatAgentApiServiceImplTest {
         assertEquals("control", result.modelVariant)
         assertEquals("gemini-2.5-flash", result.modelId)
         assertEquals("chat_agent", result.aiFlow)
+    }
+
+    // ── Voice-call mode (`voice: {session_id}`) ───────────────────────────────
+
+    private fun jsonResponse(status: HttpStatusCode, body: String): MockRequestHandler = {
+        respond(
+            content = body,
+            status = status,
+            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+        )
+    }
+
+    private suspend fun captureBody(voice: AgentVoiceContext?): String {
+        var captured = ""
+        val service = makeService { request ->
+            captured = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":5}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+        service.step(
+            userId = "u1",
+            transcript = listOf(AgentTranscriptEntry.UserText("hi")),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            voice = voice,
+        )
+        return captured
+    }
+
+    @Test
+    fun step_voice_sendsSessionIdAndNoOptionsSupport() = runTest {
+        val body = Json.parseToJsonElement(captureBody(AgentVoiceContext(sessionId = "sess-42"))).jsonObject
+
+        assertEquals("sess-42", body["voice"]?.jsonObject?.get("session_id")?.jsonPrimitive?.content)
+        assertEquals("false", body["supports_options"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun step_withoutVoice_omitsVoiceKeyAndKeepsOptionsSupport() = runTest {
+        val body = Json.parseToJsonElement(captureBody(voice = null)).jsonObject
+
+        assertNull(body["voice"])
+        assertEquals("true", body["supports_options"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun step_voice_409SessionInvalid_returnsVoiceRefusedWithReason() = runTest {
+        val service = makeService(
+            jsonResponse(HttpStatusCode.Conflict, """{"success":false,"error":"voice_session_invalid","reason":"closed"}"""),
+        )
+
+        val result = service.step(
+            userId = "u1",
+            transcript = listOf(AgentTranscriptEntry.UserText("hi")),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            voice = AgentVoiceContext("sess-1"),
+        )
+
+        assertEquals(AgentStepResult.VoiceRefused(httpStatus = 409, error = "voice_session_invalid", reason = "closed"), result)
+    }
+
+    @Test
+    fun step_voice_429RateLimited_returnsVoiceRefusedWithRetryAfter() = runTest {
+        val service = makeService(
+            jsonResponse(HttpStatusCode.TooManyRequests, """{"success":false,"error":"voice_rate_limited","retry_after_seconds":1.5}"""),
+        )
+
+        val result = service.step(
+            userId = "u1",
+            transcript = listOf(AgentTranscriptEntry.UserText("hi")),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            voice = AgentVoiceContext("sess-1"),
+        )
+
+        assertEquals(
+            AgentStepResult.VoiceRefused(httpStatus = 429, error = "voice_rate_limited", retryAfterSeconds = 1.5),
+            result,
+        )
+    }
+
+    @Test
+    fun step_voice_400Malformed_returnsVoiceRefused() = runTest {
+        val service = makeService(
+            jsonResponse(HttpStatusCode.BadRequest, """{"success":false,"error":"voice_session_invalid","reason":"malformed"}"""),
+        )
+
+        val result = service.step(
+            userId = "u1",
+            transcript = listOf(AgentTranscriptEntry.UserText("hi")),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            voice = AgentVoiceContext("bad"),
+        )
+
+        assertEquals(AgentStepResult.VoiceRefused(httpStatus = 400, error = "voice_session_invalid", reason = "malformed"), result)
+    }
+
+    @Test
+    fun step_voice_400NotAboutSession_staysInvalidRequest() = runTest {
+        val service = makeService(
+            jsonResponse(HttpStatusCode.BadRequest, """{"success":false,"error":"transcript too long (max 60 entries)"}"""),
+        )
+
+        val result = service.step(
+            userId = "u1",
+            transcript = listOf(AgentTranscriptEntry.UserText("hi")),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            voice = AgentVoiceContext("sess-1"),
+        )
+
+        assertEquals(AgentStepResult.InvalidRequest("transcript too long (max 60 entries)"), result)
+    }
+
+    @Test
+    fun step_withoutVoice_409StaysServiceError() = runTest {
+        val service = makeService(
+            jsonResponse(HttpStatusCode.Conflict, """{"success":false,"error":"voice_session_invalid","reason":"closed"}"""),
+        )
+
+        val result = service.step(
+            userId = "u1",
+            transcript = listOf(AgentTranscriptEntry.UserText("hi")),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.ServiceError>(result)
     }
 }

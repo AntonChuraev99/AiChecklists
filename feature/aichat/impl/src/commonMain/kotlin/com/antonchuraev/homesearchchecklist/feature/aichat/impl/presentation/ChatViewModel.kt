@@ -48,6 +48,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Checkl
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentChecklistsSummary
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolCallMapper
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolResultSerializer
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentTranscriptWindow
@@ -745,6 +746,7 @@ class ChatViewModel(
         is AgentStepResult.Final -> modelVariant
         is AgentStepResult.Options -> modelVariant
         is AgentStepResult.InvalidRequest,
+        is AgentStepResult.VoiceRefused,
         AgentStepResult.InsufficientCredits,
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
@@ -757,6 +759,7 @@ class ChatViewModel(
         is AgentStepResult.Final -> modelId
         is AgentStepResult.Options -> modelId
         is AgentStepResult.InvalidRequest,
+        is AgentStepResult.VoiceRefused,
         AgentStepResult.InsufficientCredits,
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
@@ -769,6 +772,7 @@ class ChatViewModel(
         is AgentStepResult.Final -> aiFlow
         is AgentStepResult.Options -> aiFlow
         is AgentStepResult.InvalidRequest,
+        is AgentStepResult.VoiceRefused,
         AgentStepResult.InsufficientCredits,
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
@@ -2394,41 +2398,10 @@ class ChatViewModel(
      * [ChecklistItemContext.position] (list index) is the best available recency proxy. Answering
      * an absolute "when did I add X" would require a schema change (a per-item createdAt column).
      */
-    private suspend fun buildChecklistsSummary(): List<ChecklistContext> = runCatching {
-        var remainingBudget = RECENT_ITEMS_TOTAL_BUDGET
-        checklistRepository.projects.first()
-            .take(CHECKLIST_SUMMARY_LIMIT)
-            .map { checklist ->
-                // Index the FULL item list first so position reflects the real list order,
-                // then keep only leaves, then take the freshest tail within the global budget.
-                val perListCap = minOf(RECENT_ITEMS_PER_CHECKLIST, remainingBudget).coerceAtLeast(0)
-                val recent = if (perListCap == 0) {
-                    emptyList()
-                } else {
-                    checklist.items
-                        .mapIndexed { index, item -> index to item }
-                        .filter { (_, item) -> item.type == ChecklistNodeType.ITEM }
-                        .takeLast(perListCap)
-                        .map { (index, item) ->
-                            ChecklistItemContext(
-                                text = item.text,
-                                checked = item.checked,
-                                position = index,
-                            )
-                        }
-                }
-                remainingBudget -= recent.size
-                ChecklistContext(
-                    name = checklist.name,
-                    totalItems = checklist.items.count { it.type == ChecklistNodeType.ITEM },
-                    doneItems = checklist.items.count { it.type == ChecklistNodeType.ITEM && it.checked },
-                    recentItems = recent,
-                )
-            }
-    }.getOrElse { e ->
-        logger.error(TAG, "buildChecklistsSummary failed — ${e.message}", e)
-        emptyList()
-    }
+    private suspend fun buildChecklistsSummary(): List<ChecklistContext> =
+        // Shared with the voice call's turn gateway — one builder, so the two surfaces can never
+        // describe the user's lists differently.
+        AgentChecklistsSummary.load(checklistRepository, logger, TAG)
 
     // ─── Layer 3 screen snapshot (what checklists_summary structurally cannot carry) ──────
 
@@ -2958,6 +2931,21 @@ class ChatViewModel(
 
                 AgentStepResult.ServiceError -> {
                     logger.warning(TAG, "runAgentTurn: ServiceError")
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
+                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_service", retryText = userInput, routedLayer = RoutingLayer.FullChat))
+                    return
+                }
+
+                // Voice-call mode only — the text chat never sends `voice`, so reaching this is a
+                // client bug. Answered like a service error (a visible reply with Retry), and logged
+                // with a throwable so it reaches Crashlytics instead of hiding behind that copy.
+                is AgentStepResult.VoiceRefused -> {
+                    logger.error(
+                        TAG,
+                        "runAgentTurn: voice refusal on a text turn — status=${stepResult.httpStatus} error=${stepResult.error}",
+                        IllegalStateException("chat_agent voice refusal on a text turn: ${stepResult.error}"),
+                    )
                     trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_service", retryText = userInput, routedLayer = RoutingLayer.FullChat))
@@ -4036,17 +4024,17 @@ class ChatViewModel(
         /** Backoff between history-seed retries; ~5×400ms covers OPFS Web Worker warm-up. */
         const val HISTORY_LOAD_RETRY_DELAY_MS = 400L
         /** Max checklists to include in Layer 3 context summary. */
-        const val CHECKLIST_SUMMARY_LIMIT = 8
+        const val CHECKLIST_SUMMARY_LIMIT = AgentChecklistsSummary.CHECKLIST_SUMMARY_LIMIT
         /**
          * Max recent items sent PER checklist in the Layer 3 context (the freshest tail of the list).
          * Small by design — the goal is "what did I add recently", not a full export.
          */
-        const val RECENT_ITEMS_PER_CHECKLIST = 6
+        const val RECENT_ITEMS_PER_CHECKLIST = AgentChecklistsSummary.RECENT_ITEMS_PER_CHECKLIST
         /**
          * Global cap on recent items sent across ALL checklists in one request. Bounds token cost
          * (and the amount of item text leaving the device) no matter how many lists the user has.
          */
-        const val RECENT_ITEMS_TOTAL_BUDGET = 30
+        const val RECENT_ITEMS_TOTAL_BUDGET = AgentChecklistsSummary.RECENT_ITEMS_TOTAL_BUDGET
         /**
          * Rows of the screen snapshot (`context_screen`) sent per turn — same budgeting spirit as
          * [RECENT_ITEMS_TOTAL_BUDGET]. The server clamps again at 20; the client stays below it so
