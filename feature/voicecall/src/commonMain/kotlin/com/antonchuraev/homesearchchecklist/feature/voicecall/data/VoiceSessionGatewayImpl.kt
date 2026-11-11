@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.voice.api.VoicePlan
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceQuota
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceResult
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEnd
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndReason
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndRequest
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionGateway
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionId
@@ -75,8 +76,8 @@ internal class VoiceSessionGatewayImpl(
         call("heartbeat", SessionRequest(action = "heartbeat", sessionId = id.value)) { status, body ->
             if (status in 200..299) {
                 val dto = wireJson.decodeFromString<SessionResponseDto>(body)
-                if (dto.ended) logger.info(TAG, "heartbeat: the server closed the session, reason=${dto.reason}")
-                VoiceResult.Success(VoiceHeartbeat(quota = dto.toQuota(), ended = dto.ended))
+                val endReason = if (dto.ended) endReasonOf(dto.reason) else null
+                VoiceResult.Success(VoiceHeartbeat(quota = dto.toQuota(), ended = dto.ended, endReason = endReason))
             } else {
                 VoiceResult.Failure(errorFor(status, body))
             }
@@ -135,6 +136,21 @@ internal class VoiceSessionGatewayImpl(
             logger.error(TAG, "$action: unreadable response status=$status — ${e.message}", e)
             VoiceResult.Failure(VoiceCallError.Unavailable)
         }
+    }
+
+    /**
+     * Server `reason` of a closed session → [VoiceSessionEndReason]; parsed here once. A missing or
+     * unknown reason (an older server, `closed`) is `null`: the engine then falls back to the minutes
+     * left, and the reason is logged so the gap is visible.
+     */
+    private fun endReasonOf(wire: String?): VoiceSessionEndReason? {
+        val reason = VoiceSessionEndReason.ofWire(wire)
+        if (reason == null) {
+            logger.warning(TAG, "heartbeat: the server closed the session with an unknown reason=$wire")
+        } else {
+            logger.info(TAG, "heartbeat: the server closed the session, reason=${reason.wireValue}")
+        }
+        return reason
     }
 
     private fun errorOf(body: String): SessionResponseDto =

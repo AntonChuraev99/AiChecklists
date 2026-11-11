@@ -14,6 +14,7 @@ import com.antonchuraev.homesearchchecklist.core.voice.api.UnavailableReason
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceAgentAction
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoicePlan
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceQuota
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -223,6 +224,74 @@ class VoiceCallUiMapperTest {
         assertEquals(600, summary.durationSec)
         assertEquals(true, summary.callAgainAvailable)
         assertEquals(120, summary.freeSecondsLeft)
+    }
+
+    private fun serverEnded(reason: VoiceSessionEndReason?, left: Int, plan: VoicePlan = VoicePlan.Premium) = map(
+        CallEngineState(
+            stop = CallStop.LimitReached(quota(left = left, plan = plan), duringCall = true, serverReason = reason),
+            elapsedSec = 120,
+            quota = quota(left = left, plan = plan),
+            actions = listOf(trip),
+        ),
+    )
+
+    @Test
+    fun serverReasonMaxCallDuration_isTheCallMaximumSummary_evenAtZeroMinutes() {
+        // At 0 minutes the old by-remaining rule would have said "minutes ran out".
+        assertEquals(
+            VoiceCallSummaryReason.CallCap,
+            assertIs<VoiceCallUiState.Summary>(serverEnded(VoiceSessionEndReason.MaxCallDuration, left = 0)).reason,
+        )
+        assertEquals(
+            VoiceCallSummaryReason.CallCap,
+            assertIs<VoiceCallUiState.Summary>(serverEnded(VoiceSessionEndReason.MaxCallDuration, left = 1080)).reason,
+        )
+    }
+
+    @Test
+    fun serverReasonQuotaExhausted_isTheLimitScreen_evenWithSecondsReported() {
+        // The heartbeat's minutes may lag the verdict; the server's reason wins over the number.
+        val limit = assertIs<VoiceCallUiState.LimitReached>(serverEnded(VoiceSessionEndReason.QuotaExhausted, left = 30, plan = VoicePlan.Free))
+        assertEquals(VoicePlanUi.Free, limit.plan)
+        assertEquals(1, limit.actions.size)
+        assertIs<VoiceCallUiState.LimitReached>(serverEnded(VoiceSessionEndReason.QuotaExhausted, left = 0))
+    }
+
+    @Test
+    fun serverReasonUnknown_fallsBackToTheMinutesLeft() {
+        assertEquals(
+            VoiceCallSummaryReason.CallCap,
+            assertIs<VoiceCallUiState.Summary>(serverEnded(reason = null, left = 1080)).reason,
+        )
+        assertIs<VoiceCallUiState.LimitReached>(serverEnded(reason = null, left = 0))
+        assertEquals(
+            VoiceCallSummaryReason.CallCap,
+            assertIs<VoiceCallUiState.Summary>(serverEnded(VoiceSessionEndReason.ClientEnd, left = 600)).reason,
+        )
+    }
+
+    @Test
+    fun serverKillSwitchMidCall_isTheFlagOffFailure_withoutCallAgain() {
+        // The engine stops a `disabled` heartbeat as Unavailable(FlagOff), whatever minutes are left.
+        val ui = map(
+            CallEngineState(stop = CallStop.Unavailable(UnavailableReason.FlagOff), elapsedSec = 120, quota = quota(left = 1080), actions = listOf(trip)),
+        )
+        assertEquals(VoiceCallUiState.Failure(VoiceCallFailureUi.FlagOff), ui)
+    }
+
+    @Test
+    fun serverIdleClose_isTheConnectionLost_notTheCallMaximum() {
+        // The engine stops an `idle` heartbeat as Dropped(Offline).
+        assertEquals(
+            VoiceCallUiState.Failure(VoiceCallFailureUi.Offline),
+            map(CallEngineState(stop = CallStop.Dropped(DropCause.Offline), elapsedSec = 120, quota = quota(left = 1080))),
+        )
+        assertEquals(
+            VoiceCallSummaryReason.Dropped,
+            assertIs<VoiceCallUiState.Summary>(
+                map(CallEngineState(stop = CallStop.Dropped(DropCause.Offline), elapsedSec = 120, quota = quota(left = 1080), actions = listOf(trip))),
+            ).reason,
+        )
     }
 
     @Test

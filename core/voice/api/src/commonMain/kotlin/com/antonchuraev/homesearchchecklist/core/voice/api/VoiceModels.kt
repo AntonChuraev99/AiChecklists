@@ -407,8 +407,46 @@ data class VoiceSessionEndRequest(
     val interrupted: InterruptedTurn?,
 )
 
-/** @property ended the server closed the session (minutes ran out or the session timed out). */
-data class VoiceHeartbeat(val quota: VoiceQuota, val ended: Boolean)
+/**
+ * Why the server closed a session, as `voice_session` reports it on a heartbeat (`reason`, server
+ * `voice_logic.REASON_*`). A reason the client does not know is `null`, never a guess.
+ */
+enum class VoiceSessionEndReason(val wireValue: String) {
+    /** The account's minutes ran out. */
+    QuotaExhausted("quota_exhausted"),
+
+    /** The call reached the per-call maximum; the account may still have minutes. */
+    MaxCallDuration("max_call_duration"),
+
+    /** No heartbeat reached the server for its idle window: the connection was lost. */
+    Idle("idle"),
+
+    /** The client already ended the session. */
+    ClientEnd("client_end"),
+
+    /** The server kill switch turned voice calls off mid-call. */
+    Disabled("disabled"),
+    ;
+
+    companion object {
+        fun ofWire(value: String?): VoiceSessionEndReason? = entries.firstOrNull { it.wireValue == value }
+    }
+}
+
+/**
+ * @property ended the server closed the session (minutes ran out, the call cap, idle, kill switch).
+ * @property endReason why the server closed it, `null` when it is still open or the reason is unknown.
+ *   Not part of `equals`/`copy` (declared outside the primary constructor): it was added after the
+ *   two-field contract, and `copy()` drops it — build a new instance instead.
+ */
+data class VoiceHeartbeat(val quota: VoiceQuota, val ended: Boolean) {
+    var endReason: VoiceSessionEndReason? = null
+        private set
+
+    constructor(quota: VoiceQuota, ended: Boolean, endReason: VoiceSessionEndReason?) : this(quota, ended) {
+        this.endReason = endReason
+    }
+}
 
 /**
  * Answer of [VoiceSessionGateway.end].

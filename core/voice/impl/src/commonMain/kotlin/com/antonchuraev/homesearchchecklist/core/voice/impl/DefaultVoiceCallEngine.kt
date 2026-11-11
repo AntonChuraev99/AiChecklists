@@ -35,6 +35,7 @@ import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceCallEngine
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceCallError
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceCapabilities
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceResult
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndReason
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndRequest
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionGateway
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionId
@@ -147,6 +148,7 @@ internal class DefaultVoiceCallEngine(
     private var startedSessionId: VoiceSessionId? = null
     private var pausedAtMs: Long? = null
     private var limitPending: CallStop? = null
+    private var limitPendingReason: CallEndReason = CallEndReason.Limit
     private var consecutiveErrors = 0
     private var consecutiveSttErrors = 0
 
@@ -345,24 +347,38 @@ internal class DefaultVoiceCallEngine(
             is VoiceResult.Success -> {
                 val quota = result.value.quota
                 _state.update { it.copy(quota = quota, lastMinute = quota.secondsLeft <= LAST_MINUTE_SEC) }
-                if (result.value.ended || quota.secondsLeft <= 0) requestLimitEnd(CallStop.LimitReached(quota, duringCall = true))
+                val serverReason = result.value.endReason.takeIf { result.value.ended }
+                when {
+                    // Kill switch mid-call: calls are off, not a limit (no "call again", no limit event).
+                    serverReason == VoiceSessionEndReason.Disabled ->
+                        requestLimitEnd(CallStop.Unavailable(UnavailableReason.FlagOff), CallEndReason.Error)
+                    // The server stopped hearing our heartbeats: the connection was lost.
+                    serverReason == VoiceSessionEndReason.Idle ->
+                        requestLimitEnd(CallStop.Dropped(DropCause.Offline), CallEndReason.Offline)
+                    result.value.ended || quota.secondsLeft <= 0 ->
+                        requestLimitEnd(CallStop.LimitReached(quota, duringCall = true, serverReason = serverReason))
+                }
             }
             // A lost heartbeat is not charged; the next one or the end call settles the minutes.
             is VoiceResult.Failure -> emit(CallEngineEvent.Error(stage = "session", code = result.error.code))
         }
     }
 
-    /** The agent finishes the sentence being spoken, then the call ends (heartbeat `ended`, [CallConfig.softLimitSec]). */
-    private fun requestLimitEnd(stop: CallStop) {
+    /**
+     * The agent finishes the sentence being spoken, then the call ends (heartbeat `ended`, [CallConfig.softLimitSec]).
+     * [reason] is what the end request reports to the server and analytics.
+     */
+    private fun requestLimitEnd(stop: CallStop, reason: CallEndReason = CallEndReason.Limit) {
         if (ended || limitPending != null) return
         limitPending = stop
+        limitPendingReason = reason
         if (_state.value.phase == CallPhase.Speaking) return
         finishLimit()
     }
 
     private fun finishLimit() {
         val stop = limitPending ?: return
-        endCall(CallEndReason.Limit, stop)
+        endCall(limitPendingReason, stop)
     }
 
     // ---------------------------------------------------------------------------------------------

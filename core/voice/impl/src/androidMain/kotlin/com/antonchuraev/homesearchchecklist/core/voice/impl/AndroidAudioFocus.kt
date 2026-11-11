@@ -6,7 +6,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
-import android.util.Log
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.voice.api.AudioFocusController
 import com.antonchuraev.homesearchchecklist.core.voice.api.FocusChange
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +21,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
  * the main looper, and the call machine runs there too. API 26+ uses an [AudioFocusRequest] with `USAGE_ASSISTANT`;
  * API 24-25 (minSdk) the legacy stream request on `STREAM_MUSIC`, which the assistant usage maps to.
  */
-internal class AndroidAudioFocus(context: Context) : AudioFocusController {
+internal class AndroidAudioFocus(
+    context: Context,
+    private val logger: AppLogger,
+) : AudioFocusController {
 
     private val manager = context.getSystemService(AudioManager::class.java)
 
@@ -59,7 +62,7 @@ internal class AndroidAudioFocus(context: Context) : AudioFocusController {
         .build()
 
     override fun acquire(): Boolean {
-        val audio = manager ?: return false.also { Log.w(TAG, "AudioManager unavailable") }
+        val audio = manager ?: return false.also { logger.warning(TAG, "AudioManager unavailable: audio focus not acquired") }
         val result = if (request != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audio.requestAudioFocus(request)
         } else {
@@ -69,7 +72,7 @@ internal class AndroidAudioFocus(context: Context) : AudioFocusController {
         val granted = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         // A refused request leaves the registered one in the focus stack (the Gain after a phone call goes to it), so
         // a refusal does not clear [held]: release() must still abandon it.
-        if (granted) held = true else Log.w(TAG, "audio focus refused ($result)")
+        if (granted) held = true else logger.warning(TAG, "audio focus refused ($result)")
         return granted
     }
 
@@ -95,7 +98,10 @@ internal class AndroidAudioFocus(context: Context) : AudioFocusController {
     }
 
     private fun report(change: FocusChange) {
-        if (!_changes.tryEmit(change)) Log.e(TAG, "focus change $change dropped: buffer full")
+        if (!_changes.tryEmit(change)) {
+            val message = "focus change $change dropped: buffer full"
+            logger.error(TAG, message, IllegalStateException(message))
+        }
     }
 
     private companion object {
