@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon (monochrome) layer of the v5 launcher mark: a tile rotated ~-9.5 deg with a solid
+     check that breaks out of its top-right corner. A 2dp knock-out ring (evenOdd, clipped to the
+     tile) separates the check from the tile, because the launcher tints every opaque pixel one colour.
+     Generated from the raster art; keep it inside the 66dp safe zone (radius 33dp from 54,54). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group>
+        <clip-path android:pathData="M38.7,34.66L60.23,31.06A11.74,11.74 0 0,1 73.75,40.7L77.36,62.23A11.74,11.74 0 0,1 67.71,75.76L46.18,79.36A11.74,11.74 0 0,1 32.66,69.71L29.06,48.18A11.74,11.74 0 0,1 38.7,34.66Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M38.7,34.66L60.23,31.06A11.74,11.74 0 0,1 73.75,40.7L77.36,62.23A11.74,11.74 0 0,1 67.71,75.76L46.18,79.36A11.74,11.74 0 0,1 32.66,69.71L29.06,48.18A11.74,11.74 0 0,1 38.7,34.66ZM37.87,58.4L47.33,68.55A6.8,6.8 0 0,0 57.46,68.35L80.6,41.48A6.8,6.8 0 0,0 70.3,32.6L52.11,53.72L47.82,49.12A6.8,6.8 0 0,0 37.87,58.4Z" />
+    </group>
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M39.33,57.03L48.8,67.19A4.8,4.8 0 0,0 55.95,67.05L79.09,40.17A4.8,4.8 0 0,0 71.81,33.91L52.17,56.72L46.36,50.48A4.8,4.8 0 0,0 39.33,57.03Z" />
+</vector>
