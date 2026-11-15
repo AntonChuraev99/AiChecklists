@@ -94,6 +94,8 @@ internal class PushTokenRepositoryAndroid(
         ).onSuccess {
             saveTokenSyncMarker(userId, token)
         }.onFailure { e ->
+            // registerPushToken is runCatching-based: a cancelled scope arrives here as a failure.
+            if (e is CancellationException) throw e
             logger.error(TAG, "Failed to register FCM token via CF for user=${userId.take(8)}: ${e.message}", e)
         }
         // Sticky user-property so retention charts segment exposed vs holdout (incremental lift).

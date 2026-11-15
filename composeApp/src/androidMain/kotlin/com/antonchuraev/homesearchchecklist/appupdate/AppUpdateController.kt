@@ -383,6 +383,8 @@ class AppUpdateController(
     // multi-user devices where the app was installed by a different Google account).
     // ERROR_PLAY_STORE_NOT_FOUND (-9) — device without Play Store.
     // ERROR_API_NOT_AVAILABLE (-3) — device does not support the API.
+    // ERROR_INSTALL_NOT_ALLOWED (-6) — current device state forbids it (low battery, low disk
+    // space, …); Play rejects even the update check with it.
     // These are expected states, not Crashlytics-worthy bugs — log to logcat and send analytics
     // (app_update_unavailable) to see how many users have no in-app update.
     private fun logFailure(error: Throwable, message: String, source: String) {
@@ -417,6 +419,7 @@ class AppUpdateController(
         InstallErrorCode.ERROR_APP_NOT_OWNED -> "app_not_owned"
         InstallErrorCode.ERROR_PLAY_STORE_NOT_FOUND -> "no_play_store"
         InstallErrorCode.ERROR_API_NOT_AVAILABLE -> "api_not_available"
+        InstallErrorCode.ERROR_INSTALL_NOT_ALLOWED -> "install_not_allowed"
         else -> "other"
     }
 
@@ -529,6 +532,7 @@ class AppUpdateController(
             InstallErrorCode.ERROR_APP_NOT_OWNED,
             InstallErrorCode.ERROR_PLAY_STORE_NOT_FOUND,
             InstallErrorCode.ERROR_API_NOT_AVAILABLE,
+            InstallErrorCode.ERROR_INSTALL_NOT_ALLOWED,
         )
     }
 }
