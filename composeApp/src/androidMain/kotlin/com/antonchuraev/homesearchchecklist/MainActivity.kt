@@ -38,6 +38,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPu
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.deeplink.GalleryDeepLink
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
+import com.antonchuraev.homesearchchecklist.layoutdebug.LayoutDebugRoot
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
 import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
@@ -195,7 +196,10 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
 
-            App()
+            // No-op wrapper unless the debug-only layout agent enabled the bridge.
+            LayoutDebugRoot {
+                App()
+            }
 
             // Provide Activity reference to GoogleAuthRepository so Credential Manager
             // can display its bottom sheet. Must be called after Koin is initialized.

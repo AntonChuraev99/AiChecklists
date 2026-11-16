@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Loopback ServerSocket still counts as network access. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <!-- Debug-only auto-start: providers are created before Application.onCreate returns. -->
+        <provider
+            android:name="com.antonchuraev.aichecklists.app.layoutdebug.LayoutDebugInstaller"
+            android:authorities="${applicationId}.layoutdebug"
+            android:exported="false" />
+    </application>
+</manifest>
