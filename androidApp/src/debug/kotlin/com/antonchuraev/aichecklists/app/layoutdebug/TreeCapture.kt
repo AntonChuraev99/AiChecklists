@@ -2,11 +2,14 @@
 
 package com.antonchuraev.aichecklists.app.layoutdebug
 
+import android.util.Log
 import androidx.compose.ui.tooling.data.Group
 import androidx.compose.ui.tooling.data.NodeGroup
 import androidx.compose.ui.tooling.data.UiToolingDataApi
 import androidx.compose.ui.tooling.data.asTree
 import com.antonchuraev.homesearchchecklist.layoutdebug.LayoutDebugBridge
+
+private const val TAG = "layout-debug"
 
 /**
  * Turns the live composition into a tree an agent can act on.
@@ -58,7 +61,10 @@ object TreeCapture {
         val root = N("Composition", null, -1, 0, 0, widthPx, heightPx, null)
         root.id = "root"
         for (table in tables) {
-            val tree = runCatching { table.asTree() }.getOrNull() ?: continue
+            // One unreadable table (disposed mid-read, say) must not cost the whole tree.
+            val tree = runCatching { table.asTree() }
+                .onFailure { Log.w(TAG, "slot-таблица пропущена: ${it.message}", it) }
+                .getOrNull() ?: continue
             build(tree, root)
         }
 
@@ -146,10 +152,10 @@ object TreeCapture {
     }
 
     /**
-     * Ids must survive a re-capture: an override recorded against one snapshot has to
-     * find the same element in the next. A layout node's identity is stable for the
-     * life of the composition, so it wins; anything else falls back to its position in
-     * the tree, which is stable as long as the structure is.
+     * Ids address nodes of *this* snapshot only. A node owning a layout node is named after
+     * that node's identity; anything else falls back to its position in the tree, which
+     * shifts when a subcomposition appears or a slot table is collected. That is why live
+     * overrides are tracked by layout node instance in [LayoutDebugAgent], never by id.
      */
     private fun assignIds(node: N, depth: Int) {
         node.depth = depth
