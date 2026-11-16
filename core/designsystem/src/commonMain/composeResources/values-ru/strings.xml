@@ -1460,6 +1460,7 @@
     <string name="inbox_empty_description">Всё, что вы записываете, сначала попадает сюда. Добавьте задачу сейчас, а разложить по проектам можно позже.</string>
     <string name="inbox_project_empty_description">В этом проекте пока нет задач.</string>
     <string name="inbox_ai_entry_title">Превратите контент в чек-лист</string>
+    <string name="inbox_empty_ai_hint">Сфотографируйте заметку, дайте PDF или ссылку — или просто скажите.</string>
     <string name="capture_dock_ai_entry_title">Или создайте чек-лист из:</string>
     <string name="inbox_open_project_action">Открыть проект</string>
     <string name="inbox_task_sheet_move">Перенести в проект</string>

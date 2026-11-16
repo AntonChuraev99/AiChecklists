@@ -34,8 +34,8 @@ fun TodayRoute(
     TodayScreen(
         state = state,
         drawerState = drawerState,
-        onReminderClick = { checklistId, fillId ->
-            viewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))
+        onReminderClick = { checklistId, focusItemId ->
+            viewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, focusItemId))
         },
         onRetry = { viewModel.sendIntent(TodayIntent.OnRefresh) },
         onBack = onBack,

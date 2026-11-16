@@ -251,14 +251,14 @@ class TodayViewModel(
 
     override fun onIntent(intent: TodayIntent) {
         when (intent) {
-            is TodayIntent.OnReminderClick -> {
-                val fillId = intent.fillId
-                if (fillId != null) {
-                    appNavigator.navigateToFillDetail(fillId)
-                } else {
-                    appNavigator.navigateToChecklistDetail(intent.checklistId)
-                }
-            }
+            // The standard checklist page — the one Projects and the Calendar page open — for BOTH
+            // reminder kinds. Item reminders live in the DEFAULT fill (observeRemindersInRange reads
+            // only default fills), and ChecklistDetail is that fill, so nothing is lost; FillDetail
+            // is the history view of a single session and read as a foreign screen here.
+            is TodayIntent.OnReminderClick -> appNavigator.navigateToChecklistDetail(
+                checklistId = intent.checklistId,
+                focusItemId = intent.focusItemId,
+            )
             TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
             is TodayIntent.OnQuickAddTextChanged ->
                 _draft.value = _draft.value.copy(text = intent.text)
@@ -552,7 +552,7 @@ class TodayViewModel(
                 itemName = null,
                 checklistName = checklistName,
                 checklistId = checklistId,
-                fillId = null,
+                focusItemId = null,
                 timeLabel = formatTime(reminderAt),
                 isPastDue = reminderAt < nowMs,
                 isRecurring = isRecurring,
@@ -563,7 +563,7 @@ class TodayViewModel(
                 itemName = itemText,
                 checklistName = checklistName,
                 checklistId = checklistId,
-                fillId = fillId,
+                focusItemId = itemId,
                 timeLabel = formatTime(reminderAt),
                 isPastDue = reminderAt < nowMs,
                 isRecurring = isRecurring,
@@ -641,8 +641,11 @@ class TodayViewModel(
  * Intents for TodayScreen actions.
  */
 sealed interface TodayIntent : Intent {
-    /** User tapped a reminder row. Navigates to FillDetail (fillId != null) or ChecklistDetail. */
-    data class OnReminderClick(val checklistId: Long, val fillId: Long?) : TodayIntent
+    /**
+     * User tapped a reminder row. Opens ChecklistDetail, focused on [focusItemId] for an item-level
+     * reminder (null for a checklist-level one).
+     */
+    data class OnReminderClick(val checklistId: Long, val focusItemId: String?) : TodayIntent
     data class OnQuickAddTextChanged(val text: String) : TodayIntent
 
     /** A capture-dock chip was tapped (reminder preset or Important). */

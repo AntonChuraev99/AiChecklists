@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.containers
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,8 +27,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,6 +119,17 @@ fun AppScaffold(
      * labels stacked on top of each other.
      */
     startAlignedTitle: Boolean = false,
+    /**
+     * The bar title is a scroll-revealed copy of an in-content heading (the checklist detail's header
+     * card): the screen passes [title] only while that heading is scrolled under the bar, and null
+     * otherwise.
+     *
+     * In this mode the title is capped to ONE line with an ellipsis — the full, wrapping name is
+     * still on the page, so the bar never grows to carry it (owner, layout-debug 2026-11-16: a long
+     * name wrapped to 3-4 lines and inflated the toolbar over the list) — and it fades in and out
+     * instead of popping, keeping the last text on screen while it fades out.
+     */
+    titleRevealedOnScroll: Boolean = false,
     onBackButtonClick: (() -> Unit)? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable () -> Unit = {},
@@ -123,6 +145,19 @@ fun AppScaffold(
      * keeps the safe inset-above-navbar behaviour for ordinary screens.
      */
     contentExtendsBehindNavBar: Boolean = false,
+    /**
+     * Fill of the bottom-inset band UNDER [bottomBar] — the system-navigation zone (and, while the
+     * keyboard is up, the strip behind it) that the slot wrapper pads the bar above. Unspecified (the
+     * default) leaves the band to the Scaffold's page background, as before.
+     *
+     * Pass the bar's own surface colour when the bar is a coloured plate that has to reach the window
+     * edge: without it the plate stops one navigation bar short of the bottom and the system zone below
+     * it reads as a second, page-coloured strip (owner report from layout-debug, 2026-11-16, on the
+     * checklist detail's capture plate). Painted only in the band below the bar's measured height, so
+     * a plate with rounded top shoulders keeps the page colour in its corners. Ignored when
+     * [contentExtendsBehindNavBar] is true — there the screen paints the zone itself.
+     */
+    bottomBarInsetColor: Color = Color.Unspecified,
     content: @Composable () -> Unit
 ) {
     val windowSizeClass = rememberAppWindowSizeClass()
@@ -163,8 +198,31 @@ fun AppScaffold(
         if (contentExtendsBehindNavBar) {
             bottomBar()
         } else {
-            Box(modifier = Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
-                bottomBar()
+            // ONE tree whether or not a band colour is set, so toggling [bottomBarInsetColor] (the
+            // detail screen drops it in edit mode) never disposes and re-creates the bar's state.
+            // The band is "slot height minus bar height", both read in the DRAW phase: the bar's
+            // height lands in an int state from onSizeChanged and is only read inside drawBehind, so
+            // the keyboard animation (which grows the band every frame) redraws this one node and
+            // recomposes nothing.
+            val barHeightPx = remember { mutableIntStateOf(0) }
+            Box(
+                modifier = Modifier
+                    .drawBehind {
+                        if (!bottomBarInsetColor.isSpecified) return@drawBehind
+                        val band = size.height - barHeightPx.intValue
+                        if (band > 0f) {
+                            drawRect(
+                                color = bottomBarInsetColor,
+                                topLeft = Offset(0f, size.height - band),
+                                size = Size(size.width, band),
+                            )
+                        }
+                    }
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+            ) {
+                Box(modifier = Modifier.onSizeChanged { barHeightPx.intValue = it.height }) {
+                    bottomBar()
+                }
             }
         }
     }
@@ -184,8 +242,22 @@ fun AppScaffold(
             if (title != null || onBackButtonClick != null || navigationIcon != null) {
                 // One title slot for every bar type below, so the subtitle cannot exist on one size
                 // class and quietly vanish on another.
+                // Plain (non-snapshot) cache of the last non-null title: read only within the same
+                // composition, it lets the scroll-revealed title keep its text while fading OUT.
+                val lastRevealedTitle = remember { arrayOfNulls<String>(1) }
+                if (title != null) lastRevealedTitle[0] = title
                 val titleSlot: @Composable (titleStyle: TextStyle) -> Unit = { titleStyle ->
-                    if (title != null) {
+                    if (titleRevealedOnScroll) {
+                        AnimatedVisibility(visible = title != null, enter = fadeIn(), exit = fadeOut()) {
+                            Text(
+                                text = title ?: lastRevealedTitle[0].orEmpty(),
+                                style = titleStyle,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    } else if (title != null) {
                         Column {
                             Text(
                                 text = title,

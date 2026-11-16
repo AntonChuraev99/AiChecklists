@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -72,8 +73,16 @@ fun AppChecklistHeaderCard(
     total: Int,
     isFolder: Boolean,
     modifier: Modifier = Modifier,
+    /**
+     * Distance in px from the card's top edge to the bottom of the title text, reported on every
+     * title size change (fontScale, locale, wrapping). The host uses it to tell when the heading has
+     * scrolled under its top bar and the bar should carry the name instead.
+     */
+    onTitleBottomChanged: ((Int) -> Unit)? = null,
 ) {
-    val fontScale = LocalDensity.current.fontScale
+    val density = LocalDensity.current
+    val fontScale = density.fontScale
+    val titleTopPx = with(density) { AppChecklistHeaderCardDefaults.Padding.roundToPx() }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = AppShapeTokens.HeaderCard,
@@ -109,7 +118,17 @@ fun AppChecklistHeaderCard(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.semantics { heading() },
+                        // The title is the first child of a top-aligned row inside the card padding,
+                        // so its top sits exactly at [Padding] from the card's top edge.
+                        modifier = Modifier
+                            .semantics { heading() }
+                            .then(
+                                if (onTitleBottomChanged != null) {
+                                    Modifier.onSizeChanged { onTitleBottomChanged(titleTopPx + it.height) }
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                     val showSubtitle = total > 0 && !subtitle.isNullOrEmpty()
                     if (!showTile && total > 0) {

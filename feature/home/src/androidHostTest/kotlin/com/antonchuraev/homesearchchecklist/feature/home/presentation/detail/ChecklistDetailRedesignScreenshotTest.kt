@@ -2,10 +2,13 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
@@ -173,6 +176,47 @@ class ChecklistDetailRedesignScreenshotTest {
         composeTestRule.onRoot().captureRoboImage()
     }
 
+    // ── Bar title on scroll: the header card's name moves into the toolbar once it scrolls away ────
+
+    /** Scrolled a little: the header title is still below the bar, so the bar carries no title. */
+    @Test
+    fun detail_360_scrolledPartly_noBarTitle() = scrolledShot(groceries(), scrollDp = 24f)
+
+    /**
+     * Just past the title's bottom (8dp slot top + 16dp card padding + a 32dp headline line = 56dp):
+     * the title is under the bar while the subtitle and ring are still on screen — the bar takes the
+     * name at the heading's own edge, not when the whole card is gone.
+     */
+    @Test
+    fun detail_360_scrolledPastTitleOnly_barTitle() = scrolledShot(groceries(), scrollDp = 64f)
+
+    /** Scrolled past the header: the long name sits in the bar on ONE line with an ellipsis. */
+    @Test
+    fun detail_360_scrolled_barTitle_light() = scrolledShot(longGroceries(), scrollDp = 200f)
+
+    @Test
+    fun detail_360_scrolled_barTitle_dark() = scrolledShot(longGroceries(), scrollDp = 200f, dark = true)
+
+    @Test
+    fun detail_360_scrolled_barTitle_ru_fontScale15() {
+        Locale.setDefault(Locale.forLanguageTag("ru"))
+        RuntimeEnvironment.setFontScale(1.5f)
+        scrolledShot(
+            checklist(
+                name = "Еженедельные покупки продуктов на всю семью",
+                rows = listOf(
+                    Row("Апельсиновый сок", false),
+                    Row("Оливковое масло первого холодного отжима", false, important = true),
+                    Row("Хлеб", false),
+                    Row("Кофе в зёрнах", false),
+                    Row("Яйца", true),
+                    Row("Молоко", true),
+                ),
+            ),
+            scrollDp = 300f,
+        )
+    }
+
     /** Regression: v2 Weekly keeps today's bar title/subtitle and per-day add — no plate, no header card. */
     @Test
     fun regression_v2Weekly_untouched() = shot(morningRoutine())
@@ -185,6 +229,16 @@ class ChecklistDetailRedesignScreenshotTest {
 
     private fun shot(state: ChecklistDetailState.Content, dark: Boolean = false, v2: Boolean = true) {
         setContent(state, dark, v2)
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    /** Scrolls the list by [scrollDp] through the real LazyColumn's semantics, then lets fades settle. */
+    private fun scrolledShot(state: ChecklistDetailState.Content, scrollDp: Float, dark: Boolean = false) {
+        setContent(state, dark)
+        val px = scrollDp * composeTestRule.density.density
+        composeTestRule.onNode(hasScrollToIndexAction())
+            .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, px) }
+        composeTestRule.waitForIdle()
         composeTestRule.onRoot().captureRoboImage()
     }
 
@@ -235,6 +289,20 @@ class ChecklistDetailRedesignScreenshotTest {
             Row("Coffee beans", true),
             Row("Orange juice", false),
             Row("Olive oil", false, important = true),
+        ),
+    )
+
+    private fun longGroceries() = checklist(
+        name = "Weekly groceries for the whole family and the neighbours",
+        rows = listOf(
+            Row("Eggs", true),
+            Row("Milk", true),
+            Row("Whole-grain bread", true),
+            Row("Coffee beans", true),
+            Row("Orange juice", false),
+            Row("Olive oil", false, important = true),
+            Row("Apples", false),
+            Row("Rice", false),
         ),
     )
 
