@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.SparkleTile
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
@@ -46,20 +45,21 @@ enum class AiInviteStyle {
 object AppAiInviteRowDefaults {
     /** Minimum, never fixed — a RU title wraps to 2 lines at 320dp. */
     val MinHeight: Dp = 48.dp
-    val TileSize: Dp = 32.dp
+    /** Start and end inset of the title / chevron (outside a group). */
+    val HorizontalPadding: Dp = 16.dp
     val ChevronSize: Dp = 20.dp
     val DashOn: Dp = 6.dp
     val DashOff: Dp = 4.dp
 }
 
 /**
- * An invitation to ask Gisti something about what is on screen (redesign B): sparkle tile · title
- * (+ optional subtitle) · chevron. ONE anatomy for every AI invite row — [AppPlanNudge] delegates
- * here rather than drawing a twin.
+ * An invitation to ask Gisti something about what is on screen (redesign B): title (+ optional
+ * subtitle) · chevron. ONE anatomy for every AI invite row — [AppPlanNudge] delegates here rather than
+ * drawing a twin.
  *
- * Anatomy: [Surface] with `onClick` (one button node; the chevron and tile are decorative), min height
- * 48, padding start 8 / end 16 / vertical 6, gap 10. [SparkleTile] 32dp circle · title `titleSmall`
- * `onSurface` max 2 lines · subtitle `bodySmall` `onSurfaceVariant` · 20dp chevron.
+ * Anatomy: [Surface] with `onClick` (one button node; the chevron is decorative), min height 48,
+ * padding 16 / 16 / vertical 6, gap 10. Title `titleSmall` `onSurface` max 2 lines · subtitle
+ * `bodySmall` `onSurfaceVariant` · 20dp chevron. No sparkle tile since 2026-11-16 (owner).
  *
  * [AiInviteStyle.Outlined] draws its dashed 1dp `outline` border by hand (`PathEffect.dashPathEffect`
  * 6/4dp, 4.15:1 on the page) — M3 `BorderStroke` has no dash.
@@ -121,23 +121,25 @@ fun AppAiInviteRow(
             .heightIn(min = AppAiInviteRowDefaults.MinHeight)
             .then(dashed),
     ) {
-        // Inside a group the sparkle tile centres on the column the round checkboxes of the rows
-        // above it sit on (16 + 24/2 = 28dp), so the segment reads as one more row of the group.
+        // Text only — no sparkle tile (owner, layout-debug 2026-11-16: "убери эту ИИ-иконку с этой
+        // кнопки, пусть будет просто с текстом"). The title now opens the row, so the start inset
+        // matches the end one (16dp); inside a group it is the group row's own inset, so the title
+        // lines up with the left edge of the round checkboxes above it.
         val start = if (style == AiInviteStyle.GroupRow) {
-            AppDensity.GroupRowPaddingHorizontal -
-                (AppAiInviteRowDefaults.TileSize - AppDensity.RoundCheckboxBox) / 2
+            AppDensity.GroupRowPaddingHorizontal
         } else {
-            8.dp
+            AppAiInviteRowDefaults.HorizontalPadding
         }
         Row(
-            modifier = Modifier.padding(start = start, end = 16.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.padding(
+                start = start,
+                end = AppAiInviteRowDefaults.HorizontalPadding,
+                top = 6.dp,
+                bottom = 6.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SparkleTile(
-                size = AppAiInviteRowDefaults.TileSize,
-                cornerRadius = AppAiInviteRowDefaults.TileSize / 2,
-            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,

@@ -2,10 +2,11 @@
 
 _Last updated: 2026-11-16_
 
-Быстрый поиск по 91 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 92 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-11-16 | pattern | theme, edge-to-edge, navigationBars, AppScaffold, bottomBarInsetColor, titleRevealedOnScroll, derivedStateOf | [AppScaffold: полоса навбара под bottomBar не красится; название в toolbar при скролле](appscaffold-bottombar-inset-strip-and-title-reveal-2026-11-16.md) |
 | 2026-11-16 | pattern | layout-debug, LayoutDebugBridge, LocalInspectionTables, SubcomposeLayout, ui-tooling, debug-source-set, ServerSocket | [Агент layout-debug в debug-сборке Android: мост в androidMain, сервер в src/debug, только loopback](layout-debug-agent-android-2026-11-16.md) |
 | 2026-11-15 | bug-fix | crash, LazyColumn, key, buildRemindersInRange, expandInRange, reminderAt, repeatNextAt | [Одно напоминание из двух источников: дубль ключа LazyColumn на Today](reminder-oneshot-recurring-duplicate-lazy-key-2026-11-15.md) |
 | 2026-11-13 | pattern | image, launcher-icon, adaptive-icon, ic_launcher_background, ic_launcher_monochrome, themed-icon, splash | [Launcher-иконка v5: растровый background, прозрачный foreground, векторный monochrome](launcher-icon-v5-raster-adaptive-2026-11-13.md) |

@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -28,11 +30,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +52,7 @@ import aichecklists.core.designsystem.generated.resources.analyze_source_voice
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapes
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
@@ -201,35 +208,7 @@ fun SourceRow(
     modifier: Modifier = Modifier,
 ) {
     SourcePillGrid(
-        entries = listOf(
-            SourcePillEntry(
-                AnalyzeInputKind.PHOTO,
-                Icons.Outlined.PhotoCamera,
-                stringResource(Res.string.analyze_source_photo),
-                tint = SourceTintPhoto,
-            ),
-            SourcePillEntry(
-                AnalyzeInputKind.PDF,
-                Icons.Outlined.AttachFile,
-                stringResource(Res.string.analyze_source_pdf),
-                tint = SourceTintPdf,
-            ),
-            SourcePillEntry(
-                AnalyzeInputKind.WEB_LINK,
-                Icons.Outlined.Link,
-                // The SHORT form ("Link"). The pills are equal width, so the widest label alone
-                // decides whether four fit abreast on a 360dp window — and "Web Link", the long form
-                // this replaced, measured just over the line and dropped the whole row to a 2x2 grid.
-                stringResource(Res.string.analyze_source_link_short),
-                tint = SourceTintLink,
-            ),
-            SourcePillEntry(
-                AnalyzeInputKind.VOICE,
-                Icons.Outlined.Mic,
-                stringResource(Res.string.analyze_source_voice),
-                tint = SourceTintVoice,
-            ),
-        ),
+        entries = sourceDoorEntries(),
         onSelect = onSelect,
         modifier = modifier,
         // The four doors are peers, not a choice with a current answer: this row OPENS Analyze, it
@@ -237,6 +216,228 @@ fun SourceRow(
         selected = null,
     )
 }
+
+/**
+ * The four Analyze doors — material, glyph, visible label and palette slot — in their fixed order.
+ *
+ * ONE list for both renderings of the doors ([SourceRow]'s pills and [SourceTileRow]'s tiles), so the
+ * empty Inbox card and the capture dock cannot drift into two answers to "what can I hand the AI", nor
+ * into two colours for the same material.
+ */
+@Composable
+private fun sourceDoorEntries(): List<SourcePillEntry<AnalyzeInputKind>> = listOf(
+    SourcePillEntry(
+        AnalyzeInputKind.PHOTO,
+        Icons.Outlined.PhotoCamera,
+        stringResource(Res.string.analyze_source_photo),
+        tint = SourceTintPhoto,
+    ),
+    SourcePillEntry(
+        AnalyzeInputKind.PDF,
+        Icons.Outlined.AttachFile,
+        stringResource(Res.string.analyze_source_pdf),
+        tint = SourceTintPdf,
+    ),
+    SourcePillEntry(
+        AnalyzeInputKind.WEB_LINK,
+        Icons.Outlined.Link,
+        // The SHORT form ("Link"). The pills are equal width, so the widest label alone
+        // decides whether four fit abreast on a 360dp window — and "Web Link", the long form
+        // this replaced, measured just over the line and dropped the whole row to a 2x2 grid.
+        stringResource(Res.string.analyze_source_link_short),
+        tint = SourceTintLink,
+    ),
+    SourcePillEntry(
+        AnalyzeInputKind.VOICE,
+        Icons.Outlined.Mic,
+        stringResource(Res.string.analyze_source_voice),
+        tint = SourceTintVoice,
+    ),
+)
+
+/**
+ * The four Analyze doors as TILES — a tinted disc over (or beside) a visible label — for the Inbox's
+ * own offer: the empty-Inbox card and the sparse-Inbox block (owner's pick, concept C, 2026-11-16).
+ * The capture dock keeps its pills ([SourceRow]); this is the page-plane rendering of the same doors.
+ *
+ * ## Layout contract — the [SourcePillGrid] ladder, with two tile shapes
+ * - Rung 4: four VERTICAL tiles abreast (40dp disc above a centred label, ≥64dp tall).
+ * - Rung 2 / rung 1: HORIZONTAL tiles (32dp disc, label to its right, ≥48dp tall) in a 2×2 grid or
+ *   one column.
+ * - Every rung is MEASURED against the real tiles at the real text scale and locale — the same reason
+ *   and the same probe ([clearAndSetSemantics] on it, or every label exists twice in the tree) as the
+ *   pill grid. A rung is taken only if its widest tile fits a column, so a label never wraps beside an
+ *   unwrapped peer and is never truncated.
+ * - Capped at [SourceTileRowMaxWidth] and start-aligned: on a wide pane four tiles stay a compact
+ *   group under the heading instead of drifting to the four corners of the card.
+ *
+ * @param onSelect the material tapped; the HOST emits `ai_entry_tapped` with its own surface, as with
+ *   [SourceRow].
+ */
+@Composable
+fun SourceTileRow(
+    onSelect: (AnalyzeInputKind) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val entries = sourceDoorEntries()
+    val gap = AppDimens.SpacingSm
+    // widthIn BEFORE fillMaxWidth: the cap has to lower the max the fill then fills to. In the other
+    // order the fill pins min == max to the parent and the cap is coerced away.
+    SubcomposeLayout(modifier = modifier.widthIn(max = SourceTileRowMaxWidth).fillMaxWidth()) { constraints ->
+        val gapPx = gap.roundToPx()
+
+        fun widest(slot: SourceTileSlot, vertical: Boolean): Int = subcompose(slot) {
+            entries.forEach {
+                SourceTile(
+                    entry = it,
+                    vertical = vertical,
+                    onSelect = {},
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
+            }
+        }.maxOf { it.measure(Constraints()).width }
+
+        fun fits(widestTile: Int, rung: Int): Boolean =
+            !constraints.hasBoundedWidth || widestTile * rung + gapPx * (rung - 1) <= constraints.maxWidth
+
+        val verticalWidest = widest(SourceTileSlot.ProbeVertical, vertical = true)
+        // The horizontal probe only runs when the vertical rung failed — on a phone at fontScale 1.0
+        // that is never, so the common frame pays for one probe, not two.
+        val perRow: Int
+        val vertical: Boolean
+        if (fits(verticalWidest, entries.size)) {
+            perRow = entries.size
+            vertical = true
+        } else {
+            val horizontalWidest = widest(SourceTileSlot.ProbeHorizontal, vertical = false)
+            perRow = sourcePillRungs(entries.size).drop(1).firstOrNull { fits(horizontalWidest, it) } ?: 1
+            vertical = false
+        }
+
+        val columns = if (constraints.hasBoundedWidth) {
+            sourcePillColumnWidths(available = constraints.maxWidth - gapPx * (perRow - 1), perRow = perRow)
+        } else {
+            IntArray(perRow) { verticalWidest }
+        }
+
+        val content = subcompose(SourceTileSlot.Content) {
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                entries.chunked(perRow).forEach { group ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                        group.forEachIndexed { column, entry ->
+                            SourceTile(
+                                entry = entry,
+                                vertical = vertical,
+                                onSelect = onSelect,
+                                modifier = Modifier
+                                    .width(columns[column].toDp())
+                                    // Only on the PLACED tiles — the probe's copies are cleared.
+                                    .testTag("source_tile_${entry.value.name.lowercase()}"),
+                            )
+                        }
+                    }
+                }
+            }
+        }.first().measure(constraints.copy(minWidth = 0))
+
+        layout(content.width, content.height) { content.place(0, 0) }
+    }
+}
+
+/**
+ * One door of a [SourceTileRow]. Borderless on purpose: the tinted disc is the control's mark and the
+ * card around the row is its boundary; the press shows as a ripple clipped to [AppShapes.medium]
+ * (inside the Surface, so it follows the shape — not the bounding box).
+ */
+@Composable
+private fun SourceTile(
+    entry: SourcePillEntry<AnalyzeInputKind>,
+    vertical: Boolean,
+    onSelect: (AnalyzeInputKind) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val slot = entry.tint ?: 0
+    Surface(
+        onClick = { onSelect(entry.value) },
+        shape = AppShapes.medium,
+        color = Color.Transparent,
+        modifier = modifier
+            .heightIn(min = if (vertical) SourceTileVerticalMinHeight else AppDimens.MinTouchTarget)
+            // Surface(onClick) is already a button to TalkBack, and it MERGES the disc and label into
+            // one node whose name is the visible label.
+            .semantics { role = Role.Button },
+    ) {
+        if (vertical) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(
+                    start = AppDimens.SpacingXs,
+                    end = AppDimens.SpacingXs,
+                    top = AppDimens.SpacingSm,
+                    bottom = AppDimens.SpacingXs,
+                ),
+            ) {
+                SourceTileDisc(entry = entry, slot = slot, disc = SourceTileDiscSize, glyph = SourceTileGlyphSize)
+                Spacer(Modifier.height(AppDimens.SpacingXs))
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    // No maxLines/ellipsis: a label that cannot fit moves the row down a rung.
+                )
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = AppDimens.SpacingSm, vertical = AppDimens.SpacingXs),
+            ) {
+                SourceTileDisc(entry = entry, slot = slot, disc = AppDimens.IconSizeLg, glyph = SourceIconSize)
+                Spacer(Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceTileDisc(
+    entry: SourcePillEntry<AnalyzeInputKind>,
+    slot: Int,
+    disc: androidx.compose.ui.unit.Dp,
+    glyph: androidx.compose.ui.unit.Dp,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(disc)
+            .background(GistiColors.paletteTint(slot), CircleShape),
+    ) {
+        Icon(
+            imageVector = entry.icon,
+            contentDescription = null,
+            tint = GistiColors.paletteContent(slot),
+            modifier = Modifier.size(glyph),
+        )
+    }
+}
+
+private enum class SourceTileSlot { ProbeVertical, ProbeHorizontal, Content }
+
+/** Disc of a vertical source tile (spec 3C: 40dp disc, 20dp glyph). */
+private val SourceTileDiscSize = 40.dp
+private val SourceTileGlyphSize = 20.dp
+
+/** A vertical tile: disc + gap + one label line, with its insets. */
+private val SourceTileVerticalMinHeight = 64.dp
+
+/** Four 88dp tiles and their three gaps — the width a [SourceTileRow] never grows past. */
+private val SourceTileRowMaxWidth = 88.dp * 4 + AppDimens.SpacingSm * 3
 
 /**
  * The measured grid behind [SourceRow] and behind the Analyze screen's source picker: N equal pills,
@@ -540,10 +741,15 @@ fun <T> SourcePill(
         } else {
             BorderStroke(AppDimens.DividerThickness, AppChatColors.controlOutline())
         },
-        shape = RoundedCornerShape(percent = 50),
+        shape = SourcePillShape,
         modifier = modifier
             // MIN height, not a fixed one — see the layout contract in [SourcePillGrid]'s KDoc.
             .heightIn(min = AppDimens.MinTouchTarget)
+            // Clip BEFORE the clickable: this Surface takes no onClick, so the clickable sits on the
+            // OUTER modifier, ahead of the Surface's own shape clip, and its ripple filled the
+            // capsule's bounding rectangle — square corners past the pill (owner, layout-debug
+            // 2026-11-16: "выделяет неверную область без фигуры").
+            .clip(SourcePillShape)
             // role = Button so the accessible node is announced as pressable. It also MERGES this
             // capsule's descendants, which is what makes the icon decorative and the label part of
             // this one node — in a grid that label is the accessible name and no contentDescription
@@ -621,11 +827,14 @@ private fun <T> SoftChromePill(
 ) {
     Surface(
         color = if (isFilled) MaterialTheme.colorScheme.primary else AppChatColors.raised(),
-        shape = RoundedCornerShape(percent = 50),
+        shape = SourcePillShape,
         modifier = modifier
             // The 48dp TARGET first, then the 44dp body inside it.
             .minimumInteractiveComponentSize()
             .heightIn(min = SoftPillVisualHeight)
+            // Same as the page pill: the ripple follows the capsule, not its bounding box. After the
+            // 48dp target, so the target itself is not clipped — only the 44dp body and its ripple.
+            .clip(SourcePillShape)
             .clickable(role = Role.Button) { onSelect(entry.value) }
             .semantics {
                 if (isSelected != null) this.selected = isSelected
@@ -689,6 +898,9 @@ private fun <T> SoftChromePill(
 }
 
 private val SourceIconSize = 18.dp
+
+/** The capsule of every source pill — the Surface's shape AND the clickable's clip, one value. */
+private val SourcePillShape = RoundedCornerShape(percent = 50)
 
 /** The dock pill's visible body inside its 48dp target (spec B pass 2: 44 visual / 48 target). */
 private val SoftPillVisualHeight = 44.dp

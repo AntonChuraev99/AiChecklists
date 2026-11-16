@@ -108,7 +108,9 @@ import org.jetbrains.compose.resources.stringResource
  * @param itemName The name of the checklist item (or null if checklist-level reminder).
  * @param checklistName Parent checklist title — always shown as context.
  * @param checklistId Used for navigation to ChecklistDetail.
- * @param fillId Used for navigation to FillDetail (may be null for checklist reminders).
+ * @param focusItemId Item to scroll to and highlight on ChecklistDetail — the reminder's item id, or
+ *   null for a checklist-level reminder. A tap opens the standard checklist page (the one Projects
+ *   opens), never FillDetail: item reminders come from the DEFAULT fill, which ChecklistDetail is.
  * @param timeLabel Human-readable time string, e.g. "14:30" or "09:00".
  * @param isPastDue True if reminderAt < nowMillis within today.
  * @param isRecurring True if this is a recurring reminder (visual indicator only).
@@ -120,7 +122,7 @@ data class TodayReminderItem(
     val itemName: String?,
     val checklistName: String,
     val checklistId: Long,
-    val fillId: Long?,
+    val focusItemId: String?,
     val timeLabel: String,
     val isPastDue: Boolean,
     val isRecurring: Boolean = false,
@@ -208,9 +210,8 @@ internal fun TodayScreenState.hostsAddTaskAction(): Boolean = when (this) {
  * @param drawerState Lifted [DrawerState] from App.kt — hamburger opens it.
  *   Null on Medium/Expanded where NavigationRail/PermanentDrawer is always visible —
  *   in that case the hamburger icon is omitted from the TopAppBar.
- * @param onReminderClick Navigation callback. Receives checklistId and optional fillId.
- *        - If fillId != null → navigate to FillDetail(fillId)
- *        - If fillId == null → navigate to ChecklistDetail(checklistId)
+ * @param onReminderClick Navigation callback. Receives checklistId and optional focusItemId; both
+ *        open ChecklistDetail(checklistId, focusItemId).
  * @param onRetry Called from the [TodayScreenState.Error] retry CTA — re-fetches reminders.
  * @param onBack Optional explicit back affordance, rendered as the TopAppBar back arrow ONLY when
  *   [drawerState] is null (with a drawer the hamburger owns that slot).
@@ -230,7 +231,7 @@ internal fun TodayScreenState.hostsAddTaskAction(): Boolean = when (this) {
 fun TodayScreen(
     state: TodayScreenState,
     drawerState: DrawerState?,
-    onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    onReminderClick: (checklistId: Long, focusItemId: String?) -> Unit,
     onRetry: () -> Unit,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -295,7 +296,7 @@ fun TodayScreen(
 @Composable
 fun TodayBody(
     state: TodayScreenState,
-    onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    onReminderClick: (checklistId: Long, focusItemId: String?) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     contentBottomPadding: Dp = 0.dp,
@@ -383,7 +384,7 @@ private fun TodayLoadingContent() {
 @Composable
 private fun TodaySuccessContent(
     state: TodayScreenState.Success,
-    onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    onReminderClick: (checklistId: Long, focusItemId: String?) -> Unit,
     contentBottomPadding: Dp = 0.dp,
 ) {
     LazyColumn(
@@ -420,7 +421,7 @@ private fun TodaySuccessContent(
             ) { reminder ->
                 TodayReminderRow(
                     item = reminder,
-                    onClick = { onReminderClick(reminder.checklistId, reminder.fillId) },
+                    onClick = { onReminderClick(reminder.checklistId, reminder.focusItemId) },
                 )
             }
         }
@@ -439,7 +440,7 @@ private fun TodaySuccessContent(
             ) { reminder ->
                 TodayReminderRow(
                     item = reminder,
-                    onClick = { onReminderClick(reminder.checklistId, reminder.fillId) },
+                    onClick = { onReminderClick(reminder.checklistId, reminder.focusItemId) },
                 )
             }
         }

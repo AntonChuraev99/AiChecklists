@@ -1,9 +1,12 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.analyze_source_link_short
+import aichecklists.core.designsystem.generated.resources.analyze_source_pdf
+import aichecklists.core.designsystem.generated.resources.analyze_source_photo
+import aichecklists.core.designsystem.generated.resources.analyze_source_voice
 import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
-import aichecklists.core.designsystem.generated.resources.inbox_empty_description
-import aichecklists.core.designsystem.generated.resources.inbox_empty_title
+import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_project_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
 import androidx.activity.ComponentActivity
@@ -13,6 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -43,8 +49,10 @@ import kotlin.test.assertTrue
  * The carrier depends on whether the page has anything on it, and that is the part these tests pin:
  *  - **with tasks** — a row at the END of the list, the Todoist anatomy the owner picked after seeing
  *    both variants rendered;
- *  - **empty** — the placeholder's own `action` slot (owner request, 2026-08-17), with the trailing row
- *    withheld. Both carriers use the same string, so two at once means two identically-named nodes.
+ *  - **empty** — inside the placeholder, with the trailing row withheld: on a project page the
+ *    `EmptyState`'s own `action` slot (owner request, 2026-08-17); on the Inbox the same `AddTaskRow`
+ *    inside the start card (concept C, 2026-11-16). Both carriers use the same string, so two at once
+ *    means two identically-named nodes.
  *
  * Tested through the real [InboxScreen] composable rather than through state, because every claim
  * here is about what is COMPOSED and where: "the row exists", "it is below the last task", "it is
@@ -137,43 +145,65 @@ class InboxAddTaskRowTest {
     // ── A2. On an EMPTY page the action is PART OF THE PLACEHOLDER ───────────
 
     /**
-     * Two claims in one, and the pair is the whole contract of the 2026-08-17 change:
+     * The empty INBOX is one start card (concept C, owner 2026-11-16, rewritten with the owner's
+     * permission from the 2026-08-17 `EmptyState`-action anatomy). Three claims:
      *
-     *  1. **There is exactly ONE add-task control.** Previously the empty page carried a `prominent`
-     *     `AddTaskRow` *below* the placeholder; the action now lives in `EmptyState`'s own `action`
-     *     slot, and the trailing row is withheld. Leaving both composed would put two nodes with the
-     *     identical accessible name "Add task" on one screen — ambiguous to a screen reader and to
-     *     every UI test matching that label (which is why `strings.xml` splits that name off in the
-     *     first place).
-     *  2. **It is INSIDE the placeholder**, not merely somewhere on the page. Asserted as the gap
-     *     between the placeholder's description and the control, because that gap is the difference:
-     *     `EmptyState` puts `SpacingXl` (24dp) between the two, whereas the previous anatomy put the
-     *     row after a box whose height is 60% of the viewport — ~175dp on this 891dp frame. So the
-     *     old rendering fails this by an order of magnitude, and the assertion needs no exact
-     *     spacing to be re-tuned whenever the empty state's rhythm is.
+     *  1. **There is exactly ONE add-task control** on the page — unchanged invariant: the trailing row
+     *     stands down while the card carries the action, so no two nodes share the name "Add task".
+     *  2. **ONE card holds every way to create**: the card (`inbox_empty_start`) contains the four
+     *     material doors AND the add-task row ("все виды создания в одной карточке").
+     *  3. **Order C**: the doors sit ABOVE the add-task row.
      *
-     * This test REPLACES `inboxScreen_withEmptyInbox_stillShowsTheAddTaskRow`, whose only claim was
-     * "an add-task control exists somewhere" — true both before and after, i.e. blind to the change.
-     * The invariant it protected (a brand-new user, whose Inbox is empty by definition, must have a
-     * visible way to add anything) is claim 1 here, strengthened from "at least one" to "exactly one".
+     * Replaces the description-to-button gap assertion: the Inbox no longer renders `EmptyState`, so
+     * "directly under the placeholder's description" has no description to measure from. Containment
+     * in the tagged card is the stronger form of "inside the placeholder".
      */
     @Test
     fun inboxScreen_withEmptyInbox_hostsTheAddTaskActionInsideThePlaceholder() {
         var addTaskLabel = ""
-        var emptyTitle = ""
-        var emptyDescription = ""
+        var heading = ""
+        val sources = mutableListOf<String>()
         composeTestRule.setContent {
             addTaskLabel = stringResource(Res.string.inbox_add_task_row)
-            emptyTitle = stringResource(Res.string.inbox_empty_title)
-            emptyDescription = stringResource(Res.string.inbox_empty_description)
+            heading = stringResource(Res.string.inbox_ai_entry_title)
+            sources.clear()
+            sources += stringResource(Res.string.analyze_source_photo)
+            sources += stringResource(Res.string.analyze_source_pdf)
+            sources += stringResource(Res.string.analyze_source_link_short)
+            sources += stringResource(Res.string.analyze_source_voice)
             InboxUnderTest(state = inboxContent(tasks = emptyList()))
         }
         composeTestRule.waitForIdle()
 
-        // Precondition: the empty Inbox page really is what is on screen right now.
-        composeTestRule.onNodeWithText(emptyTitle).assertIsDisplayed()
+        // Precondition: the empty Inbox card really is what is on screen right now.
+        composeTestRule.onNodeWithText(heading).assertIsDisplayed()
 
-        assertAddTaskActionSitsInsideThePlaceholder(addTaskLabel, emptyDescription)
+        // 1. Exactly one add-task control on the page.
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText(addTaskLabel).fetchSemanticsNodes().size,
+            "exactly ONE control named \"$addTaskLabel\" may be on an empty Inbox — the start card is " +
+                "the carrier there, and the trailing row must stand down",
+        )
+
+        // 2. The card holds the four doors and the add-task row.
+        val inCard = hasAnyAncestor(hasTestTag(InboxEmptyStartTag))
+        val addInCard = composeTestRule.onAllNodes(hasText(addTaskLabel) and inCard).fetchSemanticsNodes()
+        assertEquals(1, addInCard.size, "the add-task row must be INSIDE the start card")
+        composeTestRule.onNode(hasText(addTaskLabel) and inCard).assertIsDisplayed()
+        val addTop = addInCard.single().boundsInRoot.top
+
+        sources.forEach { source ->
+            val nodes = composeTestRule.onAllNodes(hasText(source) and inCard).fetchSemanticsNodes()
+            assertEquals(1, nodes.size, "the \"$source\" door must be INSIDE the start card, exactly once")
+            // 3. Order C: doors above the add-task row.
+            val sourceBottom = nodes.single().boundsInRoot.bottom
+            assertTrue(
+                sourceBottom <= addTop,
+                "the \"$source\" door must sit ABOVE the add-task row (door bottom=$sourceBottom, " +
+                    "add-task top=$addTop)",
+            )
+        }
     }
 
     /** Same guarantee on a PROJECT page — its empty state is a different branch of the same `when`. */

@@ -88,6 +88,7 @@ private val TOMORROW_MS = 1_746_619_200_000L  // 2026-05-07 00:00 UTC
 private class FakeNavigator : AppNavigator {
     val navigatedFillIds = mutableListOf<Long>()
     val navigatedChecklistIds = mutableListOf<Long>()
+    val navigatedFocusItemIds = mutableListOf<String?>()
     var navigatedToTemplates = false
 
     /** (material, door) pairs handed to Analyze — the other half of an `ai_entry_tapped`. */
@@ -119,6 +120,7 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToAnalyzeResultPreview() {}
     override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {
         navigatedChecklistIds.add(checklistId)
+        navigatedFocusItemIds.add(focusItemId)
     }
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
         navigatedFillIds.add(fillId)
@@ -409,19 +411,52 @@ class TodayViewModelTest {
         assertTrue(allItems.isNotEmpty())
     }
 
-    // ── 4. Navigation: item-level reminder → FillDetail ─────────────────────
+    // ── 4. Navigation: item-level reminder → standard ChecklistDetail, focused on the item ──
+    //
+    // Owner rule (2026-11-16, layout-debug №9): a tap on a reminder in Calendar must open the same
+    // page Projects opens, not FillDetail. Item reminders come from the DEFAULT fill, so the item is
+    // reachable on ChecklistDetail; the item id rides along as focus so the context is not lost.
 
     @Test
-    fun intentOnReminderClick_itemLevel_navigatesToFillDetail() = runTest {
+    fun intentOnReminderClick_itemLevel_opensChecklistDetailFocusedOnItem_neverFillDetail() = runTest {
         val navigator = FakeNavigator()
         val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
             NoOpSmartDateParser,
         )
 
-        vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, fillId = 42L))
+        vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, focusItemId = "item_42"))
 
-        assertEquals(listOf(42L), navigator.navigatedFillIds)
-        assertTrue(navigator.navigatedChecklistIds.isEmpty())
+        assertEquals(listOf(5L), navigator.navigatedChecklistIds)
+        assertEquals(listOf<String?>("item_42"), navigator.navigatedFocusItemIds)
+        assertTrue(navigator.navigatedFillIds.isEmpty())
+    }
+
+    @Test
+    fun itemLevelRow_carriesItsItemId_soTheTapFocusesThatItem() = runTest {
+        val repo = FakeRepository(
+            remindersInRange = listOf(
+                itemLevelReminder(checklistId = 3L, fillId = 30L, itemId = "item_x", reminderAt = PAST_DUE_MS),
+                checklistLevelReminder(checklistId = 4L, reminderAt = PAST_DUE_MS),
+            ),
+        )
+        val navigator = FakeNavigator()
+        val vm = TodayViewModel(repo, ensureInbox(repo), navigator, NoOpScheduler(), NoOpAnalytics(), logger, limitsUseCase(),
+            NoOpSmartDateParser,
+        )
+        val state = vm.awaitState()
+        assertIs<TodayScreenState.Success>(state)
+        val rows = state.pastDue + state.today
+
+        val itemRow = rows.single { it.checklistId == 3L }
+        val checklistRow = rows.single { it.checklistId == 4L }
+        assertEquals("item_x", itemRow.focusItemId)
+        assertEquals(null, checklistRow.focusItemId)
+
+        vm.sendIntent(TodayIntent.OnReminderClick(itemRow.checklistId, itemRow.focusItemId))
+
+        assertEquals(listOf(3L), navigator.navigatedChecklistIds)
+        assertEquals(listOf<String?>("item_x"), navigator.navigatedFocusItemIds)
+        assertTrue(navigator.navigatedFillIds.isEmpty())
     }
 
     // ── 5. Navigation: checklist-level reminder → ChecklistDetail ───────────
@@ -433,7 +468,7 @@ class TodayViewModelTest {
             NoOpSmartDateParser,
         )
 
-        vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, fillId = null))
+        vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, focusItemId = null))
 
         assertEquals(listOf(7L), navigator.navigatedChecklistIds)
         assertTrue(navigator.navigatedFillIds.isEmpty())

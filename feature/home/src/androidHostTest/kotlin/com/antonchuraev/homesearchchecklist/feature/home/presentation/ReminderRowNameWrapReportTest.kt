@@ -238,7 +238,7 @@ class ReminderRowNameWrapReportTest {
         itemName = text,
         checklistName = "Здоровье",
         checklistId = 1L,
-        fillId = 1L,
+        focusItemId = id,
         timeLabel = "09:30",
         isPastDue = false,
     )

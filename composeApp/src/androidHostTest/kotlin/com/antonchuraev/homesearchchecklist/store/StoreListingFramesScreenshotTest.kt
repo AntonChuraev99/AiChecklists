@@ -436,7 +436,7 @@ class StoreListingFramesScreenshotTest {
             itemName = name,
             checklistName = "Home",
             checklistId = 1L,
-            fillId = null,
+            focusItemId = null,
             timeLabel = time,
             isPastDue = false,
             isRecurring = recurring,
