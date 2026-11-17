@@ -24,13 +24,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsSeventeenReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsEighteenReleaseGroups`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 43 posts across 17 main-versions (v1.6-v1.21, v1.23; v1.22 had no feed entry)
-        assertEquals(17, releases.size)
+        // 45 posts across 18 main-versions (v1.6-v1.21, v1.23, v1.24; v1.22 had no feed entry)
+        assertEquals(18, releases.size)
     }
 
     @Test
@@ -39,8 +39,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.23 has the highest post timestamp)
-        assertEquals("1.23", releases.first().version)
+        // Newest release first (v1.24 has the highest post timestamp)
+        assertEquals("1.24", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -52,9 +52,33 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.24", "1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
+    }
+
+    @Test
+    fun `getReleases_withDefaultJson_v1_24HasTwoPostsLedByInboxStartCardWithStoreDescription`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v124 = releases.first { it.version == "1.24" }
+
+        assertEquals(2, v124.posts.size)
+        // Both posts share one timestamp; JSON order decides the lead post
+        assertEquals("inbox_start_card_v1", v124.posts.first().id, "inbox_start_card_v1 must lead the 1.24 group")
+        assertEquals("today_reminder_opens_task_v1", v124.posts[1].id)
+        // Both are in-place changes with no standalone destination — no CTA
+        v124.posts.forEach { post ->
+            assertTrue(post.actions.isEmpty(), "Post ${post.id} must carry no CTA")
+        }
+        // Onboarding + polish lines are not covered by the posts, so the note stays
+        val desc124 = requireNotNull(v124.storeDescription) { "v1.24 storeDescription must not be null" }
+        assertTrue(desc124.contains("A new way to start"))
+        assertTrue(desc124.contains("Cleaner screens"))
+        // De-dup: the note must not repeat the post titles
+        assertTrue(!desc124.contains("A clearer start for an empty Inbox"))
+        assertTrue(!desc124.contains("Reminders open right on the task"))
     }
 
     @Test
@@ -331,13 +355,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsFortyThree`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsFortyFive`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(43, totalPosts)
+        assertEquals(45, totalPosts)
     }
 
     @Test
