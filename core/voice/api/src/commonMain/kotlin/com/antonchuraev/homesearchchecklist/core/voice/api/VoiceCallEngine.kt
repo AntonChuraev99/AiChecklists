@@ -84,8 +84,16 @@ sealed interface CallPhase {
 
 /** Why the call is no longer running; set together with the last [CallPhase]. */
 sealed interface CallStop {
-    /** The minutes ran out, before the call or [duringCall]. */
-    data class LimitReached(val quota: VoiceQuota, val duringCall: Boolean) : CallStop
+    /**
+     * The minutes ran out, before the call or [duringCall]. [serverReason] is why the server closed the
+     * session on a heartbeat ([VoiceSessionEndReason.QuotaExhausted] / [VoiceSessionEndReason.MaxCallDuration]);
+     * `null` when the server gave none the client knows (the UI then decides by the minutes left).
+     */
+    data class LimitReached(
+        val quota: VoiceQuota,
+        val duringCall: Boolean,
+        val serverReason: VoiceSessionEndReason? = null,
+    ) : CallStop
 
     /** The call could not start or go on on this device or account. */
     data class Unavailable(val reason: UnavailableReason) : CallStop

@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.core.voice.api.VoicePlan
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceQuota
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceResult
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEnd
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndReason
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndRequest
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionId
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionStart
@@ -31,6 +32,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VoiceSessionGatewayImplTest {
@@ -170,6 +173,49 @@ class VoiceSessionGatewayImplTest {
         val body = Json.parseToJsonElement(bodies.single()).jsonObject
         assertEquals("heartbeat", body["action"]?.jsonPrimitive?.content)
         assertEquals("srv-1", body["session_id"]?.jsonPrimitive?.content)
+    }
+
+    private suspend fun heartbeatReason(json: String, logger: AppLogger = NoLog): VoiceSessionEndReason? {
+        val result = VoiceSessionGatewayImpl(
+            userId = { "user-1" },
+            logger = logger,
+            httpClient = HttpClient(MockEngine { answer(HttpStatusCode.OK, json)(it) }) {
+                install(ContentNegotiation) { json(VoiceSessionGatewayImpl.wireJson) }
+            },
+        ).heartbeat(VoiceSessionId("srv-1"), elapsedSec = 15)
+        return assertIs<VoiceResult.Success<VoiceHeartbeat>>(result).value.endReason
+    }
+
+    @Test
+    fun heartbeatEnded_parsesEveryServerReason() = runTest {
+        fun ended(reason: String) = """{"success":true,"ended":true,"reason":"$reason","remaining_seconds":1080}"""
+        assertEquals(VoiceSessionEndReason.QuotaExhausted, heartbeatReason(ended("quota_exhausted")))
+        assertEquals(VoiceSessionEndReason.MaxCallDuration, heartbeatReason(ended("max_call_duration")))
+        assertEquals(VoiceSessionEndReason.Idle, heartbeatReason(ended("idle")))
+        assertEquals(VoiceSessionEndReason.ClientEnd, heartbeatReason(ended("client_end")))
+        assertEquals(VoiceSessionEndReason.Disabled, heartbeatReason(ended("disabled")))
+    }
+
+    @Test
+    fun heartbeatEnded_unknownOrMissingReason_isNull_andWarns() = runTest {
+        val warnings = mutableListOf<String>()
+        val log = object : AppLogger {
+            override fun debug(tag: String, message: String) = Unit
+            override fun info(tag: String, message: String) = Unit
+            override fun warning(tag: String, message: String) {
+                warnings += message
+            }
+            override fun error(tag: String, message: String, throwable: Throwable?) = Unit
+        }
+        assertNull(heartbeatReason("""{"success":true,"ended":true,"reason":"closed","remaining_seconds":60}""", log))
+        assertNull(heartbeatReason("""{"success":true,"ended":true,"remaining_seconds":60}""", log))
+        assertEquals(2, warnings.size)
+        assertTrue("closed" in warnings.first())
+    }
+
+    @Test
+    fun heartbeatOpen_hasNoEndReason_evenIfTheServerSentOne() = runTest {
+        assertNull(heartbeatReason("""{"success":true,"ended":false,"reason":"idle","remaining_seconds":60}"""))
     }
 
     @Test

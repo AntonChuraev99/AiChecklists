@@ -83,6 +83,9 @@ import org.jetbrains.compose.resources.stringResource
  * reader believes an empty page still shows a taller row. Restore it from git, don't re-invent it, if
  * the empty-state decision is ever reverted.
  *
+ * Since 2026-11-16 (concept C) the EMPTY INBOX mounts this very row again — at its normal size, as the
+ * last element of the start card under the four source tiles. Project pages keep `EmptyState`'s button.
+ *
  * ## Redesign B (2026-10-16): a soft pill
  * Pill shape ([AppShapeTokens.Pill]), the cream card fill + 1dp `outlineVariant` hairline the task
  * groups use, and the plus inside a 28dp RECESSED circle. On the sand page the old

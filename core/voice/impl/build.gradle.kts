@@ -36,6 +36,10 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.bundles.koin.library)
         }
+        androidMain.dependencies {
+            // AppLogger for the platform audio's error paths (Crashlytics via the app's logger binding).
+            implementation(projects.core.common.api)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)

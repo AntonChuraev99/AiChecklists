@@ -256,6 +256,40 @@ class ChatAgentVoiceTurnGatewayTest {
         )
     }
 
+    private class RecordingLog : AppLogger {
+        val errors = mutableListOf<Pair<String, Throwable?>>()
+        override fun debug(tag: String, message: String) = Unit
+        override fun info(tag: String, message: String) = Unit
+        override fun warning(tag: String, message: String) = Unit
+        override fun error(tag: String, message: String, throwable: Throwable?) {
+            errors += message to throwable
+        }
+    }
+
+    @Test
+    fun malformedSession_isLoggedAsAnErrorWithAThrowable_otherRefusalsAreNot() = runTest {
+        suspend fun errorsOf(result: AgentStepResult): List<Pair<String, Throwable?>> {
+            val log = RecordingLog()
+            ChatAgentVoiceTurnGateway(
+                agentApi = FakeAgentApi(result),
+                dispatcher = dispatcherOk,
+                userId = { "user-1" },
+                checklistsSummary = { emptyList() },
+                logger = log,
+            ).turn(request("x")).toList()
+            return log.errors
+        }
+
+        val malformed = errorsOf(AgentStepResult.VoiceRefused(400, "voice_session_invalid", reason = "malformed")).single()
+        assertTrue("voice_session_malformed" in malformed.first)
+        assertIs<IllegalStateException>(malformed.second)
+
+        // Already reported by the API service: not logged twice.
+        assertTrue(errorsOf(AgentStepResult.InvalidRequest(reason = "bad_transcript")).isEmpty())
+        assertTrue(errorsOf(AgentStepResult.NetworkError).isEmpty())
+        assertTrue(errorsOf(AgentStepResult.VoiceRefused(409, "voice_session_invalid", reason = "closed")).isEmpty())
+    }
+
     @Test
     fun blankUserId_failsWithoutCallingTheServer() = runTest {
         val api = FakeAgentApi(final("never"))

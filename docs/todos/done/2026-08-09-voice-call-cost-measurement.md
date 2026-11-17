@@ -1,6 +1,6 @@
 # Voice Call — Cost Per Minute (Measurement & Display)
 
-**Status:** Open
+**Status:** cancelled — 2026-11-11. Тариф звонка — минуты, а не кредиты: `voiceCallCostCredits` и «кредит за минуту» в новой реализации не существуют, остаток минут приходит с сервера (`voice_session`). Себестоимость минуты для сервера (ходы `chat_agent`) остаётся вопросом раскатки, не этой записи.
 
 **Severity:** P2 — UX debt, no user-facing cost visibility
 

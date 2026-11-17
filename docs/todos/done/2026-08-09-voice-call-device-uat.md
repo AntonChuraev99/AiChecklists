@@ -1,6 +1,6 @@
 # Voice Call — User Acceptance Testing (Device & Live Cycles)
 
-**Status:** Open
+**Status:** resolved — 2026-11-11. Владелец прогнал звонок новой реализации на Pixel 9 после пополнения Gemini («вроде всё работает»); `voice_session` в этот день отвечал без ошибок. Фаза 3 (Live) неприменима — движка Live больше нет. Пограничные случаи фазы 2 по пунктам не протоколировались.
 
 **Severity:** P1 — no user-visible feature without UAT
 

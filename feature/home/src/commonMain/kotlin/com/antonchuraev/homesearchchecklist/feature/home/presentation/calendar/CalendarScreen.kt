@@ -176,7 +176,7 @@ fun CalendarScreen(
     todayState: TodayScreenState,
     calendarState: CalendarState,
     drawerState: DrawerState?,
-    onTodayReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    onTodayReminderClick: (checklistId: Long, focusItemId: String?) -> Unit,
     onTodayRetry: () -> Unit,
     onCalendarIntent: (CalendarIntent) -> Unit,
     /**

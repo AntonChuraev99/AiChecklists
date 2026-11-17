@@ -1628,6 +1628,8 @@
          the Play listing's own promise (screenshot 2, "Any content -> checklist") so the first
          screen states what the user installed the app for. -->
     <string name="inbox_ai_entry_title">Turn content into a checklist</string>
+    <!-- Empty Inbox card: the line under the heading that names the four materials. -->
+    <string name="inbox_empty_ai_hint">Snap a note, drop a PDF or a link, or just say it.</string>
     <!-- Heading over the SAME SourceRow when it sits inside the capture dock, under the task field.
          Deliberately not inbox_ai_entry_title: there the row is the screen's own promise, here it is
          the alternative to the task the user is already typing, so the copy has to say "or". The

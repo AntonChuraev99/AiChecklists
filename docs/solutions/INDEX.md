@@ -1,11 +1,15 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-16_
 
-Быстрый поиск по 89 накопленным решениям. Для полного контента — открой файл по ссылке.
+Быстрый поиск по 93 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-11-16 | pattern | theme, edge-to-edge, navigationBars, AppScaffold, bottomBarInsetColor, titleRevealedOnScroll, derivedStateOf | [AppScaffold: полоса навбара под bottomBar не красится; название в toolbar при скролле](appscaffold-bottombar-inset-strip-and-title-reveal-2026-11-16.md) |
+| 2026-11-16 | pattern | layout-debug, LayoutDebugBridge, LocalInspectionTables, SubcomposeLayout, ui-tooling, debug-source-set, ServerSocket | [Агент layout-debug в debug-сборке Android: мост в androidMain, сервер в src/debug, только loopback](layout-debug-agent-android-2026-11-16.md) |
+| 2026-11-15 | bug-fix | crash, LazyColumn, key, buildRemindersInRange, expandInRange, reminderAt, repeatNextAt | [Одно напоминание из двух источников: дубль ключа LazyColumn на Today](reminder-oneshot-recurring-duplicate-lazy-key-2026-11-15.md) |
+| 2026-11-13 | pattern | image, launcher-icon, adaptive-icon, ic_launcher_background, ic_launcher_monochrome, themed-icon, splash | [Launcher-иконка v5: растровый background, прозрачный foreground, векторный monochrome](launcher-icon-v5-raster-adaptive-2026-11-13.md) |
 | 2026-11-04 | pattern | navigation, ShellLaunchRequests, LaunchedEffect, race-condition, v2ChatDockOpen, onboarding | [Открыть док чата или звонок из экрана до шелла (онбординг)](shell-launch-from-pre-shell-screen-2026-11-04.md) |
 | 2026-11-04 | pattern | performance, jank, measureAndLayout, perfetto, baseline-profile, recomposition, stability, WindowInsets | [Лаги Compose: покадровый layout в V2-доках, wiggle, Baseline Profile](compose-jank-v2-dock-layout-and-baseline-profile-2026-11-04.md) |
 | 2026-10-26 | bug-fix | localization, i18n, inbox, isInbox, checklistDisplayName, stringResource, sync | [Имя системного Inbox — из ресурсов при показе, а не из БД](system-row-name-localized-at-display-2026-10-26.md) |

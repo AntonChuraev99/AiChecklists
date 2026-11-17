@@ -184,6 +184,21 @@ internal class ChatAgentVoiceTurnGateway(
         history[index] = AgentTranscriptEntry.ModelText(if (heard.isEmpty()) CUT_MARK else "$heard $CUT_MARK")
     }
 
+    /**
+     * The server refused the voice session as malformed: a defect of this client, so it is logged as
+     * an error with a throwable — that is what reaches Crashlytics (`recordException`); the engine and
+     * the ViewModel above only see the code. (`InvalidRequest` is already logged so by the API service.)
+     */
+    private fun malformedSession(): VoiceCallError.ClientBug {
+        val bug = VoiceCallError.ClientBug("voice_session_malformed")
+        logger.error(
+            TAG,
+            "voice turn refused as a client bug: ${bug.reason}",
+            IllegalStateException("voice turn client bug: ${bug.reason}"),
+        )
+        return bug
+    }
+
     private fun AgentStepResult.toVoiceError(): VoiceCallError = when (this) {
         AgentStepResult.NetworkError -> VoiceCallError.Unreachable
         AgentStepResult.ServiceError -> VoiceCallError.Unavailable
@@ -195,7 +210,7 @@ internal class ChatAgentVoiceTurnGateway(
             // Minutes ran out between two heartbeats: the next heartbeat ends the call with the
             // limit screen, so this turn only fails (not the whole call as "not entitled").
             reason == REASON_EXHAUSTED -> VoiceCallError.Other(code = "voice_session_exhausted")
-            reason == REASON_MALFORMED -> VoiceCallError.ClientBug("voice_session_malformed")
+            reason == REASON_MALFORMED -> malformedSession()
             // not_found / closed / expired / disabled: the session is dead, every next turn would be
             // refused the same way — end the call now instead of after three failed turns.
             else -> VoiceCallError.NotEntitled(reason ?: "voice_session_invalid")

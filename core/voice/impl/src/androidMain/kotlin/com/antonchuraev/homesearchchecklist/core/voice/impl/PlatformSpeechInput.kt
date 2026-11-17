@@ -13,7 +13,7 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.util.Log
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.voice.api.ListenOptions
 import com.antonchuraev.homesearchchecklist.core.voice.api.SpeechAvailability
 import com.antonchuraev.homesearchchecklist.core.voice.api.SpeechErrorKind
@@ -42,7 +42,10 @@ import kotlin.time.Duration.Companion.seconds
  * One recognizer per utterance, created and destroyed on the main thread as the API requires. One instance per call
  * (Koin `factory`): [finishUtterance] stops the utterance of this instance only.
  */
-internal class PlatformSpeechInput(private val context: Context) : SpeechInput {
+internal class PlatformSpeechInput(
+    private val context: Context,
+    private val logger: AppLogger,
+) : SpeechInput {
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -82,7 +85,7 @@ internal class PlatformSpeechInput(private val context: Context) : SpeechInput {
                         }
 
                         override fun onError(error: Int) {
-                            Log.w(TAG, "checkRecognitionSupport(${locale.tag}) failed: $error")
+                            logger.warning(TAG, "checkRecognitionSupport(${locale.tag}) failed: $error")
                             if (continuation.isActive) continuation.resume(null)
                         }
                     },
@@ -90,7 +93,7 @@ internal class PlatformSpeechInput(private val context: Context) : SpeechInput {
             }
         }
         recognizer.destroy()
-        if (support == null) Log.w(TAG, "checkRecognitionSupport(${locale.tag}) gave no answer: not on-device")
+        if (support == null) logger.warning(TAG,"checkRecognitionSupport(${locale.tag}) gave no answer: not on-device")
         val language = locale.language
         return support?.installedOnDeviceLanguages.orEmpty().any { it.substringBefore('-').lowercase() == language }
     }
@@ -129,10 +132,10 @@ internal class PlatformSpeechInput(private val context: Context) : SpeechInput {
                 override fun onError(error: Int) {
                     val kind = error.toKind()
                     // Analytics sees only the kind; several platform codes map to one (2, 1, 4, 11 -> Network).
-                    Log.w(TAG, "recognizer error $error -> $kind (onDevice=$onDevice)")
+                    logger.warning(TAG, "recognizer error $error -> $kind (onDevice=$onDevice)")
                     if (onDevice && kind == SpeechErrorKind.LanguageUnavailable) {
                         // The on-device model lacks the language: the system recognizer takes this and later utterances.
-                        Log.w(TAG, "on-device recognizer refused ${locale.tag} ($error), using the system recognizer")
+                        logger.warning(TAG, "on-device recognizer refused ${locale.tag} ($error), using the system recognizer")
                         modes[locale.tag] = SpeechAvailability.Network
                         onDevice = false
                         created.destroy()

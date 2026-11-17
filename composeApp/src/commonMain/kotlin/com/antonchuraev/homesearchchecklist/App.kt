@@ -1201,6 +1201,27 @@ fun App() {
             val voiceCapabilities: VoiceCapabilities = koinInject()
             val remoteConfigProvider: RemoteConfigProvider = koinInject()
             val isDebugBuild: Boolean = koinInject(named("isDebugBuild"))
+
+            // Voice call entries: the Ask pill's call button (V2NavigationShell `onStartVoiceCall`), the
+            // chat composer's (ChatInputRow `onCallClick`) and the onboarding's Call (its route gets
+            // `voiceCallAvailable`; the start goes through the ShellLaunch hand-off below) — ONE gate.
+            // Each lambda is null when the platform has no call (web, iOS) or the client flag
+            // `voice_call_enabled` is off (default: on in debug, off in release); a null hides the button.
+            val voiceCallAvailable = voiceCapabilities.isCallSupported &&
+                remoteConfigProvider.getBoolean(
+                    RemoteConfigKeys.VOICE_CALL_ENABLED,
+                    RemoteConfigDefaults.voiceCallEnabled(isDebugBuild),
+                )
+            val startVoiceCall: (() -> Unit)? = if (voiceCallAvailable) {
+                { voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_PILL)) }
+            } else {
+                null
+            }
+            val startVoiceCallFromChat: (() -> Unit)? = if (voiceCallAvailable) {
+                { voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_CHAT)) }
+            } else {
+                null
+            }
             Box(modifier = Modifier.fillMaxSize()) {
 
             // Scene strategy is platform-dependent so the web layout differs from Android/iOS:
@@ -1904,6 +1925,8 @@ fun App() {
                                     // Item-create keeps the attach button visible (help + mic stay hidden)
                                     // so files can be staged on the new item.
                                     attachVisibleInSimpleMode = ic != null,
+                                    // Same call entry as the home pill; the row hides it in item-create.
+                                    onCallClick = startVoiceCallFromChat,
                                 )
                               }
                             }
@@ -1977,6 +2000,7 @@ fun App() {
                                 isTranscribing = chatUiState.isTranscribing,
                                 onDragCancelChanged = { chatSheetDragCancel = it },
                                 focusRequester = chatFullInputFocusRequester,
+                                onCallClick = startVoiceCallFromChat,
                             )
                         }
                     },
@@ -1989,16 +2013,6 @@ fun App() {
                     },
                 )
             }
-
-            // Voice call availability — ONE definition for every call entry: the Ask pill's call
-            // button (below) and the onboarding's Call (passed into its route). False when the
-            // platform has no call (web, iOS) or the client flag `voice_call_enabled` is off
-            // (default: on in debug, off in release).
-            val voiceCallAvailable = voiceCapabilities.isCallSupported &&
-                remoteConfigProvider.getBoolean(
-                    RemoteConfigKeys.VOICE_CALL_ENABLED,
-                    RemoteConfigDefaults.voiceCallEnabled(isDebugBuild),
-                )
 
             val renderNav: @Composable (DrawerState?) -> Unit = { drawerState ->
             NavDisplay(
@@ -2496,15 +2510,6 @@ fun App() {
                 }, // end entryProvider
             ) // end NavDisplay
             } // end renderNav lambda
-
-            // Voice call entry: the Ask pill's call button (V2NavigationShell `onStartVoiceCall`; the
-            // shell hides the button when this is null). Null when `voiceCallAvailable` (above the
-            // NavDisplay) is false; otherwise it starts the call overlay below.
-            val startVoiceCall: (() -> Unit)? = if (voiceCallAvailable) {
-                { voiceCallViewModel.onAction(VoiceCallAction.Start(surface = VOICE_CALL_SURFACE_PILL)) }
-            } else {
-                null
-            }
 
             // Shell hand-offs requested by a feature that cannot reach the shell (today: the
             // onboarding's Chat / Call exits). A sticky request, acted on once a shell is mounted —
@@ -3050,6 +3055,9 @@ private const val WIDGET_PROMO_MIN_CHECKLISTS = 2
 
 /** Analytics `surface` of a voice call started from the Ask pill (and `source` of "Ask in chat" from it). */
 private const val VOICE_CALL_SURFACE_PILL = "pill_call"
+
+/** `voice_call_tapped.surface` for the call button inside the chat composer (dock + full overlay). */
+private const val VOICE_CALL_SURFACE_CHAT = "chat_call"
 
 // `surface` of voice_call_* when the onboarding's Call started it (vs the Ask pill's button).
 private const val VOICE_CALL_SURFACE_ONBOARDING = "onboarding"

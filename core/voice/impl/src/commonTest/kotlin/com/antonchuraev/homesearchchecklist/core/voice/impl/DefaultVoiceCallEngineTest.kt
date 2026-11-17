@@ -30,6 +30,7 @@ import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceHeartbeat
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoicePlan
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceResult
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEnd
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndReason
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionStart
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceTurnEvent
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceTurnProgress
@@ -767,6 +768,51 @@ class DefaultVoiceCallEngineTest {
         assertEquals(CallStop.LimitReached(empty, duringCall = true), h.state.stop)
         assertEquals(CallEndReason.Limit, h.sessions.ends.single().reason)
         assertEquals(CallEngineEvent.LimitReached(VoicePlan.Free, duringCall = true), h.eventsOf<CallEngineEvent.LimitReached>().single())
+    }
+
+    private fun endedBeat(reason: VoiceSessionEndReason?, secondsLeft: Int = 1080) = VoiceResult.Success(
+        VoiceHeartbeat(VoiceFixtures.freeQuota.copy(secondsLeft = secondsLeft), ended = true, endReason = reason),
+    )
+
+    @Test
+    fun theServerKillSwitchMidCallEndsAsUnavailable_notAsALimit() = runTest {
+        val h = EngineHarness(this)
+        h.sessions.heartbeatResult = { _, _ -> endedBeat(VoiceSessionEndReason.Disabled) }
+        h.connect()
+        advanceTimeBy(15_001)
+
+        assertEquals(CallStop.Unavailable(UnavailableReason.FlagOff), h.state.stop)
+        assertEquals(CallEndReason.Error, h.sessions.ends.single().reason)
+        assertTrue(h.eventsOf<CallEngineEvent.LimitReached>().isEmpty())
+    }
+
+    @Test
+    fun theServerIdleCloseEndsAsDroppedOffline() = runTest {
+        val h = EngineHarness(this)
+        h.sessions.heartbeatResult = { _, _ -> endedBeat(VoiceSessionEndReason.Idle) }
+        h.connect()
+        advanceTimeBy(15_001)
+
+        assertEquals(CallStop.Dropped(DropCause.Offline), h.state.stop)
+        assertEquals(CallEndReason.Offline, h.sessions.ends.single().reason)
+        assertTrue(h.eventsOf<CallEngineEvent.LimitReached>().isEmpty())
+    }
+
+    @Test
+    fun theServerLimitReasonsRideOnTheLimitStop() = runTest {
+        val cap = EngineHarness(this)
+        cap.sessions.heartbeatResult = { _, _ -> endedBeat(VoiceSessionEndReason.MaxCallDuration) }
+        cap.connect()
+        advanceTimeBy(15_001)
+        val capStop = cap.state.stop as CallStop.LimitReached
+        assertEquals(VoiceSessionEndReason.MaxCallDuration, capStop.serverReason)
+        assertEquals(CallEndReason.Limit, cap.sessions.ends.single().reason)
+
+        val quota = EngineHarness(this)
+        quota.sessions.heartbeatResult = { _, _ -> endedBeat(VoiceSessionEndReason.QuotaExhausted, secondsLeft = 0) }
+        quota.connect()
+        advanceTimeBy(15_001)
+        assertEquals(VoiceSessionEndReason.QuotaExhausted, (quota.state.stop as CallStop.LimitReached).serverReason)
     }
 
     @Test

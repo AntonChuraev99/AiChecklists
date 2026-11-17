@@ -186,7 +186,7 @@ New feature shipping in v1.X:
 3. Append to the `posts` array in `UpdateFeedContent.JSON` (`feature/updatefeed/.../data/UpdateFeedContent.kt`). The JSON is one line by design — keep it that way so diffs stay review-able.
 4. If Google Play release notes for this version contain lines that would duplicate the post description, **remove those lines from `releaseNotes[version].notes`**. De-duplication is enforced in `UpdateFeedRepositoryImplTest`; tests will fail if the same line appears twice across the feed.
 5. Update post-count and version-count assertions in `UpdateFeedRepositoryImplTest` (e.g. `returnsNineReleaseGroups`, `totalPostCountIsNineteen`) so they match the new content.
-6. Run `./gradlew :feature:updatefeed:testDebugUnitTest` — expect green.
+6. Run `./gradlew :feature:updatefeed:testAndroidHostTest` — expect green (AGP 9 KMP library: there is no `testDebugUnitTest`).
 7. Open a PR; the new content ships with the APK that includes it. Verify on a test device: force-stop, install, open the app, land on Updates.
 
 Deprecated / never-shipped content:
@@ -304,7 +304,7 @@ Now `shrinkVertically` measures the 12dp padding together with the body, so tota
 
 Mandatory tests (all in `commonTest`, no platform deps):
 
-- `UpdateFeedRepositoryImplTest` — JSON parsing, version grouping, de-duplication invariants, store-notes attachment, min-version invariants (19 posts, 9 groups as of v1.14; update counts when content changes).
+- `UpdateFeedRepositoryImplTest` — JSON parsing, version grouping, de-duplication invariants, store-notes attachment, min-version invariants (43 posts, 17 groups as of v1.23; update counts when content changes).
 - `UpdateFeedViewModelTest` — state transitions for Loading/Empty/Success, action-click → deeplink dispatch, premium banner click routing.
 - `UpdateFeedDeepLinkHandlerTest` — every deeplink host listed as supported must parse; unknown hosts must return `false` and log.
 

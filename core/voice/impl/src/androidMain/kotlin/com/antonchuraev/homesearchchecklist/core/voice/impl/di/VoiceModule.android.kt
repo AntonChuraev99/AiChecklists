@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.core.voice.impl.di
 
 import android.content.Context
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.voice.api.AudioFocusController
 import com.antonchuraev.homesearchchecklist.core.voice.api.AudioRouteMonitor
 import com.antonchuraev.homesearchchecklist.core.voice.api.BargeInDetector
@@ -30,13 +31,13 @@ import org.koin.dsl.module
  * (`single { AppContextHolder.context }`). Per-call objects are `factory`, see [voiceModule].
  */
 internal actual fun platformVoiceModule(): Module = module {
-    factory<SpeechInput> { PlatformSpeechInput(get<Context>()) }
-    factory<SpeechOutput> { PlatformSpeechOutput(get<Context>()) }
-    factory<AudioFocusController> { AndroidAudioFocus(get<Context>()) }
+    factory<SpeechInput> { PlatformSpeechInput(get<Context>(), get<AppLogger>()) }
+    factory<SpeechOutput> { PlatformSpeechOutput(get<Context>(), get<AppLogger>()) }
+    factory<AudioFocusController> { AndroidAudioFocus(get<Context>(), get<AppLogger>()) }
     single<AudioRouteMonitor> { AndroidAudioRouteMonitor(get<Context>()) }
-    single<BargeInDetector> { AndroidBargeInDetector(get<Context>()) }
+    single<BargeInDetector> { AndroidBargeInDetector(get<Context>(), get<AppLogger>()) }
     single<VoiceCapabilities> { AndroidVoiceCapabilities(get<Context>()) }
-    single<VoiceNetworkMonitor> { AndroidVoiceNetworkMonitor(get<Context>()) }
+    single<VoiceNetworkMonitor> { AndroidVoiceNetworkMonitor(get<Context>(), get<AppLogger>()) }
 
     // Parameters (matched by type): VoiceTurnGateway and VoiceSessionGateway, required; a Flow<Boolean> "the device is
     // online", optional (without it the call never goes offline by itself: a failed turn still retries while

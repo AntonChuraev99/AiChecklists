@@ -11,7 +11,7 @@ import com.antonchuraev.homesearchchecklist.core.voice.api.ThinkingDelay
 import com.antonchuraev.homesearchchecklist.core.voice.api.UnavailableReason
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceAgentAction
 import com.antonchuraev.homesearchchecklist.core.voice.api.VoicePlan
-import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceQuota
+import com.antonchuraev.homesearchchecklist.core.voice.api.VoiceSessionEndReason
 
 /**
  * What the ViewModel knows about the running call besides the engine's state.
@@ -50,7 +50,7 @@ object VoiceCallUiMapper {
         val actions = state.actions.mapIndexed(::actionUi)
         return when (val stop = state.stop) {
             null -> inCall(state, facts, actions)
-            is CallStop.LimitReached -> limit(stop.quota, state, actions, formatLocalTime)
+            is CallStop.LimitReached -> limit(stop, state, actions, formatLocalTime)
             is CallStop.Unavailable -> VoiceCallUiState.Failure(failureOf(stop.reason))
             is CallStop.Dropped -> dropped(stop.cause, state, actions)
             is CallStop.Ended -> ended(stop.reason, state, actions)
@@ -167,14 +167,24 @@ object VoiceCallUiMapper {
     // Stopped
     // ---------------------------------------------------------------------------------------------
 
+    /**
+     * The server's reason decides when it gave one; the kill switch and the idle close never get here
+     * (the engine stops those as Unavailable / Dropped). Without a known reason the minutes left decide:
+     * minutes still on the account read as the per-call maximum.
+     */
     private fun limit(
-        quota: VoiceQuota,
+        stop: CallStop.LimitReached,
         state: CallEngineState,
         actions: List<VoiceActionUi>,
         formatLocalTime: (Long) -> String,
-    ): VoiceCallUiState =
-        if (quota.secondsLeft > 0) {
-            // The server ended the call with minutes still on the account: the per-call maximum.
+    ): VoiceCallUiState {
+        val quota = stop.quota
+        val callCap = when (stop.serverReason) {
+            VoiceSessionEndReason.MaxCallDuration -> true
+            VoiceSessionEndReason.QuotaExhausted -> false
+            else -> quota.secondsLeft > 0
+        }
+        return if (callCap) {
             summary(VoiceCallSummaryReason.CallCap, state, actions)
         } else {
             VoiceCallUiState.LimitReached(
@@ -183,6 +193,7 @@ object VoiceCallUiMapper {
                 actions = actions,
             )
         }
+    }
 
     private fun dropped(cause: DropCause, state: CallEngineState, actions: List<VoiceActionUi>): VoiceCallUiState =
         when {

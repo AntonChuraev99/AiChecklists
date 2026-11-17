@@ -14,6 +14,7 @@ import aichecklists.core.designsystem.generated.resources.inbox_add_task_row
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
 import aichecklists.core.designsystem.generated.resources.inbox_ai_entry_title
 import aichecklists.core.designsystem.generated.resources.inbox_display_options
+import aichecklists.core.designsystem.generated.resources.inbox_empty_ai_hint
 import aichecklists.core.designsystem.generated.resources.inbox_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
 import aichecklists.core.designsystem.generated.resources.inbox_error_retry
@@ -50,6 +51,7 @@ import aichecklists.core.designsystem.generated.resources.weekday_thursday
 import aichecklists.core.designsystem.generated.resources.weekday_tuesday
 import aichecklists.core.designsystem.generated.resources.weekday_wednesday
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -59,6 +61,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -132,6 +135,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -202,6 +208,11 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SourceTileRow
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.InboxConvertIllustration
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTextStyles
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
@@ -1053,7 +1064,10 @@ private fun InboxHeader(
                     text = title,
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
+                    // ONE line, owner decision 2026-11-16 (layout-debug): a two-line headlineLarge
+                    // project name pushed the whole page down. Ellipsis on screen; the full name
+                    // stays in the Text's semantics for a screen reader.
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.semantics { heading() },
                 )
@@ -1381,16 +1395,22 @@ private fun InboxContent(
                     .padding(bottom = AppDimens.SpacingXs),
             )
 
-            // Notifications-off banner: a fixed header ABOVE the pager, never a list item, so the
-            // pager / reorder / scroll indices are untouched. Same behaviour as checklist detail.
-            AnimatedNotificationsOffBanner(
-                banner = content.notificationsBanner,
-                onCta = { onIntent(InboxIntent.OnNotificationsBannerCta(bannerPermission.request())) },
-                onDismiss = { onIntent(InboxIntent.OnNotificationsBannerDismiss) },
-                modifier = Modifier
-                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                    .padding(bottom = AppDimens.SpacingSm),
-            )
+            // Notifications-off banner: the FIRST item of every page's list, so it scrolls away with
+            // the rows (owner, layout-debug 2026-11-16: "банер должен скролиться вместе с пунктами").
+            // It used to be a fixed header above the pager, which kept ~180dp of every page pinned.
+            // Same placement as checklist detail, where the banner is already a list item. Nothing in
+            // the page list addresses items by index, so the extra leading item moves no logic.
+            // One lambda for all pages: the banner is per-screen state, not per-project.
+            val notificationsBanner: @Composable () -> Unit = {
+                AnimatedNotificationsOffBanner(
+                    banner = content.notificationsBanner,
+                    onCta = { onIntent(InboxIntent.OnNotificationsBannerCta(bannerPermission.request())) },
+                    onDismiss = { onIntent(InboxIntent.OnNotificationsBannerDismiss) },
+                    modifier = Modifier
+                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                        .padding(bottom = AppDimens.SpacingSm),
+                )
+            }
 
             HorizontalPager(
                 state = pagerState,
@@ -1420,6 +1440,7 @@ private fun InboxContent(
                         planNudgeSuppressed = content.planNudgeDismissed,
                         onPlanDayClick = onPlanDayClick,
                         onIntent = onIntent,
+                        listHeader = notificationsBanner,
                     )
                 }
             }
@@ -1447,6 +1468,8 @@ private fun InboxContent(
  * @param showAddTaskRow whether the trailing add-task row is composed. Decided by [InboxScreen] (see
  *   its `showAddTaskRow`), never here: the reasons are the window size and the host's dock flag, and
  *   neither is this composable's business.
+ * @param listHeader the first item of the list (the notifications-off banner), composed on every
+ *   page and always present — it animates its own visibility, so an empty banner is a 0-height item.
  */
 @Composable
 private fun InboxPageList(
@@ -1461,6 +1484,7 @@ private fun InboxPageList(
     planNudgeSuppressed: Boolean,
     onPlanDayClick: (() -> Unit)?,
     onIntent: (InboxIntent) -> Unit,
+    listHeader: @Composable () -> Unit = {},
 ) {
     // The screen's horizontal inset, applied PER ITEM instead of once on the list. It used to sit on
     // the LazyColumn's own modifier, and that broke the moment the empty state moved INSIDE the
@@ -1550,6 +1574,10 @@ private fun InboxPageList(
                 bottom = AppDimens.SpacingXl + contentBottomPadding,
             ),
         ) {
+            // Always composed (a hidden banner is a 0-height item) so its grant / dismiss exit
+            // animates inside the list instead of the item being removed under it.
+            item(key = "notifications_banner") { listHeader() }
+
             // The empty state is an ITEM of the list rather than a replacement for it, and that is
             // the whole point: it used to be rendered INSTEAD of the LazyColumn, so an add-task row
             // that lives inside the list would have been composed nowhere on an empty page — and a
@@ -1567,7 +1595,50 @@ private fun InboxPageList(
             // underneath. Lazy items are measured with an unbounded height, so `fillMaxSize()`
             // inside `EmptyState` resolves to wrap-content here and this Box takes whichever is
             // taller: the 60% band or the content.
-            if (page.tasks.isEmpty()) {
+            // ── The EMPTY INBOX: one card that holds every way to create (concept C, owner 2026-11-16) ──
+            // The illustration, the promise, the four material tiles AND the plain "Add task" row, in
+            // that order, inside ONE card — the owner's correction after picking C: "все виды создания
+            // в одной карточке", no "or" divider. Pinned to the top of the list rather than centred in a
+            // 60% band: the card IS the content, and a band would push the add-task row towards the fold.
+            //
+            // The add-task row inside the card is gated on `emptyStateHostsAddTask` — the same ONE
+            // named condition that withholds the trailing `"inline_add_task"` row below — so the page
+            // never carries two controls named "Add task", nor none on Compact.
+            //
+            // Project pages keep their own `EmptyState` placeholder in the branch further down.
+            if (page.tasks.isEmpty() && page.isInbox) {
+                item(key = "empty_state") {
+                    if (showAiSourceRow || emptyStateHostsAddTask) {
+                        InboxEmptyStartCard(
+                            showSources = showAiSourceRow,
+                            onSourceSelect = { kind ->
+                                onIntent(InboxIntent.OnAiSourceTapped(kind, AiEntrySource.INBOX_EMPTY))
+                            },
+                            onAddTask = if (emptyStateHostsAddTask) {
+                                { onIntent(InboxIntent.OnAddTaskRowClick) }
+                            } else {
+                                null
+                            },
+                            modifier = rowInset.padding(top = AppDimens.SpacingSm),
+                        )
+                    } else {
+                        // The capture dock is up: it carries both the sources and the input, so the
+                        // card stands down entirely — but a blank page under the scrim would read as a
+                        // failed load, so one quiet line still says what this page is.
+                        Text(
+                            text = stringResource(Res.string.inbox_empty_title),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = rowInset
+                                .fillMaxWidth()
+                                .padding(top = AppDimens.SpacingXl),
+                        )
+                    }
+                }
+            }
+
+            if (page.tasks.isEmpty() && !page.isInbox) {
                 item(key = "empty_state") {
                     // ── The add-task action IS the placeholder's action slot ──────────────────────
                     // On an empty page the "add task" affordance moved from a separate row under the
@@ -1599,25 +1670,15 @@ private fun InboxPageList(
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (page.isInbox) {
-                            EmptyState(
-                                icon = Icons.Outlined.Inbox,
-                                title = stringResource(Res.string.inbox_empty_title),
-                                description = stringResource(Res.string.inbox_empty_description),
-                                actionLabel = addTaskLabel,
-                                onAction = onAddTask,
-                            )
-                        } else {
-                            EmptyState(
-                                icon = Icons.Outlined.ChecklistRtl,
-                                title = page.title,
-                                description = stringResource(
-                                    Res.string.inbox_project_empty_description
-                                ),
-                                actionLabel = addTaskLabel,
-                                onAction = onAddTask,
-                            )
-                        }
+                        EmptyState(
+                            icon = Icons.Outlined.ChecklistRtl,
+                            title = page.title,
+                            description = stringResource(
+                                Res.string.inbox_project_empty_description
+                            ),
+                            actionLabel = addTaskLabel,
+                            onAction = onAddTask,
+                        )
                     }
                 }
             }
@@ -1747,38 +1808,36 @@ private fun InboxPageList(
             // the owner already reviewed on device. The AI block therefore sits below it as a
             // clearly separate offer — still inside the first viewport, which is what the sparse
             // gate guarantees.
-            if (showAiSourceRow && page.isInbox && page.tasks.size <= SparseInboxTaskLimit) {
+            //
+            // From ONE task up, never at zero: an empty Inbox already carries the same four doors in
+            // its `"empty_state"` card, and both at once would put eight tiles on one page.
+            if (showAiSourceRow && page.isInbox && page.tasks.size in 1..SparseInboxTaskLimit) {
                 item(key = "ai_source_row") {
-                    // The heading carries the promise; the pills carry the doors. Without it four
-                    // bare pills read as "attach something to a task", which is a different (and
+                    // The heading carries the promise; the tiles carry the doors. Without it four
+                    // bare doors read as "attach something to a task", which is a different (and
                     // already-served) offer — the words are what make this the listing's own
                     // "any content -> checklist".
                     //
-                    // Heading + row come from ONE shared component (`SourceRowSection`), which is also
-                    // what the capture dock mounts. They used to be a hand-rolled Column here and a
-                    // bare row there, which is exactly how the dock ended up with no heading at all;
-                    // one component means the two cannot drift in type scale or in the gap between
-                    // heading and pills again. The inset and the top gap stay HERE — they are this
-                    // list's rhythm, not the section's.
-                    SourceRowSection(
-                        title = stringResource(Res.string.inbox_ai_entry_title),
-                        onSelect = { kind ->
-                            onIntent(
-                                InboxIntent.OnAiSourceTapped(
-                                    kind = kind,
-                                    // Two values, not one: "the list was empty" and "the list was
-                                    // nearly empty" are different user states, and collapsing them
-                                    // would hide which of the two actually converts.
-                                    source = if (page.tasks.isEmpty()) {
-                                        AiEntrySource.INBOX_EMPTY
-                                    } else {
-                                        AiEntrySource.INBOX_SPARSE
-                                    },
-                                )
-                            )
-                        },
-                        modifier = rowInset.padding(top = AppDimens.SpacingLg),
-                    )
+                    // Tiles, the SAME `SourceTileRow` the empty card mounts (owner's pick, concept C):
+                    // going from 0 to 1 task must not swap the doors' look under the user's finger.
+                    // The capture dock keeps its pills — it is a different plane.
+                    Column(modifier = rowInset.padding(top = AppDimens.SpacingLg)) {
+                        Text(
+                            text = stringResource(Res.string.inbox_ai_entry_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = AppDimens.SpacingXs)
+                                .semantics { heading() },
+                        )
+                        SourceTileRow(
+                            onSelect = { kind ->
+                                // INBOX_SPARSE only: the empty case is the card's, with its own surface.
+                                onIntent(InboxIntent.OnAiSourceTapped(kind, AiEntrySource.INBOX_SPARSE))
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -1792,6 +1851,93 @@ private fun InboxPageList(
  * going, and the empty state alone would hide the affordance the moment they typed anything.
  */
 private const val SparseInboxTaskLimit = 2
+
+/**
+ * The empty Inbox's start card (concept C "show the transformation", owner 2026-11-16): picture →
+ * promise → the four material tiles → the plain "Add task" row, all in ONE card.
+ *
+ * TalkBack order follows the drawing order: heading, hint, Photo · PDF · Link · Voice, Add task. The
+ * illustration is cleared from the tree.
+ *
+ * @param showSources whether the picture, heading, hint and tiles are drawn. False only while the
+ *   capture dock is up (the dock hosts the same doors) — then the card carries just [onAddTask], if any.
+ * @param onAddTask the add-task row's action, or null when this page must not carry one (rail/drawer:
+ *   the shell's "+" is the door; dock open: the dock IS the row expanded). Decided by the caller's
+ *   `emptyStateHostsAddTask`, never here.
+ */
+@Composable
+private fun InboxEmptyStartCard(
+    showSources: Boolean,
+    onSourceSelect: (AnalyzeInputKind) -> Unit,
+    onAddTask: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    // The picture is the first thing to go when room runs out: on a short window or at a large font
+    // scale it pushed the add-task row under the bottom bar (320×568 @ 1.3 RU). Words and doors stay.
+    //
+    // Two steps, one per constraint: a short window OR a large font drops the picture; a short window
+    // AND a large font also drops the hint line — at 320×568 @ 1.3 RU the picture alone was not
+    // enough (the 3-line hint still put the row ~60dp under the bar). The heading and the named tiles
+    // carry the same promise without it.
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val shortWindow = windowHeight < InboxIllustrationMinWindowHeight
+    val largeFont = LocalDensity.current.fontScale >= InboxIllustrationMaxFontScale
+    val showIllustration = showSources && !shortWindow && !largeFont
+    val showHint = !(shortWindow && largeFont)
+
+    Surface(
+        shape = AppShapeTokens.Group,
+        color = AppSurface.card(),
+        border = BorderStroke(AppDimens.DividerThickness, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(InboxEmptyStartTag),
+    ) {
+        Column {
+            if (showIllustration) {
+                InboxConvertIllustration(modifier = Modifier.padding(AppDimens.SpacingSm))
+            }
+            Column(modifier = Modifier.padding(AppDimens.SpacingLg)) {
+                if (showSources) {
+                    Text(
+                        text = stringResource(Res.string.inbox_ai_entry_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { heading() },
+                    )
+                    if (showHint) {
+                        Text(
+                            text = stringResource(Res.string.inbox_empty_ai_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = AppDimens.SpacingXxs),
+                        )
+                    }
+                    Spacer(Modifier.height(AppDimens.SpacingMd))
+                    SourceTileRow(onSelect = onSourceSelect)
+                }
+                if (onAddTask != null) {
+                    if (showSources) Spacer(Modifier.height(AppDimens.SpacingMd))
+                    // The SAME row the list ends with on a non-empty page — one action, one look.
+                    AddTaskRow(onClick = onAddTask)
+                }
+            }
+        }
+    }
+}
+
+/** testTag of the empty-Inbox start card (`<screen>_<element>`). */
+internal const val InboxEmptyStartTag = "inbox_empty_start"
+
+/** Below this window height the empty card drops its picture (spec 3C, height degradation). */
+private val InboxIllustrationMinWindowHeight = 640.dp
+
+/** From this font scale up the empty card drops its picture. */
+private const val InboxIllustrationMaxFontScale = 1.3f
 
 /**
  * Holds the section clock steady while the user is working.

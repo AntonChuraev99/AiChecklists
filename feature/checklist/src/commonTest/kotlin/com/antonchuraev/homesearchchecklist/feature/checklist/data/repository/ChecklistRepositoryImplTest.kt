@@ -18,6 +18,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.SyncStatus
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import kotlinx.coroutines.flow.Flow
@@ -481,6 +483,65 @@ class ChecklistRepositoryImplTest {
         assertEquals(2, projectRows.size, "checklist-level + item-level for the project; got $emitted")
         assertTrue(inboxRows.all { it.isInbox }, "every Inbox reminder must carry the flag; got $inboxRows")
         assertTrue(projectRows.none { it.isInbox }, "a project must never be flagged; got $projectRows")
+    }
+
+    // ─── Tests: one row per (reminder, instant) — the Today LazyColumn key ───
+
+    /**
+     * Prod FATAL `Key "cl_<id>_<reminderAt>" was already used` (Today screen, v1.23.0). The screen
+     * keys each checklist-level row by `cl_${checklistId}_${reminderAt}`, so two entries for the same
+     * checklist at the same instant crash the LazyColumn. A checklist carrying BOTH a one-shot
+     * [ChecklistEntity.reminderAt] and a repeat rule whose current occurrence is that same instant
+     * must surface ONE row there, not one from each branch of the scan.
+     */
+    @Test
+    fun observeRemindersInRange_checklistOneShotAndRecurringAtSameInstant_emitsOneEntry() = runTest {
+        checklistDao.checklists.add(
+            Checklist(id = 1L, name = "Groceries", items = emptyList()).toEntityRow().copy(
+                reminderAt = TONIGHT,
+                repeatRule = ReminderRepeatRule(type = RepeatType.DAILY),
+                repeatTimeOfDayMinutes = 18 * 60,
+                repeatNextAt = TONIGHT,
+            ),
+        )
+
+        val emitted = newRepo().observeRemindersInRange(DAY_START, DAY_END).first()
+
+        val atTonight = emitted.filterIsInstance<TodayReminderInfo.ChecklistLevel>()
+            .filter { it.checklistId == 1L && it.reminderAt == TONIGHT }
+        assertEquals(
+            1,
+            atTonight.size,
+            "one checklist-level row per (checklistId, reminderAt) — the Today LazyColumn key; got $emitted",
+        )
+    }
+
+    /**
+     * Item-level twin of the test above: the Today key is `il_${fillId}_${itemId}_${reminderAt}`, and
+     * a default-fill item with BOTH a one-shot [ChecklistFillItem.reminderAt] and a repeat rule firing
+     * at that same instant must surface ONE row there.
+     */
+    @Test
+    fun observeRemindersInRange_itemOneShotAndRecurringAtSameInstant_emitsOneEntry() = runTest {
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Inbox", items = emptyList()).toEntityRow())
+        val item = ChecklistFillItem(text = "Water the plants", checked = false)
+            .withReminderAt(TONIGHT)
+            .withRepeatRule(
+                rule = ReminderRepeatRule(type = RepeatType.DAILY),
+                timeOfDayMinutes = 18 * 60,
+                nextAt = TONIGHT,
+            )
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = listOf(item)))
+
+        val emitted = newRepo().observeRemindersInRange(DAY_START, DAY_END).first()
+
+        val atTonight = emitted.filterIsInstance<TodayReminderInfo.ItemLevel>()
+            .filter { it.fillId == 10L && it.itemId == item.id && it.reminderAt == TONIGHT }
+        assertEquals(
+            1,
+            atTonight.size,
+            "one item-level row per (fillId, itemId, reminderAt) — the Today LazyColumn key; got $emitted",
+        )
     }
 
     // ─── System under test factory + fakes ───────────────────────────────────

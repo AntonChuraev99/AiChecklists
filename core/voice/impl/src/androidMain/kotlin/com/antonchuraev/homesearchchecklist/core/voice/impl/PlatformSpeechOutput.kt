@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.util.Log
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.voice.api.SpeechLocale
 import com.antonchuraev.homesearchchecklist.core.voice.api.SpeechOutput
 import com.antonchuraev.homesearchchecklist.core.voice.api.SpeechOutputEvent
@@ -37,7 +37,10 @@ import kotlin.time.Duration.Companion.seconds
  * One instance per call (Koin `factory`); [release] shuts the engine down, a later [prepare] binds a new one.
  * Callbacks come on a binder thread: the tables below are concurrent, events go through a buffered flow.
  */
-internal class PlatformSpeechOutput(private val context: Context) : SpeechOutput {
+internal class PlatformSpeechOutput(
+    private val context: Context,
+    private val logger: AppLogger,
+) : SpeechOutput {
 
     @Volatile private var tts: TextToSpeech? = null
 
@@ -72,7 +75,7 @@ internal class PlatformSpeechOutput(private val context: Context) : SpeechOutput
         } ?: false
         val engine = created
         if (!ok || engine == null) {
-            Log.w(TAG, "TextToSpeech did not initialize")
+            logger.warning(TAG, "TextToSpeech did not initialize (ok=$ok): speech output unavailable")
             engine?.shutdown()
             return null
         }
@@ -90,7 +93,8 @@ internal class PlatformSpeechOutput(private val context: Context) : SpeechOutput
     override fun speak(utteranceId: String, segments: List<SpeechSegmentOut>, rate: SpeechRate) {
         val engine = tts
         if (engine == null) {
-            Log.e(TAG, "speak before prepare: $utteranceId")
+            val message = "speak before prepare: $utteranceId"
+            logger.error(TAG, message, IllegalStateException(message))
             _events.tryEmit(SpeechOutputEvent.Error(utteranceId, TextToSpeech.ERROR))
             return
         }
@@ -104,7 +108,7 @@ internal class PlatformSpeechOutput(private val context: Context) : SpeechOutput
             val result = engine.speak(segment.text, TextToSpeech.QUEUE_ADD, null, id)
             if (result != TextToSpeech.SUCCESS) {
                 this.segments.remove(id)
-                Log.w(TAG, "TTS speak refused ($result) on $utteranceId")
+                logger.warning(TAG, "TTS speak refused ($result) on $utteranceId: utterance ends with Error")
                 _events.tryEmit(SpeechOutputEvent.Error(utteranceId, result))
                 return
             }
@@ -162,7 +166,7 @@ internal class PlatformSpeechOutput(private val context: Context) : SpeechOutput
 
         override fun onError(utteranceId: String, errorCode: Int) {
             val segment = segments.remove(utteranceId) ?: return
-            Log.w(TAG, "TTS error $errorCode on ${segment.utteranceId}")
+            logger.warning(TAG, "TTS error $errorCode on ${segment.utteranceId}: rest of the utterance dropped")
             // The rest of this utterance is dropped so one Error ends it.
             segments.entries.removeIf { it.value.utteranceId == segment.utteranceId }
             _level.value = 0f

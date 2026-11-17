@@ -72,6 +72,8 @@ kotlin {
         androidMain.dependencies {
             // rememberLauncherForActivityResult for the RECORD_AUDIO request (platform/VoiceCallPlatform.android.kt).
             implementation(libs.androidx.activity.compose)
+            // koinInject<AppLogger>() in the same platform file (error paths of the settings intents).
+            implementation(libs.koin.compose)
             implementation(libs.ktor.client.okhttp)
         }
         val iosMain by creating {

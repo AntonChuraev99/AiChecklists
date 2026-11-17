@@ -233,7 +233,10 @@ private fun ChatEmptyStateCompact(
         Text(
             text = stringResource(Res.string.chat_panel_greeting),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Primary text role, not the muted `onSurfaceVariant`: on the warm chat sheet the muted
+            // greeting dissolved into the sheet (owner, layout-debug 2026-11-16: "сделаем чёрным").
+            // `onSurface` is near-black in light and near-white in dark, so dark stays readable.
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal),

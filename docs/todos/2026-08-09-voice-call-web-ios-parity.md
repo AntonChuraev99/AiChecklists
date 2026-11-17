@@ -2,6 +2,8 @@
 
 **Status:** Open
 
+> **2026-11-11:** движок заменён (on-device распознавание → `chat_agent` → системный TTS, `:core:voice:*`); Android-only в первой версии — решение владельца 2026-11-04. Варианты ниже про TurnBased/Live и `transcribe_audio` устарели; web/iOS — свои `actual` для распознавания и TTS в `:core:voice:impl`.
+
 **Severity:** P2 — violates CLAUDE.md architecture parity rule
 
 **Trigger:** Before voice call becomes a marketed feature or counted in platform parity matrices.

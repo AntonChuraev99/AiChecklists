@@ -145,8 +145,8 @@ fun CalendarRoute(
         // nothing to do here — no dock flag changes, so there is no callback to fork.
         onAiSourceTapped = { todayViewModel.sendIntent(TodayIntent.OnAiSourceTapped(it)) },
         snackbarHostState = snackbarHostState,
-        onTodayReminderClick = { checklistId, fillId ->
-            todayViewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))
+        onTodayReminderClick = { checklistId, focusItemId ->
+            todayViewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, focusItemId))
         },
         onTodayRetry = { todayViewModel.sendIntent(TodayIntent.OnRefresh) },
         creditsSource = creditsSource,

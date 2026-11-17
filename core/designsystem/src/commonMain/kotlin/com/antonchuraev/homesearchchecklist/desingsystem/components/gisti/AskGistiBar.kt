@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -72,8 +73,9 @@ enum class AskGistiBarStyle {
  *  - leading: a 48dp "+" target (36dp recessed circle) when [onAttachClick] is set, otherwise the
  *    36dp [SparkleTile]
  *  - label `bodyLarge` `onSurfaceVariant`, ONE line + ellipsis
- *  - trailing: mic (48dp target, neutral `onSurfaceVariant` glyph), then the call button — a 40dp
- *    `primary` circle with an `onPrimary` sound-wave glyph in a 48dp target
+ *  - trailing: mic (48dp target, neutral `onSurfaceVariant` glyph), then the call button — a 36dp
+ *    `primary` circle (the same [AskPillDefaults.DiscSize] as the "+") with an `onPrimary`
+ *    sound-wave glyph in a 48dp target
  *
  * @param placeholder Text shown when [value] is null.
  * @param onClick Invoked when the pill body is tapped (opens chat).
@@ -236,31 +238,14 @@ private fun AskGistiChromePill(
                 ),
         ) {
             if (onAttachClick != null) {
-                PillIconButton(
+                GistiAttachButton(
                     onClick = onAttachClick,
                     contentDescription = attachContentDescription,
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(36.dp)
-                            // A step DOWN from the cream pill, carried by the fill alone. In dark
-                            // `recessed()` equals `bottomChromeRaised()` (the pill), so the top of
-                            // the container ramp is the only rung that still reads.
-                            .background(attachFill(), CircleShape),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = null, // carried by the button node
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(AppDimens.IconSizeMd),
-                        )
-                    }
-                }
+                )
             } else {
                 // Control path (no attach entry wired): keep the brand mark so the leading edge
                 // never goes empty. Part of the pill's own tap target.
-                SparkleTile(size = 36.dp, cornerRadius = 18.dp)
+                SparkleTile(size = AskPillDefaults.DiscSize, cornerRadius = AskPillDefaults.DiscSize / 2)
             }
 
             Text(
@@ -294,39 +279,147 @@ private fun AskGistiChromePill(
             }
 
             if (onCallClick != null) {
-                PillIconButton(onClick = onCallClick, contentDescription = callContentDescription) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(40.dp)
-                            // primary / onPrimary: the M3 pair built for ≥3:1 in both themes
-                            // (light #1565C0 / white, dark Blue80 / Blue10).
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.GraphicEq,
-                            contentDescription = null, // carried by the button node
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
+                GistiCallButton(onClick = onCallClick, contentDescription = callContentDescription)
             }
         }
     }
 }
+
+/**
+ * The voice-call button of the Ask pill: a 36dp `primary` disc with an `onPrimary` sound-wave glyph
+ * inside a 48dp target, announced as its own button.
+ *
+ * Public so every call entry draws the SAME control (owner, layout-debug 2026-11-16: «звонок можно
+ * начать с главного экрана или в чате») — the Ask pill on the home plate and the chat composer
+ * (`ChatInputRow`) both call this rather than each drawing its own disc.
+ *
+ * @param enabled false swaps the disc to the M3 disabled filled pair (`onSurface` 12% / 38%) and
+ *   drops the click; the disc stays, so the composer does not change shape mid-recording.
+ */
+@Composable
+fun GistiCallButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    PillIconButton(
+        onClick = onClick,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        enabled = enabled,
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                // The SAME disc as the "+" at the other end of the pill (owner,
+                // layout-debug 2026-11-16: "эти 2 кнопки должны быть одинаковы" — the call
+                // disc was 40dp against the 36dp "+" and read as sitting higher).
+                .size(AskPillDefaults.DiscSize)
+                // primary / onPrimary: the M3 pair built for ≥3:1 in both themes
+                // (light #1565C0 / white, dark Blue80 / Blue10).
+                .background(
+                    if (enabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledContainerAlpha)
+                    },
+                    CircleShape,
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.GraphicEq,
+                contentDescription = null, // carried by the button node
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledGlyphAlpha)
+                },
+                modifier = Modifier.size(AskPillDefaults.CallGlyphSize),
+            )
+        }
+    }
+}
+
+/** Sizing shared by the Ask pill's round controls and every "+" attach button that copies it. */
+object AskPillDefaults {
+    /** Touch target of every round control in the pill (and of [GistiAttachButton]). */
+    val TouchTarget: Dp = 48.dp
+
+    /** Visible disc of the "+", the call button and the control-path sparkle — ONE size for all. */
+    val DiscSize: Dp = 36.dp
+
+    /** The call glyph inside [DiscSize]; the "+" uses the standard 24dp icon. */
+    val CallGlyphSize: Dp = 20.dp
+}
+
+/**
+ * The "+" attach button of the Ask pill: a 36dp recessed disc with a "+" glyph inside a 48dp target,
+ * announced as its own button.
+ *
+ * Public so every attach entry draws the SAME control (owner, layout-debug 2026-11-16: "кнопки
+ * вложений должны везде совпадать") — the Ask pill on the home plate and the chat composer
+ * (`ChatInputRow`) both call this rather than each drawing its own glyph.
+ *
+ * @param enabled false greys the glyph to the M3 disabled alpha and drops the click; the disc stays,
+ *   so the composer does not change shape while a recording is in flight.
+ */
+@Composable
+fun GistiAttachButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    PillIconButton(
+        onClick = onClick,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        enabled = enabled,
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(AskPillDefaults.DiscSize)
+                // A step DOWN from the cream pill, carried by the fill alone. In dark `recessed()`
+                // equals `bottomChromeRaised()` (the pill), so the top of the container ramp is the
+                // only rung that still reads.
+                .background(attachFill(), CircleShape),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = null, // carried by the button node
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledGlyphAlpha)
+                },
+                modifier = Modifier.size(AppDimens.IconSizeMd),
+            )
+        }
+    }
+}
+
+/** M3 disabled-content alpha. */
+private const val DisabledGlyphAlpha = 0.38f
+
+/** M3 disabled filled-container alpha. */
+private const val DisabledContainerAlpha = 0.12f
 
 /** 48dp touch target inside the pill, announced as its own button. */
 @Composable
 private fun PillIconButton(
     onClick: () -> Unit,
     contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier
-            .size(48.dp)
+        enabled = enabled,
+        modifier = modifier
+            .size(AskPillDefaults.TouchTarget)
             .semantics {
                 role = Role.Button
                 this.contentDescription = contentDescription

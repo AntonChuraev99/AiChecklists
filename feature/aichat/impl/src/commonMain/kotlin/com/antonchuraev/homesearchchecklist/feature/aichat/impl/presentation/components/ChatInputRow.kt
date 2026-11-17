@@ -39,7 +39,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
@@ -91,6 +90,9 @@ import aichecklists.core.designsystem.generated.resources.chat_input_transcribin
 import aichecklists.core.designsystem.generated.resources.chat_record_voice
 import aichecklists.core.designsystem.generated.resources.chat_send_action
 import aichecklists.core.designsystem.generated.resources.chat_voice_press_hold_hint
+import aichecklists.core.designsystem.generated.resources.nav_ask_pill_call_description
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiAttachButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiCallButton
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
@@ -98,7 +100,7 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * Bottom input row for the AI Chat screen — Phase 3 redesign.
  *
- * Layout: `[AttachFile IconButton] · [AppTextField weight=1f] · [Mic OR Send FilledIconButton]`
+ * Layout: `[Help] · [TextField weight=1f] · [GistiAttachButton "+"] · [GistiCallButton?] · [Mic OR Send]`
  *
  * Icon-swap rule: trailing button morphs between [Icons.Filled.Mic] (canSend=false)
  * and [Icons.AutoMirrored.Filled.Send] (canSend=true) via [Crossfade] (200ms).
@@ -185,6 +187,13 @@ fun ChatInputRow(
      * [simpleSendOnly] or [isTranscribing], with the same width-collapse morph.
      */
     leading: ChatInputLeading = ChatInputLeading.Help,
+    /**
+     * Starts a voice call — the SAME entry as the home Ask pill's call button ([GistiCallButton]),
+     * placed INSIDE this row between attach and mic (never as a row of its own: the dock measures
+     * `inputContent` and an extra row overflows the panel with the keyboard up). Null draws no button
+     * (platform without calls, `voice_call_enabled` off). Shown/greyed per [chatInputCallSlot].
+     */
+    onCallClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -192,6 +201,7 @@ fun ChatInputRow(
     val helpLabel = stringResource(Res.string.chat_features_help_action)
     val recordVoiceLabel = stringResource(Res.string.chat_record_voice)
     val sendLabel = stringResource(Res.string.chat_send_action)
+    val callLabel = stringResource(Res.string.nav_ask_pill_call_description)
     val pressHoldHint = stringResource(Res.string.chat_voice_press_hold_hint)
     val defaultPlaceholder = stringResource(Res.string.chat_input_placeholder)
     val attachmentPlaceholder = stringResource(Res.string.chat_input_placeholder_with_attachment)
@@ -418,23 +428,38 @@ fun ChatInputRow(
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {
-            IconButton(
+            // The home Ask pill's "+" itself, not a look-alike (owner, layout-debug 2026-11-16:
+            // "переиспользуй + с экрана главного, кнопки вложений должны везде совпадать"): same
+            // 36dp recessed disc, same glyph, same 48dp target. Disabled while recording or
+            // transcribing too — tinting it like an idle control is what made the row read as
+            // "ready for input" while the recording was still uploading.
+            GistiAttachButton(
                 onClick = onAttachFileClick,
+                contentDescription = attachFileLabel,
                 enabled = isEnabled && !isRecording && !isTranscribing,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.AttachFile,
-                    contentDescription = attachFileLabel,
-                    modifier = Modifier.size(AppDimens.IconSizeMd),
-                    // Disabled while transcribing too — tinting it like an idle control is what made
-                    // the row read as "ready for input" while the recording was still uploading.
-                    tint = if (isEnabled && !isRecording && !isTranscribing)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                )
-            }
+            )
+        }
+
+        // [3b] Voice call — the home pill's call disc itself. Same morph as attach; see chatInputCallSlot
+        // for when it hides vs greys out.
+        val callSlot = chatInputCallSlot(
+            hasCallEntry = onCallClick != null,
+            simpleSendOnly = simpleSendOnly,
+            isTranscribing = isTranscribing,
+            canSend = canSend,
+            isEnabled = isEnabled,
+            isRecording = isRecording,
+        )
+        AnimatedVisibility(
+            visible = callSlot != ChatInputCallSlot.Hidden,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally(),
+        ) {
+            GistiCallButton(
+                onClick = { onCallClick?.invoke() },
+                contentDescription = callLabel,
+                enabled = callSlot == ChatInputCallSlot.Enabled,
+            )
         }
 
         // [4] Trailing Mic / Send / Transcribing indicator
@@ -659,6 +684,32 @@ private fun ChatInputPlaceholder(
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/** What the voice-call slot of [ChatInputRow] draws. */
+internal enum class ChatInputCallSlot { Hidden, Enabled, Disabled }
+
+/**
+ * Call-button rule of [ChatInputRow]:
+ * - **Hidden** — no call entry wired; item-create mode (the row is a Send-only add field); while
+ *   transcribing (attach steps aside for the «Recognizing speech…» status too); and while the user has
+ *   something to send — the call sits beside the MIC, and the mic itself has become Send.
+ * - **Disabled** (greyed disc, no click) — recording, or a reply is being processed: starting a call
+ *   would drop the recording / race the answer.
+ * - **Enabled** otherwise.
+ */
+internal fun chatInputCallSlot(
+    hasCallEntry: Boolean,
+    simpleSendOnly: Boolean,
+    isTranscribing: Boolean,
+    canSend: Boolean,
+    isEnabled: Boolean,
+    isRecording: Boolean,
+): ChatInputCallSlot = when {
+    !hasCallEntry || simpleSendOnly || isTranscribing -> ChatInputCallSlot.Hidden
+    canSend && !isRecording -> ChatInputCallSlot.Hidden
+    !isEnabled || isRecording -> ChatInputCallSlot.Disabled
+    else -> ChatInputCallSlot.Enabled
 }
 
 /** Content of [ChatInputRow]'s leading slot (redesign B §2.10). */

@@ -230,6 +230,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAn
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.rememberDockFullExpandState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiAttachButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
@@ -867,13 +868,19 @@ private fun ChecklistDetailContent(
         }
     }
 
-    // Bar title appears only once the header card has scrolled away (v2 Standard). Index alone never
-    // trips on a short list (LazyColumn clamps), so the card's own measured height is the threshold.
-    var headerCardHeightPx by remember { mutableIntStateOf(0) }
-    val headerScrolledOff by remember {
+    // Bar title appears once the header card's TITLE has scrolled under the bar (v2 Standard). The list
+    // viewport starts right below the bar (the scaffold pads the content by it), so "under the bar" is
+    // "slot-0 scroll offset ≥ the title's bottom inside slot 0" = the slot's top padding + the title
+    // bottom the card reports (its padding + the measured, fontScale/locale-dependent text height).
+    // Index alone never trips on a short list (LazyColumn clamps), hence the measured offset. Read
+    // only inside derivedStateOf: the screen recomposes on the boolean flip, not per scroll frame.
+    var headerTitleBottomPx by remember { mutableIntStateOf(0) }
+    val headerSlotTopPx = with(LocalDensity.current) { AppDimens.SpacingSm.roundToPx() }
+    val headerScrolledOff by remember(headerSlotTopPx) {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 ||
-                (headerCardHeightPx > 0 && listState.firstVisibleItemScrollOffset > headerCardHeightPx * 3 / 4)
+                (headerTitleBottomPx > 0 &&
+                    listState.firstVisibleItemScrollOffset >= headerSlotTopPx + headerTitleBottomPx)
         }
     }
 
@@ -1102,6 +1109,9 @@ private fun ChecklistDetailContent(
             null
         },
         startAlignedTitle = useInlineAddRow,
+        // v2 Standard's bar title is the header card's name revealed on scroll: one line + ellipsis,
+        // faded in/out (the full name stays in the card).
+        titleRevealedOnScroll = v2Standard,
         onBackButtonClick = {
             if (isEditMode) {
                 isEditMode = false
@@ -1128,6 +1138,11 @@ private fun ChecklistDetailContent(
         // v2 Standard: no dock — the capture plate is the bottomBar slot, which then owns
         // ime ∪ navigationBars (as on the Inbox), so the content must stop above it.
         contentExtendsBehindNavBar = !v2Standard,
+        // The capture plate is a bottom-chrome surface, so the system-nav zone under it is the same
+        // surface — not a page-coloured strip (owner, layout-debug 2026-11-16). Both plate states
+        // paint `bottomChrome` (resting Surface, and QuickCaptureDock via gistiDockColor()); edit
+        // mode has no plate, so the zone stays the page.
+        bottomBarInsetColor = if (v2Standard && !isEditMode) AppSurface.bottomChrome() else Color.Unspecified,
         bottomBar = {
             if (v2Standard && !isEditMode) {
                 DetailCapturePlate(
@@ -1541,7 +1556,7 @@ private fun ChecklistDetailContent(
                                 checked = checkedCount,
                                 total = totalCount,
                                 isFolder = state.currentFolderTitle != null,
-                                modifier = Modifier.onSizeChanged { headerCardHeightPx = it.height },
+                                onTitleBottomChanged = { headerTitleBottomPx = it },
                             )
                         }
                         // Notifications-off banner: one controller for the CTA; its dialog answer goes
@@ -4862,13 +4877,13 @@ private fun DetailCapturePlate(
                 )
             },
             trailingToggle = {
-                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnItemCreateAttachClick) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.AttachFile,
-                        contentDescription = stringResource(Res.string.attachment_add_file_button),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                // The Ask pill's "+" itself (owner, layout-debug 2026-11-16: attach buttons must match
+                // everywhere) — same 48dp target as the IconButton it replaces, so the slot's
+                // SpacingXs gap to the "add" disc is unchanged. Always enabled, as before.
+                GistiAttachButton(
+                    onClick = { onIntent(ChecklistDetailIntent.OnItemCreateAttachClick) },
+                    contentDescription = stringResource(Res.string.attachment_add_file_button),
+                )
             },
         )
         return

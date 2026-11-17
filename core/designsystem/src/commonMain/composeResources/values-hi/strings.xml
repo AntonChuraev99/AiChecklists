@@ -1584,6 +1584,7 @@
     <string name="inbox_empty_description">आप जो कुछ भी नोट करेंगे वह पहले यहीं आएगा। अभी टास्क जोड़ें और बाद में उसे किसी प्रोजेक्ट में लगा दें।</string>
     <string name="inbox_project_empty_description">इस प्रोजेक्ट में अभी कोई टास्क नहीं है।</string>
     <string name="inbox_ai_entry_title">कंटेंट को चेकलिस्ट में बदलें</string>
+    <string name="inbox_empty_ai_hint">नोट की फ़ोटो लें, PDF या लिंक दें, या बस बोलें।</string>
     <string name="capture_dock_ai_entry_title">या इनसे चेकलिस्ट बनाएँ:</string>
     <string name="inbox_open_project_action">प्रोजेक्ट खोलें</string>
     <string name="inbox_task_sheet_move">प्रोजेक्ट में ले जाएं</string>

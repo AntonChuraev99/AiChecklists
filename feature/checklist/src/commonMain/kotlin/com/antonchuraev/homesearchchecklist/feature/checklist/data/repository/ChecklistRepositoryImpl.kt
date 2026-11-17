@@ -758,9 +758,27 @@ class ChecklistRepositoryImpl(
 
         // ── Checklist-level reminders ──
         for (entity in checklistEntities) {
-            // One-shot reminder
+            // Recurring — expand all occurrences in [fromMs..toMs] using the rule,
+            // not just the single scheduled next-fire stored in repeatNextAt.
+            val rule = entity.repeatRule
+            val repeatNextAt = entity.repeatNextAt
+            val occurrences = if (rule != null && repeatNextAt != null) {
+                rule.expandInRange(
+                    startTriggerMillis = repeatNextAt,
+                    startOccurrenceCount = entity.repeatOccurrenceCount,
+                    fromMs = fromMs,
+                    toMs = toMs,
+                )
+            } else {
+                emptyList()
+            }
+            // One-shot reminder — skipped when a recurring occurrence lands on the same instant.
+            // Consumers key rows by (checklistId, reminderAt) (Today LazyColumn `cl_<id>_<at>`), so
+            // emitting both crashed with "Key was already used" (Crashlytics 159e2535, v1.23.0).
+            // The recurring entry wins: it carries the recurring indicator, and the alarm fires
+            // once either way. A one-shot at a unique instant is still emitted.
             val reminderAt = entity.reminderAt
-            if (reminderAt != null && reminderAt in fromMs..toMs) {
+            if (reminderAt != null && reminderAt in fromMs..toMs && reminderAt !in occurrences) {
                 result += TodayReminderInfo.ChecklistLevel(
                     checklistId = entity.id,
                     checklistName = entity.name,
@@ -769,25 +787,14 @@ class ChecklistRepositoryImpl(
                     isInbox = entity.isInbox,
                 )
             }
-            // Recurring — expand all occurrences in [fromMs..toMs] using the rule,
-            // not just the single scheduled next-fire stored in repeatNextAt.
-            val rule = entity.repeatRule
-            val repeatNextAt = entity.repeatNextAt
-            if (rule != null && repeatNextAt != null) {
-                rule.expandInRange(
-                    startTriggerMillis = repeatNextAt,
-                    startOccurrenceCount = entity.repeatOccurrenceCount,
-                    fromMs = fromMs,
-                    toMs = toMs,
-                ).forEach { occurrenceMs ->
-                    result += TodayReminderInfo.ChecklistLevel(
-                        checklistId = entity.id,
-                        checklistName = entity.name,
-                        reminderAt = occurrenceMs,
-                        isRecurring = true,
-                        isInbox = entity.isInbox,
-                    )
-                }
+            occurrences.forEach { occurrenceMs ->
+                result += TodayReminderInfo.ChecklistLevel(
+                    checklistId = entity.id,
+                    checklistName = entity.name,
+                    reminderAt = occurrenceMs,
+                    isRecurring = true,
+                    isInbox = entity.isInbox,
+                )
             }
         }
 
@@ -796,9 +803,23 @@ class ChecklistRepositoryImpl(
             val parent = parentById[fillEntity.checklistId] ?: continue
             val checklistName = parent.name
             for (item in fillEntity.items) {
-                // One-shot
+                // Recurring — same expansion pattern as checklist-level.
+                val itemRule = item.repeatRule
+                val itemRepeatNextAt = item.repeatNextAt
+                val itemOccurrences = if (itemRule != null && itemRepeatNextAt != null) {
+                    itemRule.expandInRange(
+                        startTriggerMillis = itemRepeatNextAt,
+                        startOccurrenceCount = item.repeatOccurrenceCount,
+                        fromMs = fromMs,
+                        toMs = toMs,
+                    )
+                } else {
+                    emptyList()
+                }
+                // One-shot — same dedupe as checklist-level: the Today key is
+                // `il_<fillId>_<itemId>_<at>`, so a one-shot on a recurring instant is dropped.
                 val reminderAt = item.reminderAt
-                if (reminderAt != null && reminderAt in fromMs..toMs) {
+                if (reminderAt != null && reminderAt in fromMs..toMs && reminderAt !in itemOccurrences) {
                     result += TodayReminderInfo.ItemLevel(
                         checklistId = fillEntity.checklistId,
                         checklistName = checklistName,
@@ -811,28 +832,18 @@ class ChecklistRepositoryImpl(
                         isInbox = parent.isInbox,
                     )
                 }
-                // Recurring — same expansion pattern as checklist-level.
-                val itemRule = item.repeatRule
-                val itemRepeatNextAt = item.repeatNextAt
-                if (itemRule != null && itemRepeatNextAt != null) {
-                    itemRule.expandInRange(
-                        startTriggerMillis = itemRepeatNextAt,
-                        startOccurrenceCount = item.repeatOccurrenceCount,
-                        fromMs = fromMs,
-                        toMs = toMs,
-                    ).forEach { occurrenceMs ->
-                        result += TodayReminderInfo.ItemLevel(
-                            checklistId = fillEntity.checklistId,
-                            checklistName = checklistName,
-                            fillId = fillEntity.id,
-                            itemId = item.id,
-                            itemText = item.text,
-                            reminderAt = occurrenceMs,
-                            isRecurring = true,
-                            priority = item.priority,
-                            isInbox = parent.isInbox,
-                        )
-                    }
+                itemOccurrences.forEach { occurrenceMs ->
+                    result += TodayReminderInfo.ItemLevel(
+                        checklistId = fillEntity.checklistId,
+                        checklistName = checklistName,
+                        fillId = fillEntity.id,
+                        itemId = item.id,
+                        itemText = item.text,
+                        reminderAt = occurrenceMs,
+                        isRecurring = true,
+                        priority = item.priority,
+                        isInbox = parent.isInbox,
+                    )
                 }
             }
         }
