@@ -25,12 +25,6 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirst
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase.FirstChecklistVariant
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase.OnboardingVariant
-import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.first_checklist_item_1
-import aichecklists.core.designsystem.generated.resources.first_checklist_item_2
-import aichecklists.core.designsystem.generated.resources.first_checklist_item_3
-import aichecklists.core.designsystem.generated.resources.first_checklist_item_4
-import aichecklists.core.designsystem.generated.resources.first_checklist_title
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -289,8 +283,6 @@ class SplashViewModel(
                 } else {
                     val variant = getOnboardingVariant()
                     val variantName = when (variant) {
-                        OnboardingVariant.INTERACTIVE -> "interactive"
-                        OnboardingVariant.DEFAULT -> "slides"
                         OnboardingVariant.NONE -> "none"
                         OnboardingVariant.AI_WELCOME -> "ai_welcome"
                     }
@@ -314,12 +306,10 @@ class SplashViewModel(
                         },
                     )
                     when (variant) {
-                        OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
-                        OnboardingVariant.DEFAULT -> navigateToOnboarding()
                         OnboardingVariant.AI_WELCOME -> navigateToWelcomeOnboarding()
                         OnboardingVariant.NONE -> {
                             // Skip onboarding entirely; persist as passed so future launches
-                            // bypass the variant check even if RC flips back to interactive/default.
+                            // bypass the variant check even if RC flips back to ai_welcome.
                             appScope.launch { runCatching { completeOnboardingUseCase() } }
                             navigateToMainScreen(clearBackStack = true)
                         }

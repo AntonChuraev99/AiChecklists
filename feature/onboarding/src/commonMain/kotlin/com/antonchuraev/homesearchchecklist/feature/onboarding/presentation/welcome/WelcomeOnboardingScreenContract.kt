@@ -35,51 +35,13 @@ import aichecklists.core.designsystem.generated.resources.onboarding_welcome_ite
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_items_workout_3
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_items_workout_4
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_items_workout_5
-import com.antonchuraev.homesearchchecklist.core.common.api.Intent
-import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
-import com.antonchuraev.homesearchchecklist.core.common.api.State
 import org.jetbrains.compose.resources.StringResource
 
 /**
- * "AI Welcome" onboarding ("Toki" style) — a calm, 4-step intro that frames the app as an AI
- * assistant that does the work for you, ending with a mandatory first-checklist creation step
- * (closes the largest activation leak: users who finish onboarding without ever creating a list).
- *
- * Navigation is button-driven (no swipe pager) so the back/skip semantics are explicit and
- * identical on every platform — see [WelcomeOnboardingStep] for the order.
- */
-data class WelcomeOnboardingState(
-    val currentStep: WelcomeOnboardingStep = WelcomeOnboardingStep.Welcome,
-    val inputText: String = "",
-    val selectedTemplateKey: String? = null,
-    val isCreating: Boolean = false,
-    /**
-     * True while the typed-text final-step branch is generating the first checklist via AI (branch 2
-     * of `handleCreateFirstChecklist`). Drives a full-screen, non-dismissible loader that replaces the
-     * whole onboarding chrome (top bar / progress / footer hidden) so the user can't navigate away or
-     * re-trigger while the AI request is in flight. Distinct from [isCreating], which is the quick
-     * chip/default-seed path's CTA spinner.
-     */
-    val isGeneratingAi: Boolean = false,
-    val error: String? = null,
-) : State
-
-/**
- * The four screens, in forward order. [ordinal] drives the progress bar and the
- * forward/back slide direction in the animated transition.
- */
-enum class WelcomeOnboardingStep {
-    Welcome,
-    Capture,
-    Value,
-    FirstChecklist,
-}
-
-/**
- * Starter suggestions shown as tappable chips on the final [WelcomeOnboardingStep.FirstChecklist]
- * step. Each carries its own [labelRes] (chip text), [checklistNameRes] (the name used when the chip
- * is the chosen seed for the created checklist), and [itemRes] (the hardcoded starter items the
- * created checklist is pre-filled with — NO AI, since Create/Analyze are out of reach here). Kept
+ * Starter suggestions shown as tappable chips on the [OnboardingStep.Write] screen; one tap creates
+ * and opens the preset list. Each carries its own [labelRes] (chip text), [checklistNameRes] (the
+ * created checklist's name), and [itemRes] (the hardcoded starter items it is pre-filled with — NO
+ * AI, no credits). Kept
  * self-contained — these are onboarding-only starters, intentionally NOT the full template catalog
  * (which would re-introduce the heavy interactive flow this lightweight onboarding replaces).
  *
@@ -149,9 +111,8 @@ enum class WelcomeStarterTemplate(
         fun fromKey(key: String?): WelcomeStarterTemplate? = entries.firstOrNull { it.key == key }
 
         /**
-         * Items used for the "empty input, no chip" branch — getting-started tips (mirrors the
-         * splash auto-seed spirit) so the mandatory final step always lands on a non-empty,
-         * self-explanatory checklist instead of a blank one.
+         * Getting-started tips: appended to the v2 Inbox on the Skip / Chat / Call exits (so the
+         * user never lands on an empty Inbox) and used as the items of "Save as a plain list".
          */
         val DEFAULT_STARTER_ITEMS: List<StringResource> = listOf(
             Res.string.onboarding_welcome_default_item_1,
@@ -166,33 +127,9 @@ enum class WelcomeStarterTemplate(
  * Resolves a [StringResource] to text. The production binding is the suspend Compose Resources
  * `getString`, which touches `android.content.res.Resources` and therefore throws in plain JVM
  * host unit tests (same limitation the splash starter-checklist path hits). Injecting it lets the
- * three-branch first-checklist resolution be unit-tested deterministically without a real
- * resource table — tests pass a fake that returns the key name.
+ * sample / chip / plain-list creation be unit-tested deterministically without a real resource
+ * table — tests pass a fake that returns the key name.
  */
 fun interface WelcomeStringResolver {
     suspend fun resolve(res: StringResource): String
-}
-
-sealed interface WelcomeOnboardingIntent : Intent {
-    data object OnNext : WelcomeOnboardingIntent
-    data object OnBack : WelcomeOnboardingIntent
-    data object OnSkip : WelcomeOnboardingIntent
-    data class OnInputChanged(val text: String) : WelcomeOnboardingIntent
-    data class OnTemplateSelected(val key: String) : WelcomeOnboardingIntent
-    data object OnCreateFirstChecklist : WelcomeOnboardingIntent
-
-    /**
-     * "More ways to start" card on the final step — opens the Analyze hub (Photo/PDF/voice/link)
-     * so the user can seed the first checklist from richer input. Completes onboarding first, then
-     * hands off (mirrors the AI-Analyze branch of [OnCreateFirstChecklist]).
-     */
-    data object OnMoreWaysToStart : WelcomeOnboardingIntent
-}
-
-sealed interface WelcomeOnboardingSideEffect : SideEffect {
-    /**
-     * Resolve [messageKey] to a localized string in the Screen (Compose Resources must not be
-     * touched in the ViewModel/domain) and show it in a snackbar.
-     */
-    data class ShowSnackbar(val messageKey: String) : WelcomeOnboardingSideEffect
 }

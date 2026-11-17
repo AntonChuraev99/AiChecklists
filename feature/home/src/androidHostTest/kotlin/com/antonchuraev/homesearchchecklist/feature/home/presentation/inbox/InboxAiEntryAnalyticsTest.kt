@@ -257,8 +257,6 @@ class InboxAiEntryAnalyticsTest {
         override fun onBack() {}
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
-        override fun navigateToOnboarding() {}
-        override fun navigateToInteractiveOnboarding() {}
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}

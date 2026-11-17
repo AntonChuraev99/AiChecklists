@@ -16,77 +16,21 @@
 
     <!-- Onboarding -->
     <string name="onboarding_skip">Skip</string>
-    <string name="onboarding_continue">Continue</string>
     <!-- Onboarding Page 1 - AI Chat -->
-    <string name="onboarding_page1_title">Just tell Gisti what you need</string>
-    <string name="onboarding_page1_description">Add items, set reminders, plan your week — all through AI chat.</string>
 
     <!-- Onboarding Page 2 - Create from Anything -->
-    <string name="onboarding_page2_title">Any content → checklist</string>
-    <string name="onboarding_page2_description">Photo, PDF, voice, text, or link — AI turns it into a clear checklist.</string>
 
     <!-- Onboarding Page 3 - Reminders & Calendar -->
-    <string name="onboarding_page3_title">Never miss a thing</string>
-    <string name="onboarding_page3_description">Per-item reminders, recurring schedules, and a calendar view.</string>
 
     <!-- Onboarding Page 4 - Works Everywhere -->
-    <string name="onboarding_page4_title">Your lists follow you</string>
-    <string name="onboarding_page4_description">Phone, tablet, or browser — same checklists, same AI.</string>
 
     <!-- Onboarding Get Started (last feature page CTA) -->
-    <string name="onboarding_get_started">Get Started</string>
 
     <!-- Interactive Onboarding -->
-    <string name="onboarding_interactive_category_title">What do you want to organize?</string>
-    <string name="onboarding_interactive_category_subtitle">Pick one to get started</string>
-    <string name="onboarding_interactive_category_travel">Travel</string>
-    <string name="onboarding_interactive_category_home">Home &amp; Moving</string>
-    <string name="onboarding_interactive_category_shopping">Shopping</string>
-    <string name="onboarding_interactive_category_work">Work &amp; Projects</string>
-    <string name="onboarding_interactive_category_health">Health</string>
-    <string name="onboarding_interactive_category_education">Education</string>
-    <string name="onboarding_interactive_category_fitness">Fitness</string>
-    <string name="onboarding_interactive_category_cooking">Cooking</string>
-    <string name="onboarding_interactive_category_finance">Finance</string>
-    <string name="onboarding_interactive_category_events">Events</string>
-    <string name="onboarding_interactive_style_title">How do you prefer your lists?</string>
-    <string name="onboarding_interactive_style_subtitle">This shapes your first checklist</string>
-    <string name="onboarding_interactive_style_minimalist">Minimalist</string>
-    <string name="onboarding_interactive_style_minimalist_desc">Just the essentials</string>
-    <string name="onboarding_interactive_style_detailed">Detailed</string>
-    <string name="onboarding_interactive_style_detailed_desc">Every step covered</string>
-    <string name="onboarding_interactive_style_chaotic">Everything &amp; more</string>
-    <string name="onboarding_interactive_style_chaotic_desc">Extra tips you might forget</string>
-    <string name="onboarding_interactive_template_title">Choose a checklist</string>
-    <string name="onboarding_interactive_template_subtitle">Pick your starting point</string>
-    <string name="onboarding_interactive_template_items_count">%1$d items</string>
-    <string name="onboarding_interactive_customize_title">Make it yours</string>
-    <string name="onboarding_interactive_customize_subtitle">Toggle off what you don't need</string>
-    <string name="onboarding_interactive_customize_continue">Continue</string>
-    <string name="onboarding_interactive_creating_title">Creating your checklist…</string>
-    <string name="onboarding_interactive_creating_social">12,000+ checklists created with Gisti</string>
-    <string name="onboarding_interactive_preview_title">Your checklist is ready!</string>
-    <string name="onboarding_interactive_preview_subtitle">Tap items to check them off</string>
-    <string name="onboarding_interactive_preview_button">Save &amp; Continue</string>
-    <string name="onboarding_preview_all_checked">All checked off!</string>
 
     <!-- Discover More Step -->
-    <string name="onboarding_discover_title">Your checklist is ready!</string>
-    <string name="onboarding_discover_subtitle">Make it work for you</string>
 
-    <string name="onboarding_discover_reminder_title">Set Up Reminders</string>
-    <string name="onboarding_discover_reminder_subtitle">Get reminded at the right time</string>
-    <string name="onboarding_discover_widget_title">Add Widget</string>
-    <string name="onboarding_discover_widget_subtitle">Quick access from home screen</string>
-    <string name="onboarding_discover_share_title">Share Checklist</string>
-    <string name="onboarding_discover_share_subtitle">Export or share instantly</string>
 
-    <string name="onboarding_discover_reminder_sheet_title">Quick Reminder</string>
-    <string name="onboarding_discover_reminder_tonight">Tonight, 9 PM</string>
-    <string name="onboarding_discover_reminder_daily">Daily, 9 AM</string>
-    <string name="onboarding_discover_reminder_weekly">Weekly, Monday</string>
-    <string name="onboarding_discover_reminder_custom">Custom…</string>
-    <string name="onboarding_discover_reminder_done">Reminder set!</string>
 
     <string name="onboarding_discover_widget_sheet_title">Add Widget to Home Screen</string>
     <string name="onboarding_discover_widget_step1">Long press on your home screen</string>
@@ -94,7 +38,6 @@
     <string name="onboarding_discover_widget_step3">Drag the widget to your home screen</string>
     <string name="onboarding_discover_widget_done">Got it</string>
 
-    <string name="onboarding_discover_maybe_later">Maybe Later</string>
 
     <!-- Retention: recurring-list nudge (checklist detail) -->
     <string name="recurring_nudge_title">Repeat this list weekly?</string>
@@ -111,36 +54,15 @@
     <string name="widget_promo_feature3">A daily nudge to keep the streak going</string>
     <string name="widget_promo_add">Add widget</string>
     <string name="widget_promo_skip">Not now</string>
-    <string name="onboarding_discover_completed">%1$d of %2$d completed</string>
 
     <!-- AI Welcome onboarding (Toki style) — Android-only variant -->
-    <string name="onboarding_welcome_continue">Continue</string>
-    <string name="onboarding_welcome_create_cta">Create my first list</string>
     <string name="onboarding_welcome_create_error">Couldn't create your list. Try again.</string>
     <string name="onboarding_welcome_default_checklist_name">My Checklist</string>
     <string name="onboarding_welcome_generating">Creating your checklist…</string>
     <!-- Step 1: Welcome -->
-    <string name="onboarding_welcome_title_lead">Meet your AI</string>
-    <string name="onboarding_welcome_title_accent">checklist assistant</string>
-    <string name="onboarding_welcome_testimonial_quote">"It plans my whole week in one message. I just talk, it organizes."</string>
-    <string name="onboarding_welcome_testimonial_author">Maya, early user</string>
     <!-- Step 2: Capture -->
-    <string name="onboarding_welcome_capture_title_lead">Just chat.</string>
-    <string name="onboarding_welcome_capture_title_accent">It's done.</string>
-    <string name="onboarding_welcome_capture_lead">Tell Gisti what you need in plain words. It builds the list, sets reminders, and keeps everything in order.</string>
-    <string name="onboarding_welcome_chat_bubble_user">Plan my weekend trip to the coast</string>
-    <string name="onboarding_welcome_chat_bubble_done">Trip checklist ready</string>
     <!-- Step 3: Value -->
-    <string name="onboarding_welcome_value_title_lead">Snap it.</string>
-    <string name="onboarding_welcome_value_title_accent">List it.</string>
-    <string name="onboarding_welcome_value_lead">Turn a photo, a PDF, or a quick note into a ready-to-use checklist in seconds.</string>
     <!-- Step 4: First checklist -->
-    <string name="onboarding_welcome_first_title_lead">What should I</string>
-    <string name="onboarding_welcome_first_title_accent">organize first?</string>
-    <string name="onboarding_welcome_first_lead">Type it below, or pick a starter.</string>
-    <string name="onboarding_welcome_first_input_placeholder">Describe a task or goal…</string>
-    <string name="onboarding_welcome_more_ways_title">More ways to start</string>
-    <string name="onboarding_welcome_more_ways_sub">Photo, PDF, voice or a link</string>
     <string name="onboarding_welcome_chip_groceries">Groceries</string>
     <string name="onboarding_welcome_chip_trip">Trip packing</string>
     <string name="onboarding_welcome_chip_workout">Workout plan</string>
@@ -177,6 +99,85 @@
     <string name="onboarding_welcome_default_item_2">Tap the checkbox to check things off</string>
     <string name="onboarding_welcome_default_item_3">Set a reminder so you don't forget</string>
     <string name="onboarding_welcome_default_item_4">Try AI to fill a list for you</string>
+
+    <!-- Onboarding refresh (Showcase -> Try it), DESIGN_SPEC docs/designs/onboarding-refresh-2026-11-04 -->
+    <string name="onboarding_progress_a11y">Step %1$d of %2$d</string>
+    <string name="onboarding_showcase_title_lead">Turn anything into</string>
+    <string name="onboarding_showcase_title_accent">a checklist</string>
+    <string name="onboarding_showcase_subtitle">Write it, snap it, or just talk. Gisti sorts it out.</string>
+    <string name="onboarding_showcase_write_title">Write a goal</string>
+    <string name="onboarding_showcase_write_caption">Get a step-by-step list</string>
+    <string name="onboarding_showcase_attach_title">Photo or file</string>
+    <string name="onboarding_showcase_attach_caption">Snap, PDF, link or voice — into a list</string>
+    <string name="onboarding_showcase_talk_title">Talk it through</string>
+    <string name="onboarding_showcase_talk_caption_call">Chat or call Gisti about your plans</string>
+    <string name="onboarding_showcase_talk_caption_chat">Chat with Gisti about your plans</string>
+    <string name="onboarding_showcase_cta">Try it now</string>
+    <string name="onboarding_demo_write_prompt">Beach trip</string>
+    <string name="onboarding_demo_write_item_1">Sunscreen</string>
+    <string name="onboarding_demo_write_item_2">Towels</string>
+    <string name="onboarding_demo_write_item_3">Snacks</string>
+    <string name="onboarding_demo_talk_user">Move dentist to Fri?</string>
+    <string name="onboarding_demo_talk_reply">Done</string>
+    <string name="onboarding_sample_title">No file at hand?</string>
+    <string name="onboarding_sample_body">Watch Gisti turn this note into a list.</string>
+    <string name="onboarding_sample_cta">Try with this note</string>
+    <string name="onboarding_sample_badge">Sample</string>
+    <string name="onboarding_sample_image_a11y">Sample photo: a handwritten note with six to-dos</string>
+    <string name="onboarding_sample_note_title">this week!!</string>
+    <string name="onboarding_sample_note_1">call mom re: Sunday</string>
+    <string name="onboarding_sample_note_2">milk, eggs, bread</string>
+    <string name="onboarding_sample_note_3">dentist Tue 3pm</string>
+    <string name="onboarding_sample_note_4">pay electricity before 15th</string>
+    <string name="onboarding_sample_note_5">library books!</string>
+    <string name="onboarding_sample_note_struck">gym</string>
+    <string name="onboarding_sample_note_6">yoga Thu</string>
+    <string name="onboarding_sample_reading">Reading the note…</string>
+    <string name="onboarding_sample_ready">Your list is ready</string>
+    <string name="onboarding_sample_list_meta">From the sample note</string>
+    <string name="onboarding_sample_checklist_name">This week</string>
+    <string name="onboarding_sample_item_1">Call Mom about Sunday</string>
+    <string name="onboarding_sample_item_2">Buy milk, eggs and bread</string>
+    <string name="onboarding_sample_item_3">Dentist on Tuesday at 3 PM</string>
+    <string name="onboarding_sample_item_4">Pay the electricity bill by the 15th</string>
+    <string name="onboarding_sample_item_5">Return the library books</string>
+    <string name="onboarding_sample_item_6">Yoga class on Thursday</string>
+    <string name="onboarding_try_type_placeholder">e.g. Pack for a beach trip</string>
+    <string name="onboarding_try_type_empty_hint">Type a goal first — or pick an idea below</string>
+    <string name="onboarding_try_talk_title">Talk it through with Gisti</string>
+    <string name="onboarding_try_ai_error">Gisti can't reach the AI right now. Try the sample or save your text as a list.</string>
+    <string name="onboarding_try_ai_signin">Sign in with Google to use AI here. Meanwhile, try the sample or save your text as a list.</string>
+    <string name="onboarding_try_ai_error_sample">Try the sample</string>
+    <string name="onboarding_try_ai_error_save">Save as a plain list</string>
+    <string name="onboarding_try_generating_slow">Still working on it…</string>
+    <string name="onboarding_try_generating_prompt">“%1$s”</string>
+    <string name="onboarding_ai_step_read">Reading your goal</string>
+    <string name="onboarding_ai_step_ideas">Gathering ideas</string>
+    <string name="onboarding_ai_step_order">Putting steps in order</string>
+    <string name="onboarding_ai_step_magic">Adding a little magic</string>
+    <string name="onboarding_ai_slow_longer">Some lists take a bit longer</string>
+    <string name="onboarding_ai_slow_thanks">Thanks for your patience</string>
+    <!-- Onboarding step 2, one screen per choice (docs/designs/onboarding-steps-2026-11-17) -->
+    <string name="onboarding_showcase_example">Show me an example</string>
+    <string name="onboarding_write_title">What do you want to get done?</string>
+    <string name="onboarding_write_subtitle">Type a goal or hold the mic. Gisti breaks it into steps.</string>
+    <string name="onboarding_write_subtitle_no_voice">Type a goal. Gisti breaks it into steps.</string>
+    <string name="onboarding_write_ideas_title">Or start from an idea</string>
+    <string name="onboarding_mic_denied">Microphone access is off. You can type your goal instead.</string>
+    <string name="onboarding_attach_title">Turn a photo or file into a list</string>
+    <string name="onboarding_attach_own_title">Or use your own</string>
+    <string name="onboarding_source_photo_caption">Note, whiteboard, receipt</string>
+    <string name="onboarding_source_pdf_caption">Tickets, plans, docs</string>
+    <string name="onboarding_source_link_caption">Recipe or article</string>
+    <string name="onboarding_source_voice_caption">Just say it</string>
+    <string name="onboarding_talk_greeting">Hi! Tell me what's on your plate — I'll turn it into tasks.</string>
+    <string name="onboarding_talk_greeting_hint_call">Type, hold the mic for a voice message, or call me.</string>
+    <string name="onboarding_talk_greeting_hint_chat">Type or hold the mic for a voice message.</string>
+    <string name="onboarding_talk_starters_title">Try asking</string>
+    <string name="onboarding_talk_starter_1">Plan my week</string>
+    <string name="onboarding_talk_starter_2">Help me pack for a trip</string>
+    <string name="onboarding_talk_starter_3">What can you do?</string>
+    <string name="onboarding_sample_found">Found %1$d of %2$d tasks</string>
 
     <!-- Navigation Drawer -->
     <string name="drawer_section_navigate">Navigate</string>
@@ -599,11 +600,7 @@
     <string name="paywall_no_subscription_found">No active subscription found</string>
     <string name="paywall_restore_failed">Couldn't restore purchases. Please check your connection and try again.</string>
     <string name="paywall_purchase_failed">Couldn't complete the purchase. Please try again.</string>
-    <string name="paywall_days_free">%1$d-Day Free Trial</string>
     <string name="paywall_go_premium">Go Premium</string>
-    <string name="paywall_then_price">then %1$s / month</string>
-    <string name="paywall_price_per_month">%1$s / month</string>
-    <string name="paywall_start_free_trial">Start Free Trial</string>
     <string name="paywall_subscribe_now">Subscribe Now</string>
     <string name="paywall_retry">Try Again</string>
     <string name="paywall_load_error">Unable to load subscription options.\nPlease check your connection and try again.</string>
@@ -612,7 +609,6 @@
     <string name="paywall_billing_unavailable">Purchases aren't available on this device right now.</string>
     <string name="paywall_no_payment_now">No payment due now</string>
     <string name="paywall_cancel_anytime">Cancel anytime</string>
-    <string name="paywall_auto_renew_notice">Auto-renews. Cancel anytime.</string>
     <string name="paywall_timeline_today">Today</string>
     <string name="paywall_timeline_due">Due %1$s</string>
     <string name="paywall_timeline_free">Free trial</string>
@@ -863,7 +859,6 @@
     <!-- Common Accessibility -->
     <string name="back">Back</string>
     <string name="feedback">Feedback</string>
-    <string name="completed_label">Completed</string>
 
     <!-- Checklist Detail - Undo -->
     <string name="checklist_item_deleted">"%1$s" deleted</string>
@@ -872,7 +867,6 @@
     <string name="share_items_progress">%1$d/%2$d items</string>
 
     <!-- Onboarding - Interactive - Customize Step -->
-    <string name="onboarding_interactive_settings">Settings</string>
 
     <!-- Consent Dialog -->
     <string name="consent_title">Privacy &amp; Data Usage</string>
@@ -998,8 +992,6 @@
     <string name="debug_repeat_rule_presets_description">Preview the 8 smart repeat presets sheet</string>
     <string name="debug_show_csat">Show CSAT Survey</string>
     <string name="debug_show_csat_description">Force show CSAT bottom sheet for testing</string>
-    <string name="debug_interactive_onboarding">Interactive Onboarding</string>
-    <string name="debug_interactive_onboarding_description">Open the new interactive onboarding flow</string>
     <string name="debug_dock_legacy_title">Legacy chat dock</string>
     <string name="debug_dock_legacy_description">Revert to the old flat-grey dock (no hairline) for comparison</string>
 
@@ -1007,10 +999,6 @@
     <string name="debug_onboardings_title">Onboardings</string>
     <string name="debug_onboardings_description">Launch any onboarding variant</string>
     <string name="debug_onboardings_section_variants">Variants</string>
-    <string name="debug_onboardings_interactive_title">Interactive Onboarding</string>
-    <string name="debug_onboardings_interactive_desc">Multi-step: category → style → template</string>
-    <string name="debug_onboardings_slides_title">Slides Onboarding</string>
-    <string name="debug_onboardings_slides_desc">3 pager slides + paywall</string>
     <string name="debug_onboardings_ai_welcome_title">AI Welcome (Toki)</string>
     <string name="debug_onboardings_ai_welcome_desc">4 steps: AI-agent hook → create first list</string>
 
@@ -1036,10 +1024,6 @@
     <string name="debug_catalog_state_free_limit_desc">4 checklists, free user — shows upsell button</string>
     <string name="debug_catalog_state_premium">Premium User</string>
     <string name="debug_catalog_state_premium_desc">3 checklists, premium, 300 credits</string>
-    <string name="debug_catalog_onboarding">Onboarding</string>
-    <string name="debug_catalog_onboarding_desc">Static onboarding pager</string>
-    <string name="debug_catalog_interactive_onboarding">Interactive Onboarding</string>
-    <string name="debug_catalog_interactive_onboarding_desc">Animated interactive onboarding flow</string>
     <string name="debug_catalog_main">Main</string>
     <string name="debug_catalog_main_desc">Home screen with checklist list</string>
     <string name="debug_catalog_templates">Templates</string>
@@ -1504,6 +1488,8 @@
     <string name="chat_attach_file_action">Attach file</string>
     <string name="chat_record_voice">Record voice message</string>
     <string name="chat_voice_press_hold_hint">Hold to record voice</string>
+    <string name="chat_voice_a11y_stop">Stop recording</string>
+    <string name="chat_voice_a11y_cancel">Cancel recording</string>
     <string name="chat_voice_drag_cancel_hint">Slide up to cancel</string>
     <string name="chat_voice_release_cancel_hint">Release to cancel</string>
     <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>
@@ -1600,11 +1586,6 @@
     <string name="chat_panel_scrim_description">Tap to close chat</string>
 
     <!-- First checklist (A/B auto-create) -->
-    <string name="first_checklist_title">Your first checklist</string>
-    <string name="first_checklist_item_1">Tap the circle to check off an item</string>
-    <string name="first_checklist_item_2">Tap any item to edit it</string>
-    <string name="first_checklist_item_3">Use the + button to add your own</string>
-    <string name="first_checklist_item_4">Meet your AI assistant — the chat bar at the bottom of the screen. Ask in plain words to add items, set reminders, or build a whole checklist (try «add milk» or «remind me Friday at 6pm»), or tap the mic to speak.</string>
 
     <!-- Add to existing checklist picker (ACTION_PROCESS_TEXT "Add to checklist" action) -->
     <string name="add_to_checklist_title">Add to checklist</string>

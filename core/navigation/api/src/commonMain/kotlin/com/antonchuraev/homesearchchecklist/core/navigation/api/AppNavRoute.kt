@@ -21,13 +21,7 @@ sealed interface AppNavRoute : NavKey {
     @Serializable
     data object Splash : AppNavRoute
 
-    @Serializable
-    data object Onboarding : AppNavRoute
-
-    @Serializable
-    data object InteractiveOnboarding : AppNavRoute
-
-    /** "AI Welcome" onboarding ("Toki" style) — Android-only 4-step intro (see GetOnboardingVariantUseCase). */
+    /** "AI Welcome" onboarding — the only onboarding flow, on every platform (see GetOnboardingVariantUseCase). */
     @Serializable
     data object WelcomeOnboarding : AppNavRoute
 

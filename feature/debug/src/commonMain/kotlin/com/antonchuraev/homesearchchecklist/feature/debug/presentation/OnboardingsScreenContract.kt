@@ -9,8 +9,6 @@ data class OnboardingsState(
 
 /** Each enum entry is one launchable onboarding variant. Adding a new variant = one new entry. */
 enum class OnboardingVariant {
-    Interactive,
-    Slides,
     AiWelcome,
 }
 

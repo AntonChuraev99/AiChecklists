@@ -27,15 +27,63 @@ object AnalyticsEvents {
     object Onboarding {
         const val STARTED = "onboarding_started"
         const val VM_CREATED = "onboarding_vm_created"
-        const val PAGE_VIEWED = "onboarding_page_viewed"
         const val STEP_COMPLETED = "onboarding_step_completed"
         const val SKIPPED = "onboarding_skipped"
         const val COMPLETED = "onboarding_completed"
+
+        // ── ai_welcome "Showcase → Try it" (2026-11-04). All carry VARIANT; emitted by
+        // WelcomeOnboardingViewModel. Spec: docs/designs/onboarding-refresh-2026-11-04/FEATURE_SPEC.md §7.
+
+        // Since 2026-11-17 step 2 is one screen per choice (Write / Attach / Talk); spec:
+        // docs/designs/onboarding-steps-2026-11-17/FEATURE_SPEC.md §7.
+
+        /**
+         * A step became visible. Params: STEP (showcase/write/attach/talk; `try_it` before 2026-11-17),
+         * STEP_INDEX (1/2/2/2), STEP_COUNT (2).
+         */
+        const val STEP_VIEWED = "onboarding_step_viewed"
+
+        /** A Showcase tile. Params: MODE (write/attach/talk; `default` = the removed CTA, before 2026-11-17). */
+        const val MODE_SELECTED = "onboarding_mode_selected"
+
+        /** The bundled sample was started. Params: ORIGIN (card/ai_error/showcase). No AI, no credits. */
+        const val SAMPLE_USED = "onboarding_sample_used"
+
+        /** A starter chip created its preset list. Params: KEY (WelcomeStarterTemplate.key). */
+        const val CHIP_TAPPED = "onboarding_chip_tapped"
+
+        /**
+         * Talk send → the chat. Params: PREFILLED — since 2026-11-17 a prefilled text is SENT in the chat
+         * at once (ShellLaunch.OpenChat autoSend); before, it went into the composer unsent.
+         */
+        const val CHAT_TAPPED = "onboarding_chat_tapped"
+
+        /** "Call" on Talk (only rendered where the voice call is available). */
+        const val CALL_TAPPED = "onboarding_call_tapped"
+
+        /** A Talk starter bubble: its text is sent in the chat at once. Params: KEY (OnboardingTalkStarter.key). */
+        const val STARTER_TAPPED = "onboarding_starter_tapped"
+
+        /**
+         * One mic press on the Write / Talk composer ended. Params: SCREEN (write/talk), OUTCOME
+         * (transcribed / cancelled / too_short / permission_denied / permission_just_granted /
+         * recorder_error / empty / insufficient_credits / network_error / service_error /
+         * not_registered / file_missing). A transcription (1 credit) ran for every outcome after
+         * `recorder_error` in this list.
+         */
+        const val VOICE_RECORDED = "onboarding_voice_recorded"
+
+        /** The AI-failure box appeared under the field. Params: KIND, FAILURE_REASON. */
+        const val AI_ERROR_SHOWN = "onboarding_ai_error_shown"
+
+        /** An action of the AI-failure box. Params: ACTION (sample/plain_list). */
+        const val FALLBACK_ACTION = "onboarding_fallback_action"
         const val FIRST_CHECKLIST_AUTO_CREATED = "first_checklist_auto_created"
 
         /**
          * Fired once per launch when the onboarding variant is resolved from Remote Config
-         * (only while onboarding is still pending). Params: VARIANT (slides/none/interactive),
+         * (only while onboarding is still pending). Params: VARIANT (ai_welcome/none; the retired
+         * slides/interactive arms were deleted 2026-11-04),
          * RC_ACTIVATED (did fetchAndActivate succeed), RC_VALUE_EMPTY (true = RC returned nothing
          * and we fell back to the client default — the smoking gun for "experiment never assigned",
          * the exact failure that silently collapsed the A/B split to 0% none in prod), FETCH_MS
@@ -394,6 +442,14 @@ object AnalyticsEvents {
         const val STARTED = "ai_analyze_started"
         const val COMPLETED = "ai_analyze_completed"
         const val FAILED = "ai_analyze_failed"
+
+        /**
+         * [AnalyticsParams.SURFACE] value on the three events above when the onboarding's typed goal
+         * ran the analysis IN PLACE (no Analyze screen). Absent on every Analyze-screen emit — including
+         * one opened from onboarding (`source = onboarding`), which is a real analysis of the user's
+         * own material. CSAT keys its onboarding skip on THIS, not on `source`.
+         */
+        const val SURFACE_ONBOARDING = "onboarding"
     }
 
     // ─── AI entry affordances (the DOORS into Analyze / AI-create) ───────────
@@ -933,7 +989,6 @@ object NotificationPermissionSource {
     const val CHECKLIST_REMINDER = "checklist_reminder"
     const val ITEM_REMINDER = "item_reminder"
     const val INBOX = "inbox"
-    const val ONBOARDING = "onboarding"
 }
 
 /** Fires [AnalyticsEvents.NotificationPermission.REQUESTED] with its one param. */
@@ -963,10 +1018,40 @@ object AnalyticsParams {
     const val TRIGGER_EVENT = "trigger_event"
     const val SCORE = "score"
     const val VARIANT = "variant"
-    const val PAGE = "page"
     const val ERROR = "error"
     const val FORMAT = "format"
     const val INPUT_TYPE = "input_type"
+
+    // ── onboarding (ai_welcome) dimensions ────────────────────────────────────────────────────
+    /** Onboarding step wire name: showcase | try_it (pre-2026-11-04 builds sent the old enum names). */
+    const val STEP = "step"
+
+    /** 1-based onboarding step number, an Int — funnels by position without parsing [STEP]. */
+    const val STEP_INDEX = "step_index"
+
+    /** Number of onboarding steps in this build (2 since 2026-11-04). */
+    const val STEP_COUNT = "step_count"
+
+    /** How Try it was entered: default | write | attach | talk. */
+    const val MODE = "mode"
+
+    /** Where the sample was started from: card | ai_error. */
+    const val ORIGIN = "origin"
+
+    /** Whether the chat opened with the typed text in its composer ("true"/"false"). */
+    const val PREFILLED = "prefilled"
+
+    /** Which AI-failure box was shown: unavailable | sign_in_required. */
+    const val KIND = "kind"
+
+    /** Starter-chip key on onboarding_chip_tapped. */
+    const val KEY = "key"
+
+    /** How onboarding was finished (OnboardingSeed.wire) on onboarding_completed. */
+    const val SEED = "seed"
+
+    /** Whether onboarding left the user with starter content ("true"/"false"). */
+    const val CHECKLIST_CREATED = "checklist_created"
 
     // ── ai_entry_tapped dimensions ────────────────────────────────────────────────────────────
     // WHICH AI flow the tapped door leads to: AiEntryDestination.wire = analyze | ai_create.
@@ -1382,6 +1467,29 @@ enum class ChecklistSource(val wire: String) {
 
     /** Recurring weekly checklist spawned from its parent — a Premium feature. */
     WEEKLY("weekly"),
+
+    /** Onboarding "Try with this note": the bundled sample saved as a real list, no AI. */
+    ONBOARDING_SAMPLE("onboarding_sample"),
+
+    /** Onboarding starter chip: a preset list, no AI. */
+    ONBOARDING_CHIP("onboarding_chip"),
+
+    /**
+     * Onboarding typed goal turned into a list by AI in place. Not [AI]: that value means "the
+     * Analyze flow", and its dashboards would silently gain an onboarding-only cohort.
+     */
+    ONBOARDING_AI("onboarding_ai"),
+
+    /** Onboarding AI-failure box "Save as a plain list": the typed text as a name, tips as items. */
+    ONBOARDING_PLAIN("onboarding_plain"),
+    ;
+
+    /** True for the creation paths of the onboarding (they must not move day-0 CSAT triggers). */
+    val isOnboarding: Boolean get() = wire.startsWith(ONBOARDING_WIRE_PREFIX)
+
+    private companion object {
+        const val ONBOARDING_WIRE_PREFIX = "onboarding_"
+    }
 }
 
 /**
@@ -1469,8 +1577,6 @@ object AnalyticsScreens {
     const val ANALYZE = "analyze"
     const val ANALYZE_RESULT = "analyze_result"
     const val CHAT = "chat"
-    const val ONBOARDING = "onboarding"
-    const val INTERACTIVE_ONBOARDING = "interactive_onboarding"
     const val WELCOME_ONBOARDING = "welcome_onboarding"
     const val PAYWALL = "paywall"
     const val PAYWALL_WEB_INSTALL = "paywall_web_install"

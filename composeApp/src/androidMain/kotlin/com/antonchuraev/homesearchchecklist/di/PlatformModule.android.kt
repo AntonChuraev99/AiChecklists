@@ -61,14 +61,9 @@ actual fun platformModule(): Module = module {
 
     // Exposes AppBuildConfig.isDebug to feature modules that live in commonMain
     // and cannot import AppBuildConfig directly (it is an expect object in :composeApp).
-    // Used by OnboardingViewModel / InteractiveOnboardingViewModel to suppress
+    // Used by WelcomeOnboardingViewModel (among others) to suppress
     // analytics events when launched from the debug menu.
     single(named("isDebugBuild")) { AppBuildConfig.isDebug }
-
-    // Platform flag for feature modules in commonMain that need to gate Android-only behavior
-    // without depending on the :composeApp expect object. Used by GetOnboardingVariantUseCase to
-    // resolve the Android-only "ai_welcome" onboarding (falls back to slides elsewhere).
-    single(named("isAndroid")) { true }
 
     // Firestore sync data source — Android implementation using the Firebase Android SDK.
     single<FirestoreSyncDataSource> { AndroidFirestoreSyncDataSource() }

@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputCallSlot
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.chatInputCallSlot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

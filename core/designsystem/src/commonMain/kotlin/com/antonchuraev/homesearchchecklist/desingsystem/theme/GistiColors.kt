@@ -1,9 +1,11 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 
 /**
  * Gisti "variant D" accent tokens that live on top of the Material 3
@@ -41,6 +43,21 @@ object GistiColors {
         @Composable @ReadOnlyComposable
         get() = if (LocalIsDarkTheme.current) {
             Brush.linearGradient(listOf(AiFromDark, AiToDark))
+        } else {
+            Brush.linearGradient(listOf(AiFromLight, AiToLight))
+        }
+
+    /**
+     * The accent run of a two-tone headline ("Turn anything into **a checklist**").
+     *
+     * Light = [aiGradient]. Dark = solid `colorScheme.primary`: the dark gradient (`#2A6FD6`→`#5562C4`)
+     * on the `#161412` page is only ~3.3–3.8:1 and reads dim next to the light lead text, while the
+     * dark `primary` clears ~10:1 (onboarding refresh DESIGN_SPEC §5, 2026-11-04).
+     */
+    val aiHeadlineBrush: Brush
+        @Composable @ReadOnlyComposable
+        get() = if (LocalIsDarkTheme.current) {
+            SolidColor(MaterialTheme.colorScheme.primary)
         } else {
             Brush.linearGradient(listOf(AiFromLight, AiToLight))
         }

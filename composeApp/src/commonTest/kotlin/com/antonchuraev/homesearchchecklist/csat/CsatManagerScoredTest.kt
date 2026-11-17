@@ -3,7 +3,10 @@ package com.antonchuraev.homesearchchecklist.csat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import com.antonchuraev.homesearchchecklist.core.common.api.AiEntrySource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -237,6 +240,67 @@ class CsatManagerScoredTest {
         }
     }
 
+    // ── Onboarding emits do not move the score (2026-11-04) ──────────────────────
+
+    @Test
+    fun onboardingCreates_neverReachTheChecklistMilestone() = runTest {
+        val h = newHarness()
+        h.emit(AnalyticsEvents.Checklist.SHARED) // 8 + 3 first-day = 11, one point short
+
+        // Three onboarding creates would be the 3rd-checklist milestone (+4) if they counted.
+        ChecklistSource.entries.filter { it.isOnboarding }.take(3).forEach { source ->
+            h.emit(AnalyticsEvents.Checklist.CREATED, mapOf(AnalyticsParams.SOURCE to source.wire))
+        }
+
+        assertFalse(h.manager.shouldShowCsat(), "onboarding creates must not count toward the milestone")
+
+        // The counter did not move either: three ordinary creates are still needed for the milestone.
+        repeat(2) { h.emit(AnalyticsEvents.Checklist.CREATED, mapOf(AnalyticsParams.SOURCE to ChecklistSource.MANUAL.wire)) }
+        assertFalse(h.manager.shouldShowCsat(), "2 ordinary creates after onboarding are not the 3rd checklist")
+        h.emit(AnalyticsEvents.Checklist.CREATED, mapOf(AnalyticsParams.SOURCE to ChecklistSource.MANUAL.wire))
+        assertTrue(h.manager.shouldShowCsat(), "the 3rd ordinary create is the milestone")
+    }
+
+    @Test
+    fun onboardingTypedAnalyzeCompleted_inPlace_carriesNoWeight() = runTest {
+        val h = newHarness()
+        h.emit(AnalyticsEvents.Checklist.SHARED) // 11
+
+        // The typed goal inside onboarding: source = onboarding AND surface = onboarding.
+        h.emit(
+            AnalyticsEvents.Analyze.COMPLETED,
+            mapOf(
+                AnalyticsParams.SOURCE to AiEntrySource.ONBOARDING.wire,
+                AnalyticsParams.SURFACE to AnalyticsEvents.Analyze.SURFACE_ONBOARDING,
+            ),
+        )
+        assertFalse(h.manager.shouldShowCsat(), "the onboarding typed goal's ai_analyze_completed must not score")
+
+        h.emit(AnalyticsEvents.Analyze.COMPLETED, mapOf(AnalyticsParams.SOURCE to "none"))
+        assertTrue(h.manager.shouldShowCsat(), "an Analyze-screen ai_analyze_completed still weighs 5")
+    }
+
+    @Test
+    fun analyzeScreenOpenedFromOnboardingOwnFile_stillWeighs5() = runTest {
+        val h = newHarness()
+        h.emit(AnalyticsEvents.Checklist.SHARED) // 11
+
+        // Own-file pill → Analyze screen: the entry is attributed to onboarding, but no surface is set
+        // — this is a real AI analysis of the user's own file, as on the old "More ways" path.
+        h.emit(AnalyticsEvents.Analyze.COMPLETED, mapOf(AnalyticsParams.SOURCE to AiEntrySource.ONBOARDING.wire))
+        assertTrue(h.manager.shouldShowCsat(), "Analyze of the user's own file from onboarding must weigh 5")
+    }
+
+    @Test
+    fun onboardingSource_onANonOnboardingWeightedEvent_stillCounts() = runTest {
+        val h = newHarness()
+        h.emit(AnalyticsEvents.Checklist.SHARED) // 11
+
+        // The skip is per (event, signature), not "any event with source = onboarding".
+        h.emit(AnalyticsEvents.Checklist.FILL_COMPLETED, mapOf(AnalyticsParams.SOURCE to AiEntrySource.ONBOARDING.wire))
+        assertTrue(h.manager.shouldShowCsat(), "a fill completion is not an onboarding emit, whatever its source")
+    }
+
     // ── Harness ────────────────────────────────────────────────────────────────
 
     /** Controllable time seam: epoch day for decay/cooldown, instant for the reminder window. */
@@ -263,8 +327,8 @@ class CsatManagerScoredTest {
             private set
 
         /** Feeds one event through the scored model; a non-null trigger means the survey is due. */
-        suspend fun emit(eventName: String) {
-            if (manager.processEvent(eventName) != null) shownCount++
+        suspend fun emit(eventName: String, params: Map<String, Any> = emptyMap()) {
+            if (manager.processEvent(eventName, params) != null) shownCount++
         }
     }
 

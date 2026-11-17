@@ -47,7 +47,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapeTokens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputLeading
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputLeading
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
@@ -66,7 +66,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatResponseLanguageSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatSettingsSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AttachedChoiceActions

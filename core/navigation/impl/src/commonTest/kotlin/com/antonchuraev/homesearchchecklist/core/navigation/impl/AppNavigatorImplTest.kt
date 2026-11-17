@@ -35,18 +35,18 @@ class AppNavigatorImplTest {
     }
 
     // ---------------------------------------------------------------------------
-    // Test 1: navigateToOnboarding clears stack and sets only Onboarding
+    // Test 1: navigateToWelcomeOnboarding clears stack and sets only WelcomeOnboarding
     // (popUpTo<Splash> inclusive = true semantic — wipes Splash too)
     // ---------------------------------------------------------------------------
 
     @Test
-    fun navigateToOnboarding_resetsStackWithOnboardingOnly() {
+    fun navigateToWelcomeOnboarding_resetsStackWithOnboardingOnly() {
         val nav = AppNavigatorImpl()
         // Seed with some state first
         nav.navigateToMainScreen()
         nav.navigateToTemplatesScreen()
-        nav.navigateToOnboarding()
-        assertEquals(listOf<NavKey>(AppNavRoute.Onboarding), nav.backStack.toList())
+        nav.navigateToWelcomeOnboarding()
+        assertEquals(listOf<NavKey>(AppNavRoute.WelcomeOnboarding), nav.backStack.toList())
     }
 
     // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ class AppNavigatorImplTest {
     @Test
     fun navigateToMainScreen_clearBackStack_replacesStack() {
         val nav = AppNavigatorImpl()
-        nav.navigateToOnboarding()
+        nav.navigateToWelcomeOnboarding()
         nav.navigateToMainScreen(clearBackStack = true)
         assertEquals(listOf<NavKey>(AppNavRoute.Main), nav.backStack.toList())
     }
@@ -239,7 +239,7 @@ class AppNavigatorImplTest {
     @Test
     fun checklistDetail_clearBackStack_noTopLevelRoute_seedsMainByDefault() {
         val nav = AppNavigatorImpl()
-        nav.navigateToOnboarding()
+        nav.navigateToWelcomeOnboarding()
 
         nav.navigateToChecklistDetail(checklistId = 9L, clearBackStack = true)
 
@@ -253,7 +253,7 @@ class AppNavigatorImplTest {
     fun checklistDetail_clearBackStack_noTopLevelRoute_honoursDeclaredRoot() {
         val nav = AppNavigatorImpl()
         nav.setDefaultRootRoute(AppNavRoute.Inbox)
-        nav.navigateToOnboarding()
+        nav.navigateToWelcomeOnboarding()
 
         nav.navigateToChecklistDetail(checklistId = 9L, clearBackStack = true)
 
@@ -321,7 +321,7 @@ class AppNavigatorImplTest {
     fun navigateToMainScreen_clearBackStack_noTopLevelRoute_honoursDeclaredRoot() {
         val nav = AppNavigatorImpl()
         nav.setDefaultRootRoute(AppNavRoute.Inbox)
-        nav.navigateToOnboarding()
+        nav.navigateToWelcomeOnboarding()
 
         nav.navigateToMainScreen(clearBackStack = true)
 

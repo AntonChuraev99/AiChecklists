@@ -295,8 +295,6 @@ class AnalyzeResultPreviewViewModelTest {
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
-        override fun navigateToOnboarding() {}
-        override fun navigateToInteractiveOnboarding() {}
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}

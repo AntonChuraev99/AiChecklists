@@ -1171,8 +1171,6 @@ class ChecklistDetailFolderActionsTest {
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() { backCalled = true }
-        override fun navigateToOnboarding() {}
-        override fun navigateToInteractiveOnboarding() {}
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}

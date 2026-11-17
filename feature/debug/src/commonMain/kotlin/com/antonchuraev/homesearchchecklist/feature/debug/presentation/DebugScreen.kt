@@ -125,13 +125,6 @@ fun DebugScreen(
             onShowCsat()
         },
         DebugItem(
-            Icons.Outlined.CheckCircle,
-            stringResource(Res.string.debug_interactive_onboarding),
-            stringResource(Res.string.debug_interactive_onboarding_description)
-        ) {
-            viewModel.sendIntent(DebugScreenIntent.OpenInteractiveOnboarding)
-        },
-        DebugItem(
             Icons.Default.PlayCircleFilled,
             stringResource(Res.string.debug_onboardings_title),
             stringResource(Res.string.debug_onboardings_description)

@@ -136,7 +136,7 @@ class SplashViewModelTest {
             appScope = testScope,
             logger = NoOpLogger(),
             analyticsTracker = fakeAnalytics,
-            getOnboardingVariant = GetOnboardingVariantUseCase(remoteConfig, NoOpLogger(), isAndroid = true),
+            getOnboardingVariant = GetOnboardingVariantUseCase(remoteConfig, NoOpLogger()),
             completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserData),
             remoteConfigProvider = remoteConfig,
             getFirstChecklistVariant = GetFirstChecklistVariantUseCase(remoteConfig, NoOpLogger()),
@@ -243,14 +243,14 @@ class SplashViewModelTest {
     /**
      * Returning user who hasn't finished onboarding: must NOT navigate before
      * fetchAndActivate() returns. The slow-RC fake reports an empty value
-     * before fetch and "interactive" after — if SplashViewModel skipped the
-     * wait, it would read the empty default and route to slides; the
-     * assertion below requires the post-fetch "interactive" path instead.
+     * before fetch and "none" after — if SplashViewModel skipped the
+     * wait, it would read the empty default and route to the ai_welcome fallback;
+     * the assertion below requires the post-fetch "none" path (main) instead.
      */
     @Test
     fun navigateTo_returningUserOnboardingPending_waitsForFetchAndActivate() = testScope.runTest {
         val rc = SlowOrderTrackingRemoteConfig(
-            onboardingValueAfterFetch = "interactive",
+            onboardingValueAfterFetch = "none",
             fetchDelayMillis = 200L,
         )
         val nav = RecordingNavigator()
@@ -264,7 +264,7 @@ class SplashViewModelTest {
 
         // Drain everything that does not require advancing virtual time.
         // If the bug is back (no waiting), navigateTo fires here with the
-        // pre-fetch empty RC value → slides.
+        // pre-fetch empty RC value → ai_welcome fallback.
         runCurrent()
         assertTrue(
             nav.routes.isEmpty(),
@@ -276,21 +276,22 @@ class SplashViewModelTest {
 
         assertTrue(rc.fetchInvoked, "fetchAndActivate must be invoked for returning user with !isOnboardingPassed")
         assertEquals(
-            listOf("interactive_onboarding"),
+            listOf("main"),
             nav.routes,
-            "must route by server variant 'interactive', not by stale empty client default"
+            "must route by server variant 'none', not by stale empty client default"
         )
     }
 
     /**
      * New user: registers, then must wait for fetchAndActivate before showing
-     * onboarding. The server variant in this fake is "default" — checks that
-     * the user lands on slide onboarding, not the interactive fallback.
+     * onboarding. The server variant in this fake is "none" — the only arm that
+     * differs from the empty-value fallback (ai_welcome), so landing on main proves
+     * the post-fetch value was read.
      */
     @Test
     fun navigateTo_newUser_waitsForFetchAndActivate_thenRoutesByServerVariant() = testScope.runTest {
         val rc = SlowOrderTrackingRemoteConfig(
-            onboardingValueAfterFetch = "default",
+            onboardingValueAfterFetch = "none",
             fetchDelayMillis = 200L,
         )
         val nav = RecordingNavigator()
@@ -318,9 +319,9 @@ class SplashViewModelTest {
 
         assertTrue(rc.fetchInvoked, "fetchAndActivate must be invoked for new user")
         assertEquals(
-            listOf("onboarding"),
+            listOf("main"),
             nav.routes,
-            "must route by server variant 'default' (slides), not by empty client default"
+            "must route by server variant 'none', not by empty client default"
         )
     }
 
@@ -332,7 +333,7 @@ class SplashViewModelTest {
     @Test
     fun navigateTo_returningUserOnboardingPassed_skipsRcWaitAndGoesToMain() = testScope.runTest {
         val rc = SlowOrderTrackingRemoteConfig(
-            onboardingValueAfterFetch = "interactive",
+            onboardingValueAfterFetch = "ai_welcome",
             fetchDelayMillis = 2_000L,
         )
         val nav = RecordingNavigator()
@@ -762,8 +763,6 @@ class SplashViewModelTest {
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
-        override fun navigateToOnboarding() {}
-        override fun navigateToInteractiveOnboarding() {}
         override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}
@@ -808,8 +807,6 @@ class SplashViewModelTest {
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
-        override fun navigateToOnboarding() { routes += "onboarding" }
-        override fun navigateToInteractiveOnboarding() { routes += "interactive_onboarding" }
         override fun navigateToWelcomeOnboarding() { routes += "welcome_onboarding" }
         override fun navigateToMainScreen(clearBackStack: Boolean) { routes += "main" }
         override fun navigateToDebugMenu() {}

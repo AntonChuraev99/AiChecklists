@@ -5,9 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -34,7 +37,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -53,6 +58,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppShapes
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.ChatSurfaceTone
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalChatSurfaceTone
@@ -80,6 +86,11 @@ data class SourcePillEntry<T>(
      * its plain glyph either way, so the Inbox empty state and the Analyze picker do not change.
      */
     val tint: Int? = null,
+    /**
+     * What this door takes ("Note, whiteboard, receipt"), drawn under the label by [SourceCardGrid]
+     * only. Null everywhere else: the pills and tiles have no room for it and never draw it.
+     */
+    val caption: String? = null,
 )
 
 /** Where a [SourceRowSection] is mounted — decides the heading's weight, nothing else. */
@@ -438,6 +449,146 @@ private val SourceTileVerticalMinHeight = 64.dp
 
 /** Four 88dp tiles and their three gaps — the width a [SourceTileRow] never grows past. */
 private val SourceTileRowMaxWidth = 88.dp * 4 + AppDimens.SpacingSm * 3
+
+/**
+ * The four Analyze doors as CARDS that also say what each door takes — for a screen whose whole job
+ * is "which file?" (onboarding Attach, DESIGN_SPEC onboarding-steps-2026-11-17 §3.4). The third
+ * rendering of [sourceDoorEntries]: same glyphs, palette slots, order and [onSelect] contract as
+ * [SourceRow] and [SourceTileRow]; only the [captions] are new.
+ *
+ * ## Layout contract — measured, never truncated
+ * - Two columns of VERTICAL cards (disc · title · caption) when the widest title fits ONE line at half
+ *   width and no caption needs more than two lines there.
+ * - [horizontal] (expanded windows): two columns of HORIZONTAL rows (disc beside title + caption), by
+ *   the same rule at the narrower text column.
+ * - Otherwise one column of horizontal rows. Text is never ellipsized; peers in a row share a height.
+ *
+ * @param captions the caption of each door (from `strings.xml`, resolved by the host).
+ * @param onSelect the material tapped; the HOST emits `ai_entry_tapped`, as with [SourceRow].
+ */
+@Composable
+fun SourceCardGrid(
+    captions: (AnalyzeInputKind) -> String,
+    onSelect: (AnalyzeInputKind) -> Unit,
+    modifier: Modifier = Modifier,
+    horizontal: Boolean = false,
+    enabled: Boolean = true,
+) {
+    val entries = sourceDoorEntries().map { it.copy(caption = captions(it.value)) }
+    val gap = AppDimens.SpacingSm
+    val measurer = rememberTextMeasurer()
+    val titleStyle = MaterialTheme.typography.titleSmall
+    val captionStyle = MaterialTheme.typography.bodySmall
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val half = (maxWidth - gap) / 2
+        // Text column of one card at half width, for the vertical and the horizontal shape.
+        val verticalText = half - SourceCardPadding * 2
+        val horizontalText = half - SourceCardPadding * 2 - SourceTileDiscSize - SourceCardPadding
+        fun fitsAt(textWidth: androidx.compose.ui.unit.Dp): Boolean {
+            if (textWidth <= 0.dp) return false
+            val px = with(density) { textWidth.roundToPx() }
+            return entries.all { entry ->
+                val title = measurer.measure(entry.label, titleStyle, maxLines = 1, softWrap = false).size.width
+                val caption = measurer.measure(
+                    text = entry.caption.orEmpty(),
+                    style = captionStyle,
+                    constraints = Constraints(maxWidth = px),
+                )
+                title <= px && caption.lineCount <= SourceCardCaptionMaxLines
+            }
+        }
+        val twoColumns: Boolean
+        val vertical: Boolean
+        when {
+            !horizontal && fitsAt(verticalText) -> { twoColumns = true; vertical = true }
+            horizontal && fitsAt(horizontalText) -> { twoColumns = true; vertical = false }
+            else -> { twoColumns = false; vertical = false }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            entries.chunked(if (twoColumns) 2 else 1).forEach { group ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                ) {
+                    group.forEach { entry ->
+                        SourceCard(
+                            entry = entry,
+                            vertical = vertical,
+                            enabled = enabled,
+                            onSelect = onSelect,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .testTag("source_card_${entry.value.name.lowercase()}"),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One door of a [SourceCardGrid]: one merged [Role.Button] node read as "{title}, {caption}". */
+@Composable
+private fun SourceCard(
+    entry: SourcePillEntry<AnalyzeInputKind>,
+    vertical: Boolean,
+    enabled: Boolean,
+    onSelect: (AnalyzeInputKind) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val slot = entry.tint ?: 0
+    Surface(
+        onClick = { onSelect(entry.value) },
+        enabled = enabled,
+        shape = AppShapes.medium,
+        color = AppSurface.card(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+            .heightIn(min = if (vertical) SourceCardVerticalMinHeight else SourceCardHorizontalMinHeight)
+            .semantics { role = Role.Button },
+    ) {
+        val text: @Composable () -> Unit = {
+            Text(
+                text = entry.label,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            entry.caption?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (vertical) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
+                modifier = Modifier.padding(SourceCardPadding),
+            ) {
+                SourceTileDisc(entry = entry, slot = slot, disc = SourceTileDiscSize, glyph = SourceTileGlyphSize)
+                Spacer(Modifier.height(AppDimens.SpacingSm - AppDimens.SpacingXxs))
+                text()
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SourceCardPadding),
+                modifier = Modifier.padding(SourceCardPadding),
+            ) {
+                SourceTileDisc(entry = entry, slot = slot, disc = SourceTileDiscSize, glyph = SourceTileGlyphSize)
+                Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs)) { text() }
+            }
+        }
+    }
+}
+
+private val SourceCardPadding = AppDimens.SpacingMd
+private val SourceCardVerticalMinHeight = 96.dp
+private val SourceCardHorizontalMinHeight = 64.dp
+private const val SourceCardCaptionMaxLines = 2
 
 /**
  * The measured grid behind [SourceRow] and behind the Analyze screen's source picker: N equal pills,

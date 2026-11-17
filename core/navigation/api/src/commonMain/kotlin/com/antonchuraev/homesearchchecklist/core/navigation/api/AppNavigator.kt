@@ -49,11 +49,7 @@ interface AppNavigator {
      */
     fun setDefaultRootRoute(route: AppNavRoute) = Unit
 
-    fun navigateToOnboarding()
-
-    fun navigateToInteractiveOnboarding()
-
-    /** Navigate to the Android-only "AI Welcome" onboarding (replaces the splash entry stack). */
+    /** Navigate to the "AI Welcome" onboarding, the only onboarding flow (replaces the splash entry stack). */
     fun navigateToWelcomeOnboarding()
 
     /**

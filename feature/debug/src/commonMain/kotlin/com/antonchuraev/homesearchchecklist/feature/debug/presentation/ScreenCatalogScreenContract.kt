@@ -21,8 +21,6 @@ sealed interface ScreenCatalogIntent : Intent {
     data object SeedAsPremium : ScreenCatalogIntent
 
     // Lifecycle screens
-    data object NavigateOnboarding : ScreenCatalogIntent
-    data object NavigateInteractiveOnboarding : ScreenCatalogIntent
     data object NavigateMain : ScreenCatalogIntent
 
     // Create screens

@@ -103,22 +103,6 @@ fun ScreenCatalogScreen(
             SectionHeader(stringResource(Res.string.debug_catalog_section_lifecycle))
 
             CatalogItem(
-                testTag = "catalog_onboarding",
-                title = stringResource(Res.string.debug_catalog_onboarding),
-                subtitle = stringResource(Res.string.debug_catalog_onboarding_desc),
-                isDisabled = state.isWorking,
-                onClick = { viewModel.sendIntent(ScreenCatalogIntent.NavigateOnboarding) }
-            )
-
-            CatalogItem(
-                testTag = "catalog_interactive_onboarding",
-                title = stringResource(Res.string.debug_catalog_interactive_onboarding),
-                subtitle = stringResource(Res.string.debug_catalog_interactive_onboarding_desc),
-                isDisabled = state.isWorking,
-                onClick = { viewModel.sendIntent(ScreenCatalogIntent.NavigateInteractiveOnboarding) }
-            )
-
-            CatalogItem(
                 testTag = "catalog_main",
                 title = stringResource(Res.string.debug_catalog_main),
                 subtitle = stringResource(Res.string.debug_catalog_main_desc),
