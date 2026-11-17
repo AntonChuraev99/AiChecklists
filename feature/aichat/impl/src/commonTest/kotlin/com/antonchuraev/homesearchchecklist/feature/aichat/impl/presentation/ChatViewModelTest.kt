@@ -3736,6 +3736,36 @@ class ChatViewModelTest {
         )
     }
 
+    // ── G1b. A hand-off auto-send (ShellLaunch.OpenChat(autoSend = true), onboarding Talk) is the
+    //        SAME send: out of credits it takes emitInsufficientCredits, not a dialect of its own ──
+
+    @Test
+    fun prefillAndSend_layer2InsufficientCredits_takesTheSameRefusalPathAsSend() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVmOutOfCredits(
+            analytics = analytics,
+            remoteConfig = HarnessRemoteConfigProvider(
+                longs = mapOf(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to 777L),
+            ),
+        )
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my week"))
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effectDeferred.await())
+        assertEquals("chat_insufficient_credits", message.messageKey)
+        assertEquals(777, message.paywallCtaCredits, "the auto-sent turn offers the same Become-Pro CTA")
+        testScheduler.advanceUntilIdle()
+        val params = assertNotNull(analytics.paramsOf("ai_chat_response_received"))
+        assertEquals("insufficient_credits", params["outcome"])
+        assertEquals(0, params["credits_used"])
+        val userMsg = vm.screenState.value.messages.first()
+        assertEquals("Plan my week", userMsg.content, "the hand-off text is the user's sent message")
+    }
+
     // ── G2. The CTA survives the ChatRoute round-trip onto the bubble ─────────
     //
     // ShowAssistantMessage is resolved to text by the host (ChatRoute / App.kt dock) and sent back

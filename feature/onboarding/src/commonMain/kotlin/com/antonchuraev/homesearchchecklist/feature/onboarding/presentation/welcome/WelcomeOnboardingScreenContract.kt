@@ -38,7 +38,7 @@ import aichecklists.core.designsystem.generated.resources.onboarding_welcome_ite
 import org.jetbrains.compose.resources.StringResource
 
 /**
- * Starter suggestions shown as tappable chips on the [OnboardingStep.TryIt] step; one tap creates
+ * Starter suggestions shown as tappable chips on the [OnboardingStep.Write] screen; one tap creates
  * and opens the preset list. Each carries its own [labelRes] (chip text), [checklistNameRes] (the
  * created checklist's name), and [itemRes] (the hardcoded starter items it is pre-filled with — NO
  * AI, no credits). Kept

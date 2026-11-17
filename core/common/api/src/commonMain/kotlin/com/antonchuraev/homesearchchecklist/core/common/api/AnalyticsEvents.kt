@@ -34,23 +34,44 @@ object AnalyticsEvents {
         // ── ai_welcome "Showcase → Try it" (2026-11-04). All carry VARIANT; emitted by
         // WelcomeOnboardingViewModel. Spec: docs/designs/onboarding-refresh-2026-11-04/FEATURE_SPEC.md §7.
 
-        /** A step became visible. Params: STEP (showcase/try_it), STEP_INDEX, STEP_COUNT. */
+        // Since 2026-11-17 step 2 is one screen per choice (Write / Attach / Talk); spec:
+        // docs/designs/onboarding-steps-2026-11-17/FEATURE_SPEC.md §7.
+
+        /**
+         * A step became visible. Params: STEP (showcase/write/attach/talk; `try_it` before 2026-11-17),
+         * STEP_INDEX (1/2/2/2), STEP_COUNT (2).
+         */
         const val STEP_VIEWED = "onboarding_step_viewed"
 
-        /** Showcase → Try it. Params: MODE (default/write/attach/talk). */
+        /** A Showcase tile. Params: MODE (write/attach/talk; `default` = the removed CTA, before 2026-11-17). */
         const val MODE_SELECTED = "onboarding_mode_selected"
 
-        /** The bundled sample was started. Params: ORIGIN (card/ai_error). No AI, no credits. */
+        /** The bundled sample was started. Params: ORIGIN (card/ai_error/showcase). No AI, no credits. */
         const val SAMPLE_USED = "onboarding_sample_used"
 
         /** A starter chip created its preset list. Params: KEY (WelcomeStarterTemplate.key). */
         const val CHIP_TAPPED = "onboarding_chip_tapped"
 
-        /** "Chat" on Try it. Params: PREFILLED (the typed text goes into the composer, unsent). */
+        /**
+         * Talk send → the chat. Params: PREFILLED — since 2026-11-17 a prefilled text is SENT in the chat
+         * at once (ShellLaunch.OpenChat autoSend); before, it went into the composer unsent.
+         */
         const val CHAT_TAPPED = "onboarding_chat_tapped"
 
-        /** "Call" on Try it (only rendered where the voice call is available). */
+        /** "Call" on Talk (only rendered where the voice call is available). */
         const val CALL_TAPPED = "onboarding_call_tapped"
+
+        /** A Talk starter bubble: its text is sent in the chat at once. Params: KEY (OnboardingTalkStarter.key). */
+        const val STARTER_TAPPED = "onboarding_starter_tapped"
+
+        /**
+         * One mic press on the Write / Talk composer ended. Params: SCREEN (write/talk), OUTCOME
+         * (transcribed / cancelled / too_short / permission_denied / permission_just_granted /
+         * recorder_error / empty / insufficient_credits / network_error / service_error /
+         * not_registered / file_missing). A transcription (1 credit) ran for every outcome after
+         * `recorder_error` in this list.
+         */
+        const val VOICE_RECORDED = "onboarding_voice_recorded"
 
         /** The AI-failure box appeared under the field. Params: KIND, FAILURE_REASON. */
         const val AI_ERROR_SHOWN = "onboarding_ai_error_shown"

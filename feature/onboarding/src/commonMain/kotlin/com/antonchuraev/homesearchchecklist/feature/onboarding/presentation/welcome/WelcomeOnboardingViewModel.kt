@@ -21,6 +21,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.ShellLaunch
 import com.antonchuraev.homesearchchecklist.core.navigation.api.ShellLaunchRequests
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiFailureReason
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
@@ -55,11 +56,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The `ai_welcome` onboarding, "Showcase → Try it".
+ * The `ai_welcome` onboarding: Showcase → one screen per choice (Write / Attach / Talk).
  *
- * Behaviour is specified in docs/designs/onboarding-refresh-2026-11-04/FEATURE_SPEC.md (state x event
- * matrix §2–3, finish branches §4, latches §6, analytics §7); the invariants it names (I1–I8) are
- * referenced below.
+ * Behaviour is specified in docs/designs/onboarding-steps-2026-11-17/FEATURE_SPEC.md (matrix §2–3,
+ * voice §4, hand-offs §5, latches §6, analytics §7), which keeps the finish branches and invariants
+ * (I1–I8) of docs/designs/onboarding-refresh-2026-11-04/FEATURE_SPEC.md §4; they are referenced below.
  *
  * Activity-scoped (Nav3 has no ViewModel entry decorator here), so every once-per-lifetime promise is
  * latched in [SavedStateHandle] and survives process death too.
@@ -81,6 +82,8 @@ class WelcomeOnboardingViewModel(
     private val shellLaunchRequests: ShellLaunchRequests,
     // Google-linked flag for the web "sign in to use AI" box (§5.3).
     private val userDataRepository: UserDataRepository,
+    // Voice dictation on Write / Talk: the chat's transcription (§4 voice).
+    private val voiceTranscriber: OnboardingVoiceTranscriber,
     // Same expression as the Ask-pill call button, computed in App.kt (§5.4).
     isCallAvailable: Boolean = false,
     private val isDebugBuild: Boolean = false,
@@ -100,6 +103,7 @@ class WelcomeOnboardingViewModel(
                 ?: OnboardingStep.Showcase,
             inputText = savedStateHandle.get<String>(KEY_INPUT).orEmpty(),
             isCallAvailable = isCallAvailable,
+            isVoiceAvailable = voiceAvailable(isWeb, userDataRepository.getUserDataFlow().value.isGoogleLinked),
         ),
     )
     override val screenState: StateFlow<OnboardingUiState> = _screenState.asStateFlow()
@@ -127,14 +131,26 @@ class WelcomeOnboardingViewModel(
         }
         // Every init, for diagnostics (tells process-death restores apart).
         track(AnalyticsEvents.Onboarding.VM_CREATED, mapOf("is_restored" to restored.toString()))
+        if (isWeb) {
+            // The linked flag may land after the first read (the user record loads asynchronously),
+            // so follow it: the mic appears once credits can exist.
+            viewModelScope.launch {
+                userDataRepository.getUserDataFlow().collect { user ->
+                    _screenState.update { it.copy(isVoiceAvailable = voiceAvailable(isWeb, user.isGoogleLinked)) }
+                }
+            }
+        }
     }
 
     override fun onIntent(intent: OnboardingIntent) {
         when (intent) {
-            // Always allowed, even while busy (I1).
+            // Always allowed, even while busy (I1): typing, the overlay's own callback, and the end
+            // of a mic press (it arrives while phase == Recording, by construction).
             is OnboardingIntent.OnInputChanged -> handleInputChanged(intent.text)
-            OnboardingIntent.OnModeFocusConsumed -> _screenState.update { it.copy(pendingFocus = null) }
             OnboardingIntent.OnSampleAnimationFinished -> handleSampleAnimationFinished()
+            OnboardingIntent.OnVoicePressReleasedBeforeStart -> handlePressReleasedBeforeStart()
+            is OnboardingIntent.OnVoiceRecordingStopped ->
+                handleVoiceStopped(intent.recordingPath, intent.mimeType, intent.stop)
             else -> if (_screenState.value.isBusy) {
                 // The visible feedback is the loader / disabled controls already on screen.
                 logger.info(TAG, "ignored $intent while ${_screenState.value.phase}")
@@ -146,8 +162,7 @@ class WelcomeOnboardingViewModel(
 
     private fun handleAction(intent: OnboardingIntent) {
         when (intent) {
-            is OnboardingIntent.OnShowcaseTileClick -> goToTryIt(intent.mode)
-            OnboardingIntent.OnShowcaseCtaClick -> goToTryIt(OnboardingMode.Default)
+            is OnboardingIntent.OnShowcaseTileClick -> goToBranch(intent.mode)
             OnboardingIntent.OnBack -> handleBack()
             OnboardingIntent.OnSkip -> handleSkip()
             OnboardingIntent.OnSendClick -> handleSend()
@@ -157,34 +172,38 @@ class WelcomeOnboardingViewModel(
             OnboardingIntent.OnSavePlainListClick -> handleSavePlainList()
             OnboardingIntent.OnChatClick -> handleChat()
             OnboardingIntent.OnCallClick -> handleCall()
+            is OnboardingIntent.OnTalkStarterClick -> handleTalkStarter(intent.starter)
+            OnboardingIntent.OnVoiceRecordingStarted -> handleVoiceStarted()
             is OnboardingIntent.OnInputChanged,
-            OnboardingIntent.OnModeFocusConsumed,
             OnboardingIntent.OnSampleAnimationFinished,
+            OnboardingIntent.OnVoicePressReleasedBeforeStart,
+            is OnboardingIntent.OnVoiceRecordingStopped,
             -> Unit // routed in onIntent
         }
     }
 
     // ── Steps ────────────────────────────────────────────────────────────────
 
-    private fun goToTryIt(mode: OnboardingMode) {
+    private fun goToBranch(mode: OnboardingMode) {
         if (_screenState.value.step != OnboardingStep.Showcase) {
-            logger.info(TAG, "Showcase action $mode ignored: already on Try it")
+            // Not a UX path: the tiles exist only on Showcase, and the step changes synchronously.
+            logger.info(TAG, "Showcase tile $mode ignored: already on ${_screenState.value.step}")
             return
         }
         trackStepCompleted(OnboardingStep.Showcase)
         track(AnalyticsEvents.Onboarding.MODE_SELECTED, mapOf(AnalyticsParams.MODE to mode.wire))
-        setStep(OnboardingStep.TryIt)
-        _screenState.update { it.copy(pendingFocus = mode.takeIf { m -> m != OnboardingMode.Default }) }
+        setStep(mode.step)
     }
 
     private fun handleBack() {
-        if (_screenState.value.step != OnboardingStep.TryIt) {
+        if (_screenState.value.step == OnboardingStep.Showcase) {
             logger.info(TAG, "back on Showcase is not handled by the screen")
             return
         }
         setStep(OnboardingStep.Showcase)
-        // I3 / I4: the error box and the pending highlight belong to Try it.
-        _screenState.update { it.copy(pendingFocus = null, aiError = null, showEmptyInputHint = false) }
+        // I3: the error box belongs to Write; the hints belong to the composer they were shown on.
+        // The text stays (shared by Write and Talk).
+        _screenState.update { it.copy(aiError = null, showEmptyInputHint = false, showVoiceTooShortHint = false) }
     }
 
     private fun setStep(step: OnboardingStep) {
@@ -194,8 +213,97 @@ class WelcomeOnboardingViewModel(
     }
 
     private fun handleInputChanged(text: String) {
-        _screenState.update { it.copy(inputText = text, showEmptyInputHint = false, aiError = null) }
+        _screenState.update {
+            it.copy(inputText = text, showEmptyInputHint = false, showVoiceTooShortHint = false, aiError = null)
+        }
         savedStateHandle[KEY_INPUT] = text
+    }
+
+    // ── §4 Voice dictation (Write / Talk): hold → clip → transcribe → text in the field ──
+
+    private fun handleVoiceStarted() {
+        val step = _screenState.value.step
+        if (!_screenState.value.isVoiceAvailable) {
+            // Not a UX path: the mic is not rendered here (web, not linked to Google — 0 credits).
+            logger.warning(TAG, "mic press ignored: voice unavailable (web, not linked to Google)")
+            return
+        }
+        if (!step.hasComposer) {
+            // Not a UX path: the mic exists only on the Write / Talk composers.
+            logger.warning(TAG, "mic press on $step ignored: no composer there")
+            return
+        }
+        _screenState.update {
+            it.copy(phase = OnboardingPhase.Recording(step), showVoiceTooShortHint = false, showEmptyInputHint = false)
+        }
+    }
+
+    private fun handlePressReleasedBeforeStart() {
+        // UI only: the recording strip drops now; the press's terminal callback still comes later.
+        if (_screenState.value.phase is OnboardingPhase.Recording) {
+            _screenState.update { it.copy(phase = OnboardingPhase.Idle) }
+        }
+    }
+
+    private fun handleVoiceStopped(recordingPath: String?, mimeType: String, stop: OnboardingVoiceStop?) {
+        val state = _screenState.value
+        val phase = state.phase
+        if (phase !is OnboardingPhase.Recording && phase != OnboardingPhase.Idle) {
+            // A recorder callback that outlived its press into a loader / Leaving: nothing to fill.
+            logger.warning(TAG, "voice result ignored while $phase")
+            return
+        }
+        if (!state.isVoiceAvailable) {
+            // No mic is rendered without voice; a stray result must not spend a credit that cannot exist.
+            logger.warning(TAG, "voice result ignored: voice unavailable (web, not linked to Google)")
+            if (phase is OnboardingPhase.Recording) _screenState.update { it.copy(phase = OnboardingPhase.Idle) }
+            return
+        }
+        val screen = (phase as? OnboardingPhase.Recording)?.screen ?: state.step
+        if (recordingPath == null) {
+            val reason = stop ?: OnboardingVoiceStop.UserCancelled
+            trackVoice(screen, reason.wire)
+            _screenState.update {
+                it.copy(
+                    phase = OnboardingPhase.Idle,
+                    showVoiceTooShortHint = reason == OnboardingVoiceStop.TooShort,
+                )
+            }
+            // Every reason answers: the strip disappearing is the answer to a cancel; the hint under
+            // the composer to a too-short press; a snackbar to the rest (the field stays usable).
+            val snackbar = when (reason) {
+                OnboardingVoiceStop.UserCancelled, OnboardingVoiceStop.TooShort -> null
+                OnboardingVoiceStop.PermissionDenied -> OnboardingSnackbar.MIC_DENIED
+                OnboardingVoiceStop.PermissionJustGranted -> OnboardingSnackbar.MIC_HOLD_AGAIN
+                OnboardingVoiceStop.RecorderError -> OnboardingSnackbar.RECORDING_FAILED
+            }
+            snackbar?.let { key -> viewModelScope.launch { _sideEffect.emit(OnboardingSideEffect.ShowSnackbar(key)) } }
+            return
+        }
+        _screenState.update { it.copy(phase = OnboardingPhase.Transcribing(screen), showVoiceTooShortHint = false) }
+        viewModelScope.launch {
+            val outcome = try {
+                voiceTranscriber.transcribe(recordingPath, mimeType)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error(TAG, "voice transcription threw: ${e.message}", e)
+                TranscriptionOutcome.ServiceError
+            }
+            trackVoice(screen, transcriptionOutcomeWire(outcome))
+            if (outcome is TranscriptionOutcome.Success) {
+                val merged = appendTranscript(_screenState.value.inputText, outcome.transcript)
+                _screenState.update {
+                    it.copy(phase = OnboardingPhase.Idle, inputText = merged, showEmptyInputHint = false, aiError = null)
+                }
+                savedStateHandle[KEY_INPUT] = merged
+            } else {
+                // The repository logs the cause; the field keeps whatever was typed and stays editable.
+                logger.warning(TAG, "voice transcription produced no text: $outcome")
+                _screenState.update { it.copy(phase = OnboardingPhase.Idle) }
+                transcriptionFailureSnackbar(outcome)?.let { _sideEffect.emit(OnboardingSideEffect.ShowSnackbar(it)) }
+            }
+        }
     }
 
     // ── §4.1 Sample ──────────────────────────────────────────────────────────
@@ -453,10 +561,31 @@ class WelcomeOnboardingViewModel(
 
     // ── §4.5 Chat / §4.6 Call / §4.7 Skip ────────────────────────────────────
 
+    /**
+     * Talk send. The user pressed Send HERE, so the text is sent in the chat at once (owner decision
+     * Q2, 2026-11-17) — through the chat's own send path, credits and all. Blank → an empty chat.
+     */
     private fun handleChat() {
         val prefill = _screenState.value.inputText.trim().ifBlank { null }
         track(AnalyticsEvents.Onboarding.CHAT_TAPPED, mapOf(AnalyticsParams.PREFILLED to (prefill != null).toString()))
-        leaveToMain(OnboardingSeed.Chat) { shellLaunchRequests.request(ShellLaunch.OpenChat(prefill)) }
+        leaveToMain(OnboardingSeed.Chat) { ShellLaunch.OpenChat(prefill, autoSend = prefill != null) }
+    }
+
+    /** A Talk starter: its text, resolved in the UI language, is sent in the chat at once. */
+    private fun handleTalkStarter(starter: OnboardingTalkStarter) {
+        track(AnalyticsEvents.Onboarding.STARTER_TAPPED, mapOf(AnalyticsParams.KEY to starter.key))
+        leaveToMain(OnboardingSeed.Chat) {
+            val text = try {
+                stringResolver.resolve(starter.textRes)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Still lands in the chat (the user asked for it), just without the starter's text.
+                logger.error(TAG, "starter ${starter.key} text unresolvable, opening an empty chat: ${e.message}", e)
+                null
+            }
+            ShellLaunch.OpenChat(text, autoSend = text != null)
+        }
     }
 
     private fun handleCall() {
@@ -466,7 +595,7 @@ class WelcomeOnboardingViewModel(
             return
         }
         track(AnalyticsEvents.Onboarding.CALL_TAPPED)
-        leaveToMain(OnboardingSeed.Call) { shellLaunchRequests.request(ShellLaunch.StartVoiceCall) }
+        leaveToMain(OnboardingSeed.Call) { ShellLaunch.StartVoiceCall }
     }
 
     private fun handleSkip() {
@@ -475,20 +604,21 @@ class WelcomeOnboardingViewModel(
             AnalyticsEvents.Onboarding.SKIPPED,
             mapOf(AnalyticsParams.STEP to step.wire, AnalyticsParams.STEP_INDEX to step.index),
         )
-        leaveToMain(OnboardingSeed.Skip) {}
+        leaveToMain(OnboardingSeed.Skip) { null }
     }
 
     /**
-     * Skip / Chat / Call: tips into the Inbox (fail-open, §4.8), complete, then [beforeNavigate] (the
-     * shell request — made only once completion succeeded, so a failed completion leaves nothing
-     * pending) and main with a cleared stack.
+     * Skip / Chat / Call: tips into the Inbox (fail-open, §4.8), the shell hand-off resolved by
+     * [shellLaunch] (null = none), complete, then the request — made only once completion succeeded,
+     * so a failed completion leaves nothing pending — and main with a cleared stack.
      */
-    private fun leaveToMain(seed: OnboardingSeed, beforeNavigate: () -> Unit) {
+    private fun leaveToMain(seed: OnboardingSeed, shellLaunch: suspend () -> ShellLaunch?) {
         _screenState.update { it.copy(phase = OnboardingPhase.Leaving(seed)) }
         viewModelScope.launch {
             val tips = appendTipsToInboxFailOpen()
+            val launch = shellLaunch()
             finish(seed, checklistCreated = tips) {
-                beforeNavigate()
+                launch?.let(shellLaunchRequests::request)
                 navigator.navigateToMainScreen(clearBackStack = true)
             }
         }
@@ -617,6 +747,11 @@ class WelcomeOnboardingViewModel(
 
     private fun trackStepCompleted(step: OnboardingStep) = track(AnalyticsEvents.Onboarding.STEP_COMPLETED, stepParams(step))
 
+    private fun trackVoice(screen: OnboardingStep, outcome: String) = track(
+        AnalyticsEvents.Onboarding.VOICE_RECORDED,
+        mapOf(AnalyticsParams.SCREEN to screen.wire, AnalyticsParams.OUTCOME to outcome),
+    )
+
     private fun trackFallback(action: String) =
         track(AnalyticsEvents.Onboarding.FALLBACK_ACTION, mapOf(AnalyticsParams.ACTION to action))
 
@@ -653,6 +788,6 @@ class WelcomeOnboardingViewModel(
         private const val CREATED_KEY_CHIP_PREFIX = "chip:"
 
         /** Resolved to `onboarding_welcome_create_error` in the Screen (the VM never resolves snackbar text). */
-        const val ERROR_KEY = "onboarding_welcome_create_error"
+        const val ERROR_KEY = OnboardingSnackbar.CREATE_ERROR
     }
 }

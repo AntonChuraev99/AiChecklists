@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.di
 
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.welcome.OnboardingVoiceTranscriber
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.welcome.WelcomeOnboardingViewModel
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -22,6 +25,14 @@ val onboardingFeatureModule = module {
             ensureInbox = get(),
             shellLaunchRequests = get(),
             userDataRepository = get(),
+            // The chat's transcription, with the chat's locale: one pipeline, one credit price.
+            voiceTranscriber = run {
+                val chatRepository = get<AiChatRepository>()
+                val localeProvider = get<ChatLocaleProvider>()
+                OnboardingVoiceTranscriber { path, mime ->
+                    chatRepository.transcribeAudio(path, mime, localeProvider.current())
+                }
+            },
             isCallAvailable = params.getOrNull<Boolean>() ?: false,
             isDebugBuild = get(named("isDebugBuild")),
         )

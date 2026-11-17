@@ -33,7 +33,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppSurface
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatEmptyState
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputRow
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.RoborazziTaskType
 import com.github.takahirom.roborazzi.captureRoboImage

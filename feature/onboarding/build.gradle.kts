@@ -49,6 +49,11 @@ kotlin {
             // createChecklistFromResult). analyze depends on checklist/paywall/user (NOT onboarding),
             // so there is no dependency cycle.
             implementation(projects.feature.analyze)
+            // Voice dictation on Write / Talk (DESIGN_SPEC 2026-11-17, owner decision Q1/Q4): the
+            // chat's recorder + press gate, and the chat's transcription (AiChatRepository.transcribeAudio
+            // over TranscribeAudioApiService). Both are api-only modules with no feature deps — no cycle.
+            implementation(projects.core.filepicker.api)
+            implementation(projects.feature.aichat.api)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

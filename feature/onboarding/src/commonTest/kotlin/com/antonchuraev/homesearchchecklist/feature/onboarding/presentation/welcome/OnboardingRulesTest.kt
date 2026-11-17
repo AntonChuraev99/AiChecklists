@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.welcome
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyzeInputKind
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderErrorCodes
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiFailureReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,6 +11,64 @@ import kotlin.test.assertTrue
 
 /** Pure rules of the onboarding (FEATURE_SPEC §11.1, first paragraph). */
 class OnboardingRulesTest {
+
+    // ── voice (FEATURE_SPEC 2026-11-17 §4) ──────────────────────────────────────
+
+    @Test
+    fun voiceStopReasonFor_mapsEveryRecorderCode() {
+        assertEquals(OnboardingVoiceStop.PermissionDenied, voiceStopReasonFor(AudioRecorderErrorCodes.PERMISSION_DENIED))
+        assertEquals(
+            OnboardingVoiceStop.PermissionDenied,
+            voiceStopReasonFor(AudioRecorderErrorCodes.PERMISSION_DENIED_PERMANENTLY),
+        )
+        assertEquals(
+            OnboardingVoiceStop.PermissionJustGranted,
+            voiceStopReasonFor(AudioRecorderErrorCodes.PERMISSION_GRANTED_PRESS_AGAIN),
+        )
+        assertEquals(OnboardingVoiceStop.TooShort, voiceStopReasonFor(AudioRecorderErrorCodes.RECORDING_TOO_SHORT))
+        assertEquals(OnboardingVoiceStop.RecorderError, voiceStopReasonFor("MediaRecorder: start failed -38"))
+    }
+
+    @Test
+    fun voiceAvailable_onlyWebWithoutGoogleLinkHidesTheMic() {
+        assertFalse(voiceAvailable(isWeb = true, isGoogleLinked = false))
+        assertTrue(voiceAvailable(isWeb = true, isGoogleLinked = true))
+        assertTrue(voiceAvailable(isWeb = false, isGoogleLinked = false))
+        assertTrue(voiceAvailable(isWeb = false, isGoogleLinked = true))
+    }
+
+    @Test
+    fun appendTranscript_emptyField_takesTheTranscriptTrimmed() {
+        assertEquals("buy milk", appendTranscript("", "  buy milk \n"))
+        assertEquals("buy milk", appendTranscript("   ", "buy milk"))
+    }
+
+    @Test
+    fun appendTranscript_typedField_appendsWithOneSpace() {
+        assertEquals("Groceries for Sunday", appendTranscript("Groceries  ", " for Sunday"))
+    }
+
+    @Test
+    fun transcriptionFailureSnackbar_successHasNone_everyFailureHasOne() {
+        assertEquals(null, transcriptionFailureSnackbar(TranscriptionOutcome.Success("x")))
+        assertEquals(OnboardingSnackbar.TRANSCRIBE_EMPTY, transcriptionFailureSnackbar(TranscriptionOutcome.EmptyTranscript))
+        assertEquals(OnboardingSnackbar.NO_CREDITS, transcriptionFailureSnackbar(TranscriptionOutcome.InsufficientCredits))
+        listOf(
+            TranscriptionOutcome.FileMissing,
+            TranscriptionOutcome.NetworkError,
+            TranscriptionOutcome.NotRegistered,
+            TranscriptionOutcome.ServiceError,
+        ).forEach { assertEquals(OnboardingSnackbar.TRANSCRIBE_ERROR, transcriptionFailureSnackbar(it), "$it") }
+    }
+
+    @Test
+    fun steps_branchesShareStepIndex2_countStays2() {
+        assertEquals(listOf(1, 2, 2, 2), OnboardingStep.entries.map { it.index })
+        assertEquals(2, OnboardingStep.count)
+        assertEquals(listOf("showcase", "write", "attach", "talk"), OnboardingStep.entries.map { it.wire })
+        assertEquals(listOf(OnboardingStep.Write, OnboardingStep.Talk), OnboardingStep.entries.filter { it.hasComposer })
+        assertEquals(OnboardingMode.entries.map { it.step }, OnboardingStep.entries.drop(1), "one tile per branch")
+    }
 
     // ── plainListName ──────────────────────────────────────────────────────────
 

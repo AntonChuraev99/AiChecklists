@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputRow
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

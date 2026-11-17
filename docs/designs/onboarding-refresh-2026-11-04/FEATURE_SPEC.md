@@ -1,5 +1,7 @@
 # FEATURE_SPEC — Onboarding refresh (Showcase → Try it)
 
+> **2026-11-17:** step 2 «Try it» split into Write / Attach / Talk — §1–3, §7 and §12 are superseded by `docs/designs/onboarding-steps-2026-11-17/FEATURE_SPEC.md`; the finish branches §4 and the invariants (except I3/I4) still hold.
+
 > Проектная спека: часть имён (кейсы тестов, параметры Content, этапы демо) и тайминги — план до реализации (не проверено — источник истины код `feature/onboarding/.../welcome/` и `WelcomeOnboardingViewModelTest.kt`).
 
 - **Owner of this file:** `@feature-expert` (behaviour). Layout: `DESIGN_SPEC.md` next to it (source of truth for screens, strings, motion).

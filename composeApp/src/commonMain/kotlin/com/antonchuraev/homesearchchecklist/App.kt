@@ -217,8 +217,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatScreenIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatScreenSideEffect
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.VoicePressTerminalGate
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.endVoicePress
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.VoicePressTerminalGate
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.endVoicePress
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.VoiceEntryDecision
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.shouldCancelVoiceOnBackground
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.shouldCancelVoiceWhenDockGone
@@ -228,7 +228,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AttachedChoiceActions
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatBody
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatEmptyState
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
@@ -2544,8 +2544,23 @@ fun App() {
                             // The classic (v1) shell has no dock: the chat is a screen there.
                             navigator.navigateToAiChat()
                         }
-                        // Into the composer, NOT sent: sending spends credits, the user confirms it.
-                        request.prefill?.let { chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(it)) }
+                        chatIntentForOpenChat(request)?.let { chatIntent ->
+                            if (chatIntent is ChatScreenIntent.OnPrefillAndSend) {
+                                // Same ordering rule as the quick-action chips: seed the screen
+                                // context SYNCHRONOUSLY before the send, so the turn carries the
+                                // surface the dock opens on instead of racing the dock's own
+                                // context effect (which is keyed on the dock opening above).
+                                chatViewModel.sendIntent(
+                                    ChatScreenIntent.OnSetScreenContext(
+                                        checklistId = null,
+                                        surface = chatSurfaceFor(navigator.backStack.toList(), navVariant, null),
+                                    )
+                                )
+                            }
+                            // Unsent prefill: into the composer, the user confirms it. autoSend: the
+                            // user already pressed Send on the requester's screen (onboarding Talk).
+                            chatViewModel.sendIntent(chatIntent)
+                        }
                     }
                     ShellLaunch.StartVoiceCall ->
                         if (voiceCallAvailable) {
@@ -2978,6 +2993,16 @@ internal fun isShellStableForLaunch(
     !armResolved -> false
     showV2Shell -> v2RootApplied && v2InboxRooted
     else -> showShell
+}
+
+/**
+ * The chat intent a [ShellLaunch.OpenChat] hand-off maps to: an unsent prefill, a send through the
+ * chat's REGULAR send path ([ChatScreenIntent.OnPrefillAndSend] → `handleSend`: credits, the
+ * out-of-credits reply, analytics — no parallel path), or nothing (null prefill = an empty chat).
+ */
+internal fun chatIntentForOpenChat(launch: ShellLaunch.OpenChat): ChatScreenIntent? {
+    val text = launch.prefill ?: return null
+    return if (launch.autoSend) ChatScreenIntent.OnPrefillAndSend(text) else ChatScreenIntent.OnPrefillInput(text)
 }
 
 // ─── v2 shell route predicates (single definition — they replaced four inline copies) ──────────

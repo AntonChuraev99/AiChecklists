@@ -88,6 +88,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatSurface
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.VoicePressTerminalGate
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.endVoicePress
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import org.jetbrains.compose.resources.stringResource

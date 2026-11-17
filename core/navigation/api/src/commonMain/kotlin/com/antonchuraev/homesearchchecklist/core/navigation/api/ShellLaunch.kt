@@ -11,10 +11,15 @@ import kotlinx.coroutines.flow.StateFlow
  */
 sealed interface ShellLaunch {
     /**
-     * Open the AI chat. [prefill] goes into the composer and is NOT sent: sending spends credits, so
-     * the user confirms it. Null opens the chat's normal empty state.
+     * Open the AI chat. Null [prefill] opens the chat's normal empty state.
+     *
+     * [autoSend] = false: [prefill] goes into the composer and is NOT sent (the user confirms it there).
+     * [autoSend] = true: [prefill] is sent at once through the chat's regular send path (credits, the
+     * out-of-credits reply, analytics) — for a requester whose own screen already had a Send the user
+     * pressed (onboarding Talk, owner decision 2026-11-17), where a second confirm would be the defect.
+     * Ignored when [prefill] is null.
      */
-    data class OpenChat(val prefill: String? = null) : ShellLaunch
+    data class OpenChat(val prefill: String? = null, val autoSend: Boolean = false) : ShellLaunch
 
     /** Start the voice call through the same entry as the Ask-pill call button. */
     data object StartVoiceCall : ShellLaunch

@@ -42,7 +42,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiE
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatEmptyState
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.github.takahirom.roborazzi.captureRoboImage
 import kotlinx.coroutines.flow.first

@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.ShellLaunch
 import com.antonchuraev.homesearchchecklist.core.navigation.api.ShellLaunchRequests
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
@@ -87,6 +88,7 @@ class WelcomeOnboardingViewModelTest {
     private lateinit var fakeAnalyticsTracker: RecordingAnalyticsTracker
     private lateinit var fakeUserDataRepository: FakeUserDataRepository
     private lateinit var fakeShellLaunch: FakeShellLaunchRequests
+    private lateinit var fakeTranscriber: FakeVoiceTranscriber
 
     private val fakeStringResolver = WelcomeStringResolver { "resolved_text" }
 
@@ -110,6 +112,7 @@ class WelcomeOnboardingViewModelTest {
         fakeAnalyticsTracker = RecordingAnalyticsTracker()
         fakeUserDataRepository = FakeUserDataRepository(calls)
         fakeShellLaunch = FakeShellLaunchRequests()
+        fakeTranscriber = FakeVoiceTranscriber()
     }
 
     private fun createViewModel(
@@ -131,14 +134,20 @@ class WelcomeOnboardingViewModelTest {
         ensureInbox = EnsureInboxUseCase(fakeChecklistRepository, fakeAnalyticsTracker, NoOpLogger()),
         shellLaunchRequests = fakeShellLaunch,
         userDataRepository = fakeUserDataRepository,
+        voiceTranscriber = fakeTranscriber,
         isCallAvailable = isCallAvailable,
         isDebugBuild = false,
         isWeb = isWeb,
         stringResolver = fakeStringResolver,
     )
 
-    private fun WelcomeOnboardingViewModel.toTryIt() {
-        onIntent(OnboardingIntent.OnShowcaseCtaClick)
+    /**
+     * Showcase → [mode]'s screen through its tile. Was `toBranch()` over the Showcase CTA, which the
+     * owner removed (2026-11-17); the ViewModel's actions do not depend on the screen they come from,
+     * so each test opens the screen that hosts its action in the new layout.
+     */
+    private fun WelcomeOnboardingViewModel.toBranch(mode: OnboardingMode = OnboardingMode.Write) {
+        onIntent(OnboardingIntent.OnShowcaseTileClick(mode))
     }
 
     private fun TestScope.collectEffects(vm: WelcomeOnboardingViewModel): MutableList<OnboardingSideEffect> {
@@ -186,7 +195,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun sample_createsExactlyOneChecklist_withLocalizedItems_noAiCall() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
 
         vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
         advanceUntilIdle()
@@ -214,7 +223,7 @@ class WelcomeOnboardingViewModelTest {
     fun sample_doubleTap_insertsOnce() = runTest(testDispatcher) {
         fakeChecklistRepository.blockAddUntilReleased = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
 
         vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
         runCurrent()
@@ -230,7 +239,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun sample_navigatesOnlyAfterWriteAndAnimation_writeFirst() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
         vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
         advanceUntilIdle()
 
@@ -250,7 +259,7 @@ class WelcomeOnboardingViewModelTest {
     fun sample_navigatesOnlyAfterWriteAndAnimation_animationFirst() = runTest(testDispatcher) {
         fakeChecklistRepository.blockAddUntilReleased = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
         vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
         runCurrent()
 
@@ -270,7 +279,7 @@ class WelcomeOnboardingViewModelTest {
         fakeChecklistRepository.blockAddUntilReleased = true
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
 
         vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
         advanceUntilIdle() // the 5 s timeout elapses in virtual time
@@ -288,7 +297,7 @@ class WelcomeOnboardingViewModelTest {
         fakeChecklistRepository.shouldThrowOnAdd = true
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
 
         vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
         advanceUntilIdle()
@@ -304,27 +313,35 @@ class WelcomeOnboardingViewModelTest {
     fun completeBeforeNavigation_everyBranch() = runTest(testDispatcher) {
         val branches: List<Pair<String, (WelcomeOnboardingViewModel) -> Unit>> = listOf(
             "sample" to { vm ->
-                vm.toTryIt()
+                vm.toBranch(OnboardingMode.Attach)
                 vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Card))
                 vm.onIntent(OnboardingIntent.OnSampleAnimationFinished)
             },
-            "chip" to { vm -> vm.toTryIt(); vm.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TRIP)) },
+            "chip" to { vm -> vm.toBranch(); vm.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TRIP)) },
             "typed" to { vm ->
-                vm.toTryIt()
+                vm.toBranch()
                 vm.onIntent(OnboardingIntent.OnInputChanged("Birthday party"))
                 vm.onIntent(OnboardingIntent.OnSendClick)
             },
             "plain" to { vm ->
                 fakeAnalyzeRepository.analyzeShouldFail = true
-                vm.toTryIt()
+                vm.toBranch()
                 vm.onIntent(OnboardingIntent.OnInputChanged("Birthday party"))
                 vm.onIntent(OnboardingIntent.OnSendClick)
                 testDispatcher.scheduler.advanceUntilIdle()
                 vm.onIntent(OnboardingIntent.OnSavePlainListClick)
             },
-            "own_file" to { vm -> vm.toTryIt(); vm.onIntent(OnboardingIntent.OnOwnSourceClick(AnalyzeInputKind.PDF)) },
-            "chat" to { vm -> vm.toTryIt(); vm.onIntent(OnboardingIntent.OnChatClick) },
-            "call" to { vm -> vm.toTryIt(); vm.onIntent(OnboardingIntent.OnCallClick) },
+            "own_file" to { vm -> vm.toBranch(OnboardingMode.Attach); vm.onIntent(OnboardingIntent.OnOwnSourceClick(AnalyzeInputKind.PDF)) },
+            "chat" to { vm -> vm.toBranch(OnboardingMode.Talk); vm.onIntent(OnboardingIntent.OnChatClick) },
+            "call" to { vm -> vm.toBranch(OnboardingMode.Talk); vm.onIntent(OnboardingIntent.OnCallClick) },
+            "starter" to { vm ->
+                vm.toBranch(OnboardingMode.Talk)
+                vm.onIntent(OnboardingIntent.OnTalkStarterClick(OnboardingTalkStarter.PlanWeek))
+            },
+            "showcase_example" to { vm ->
+                vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Showcase))
+                vm.onIntent(OnboardingIntent.OnSampleAnimationFinished)
+            },
             "skip" to { vm -> vm.onIntent(OnboardingIntent.OnSkip) },
         )
         branches.forEach { (name, act) ->
@@ -332,7 +349,7 @@ class WelcomeOnboardingViewModelTest {
             val vm = createViewModel()
             act(vm)
             advanceUntilIdle()
-            if (name == "sample") {
+            if (name == "sample" || name == "showcase_example") {
                 // The animation-finished intent came before the write in this branch; send it again
                 // once the write is done (order-independence is covered by its own test).
                 vm.onIntent(OnboardingIntent.OnSampleAnimationFinished)
@@ -353,7 +370,7 @@ class WelcomeOnboardingViewModelTest {
         fakeUserDataRepository.throwOnNextUpdate = true
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch()
 
         vm.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TRIP))
         advanceUntilIdle()
@@ -390,9 +407,9 @@ class WelcomeOnboardingViewModelTest {
     }
 
     @Test
-    fun skip_sendsSeedSkip_fromTryIt() = runTest(testDispatcher) {
+    fun skip_sendsSeedSkip_fromBranch() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
 
         vm.onIntent(OnboardingIntent.OnSkip)
         advanceUntilIdle()
@@ -505,7 +522,7 @@ class WelcomeOnboardingViewModelTest {
         fakeAnalyzeRepository.analyzeError = AiAnalyzeError.Network
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Birthday party prep"))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -530,7 +547,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_aiFailure_webSignedOutCreditGate_showsSignInBox() = runTest(testDispatcher) {
         fakeAnalyzeRepository.analyzeError = AiAnalyzeError.Http(402, "Not enough credits")
         val vm = createViewModel(isWeb = true)
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -543,7 +560,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_aiFailure_thenSample_createsSample() = runTest(testDispatcher) {
         fakeAnalyzeRepository.analyzeShouldFail = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -563,7 +580,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_aiFailure_thenPlainList_namesListFromText() = runTest(testDispatcher) {
         fakeAnalyzeRepository.analyzeShouldFail = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("  Birthday party prep  "))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -587,7 +604,7 @@ class WelcomeOnboardingViewModelTest {
         fakeAnalyzeRepository.analyzeShouldFail = true
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -605,7 +622,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_success_emitsAnalyzeStartedCompleted_andChecklistCreatedOnboardingAi() = runTest(testDispatcher) {
         fakeAnalyzeRepository.resultName = "Birthday Party"
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("  Birthday party prep "))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -632,7 +649,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_blankAiName_fallsBackToDefaultName() = runTest(testDispatcher) {
         fakeAnalyzeRepository.resultName = null
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Some topic"))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -645,7 +662,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_createFails_showsBox_noActivation() = runTest(testDispatcher) {
         fakeAnalyzeRepository.createShouldFail = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -660,7 +677,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_slowGeneration_flipsIsSlowAfter8s() = runTest(testDispatcher) {
         fakeAnalyzeRepository.blockAnalyzeUntilReleased = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         runCurrent()
@@ -677,7 +694,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_editAfterError_clearsBox() = runTest(testDispatcher) {
         fakeAnalyzeRepository.analyzeShouldFail = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -691,7 +708,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun typed_analyzeEvents_carryOnboardingSurface() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -709,7 +726,7 @@ class WelcomeOnboardingViewModelTest {
         fakeUserDataRepository.throwOnNextUpdate = true // the list lands, completion fails
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -732,7 +749,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_retryWithSameText_afterFailedCompletion_reusesList() = runTest(testDispatcher) {
         fakeUserDataRepository.throwOnNextUpdate = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -749,7 +766,7 @@ class WelcomeOnboardingViewModelTest {
     fun typed_analyzeThrows_emitsFailed_andShowsBox() = runTest(testDispatcher) {
         fakeAnalyzeRepository.analyzeThrows = IllegalStateException("boom")
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -770,7 +787,7 @@ class WelcomeOnboardingViewModelTest {
         fakeAnalyzeRepository.analyzeShouldFail = true
         val vm = createViewModel()
         val effects = collectEffects(vm)
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         advanceUntilIdle()
@@ -791,7 +808,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun emptySend_showsHint_noAiCall() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("   "))
 
         vm.onIntent(OnboardingIntent.OnSendClick)
@@ -811,7 +828,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun chip_createsPresetInOneTap_noAi_andOpensIt() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
 
         vm.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TRIP))
         advanceUntilIdle()
@@ -833,7 +850,7 @@ class WelcomeOnboardingViewModelTest {
     fun chip_doubleTap_insertsOnce() = runTest(testDispatcher) {
         fakeChecklistRepository.blockAddUntilReleased = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
 
         vm.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TRIP))
         runCurrent()
@@ -849,7 +866,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun call_hiddenWhenUnavailable() = runTest(testDispatcher) {
         val vm = createViewModel(isCallAvailable = false)
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Talk)
 
         vm.onIntent(OnboardingIntent.OnCallClick)
         advanceUntilIdle()
@@ -864,7 +881,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun call_available_requestsStartVoiceCall_thenCompletes_thenMain() = runTest(testDispatcher) {
         val vm = createViewModel(isCallAvailable = true)
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Talk)
 
         vm.onIntent(OnboardingIntent.OnCallClick)
         advanceUntilIdle()
@@ -877,15 +894,16 @@ class WelcomeOnboardingViewModelTest {
     }
 
     @Test
-    fun chat_withText_requestsOpenChatWithTrimmedPrefill_notSent() = runTest(testDispatcher) {
+    fun chat_withText_requestsOpenChatWithTrimmedPrefill_autoSent() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Talk)
         vm.onIntent(OnboardingIntent.OnInputChanged("  Plan my week \n"))
 
         vm.onIntent(OnboardingIntent.OnChatClick)
         advanceUntilIdle()
 
-        assertEquals(ShellLaunch.OpenChat(prefill = "Plan my week"), fakeShellLaunch.pending.value)
+        // Owner decision Q2 (2026-11-17): the user pressed Send on Talk — the chat receives it SENT.
+        assertEquals(ShellLaunch.OpenChat(prefill = "Plan my week", autoSend = true), fakeShellLaunch.pending.value)
         assertEquals(0, fakeAnalyzeRepository.analyzeCallCount)
         assertTrue(fakeNavigator.navigatedToMainScreen)
         assertEquals("true", events(AnalyticsEvents.Onboarding.CHAT_TAPPED).single()[AnalyticsParams.PREFILLED])
@@ -895,12 +913,12 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun chat_empty_prefillNull() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Talk)
 
         vm.onIntent(OnboardingIntent.OnChatClick)
         advanceUntilIdle()
 
-        assertEquals(ShellLaunch.OpenChat(prefill = null), fakeShellLaunch.pending.value)
+        assertEquals(ShellLaunch.OpenChat(prefill = null, autoSend = false), fakeShellLaunch.pending.value)
         assertEquals("false", events(AnalyticsEvents.Onboarding.CHAT_TAPPED).single()[AnalyticsParams.PREFILLED])
     }
 
@@ -908,7 +926,7 @@ class WelcomeOnboardingViewModelTest {
     fun chat_completionFails_leavesNoPendingShellRequest() = runTest(testDispatcher) {
         fakeUserDataRepository.throwOnNextUpdate = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Talk)
 
         vm.onIntent(OnboardingIntent.OnChatClick)
         advanceUntilIdle()
@@ -922,7 +940,7 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun ownFile_navigatesToAnalyzeWithInput_onboardingSource_afterCompletion() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch(OnboardingMode.Attach)
 
         vm.onIntent(OnboardingIntent.OnOwnSourceClick(AnalyzeInputKind.PHOTO))
         advanceUntilIdle()
@@ -943,43 +961,18 @@ class WelcomeOnboardingViewModelTest {
 
     // ── 18–19. Steps ───────────────────────────────────────────────────────────
 
-    @Test
-    fun tile_setsPendingFocus_consumeClears_backClears() = runTest(testDispatcher) {
-        val vm = createViewModel()
-
-        vm.onIntent(OnboardingIntent.OnShowcaseTileClick(OnboardingMode.Write))
-        assertEquals(OnboardingStep.TryIt, vm.screenState.value.step)
-        assertEquals(OnboardingMode.Write, vm.screenState.value.pendingFocus)
-        assertEquals("write", events(AnalyticsEvents.Onboarding.MODE_SELECTED).single()[AnalyticsParams.MODE])
-
-        vm.onIntent(OnboardingIntent.OnModeFocusConsumed)
-        assertNull(vm.screenState.value.pendingFocus)
-
-        vm.onIntent(OnboardingIntent.OnBack)
-        vm.onIntent(OnboardingIntent.OnShowcaseTileClick(OnboardingMode.Talk))
-        vm.onIntent(OnboardingIntent.OnBack)
-        assertEquals(OnboardingStep.Showcase, vm.screenState.value.step)
-        assertNull(vm.screenState.value.pendingFocus, "back clears an unconsumed highlight (I4)")
-    }
+    // tile_setsPendingFocus_consumeClears_backClears and cta_goesToTryIt_withNoHighlight were removed
+    // with their contract items (owner, 2026-11-17): pendingFocus / OnModeFocusConsumed (each tile now
+    // opens its own screen, nothing to highlight) and OnShowcaseCtaClick (the CTA is gone). Their
+    // surviving halves are pinned below: tile → its screen + mode_selected, back → Showcase.
 
     @Test
-    fun cta_goesToTryIt_withNoHighlight() = runTest(testDispatcher) {
-        val vm = createViewModel()
-
-        vm.onIntent(OnboardingIntent.OnShowcaseCtaClick)
-
-        assertEquals(OnboardingStep.TryIt, vm.screenState.value.step)
-        assertNull(vm.screenState.value.pendingFocus)
-        assertEquals("default", events(AnalyticsEvents.Onboarding.MODE_SELECTED).single()[AnalyticsParams.MODE])
-    }
-
-    @Test
-    fun back_fromTryIt_keepsText_andIsNoOpOnShowcase() = runTest(testDispatcher) {
+    fun back_fromBranch_keepsText_andIsNoOpOnShowcase() = runTest(testDispatcher) {
         val vm = createViewModel()
         vm.onIntent(OnboardingIntent.OnBack)
         assertEquals(OnboardingStep.Showcase, vm.screenState.value.step)
 
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnBack)
 
@@ -990,14 +983,15 @@ class WelcomeOnboardingViewModelTest {
     @Test
     fun stepCompleted_bothSteps_withNumericIndex() = runTest(testDispatcher) {
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
 
         vm.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TODO))
         advanceUntilIdle()
 
         val completedSteps = events(AnalyticsEvents.Onboarding.STEP_COMPLETED)
         assertEquals(listOf<Any?>(1, 2), completedSteps.map { it[AnalyticsParams.STEP_INDEX] })
-        assertEquals(listOf<Any?>("showcase", "try_it"), completedSteps.map { it[AnalyticsParams.STEP] })
+        // `try_it` split into write / attach / talk (owner, 2026-11-17); the index stays 2.
+        assertEquals(listOf<Any?>("showcase", "write"), completedSteps.map { it[AnalyticsParams.STEP] })
         assertTrue(completedSteps.all { it[AnalyticsParams.STEP_COUNT] == 2 })
         assertEquals(listOf<Any?>(1, 2), events(AnalyticsEvents.Onboarding.STEP_VIEWED).map { it[AnalyticsParams.STEP_INDEX] })
     }
@@ -1008,7 +1002,7 @@ class WelcomeOnboardingViewModelTest {
     fun busy_ignoresAllActions() = runTest(testDispatcher) {
         fakeAnalyzeRepository.blockAnalyzeUntilReleased = true
         val vm = createViewModel()
-        vm.toTryIt()
+        vm.toBranch()
         vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
         vm.onIntent(OnboardingIntent.OnSendClick)
         runCurrent()
@@ -1025,7 +1019,9 @@ class WelcomeOnboardingViewModelTest {
             OnboardingIntent.OnSavePlainListClick,
             OnboardingIntent.OnChatClick,
             OnboardingIntent.OnCallClick,
-            OnboardingIntent.OnShowcaseCtaClick,
+            OnboardingIntent.OnShowcaseTileClick(OnboardingMode.Talk),
+            OnboardingIntent.OnTalkStarterClick(OnboardingTalkStarter.PlanWeek),
+            OnboardingIntent.OnVoiceRecordingStarted,
         ).forEach { vm.onIntent(it) }
         runCurrent()
 
@@ -1034,6 +1030,7 @@ class WelcomeOnboardingViewModelTest {
         assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
         assertTrue(calls.isEmpty(), "no completion, no navigation: $calls")
         assertNull(fakeShellLaunch.pending.value)
+        assertEquals(0, fakeTranscriber.calls.size)
         fakeAnalyzeRepository.releaseAnalyzeGate.complete(Unit)
         advanceUntilIdle()
     }
@@ -1045,7 +1042,7 @@ class WelcomeOnboardingViewModelTest {
         val handle = SavedStateHandle()
         fakeUserDataRepository.throwOnNextUpdate = true // the list lands, completion fails
         val vm1 = createViewModel(savedStateHandle = handle)
-        vm1.toTryIt()
+        vm1.toBranch()
         vm1.onIntent(OnboardingIntent.OnInputChanged("draft"))
         vm1.onIntent(OnboardingIntent.OnStarterChipClick(WelcomeStarterTemplate.TRIP))
         advanceUntilIdle()
@@ -1054,7 +1051,7 @@ class WelcomeOnboardingViewModelTest {
 
         // Process death: a new VM over the same SavedStateHandle.
         val vm2 = createViewModel(savedStateHandle = handle)
-        assertEquals(OnboardingStep.TryIt, vm2.screenState.value.step)
+        assertEquals(OnboardingStep.Write, vm2.screenState.value.step)
         assertEquals("draft", vm2.screenState.value.inputText)
         assertEquals(OnboardingPhase.Idle, vm2.screenState.value.phase)
         assertEquals(1, events(AnalyticsEvents.Onboarding.STARTED).size, "no second onboarding_started")
@@ -1066,6 +1063,483 @@ class WelcomeOnboardingViewModelTest {
         assertEquals(1L, fakeNavigator.lastDetailChecklistId)
         assertEquals(1, events(AnalyticsEvents.Onboarding.COMPLETED).size, "no second onboarding_completed (I5)")
         assertEquals(1, events(AnalyticsEvents.Checklist.CREATED).size)
+    }
+
+    // ══ 2026-11-17: one screen per choice, voice dictation, auto-sent chat hand-off ══════════════
+    // FEATURE_SPEC docs/designs/onboarding-steps-2026-11-17/FEATURE_SPEC.md §8.
+
+    // ── S1. Each tile opens its own screen ─────────────────────────────────────
+
+    @Test
+    fun tile_opensItsOwnScreen_stepIndex2_andModeSelected() = runTest(testDispatcher) {
+        OnboardingMode.entries.forEach { mode ->
+            resetFakes()
+            val vm = createViewModel()
+
+            vm.onIntent(OnboardingIntent.OnShowcaseTileClick(mode))
+            // A second tap lands on the branch (the step changed synchronously): no second event.
+            vm.onIntent(OnboardingIntent.OnShowcaseTileClick(mode))
+
+            assertEquals(mode.step, vm.screenState.value.step, "tile $mode")
+            assertEquals(mode.wire, events(AnalyticsEvents.Onboarding.MODE_SELECTED).single()[AnalyticsParams.MODE])
+            val viewed = events(AnalyticsEvents.Onboarding.STEP_VIEWED).last()
+            assertEquals(mode.step.wire, viewed[AnalyticsParams.STEP])
+            assertEquals(2, viewed[AnalyticsParams.STEP_INDEX])
+            assertEquals(2, viewed[AnalyticsParams.STEP_COUNT])
+            assertEquals("showcase", events(AnalyticsEvents.Onboarding.STEP_COMPLETED).single()[AnalyticsParams.STEP])
+        }
+    }
+
+    // ── S2. Back from every branch → Showcase, text kept, branch-only UI cleared ──
+
+    @Test
+    fun back_fromEveryBranch_returnsToShowcase_keepsText_clearsBoxAndHints() = runTest(testDispatcher) {
+        OnboardingMode.entries.forEach { mode ->
+            resetFakes()
+            fakeAnalyzeRepository.analyzeShouldFail = true
+            val vm = createViewModel()
+            vm.toBranch(OnboardingMode.Write)
+            vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
+            vm.onIntent(OnboardingIntent.OnSendClick)
+            advanceUntilIdle()
+            assertNotNull(vm.screenState.value.aiError)
+            vm.onIntent(OnboardingIntent.OnBack)
+            assertNull(vm.screenState.value.aiError, "the box belongs to Write (I3)")
+            vm.toBranch(mode)
+
+            vm.onIntent(OnboardingIntent.OnBack)
+
+            val state = vm.screenState.value
+            assertEquals(OnboardingStep.Showcase, state.step, "back from $mode")
+            assertEquals("Trip", state.inputText, "the goal is shared by Write and Talk and survives back")
+            assertNull(state.aiError)
+            assertFalse(state.showEmptyInputHint)
+            assertFalse(state.showVoiceTooShortHint)
+        }
+    }
+
+    @Test
+    fun typedOnWrite_carriesIntoTalk_andTalkSendAutoSendsIt() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Write)
+        vm.onIntent(OnboardingIntent.OnInputChanged("Plan my week"))
+        vm.onIntent(OnboardingIntent.OnBack)
+        vm.toBranch(OnboardingMode.Talk)
+
+        vm.onIntent(OnboardingIntent.OnChatClick)
+        advanceUntilIdle()
+
+        assertEquals(ShellLaunch.OpenChat(prefill = "Plan my week", autoSend = true), fakeShellLaunch.pending.value)
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount, "the chat owns the AI call, not onboarding")
+        assertEquals("talk", events(AnalyticsEvents.Onboarding.STEP_COMPLETED).last()[AnalyticsParams.STEP])
+    }
+
+    // ── S3. "Show me an example" — the sample straight from Showcase ─────────
+
+    @Test
+    fun showcaseExample_runsTheSampleFromStep1_noStep2() = runTest(testDispatcher) {
+        val vm = createViewModel()
+
+        vm.onIntent(OnboardingIntent.OnSampleClick(SampleOrigin.Showcase))
+        advanceUntilIdle()
+        vm.onIntent(OnboardingIntent.OnSampleAnimationFinished)
+        advanceUntilIdle()
+
+        assertEquals(1, fakeChecklistRepository.addChecklistCallCount)
+        assertEquals(6, assertNotNull(fakeChecklistRepository.lastAddedChecklist).items.size)
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount, "no AI, no credits — works with AI down")
+        assertTrue(fakeNavigator.navigatedToChecklistDetail)
+        assertEquals(OnboardingStep.Showcase, vm.screenState.value.step, "step 2 is never shown")
+        assertEquals("showcase", events(AnalyticsEvents.Onboarding.SAMPLE_USED).single()[AnalyticsParams.ORIGIN])
+        assertTrue(events(AnalyticsEvents.Onboarding.MODE_SELECTED).isEmpty())
+        assertEquals("sample", completedParams()[AnalyticsParams.SEED])
+        assertEquals(1, completedParams()[AnalyticsParams.STEP_INDEX])
+        assertEquals(listOf<Any?>("showcase"), events(AnalyticsEvents.Onboarding.STEP_COMPLETED).map { it[AnalyticsParams.STEP] })
+        assertTrue(events(AnalyticsEvents.Onboarding.FALLBACK_ACTION).isEmpty(), "not a fallback")
+    }
+
+    // ── S4. Talk starters: sent in the chat at once ────────────────────────────
+
+    @Test
+    fun talkStarter_opensChatWithItsTextAlreadySent() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Talk)
+        vm.onIntent(OnboardingIntent.OnInputChanged("ignored draft"))
+
+        vm.onIntent(OnboardingIntent.OnTalkStarterClick(OnboardingTalkStarter.PackTrip))
+        advanceUntilIdle()
+
+        // The fake resolver stands in for getString(onboarding_talk_starter_2).
+        assertEquals(ShellLaunch.OpenChat(prefill = "resolved_text", autoSend = true), fakeShellLaunch.pending.value)
+        assertCompletedBeforeNavigation()
+        assertTrue(fakeNavigator.navigatedToMainScreen)
+        assertEquals("pack_trip", events(AnalyticsEvents.Onboarding.STARTER_TAPPED).single()[AnalyticsParams.KEY])
+        assertEquals("chat", completedParams()[AnalyticsParams.SEED])
+        assertEquals("talk", events(AnalyticsEvents.Onboarding.STEP_COMPLETED).last()[AnalyticsParams.STEP])
+    }
+
+    @Test
+    fun talkStarter_completionFails_leavesNoPendingShellRequest() = runTest(testDispatcher) {
+        fakeUserDataRepository.throwOnNextUpdate = true
+        val vm = createViewModel()
+        val effects = collectEffects(vm)
+        vm.toBranch(OnboardingMode.Talk)
+
+        vm.onIntent(OnboardingIntent.OnTalkStarterClick(OnboardingTalkStarter.PlanWeek))
+        advanceUntilIdle()
+
+        assertNull(fakeShellLaunch.pending.value, "a send without navigation would fire later, out of context")
+        assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase)
+        assertTrue(effects.any { it == OnboardingSideEffect.ShowSnackbar(OnboardingSnackbar.CREATE_ERROR) })
+    }
+
+    // ── S5. Voice dictation: hold → clip → transcript in the field, NOT sent ──
+
+    @Test
+    fun voice_onWrite_transcriptLandsInField_nothingSent() = runTest(testDispatcher) {
+        fakeTranscriber.gate = CompletableDeferred()
+        fakeTranscriber.outcome = TranscriptionOutcome.Success("buy milk and eggs")
+        val handle = SavedStateHandle()
+        val vm = createViewModel(savedStateHandle = handle)
+        vm.toBranch(OnboardingMode.Write)
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        assertEquals(OnboardingPhase.Recording(OnboardingStep.Write), vm.screenState.value.phase)
+        assertTrue(vm.screenState.value.isRecording)
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a", mimeType = "audio/webm"))
+        runCurrent()
+        assertEquals(OnboardingPhase.Transcribing(OnboardingStep.Write), vm.screenState.value.phase)
+        assertTrue(vm.screenState.value.isTranscribing)
+
+        fakeTranscriber.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(OnboardingPhase.Idle, state.phase)
+        assertEquals("buy milk and eggs", state.inputText)
+        assertEquals(listOf("/tmp/clip.m4a" to "audio/webm"), fakeTranscriber.calls)
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount, "the user presses Send themselves")
+        assertNull(fakeShellLaunch.pending.value)
+        assertTrue(calls.isEmpty(), "no completion, no navigation: $calls")
+        val voice = events(AnalyticsEvents.Onboarding.VOICE_RECORDED).single()
+        assertEquals("write", voice[AnalyticsParams.SCREEN])
+        assertEquals("transcribed", voice[AnalyticsParams.OUTCOME])
+        // Process death after the transcript: it is restored like typed text.
+        assertEquals("buy milk and eggs", createViewModel(savedStateHandle = handle).screenState.value.inputText)
+    }
+
+    @Test
+    fun voice_appendsToTypedText_thenSendGeneratesFromBoth() = runTest(testDispatcher) {
+        fakeTranscriber.outcome = TranscriptionOutcome.Success("for Sunday")
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Write)
+        vm.onIntent(OnboardingIntent.OnInputChanged("Groceries "))
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a"))
+        advanceUntilIdle()
+        vm.onIntent(OnboardingIntent.OnSendClick)
+        advanceUntilIdle()
+
+        assertEquals("Groceries for Sunday", assertIs<AnalyzeInputData.RawText>(fakeAnalyzeRepository.lastInput).text)
+        assertEquals("typed", completedParams()[AnalyticsParams.SEED])
+    }
+
+    @Test
+    fun voice_onTalk_thenSend_autoSendsTheTranscriptInTheChat() = runTest(testDispatcher) {
+        fakeTranscriber.outcome = TranscriptionOutcome.Success("plan my week")
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Talk)
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a"))
+        advanceUntilIdle()
+        assertNull(fakeShellLaunch.pending.value, "dictation only fills the field")
+
+        vm.onIntent(OnboardingIntent.OnChatClick)
+        advanceUntilIdle()
+
+        assertEquals(ShellLaunch.OpenChat(prefill = "plan my week", autoSend = true), fakeShellLaunch.pending.value)
+        assertEquals("talk", events(AnalyticsEvents.Onboarding.VOICE_RECORDED).single()[AnalyticsParams.SCREEN])
+    }
+
+    @Test
+    fun voice_transcriptionFails_keepsTextEditable_withSnackbarPerCause() = runTest(testDispatcher) {
+        val cases = listOf(
+            TranscriptionOutcome.NetworkError to OnboardingSnackbar.TRANSCRIBE_ERROR,
+            TranscriptionOutcome.ServiceError to OnboardingSnackbar.TRANSCRIBE_ERROR,
+            TranscriptionOutcome.NotRegistered to OnboardingSnackbar.TRANSCRIBE_ERROR,
+            TranscriptionOutcome.FileMissing to OnboardingSnackbar.TRANSCRIBE_ERROR,
+            TranscriptionOutcome.EmptyTranscript to OnboardingSnackbar.TRANSCRIBE_EMPTY,
+            TranscriptionOutcome.InsufficientCredits to OnboardingSnackbar.NO_CREDITS,
+        )
+        cases.forEach { (outcome, snackbar) ->
+            resetFakes()
+            fakeTranscriber.outcome = outcome
+            val vm = createViewModel()
+            val effects = collectEffects(vm)
+            vm.toBranch(OnboardingMode.Write)
+            vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
+
+            vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+            vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a"))
+            advanceUntilIdle()
+
+            val state = vm.screenState.value
+            assertEquals(OnboardingPhase.Idle, state.phase, "$outcome")
+            assertEquals("Trip", state.inputText, "$outcome: the typed text survives a failed dictation")
+            assertEquals(listOf<OnboardingSideEffect>(OnboardingSideEffect.ShowSnackbar(snackbar)), effects.toList(), "$outcome")
+            assertNull(state.aiError, "a dictation failure is not the AI-list box")
+            // Still editable and usable: the field takes text and Send works.
+            vm.onIntent(OnboardingIntent.OnInputChanged("Trip to Rome"))
+            assertEquals("Trip to Rome", vm.screenState.value.inputText)
+        }
+    }
+
+    @Test
+    fun voice_transcriberThrows_isTreatedAsAFailure_notACrash() = runTest(testDispatcher) {
+        fakeTranscriber.throws = IllegalStateException("boom")
+        val vm = createViewModel()
+        val effects = collectEffects(vm)
+        vm.toBranch(OnboardingMode.Talk)
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a"))
+        advanceUntilIdle()
+
+        assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase)
+        assertTrue(effects.contains(OnboardingSideEffect.ShowSnackbar(OnboardingSnackbar.TRANSCRIBE_ERROR)))
+        assertEquals("service_error", events(AnalyticsEvents.Onboarding.VOICE_RECORDED).single()[AnalyticsParams.OUTCOME])
+    }
+
+    @Test
+    fun voice_pressEndedWithoutAudio_answersEveryReason_neverTranscribes() = runTest(testDispatcher) {
+        val cases: List<Triple<OnboardingVoiceStop?, String?, String>> = listOf(
+            // stop, snackbar, analytics outcome
+            Triple(null, null, "cancelled"),
+            Triple(OnboardingVoiceStop.UserCancelled, null, "cancelled"),
+            Triple(OnboardingVoiceStop.TooShort, null, "too_short"),
+            Triple(OnboardingVoiceStop.PermissionDenied, OnboardingSnackbar.MIC_DENIED, "permission_denied"),
+            Triple(OnboardingVoiceStop.PermissionJustGranted, OnboardingSnackbar.MIC_HOLD_AGAIN, "permission_just_granted"),
+            Triple(OnboardingVoiceStop.RecorderError, OnboardingSnackbar.RECORDING_FAILED, "recorder_error"),
+        )
+        cases.forEach { (stop, snackbar, outcome) ->
+            resetFakes()
+            val vm = createViewModel()
+            val effects = collectEffects(vm)
+            vm.toBranch(OnboardingMode.Write)
+            vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
+
+            vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+            vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped(recordingPath = null, stop = stop))
+            advanceUntilIdle()
+
+            val state = vm.screenState.value
+            assertEquals(OnboardingPhase.Idle, state.phase, "$stop: the recording state drops")
+            assertEquals("Trip", state.inputText)
+            assertEquals(stop == OnboardingVoiceStop.TooShort, state.showVoiceTooShortHint, "$stop")
+            assertEquals(listOfNotNull(snackbar?.let { OnboardingSideEffect.ShowSnackbar(it) }), effects.toList(), "$stop")
+            assertTrue(fakeTranscriber.calls.isEmpty(), "$stop: no audio, no credit")
+            assertEquals(outcome, events(AnalyticsEvents.Onboarding.VOICE_RECORDED).single()[AnalyticsParams.OUTCOME])
+        }
+    }
+
+    @Test
+    fun voice_tooShortHint_clearedByTypingOrANewPress() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Write)
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped(null, stop = OnboardingVoiceStop.TooShort))
+        assertTrue(vm.screenState.value.showVoiceTooShortHint)
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        assertFalse(vm.screenState.value.showVoiceTooShortHint, "a new press clears it")
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped(null, stop = OnboardingVoiceStop.TooShort))
+        vm.onIntent(OnboardingIntent.OnInputChanged("T"))
+        assertFalse(vm.screenState.value.showVoiceTooShortHint, "typing clears it")
+    }
+
+    @Test
+    fun voice_releaseBeforeStart_dropsRecordingAtOnce_terminalStillAnswers() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        val effects = collectEffects(vm)
+        vm.toBranch(OnboardingMode.Talk)
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+
+        // Finger up while the permission prompt is still on screen.
+        vm.onIntent(OnboardingIntent.OnVoicePressReleasedBeforeStart)
+        assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase)
+        assertTrue(effects.isEmpty(), "not an outcome yet")
+
+        // The prompt is answered "deny": the press's single terminal callback.
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped(null, stop = OnboardingVoiceStop.PermissionDenied))
+        advanceUntilIdle()
+
+        assertEquals(listOf<OnboardingSideEffect>(OnboardingSideEffect.ShowSnackbar(OnboardingSnackbar.MIC_DENIED)), effects.toList())
+        assertEquals("talk", events(AnalyticsEvents.Onboarding.VOICE_RECORDED).single()[AnalyticsParams.SCREEN])
+    }
+
+    @Test
+    fun voice_recordingAndTranscribing_areBusy_backSkipSendIgnored() = runTest(testDispatcher) {
+        fakeTranscriber.gate = CompletableDeferred()
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Write)
+        vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        listOf(OnboardingIntent.OnBack, OnboardingIntent.OnSkip, OnboardingIntent.OnSendClick).forEach { vm.onIntent(it) }
+        assertTrue(vm.screenState.value.isBusy)
+        assertEquals(OnboardingStep.Write, vm.screenState.value.step)
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a"))
+        runCurrent()
+        listOf(OnboardingIntent.OnBack, OnboardingIntent.OnSkip, OnboardingIntent.OnSendClick, OnboardingIntent.OnVoiceRecordingStarted)
+            .forEach { vm.onIntent(it) }
+        runCurrent()
+
+        assertIs<OnboardingPhase.Transcribing>(vm.screenState.value.phase)
+        assertEquals(OnboardingStep.Write, vm.screenState.value.step)
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount)
+        assertTrue(calls.isEmpty(), "no completion, no navigation: $calls")
+        fakeTranscriber.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase)
+    }
+
+    @Test
+    fun voice_pressOutsideAComposerScreen_isIgnored() = runTest(testDispatcher) {
+        listOf<OnboardingMode?>(null, OnboardingMode.Attach).forEach { mode ->
+            resetFakes()
+            val vm = createViewModel()
+            mode?.let { vm.toBranch(it) }
+
+            vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+
+            assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase, "no mic on ${vm.screenState.value.step}")
+        }
+    }
+
+    @Test
+    fun voice_resultArrivingDuringAnotherOperation_isDropped() = runTest(testDispatcher) {
+        fakeAnalyzeRepository.blockAnalyzeUntilReleased = true
+        val vm = createViewModel()
+        vm.toBranch(OnboardingMode.Write)
+        vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
+        vm.onIntent(OnboardingIntent.OnSendClick)
+        runCurrent()
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/late.m4a"))
+        runCurrent()
+
+        assertIs<OnboardingPhase.AiGenerating>(vm.screenState.value.phase)
+        assertTrue(fakeTranscriber.calls.isEmpty())
+        fakeAnalyzeRepository.releaseAnalyzeGate.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    // ── S5b. No mic on web without a Google link (0 credits until sign-in) ─────
+
+    @Test
+    fun voiceAvailability_android_true_evenUnlinked() = runTest(testDispatcher) {
+        val vm = createViewModel(isWeb = false)
+        advanceUntilIdle()
+        assertTrue(vm.screenState.value.isVoiceAvailable)
+    }
+
+    @Test
+    fun voiceAvailability_webLinked_true() = runTest(testDispatcher) {
+        fakeUserDataRepository.setGoogleLinked(true)
+        val vm = createViewModel(isWeb = true)
+        advanceUntilIdle()
+        assertTrue(vm.screenState.value.isVoiceAvailable)
+    }
+
+    @Test
+    fun voiceAvailability_webUnlinked_false_andVoiceIntentsAreIgnored() = runTest(testDispatcher) {
+        val vm = createViewModel(isWeb = true)
+        val effects = collectEffects(vm)
+        advanceUntilIdle()
+        assertFalse(vm.screenState.value.isVoiceAvailable)
+        vm.toBranch(OnboardingMode.Write)
+        vm.onIntent(OnboardingIntent.OnInputChanged("Trip"))
+
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase, "no mic, no recording state")
+        vm.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/stray.m4a"))
+        advanceUntilIdle()
+
+        assertTrue(fakeTranscriber.calls.isEmpty(), "no credit spent on a wallet that is empty by design")
+        assertEquals(OnboardingPhase.Idle, vm.screenState.value.phase)
+        assertEquals("Trip", vm.screenState.value.inputText)
+        assertTrue(effects.isEmpty())
+        assertTrue(events(AnalyticsEvents.Onboarding.VOICE_RECORDED).isEmpty())
+        // Typing and Send still work: the composer is just without the mic.
+        vm.onIntent(OnboardingIntent.OnSendClick)
+        advanceUntilIdle()
+        assertEquals(1, fakeAnalyzeRepository.analyzeCallCount)
+    }
+
+    @Test
+    fun voiceAvailability_webLinkLandsLater_micAppears() = runTest(testDispatcher) {
+        val vm = createViewModel(isWeb = true)
+        advanceUntilIdle()
+        assertFalse(vm.screenState.value.isVoiceAvailable)
+
+        fakeUserDataRepository.setGoogleLinked(true)
+        advanceUntilIdle()
+
+        assertTrue(vm.screenState.value.isVoiceAvailable)
+    }
+
+    // ── S6. Process death: step and text restored on every branch ──────────────
+
+    @Test
+    fun processDeath_restoresEachBranch_andText() = runTest(testDispatcher) {
+        OnboardingMode.entries.forEach { mode ->
+            resetFakes()
+            val handle = SavedStateHandle()
+            val vm1 = createViewModel(savedStateHandle = handle)
+            vm1.toBranch(mode)
+            vm1.onIntent(OnboardingIntent.OnInputChanged("draft"))
+
+            val vm2 = createViewModel(savedStateHandle = handle)
+
+            assertEquals(mode.step, vm2.screenState.value.step, "$mode")
+            assertEquals("draft", vm2.screenState.value.inputText)
+            assertEquals(OnboardingPhase.Idle, vm2.screenState.value.phase)
+            vm2.onIntent(OnboardingIntent.OnBack)
+            assertEquals(OnboardingStep.Showcase, vm2.screenState.value.step, "back works after a restore")
+        }
+    }
+
+    @Test
+    fun processDeath_aStepSavedByTheOldBuild_restoresToShowcase() = runTest(testDispatcher) {
+        // An app update between death and restore: the 11-04 build saved "TryIt", which no longer exists.
+        val handle = SavedStateHandle(mapOf("onboarding_step" to "TryIt", "onboarding_input" to "draft"))
+
+        val vm = createViewModel(savedStateHandle = handle)
+
+        assertEquals(OnboardingStep.Showcase, vm.screenState.value.step)
+        assertEquals("draft", vm.screenState.value.inputText)
+    }
+
+    @Test
+    fun processDeath_duringRecordingOrTranscription_restoresIdle_onTheSameScreen() = runTest(testDispatcher) {
+        fakeTranscriber.gate = CompletableDeferred()
+        val handle = SavedStateHandle()
+        val vm1 = createViewModel(savedStateHandle = handle)
+        vm1.toBranch(OnboardingMode.Talk)
+        vm1.onIntent(OnboardingIntent.OnVoiceRecordingStarted)
+        vm1.onIntent(OnboardingIntent.OnVoiceRecordingStopped("/tmp/clip.m4a"))
+        runCurrent()
+
+        val vm2 = createViewModel(savedStateHandle = handle)
+
+        assertEquals(OnboardingStep.Talk, vm2.screenState.value.step)
+        assertEquals(OnboardingPhase.Idle, vm2.screenState.value.phase, "a transcription dies with the process")
+        fakeTranscriber.gate!!.complete(Unit)
+        advanceUntilIdle()
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1095,6 +1569,20 @@ class WelcomeOnboardingViewModelTest {
         override fun info(tag: String, message: String) {}
         override fun warning(tag: String, message: String) {}
         override fun error(tag: String, message: String, throwable: Throwable?) {}
+    }
+
+    private class FakeVoiceTranscriber : OnboardingVoiceTranscriber {
+        var outcome: TranscriptionOutcome = TranscriptionOutcome.Success("transcript")
+        var throws: Exception? = null
+        var gate: CompletableDeferred<Unit>? = null
+        val calls = mutableListOf<Pair<String, String>>()
+
+        override suspend fun transcribe(audioPath: String, mimeType: String): TranscriptionOutcome {
+            calls += audioPath to mimeType
+            gate?.await()
+            throws?.let { throw it }
+            return outcome
+        }
     }
 
     private class FakeShellLaunchRequests : ShellLaunchRequests {
@@ -1286,6 +1774,10 @@ class WelcomeOnboardingViewModelTest {
 
         override fun getUserDataFlow(): StateFlow<UserData> = dataFlow
         override suspend fun getUserData(): UserData = dataFlow.value
+
+        fun setGoogleLinked(linked: Boolean) {
+            dataFlow.value = dataFlow.value.copy(isGoogleLinked = linked)
+        }
 
         override suspend fun update(userData: UserData) {
             if (throwOnNextUpdate) {

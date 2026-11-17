@@ -58,7 +58,7 @@
     <!-- AI Welcome onboarding (Toki style) — Android-only variant -->
     <string name="onboarding_welcome_create_error">आपकी सूची नहीं बन पाई। फिर से आज़माएं।</string>
     <string name="onboarding_welcome_default_checklist_name">मेरी चेकलिस्ट</string>
-    <string name="onboarding_welcome_generating">आपकी चेकलिस्ट बन रही है…</string>
+    <string name="onboarding_welcome_generating">आपकी चेकलिस्ट बन रही है…</string>
     <!-- Step 1: Welcome -->
     <!-- Step 2: Capture -->
     <!-- Step 3: Value -->
@@ -119,7 +119,6 @@
     <string name="onboarding_demo_write_item_3">स्नैक्स</string>
     <string name="onboarding_demo_talk_user">डेंटिस्ट शुक्र को?</string>
     <string name="onboarding_demo_talk_reply">हो गया</string>
-    <string name="onboarding_try_title">अपनी पहली सूची बनाएँ</string>
     <string name="onboarding_sample_title">पास में कोई फ़ाइल नहीं?</string>
     <string name="onboarding_sample_body">देखें, Gisti इस नोट को सूची में कैसे बदलता है।</string>
     <string name="onboarding_sample_cta">इस नोट से आज़माएँ</string>
@@ -143,23 +142,42 @@
     <string name="onboarding_sample_item_4">15 तारीख़ से पहले बिजली का बिल भरें</string>
     <string name="onboarding_sample_item_5">लाइब्रेरी की किताबें लौटाएँ</string>
     <string name="onboarding_sample_item_6">गुरुवार को योगा क्लास</string>
-    <string name="onboarding_try_own_file_title">अपनी फ़ाइल</string>
-    <string name="onboarding_try_type_title">जो चाहिए, लिखें</string>
     <string name="onboarding_try_type_placeholder">जैसे: छुट्टियों की पैकिंग</string>
     <string name="onboarding_try_type_empty_hint">पहले लक्ष्य लिखें — या नीचे कोई आइडिया चुनें</string>
-    <string name="onboarding_try_send_a11y">AI से सूची बनाएँ</string>
     <string name="onboarding_try_talk_title">Gisti से बात करें</string>
-    <string name="onboarding_try_talk_caption_call">आवाज़ से या चैट में दिन की योजना बनाएँ — Gisti काम ख़ुद जोड़ देगा।</string>
-    <string name="onboarding_try_talk_caption_chat">चैट में दिन की योजना बनाएँ — Gisti काम ख़ुद जोड़ देगा।</string>
-    <string name="onboarding_try_talk_caption_typed">चैट आपके टेक्स्ट से शुरू होगी।</string>
-    <string name="onboarding_try_chat">चैट</string>
-    <string name="onboarding_try_call">कॉल</string>
     <string name="onboarding_try_ai_error">Gisti अभी AI से नहीं जुड़ पा रहा। नमूना आज़माएँ या अपना टेक्स्ट सूची के रूप में सेव करें।</string>
     <string name="onboarding_try_ai_signin">यहाँ AI के लिए Google से साइन इन करें। तब तक नमूना आज़माएँ या टेक्स्ट को सूची के रूप में सेव करें।</string>
     <string name="onboarding_try_ai_error_sample">नमूना आज़माएँ</string>
     <string name="onboarding_try_ai_error_save">सादी सूची सेव करें</string>
     <string name="onboarding_try_generating_slow">अभी काम चल रहा है…</string>
     <string name="onboarding_try_generating_prompt">“%1$s”</string>
+    <string name="onboarding_ai_step_read">आपका लक्ष्य पढ़ रहा हूँ</string>
+    <string name="onboarding_ai_step_ideas">आइडिया जुटा रहा हूँ</string>
+    <string name="onboarding_ai_step_order">क़दमों को क्रम में लगा रहा हूँ</string>
+    <string name="onboarding_ai_step_magic">थोड़ा जादू जोड़ रहा हूँ</string>
+    <string name="onboarding_ai_slow_longer">कुछ सूचियों में थोड़ा ज़्यादा समय लगता है</string>
+    <string name="onboarding_ai_slow_thanks">इंतज़ार के लिए शुक्रिया</string>
+    <!-- Onboarding step 2, one screen per choice (docs/designs/onboarding-steps-2026-11-17) -->
+    <string name="onboarding_showcase_example">उदाहरण देखें</string>
+    <string name="onboarding_write_title">आपको क्या करना है?</string>
+    <string name="onboarding_write_subtitle">लक्ष्य लिखें या माइक दबाकर रखें — Gisti उसे क़दमों में बाँट देगा।</string>
+    <string name="onboarding_write_subtitle_no_voice">लक्ष्य लिखें — Gisti उसे क़दमों में बाँट देगा।</string>
+    <string name="onboarding_write_ideas_title">या किसी आइडिया से शुरू करें</string>
+    <string name="onboarding_mic_denied">माइक्रोफ़ोन की अनुमति बंद है। आप लक्ष्य लिखकर बता सकते हैं।</string>
+    <string name="onboarding_attach_title">फ़ोटो या फ़ाइल को सूची में बदलें</string>
+    <string name="onboarding_attach_own_title">या अपनी फ़ाइल</string>
+    <string name="onboarding_source_photo_caption">नोट, बोर्ड, रसीद</string>
+    <string name="onboarding_source_pdf_caption">टिकट, प्लान, दस्तावेज़</string>
+    <string name="onboarding_source_link_caption">रेसिपी या लेख</string>
+    <string name="onboarding_source_voice_caption">बस बोल दें</string>
+    <string name="onboarding_talk_greeting">नमस्ते! बताइए क्या करना है — मैं उसे कामों में बदल दूँगा।</string>
+    <string name="onboarding_talk_greeting_hint_call">लिखें, वॉइस मैसेज के लिए माइक दबाकर रखें या मुझे कॉल करें।</string>
+    <string name="onboarding_talk_greeting_hint_chat">लिखें या वॉइस मैसेज के लिए माइक दबाकर रखें।</string>
+    <string name="onboarding_talk_starters_title">जैसे</string>
+    <string name="onboarding_talk_starter_1">मेरा हफ़्ता प्लान करो</string>
+    <string name="onboarding_talk_starter_2">यात्रा की पैकिंग में मदद करो</string>
+    <string name="onboarding_talk_starter_3">तुम क्या कर सकते हो?</string>
+    <string name="onboarding_sample_found">%2$d में से %1$d काम मिले</string>
 
     <!-- Navigation Drawer -->
     <string name="drawer_section_navigate">नेविगेट करें</string>
@@ -1439,6 +1457,8 @@
     <string name="chat_attach_file_action">फ़ाइल अटैच करें</string>
     <string name="chat_record_voice">वॉइस मैसेज रिकॉर्ड करें</string>
     <string name="chat_voice_press_hold_hint">रिकॉर्ड करने के लिए दबाए रखें</string>
+    <string name="chat_voice_a11y_stop">रिकॉर्डिंग रोकें</string>
+    <string name="chat_voice_a11y_cancel">रिकॉर्डिंग रद्द करें</string>
     <string name="chat_voice_drag_cancel_hint">रद्द करने के लिए ऊपर स्लाइड करें</string>
     <string name="chat_voice_release_cancel_hint">रद्द करने के लिए छोड़ें</string>
     <string name="chat_voice_too_short">रिकॉर्डिंग बहुत छोटी है। माइक बटन को ज़्यादा देर दबाए रखें।</string>

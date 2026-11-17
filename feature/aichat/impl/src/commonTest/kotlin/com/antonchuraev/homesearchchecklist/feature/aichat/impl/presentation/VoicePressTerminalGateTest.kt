@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderErrorCodes
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.AudioRecorderLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.VoicePressTerminalGate
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.endVoicePress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

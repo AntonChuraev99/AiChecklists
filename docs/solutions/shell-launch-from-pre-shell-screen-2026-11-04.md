@@ -4,7 +4,7 @@ summary: "Экран вне шелла просит открыть чат/зво
 date: 2026-11-04
 type: pattern
 modules: [composeApp, core/navigation, feature/onboarding]
-keywords: [navigation, ShellLaunchRequests, LaunchedEffect, race-condition, v2ChatDockOpen, setDefaultRootRoute, Navigation3, onboarding, android, wasmjs]
+keywords: [navigation, ShellLaunchRequests, LaunchedEffect, race-condition, v2ChatDockOpen, setDefaultRootRoute, Navigation3, onboarding, autoSend, OnPrefillAndSend, android, wasmjs]
 project: Checklists
 ---
 
@@ -22,6 +22,7 @@ project: Checklists
 - Эффект в `App.kt` ключуется на `pendingShellLaunch`, `armResolved`, `showV2Shell`, `showShell`, `v2RootApplied`, `v2InboxRooted`, `currentTopRoute` и выходит, пока `isShellStableForLaunch(...)` ложно: в v2 — пока подмена корня не прошла и Inbox нет в стеке.
 - Открывая док, эффект запоминает `v2DockLaunchRoute = currentTopRoute`; закрыватель доков по смене маршрута пропускает ровно этот маршрут и сбрасывает маркер на первой же смене. Порядок двух эффектов в кадре перестаёт влиять на результат.
 - v1 (classic): `OpenChat` → `navigateToAiChat()`; `ChatRoute` берёт тот же Activity-scoped `ChatViewModel`, prefill доходит.
+- `OpenChat(prefill, autoSend = true)` (2026-11-17): `chatIntentForOpenChat` → `OnPrefillAndSend`, штатная отправка чата (кредиты, 402), перед ней синхронно `OnSetScreenContext`.
 
 ## Почему именно так
 
@@ -34,4 +35,6 @@ project: Checklists
 - `core/navigation/impl/src/commonMain/kotlin/com/antonchuraev/homesearchchecklist/core/navigation/impl/ShellLaunchRequestsImpl.kt`
 - `composeApp/src/commonMain/kotlin/com/antonchuraev/homesearchchecklist/App.kt` — `isShellStableForLaunch`, `v2DockLaunchRoute`, `v2RootApplied`
 - `composeApp/src/commonTest/kotlin/com/antonchuraev/homesearchchecklist/ShellLaunchGateTest.kt`
-- Задача: `docs/active/onboarding-refresh-2026-11-04.md`
+- `composeApp/src/commonTest/kotlin/com/antonchuraev/homesearchchecklist/ShellLaunchChatIntentTest.kt` — `autoSend` → `OnPrefillAndSend`
+- `feature/aichat/impl/src/commonTest/kotlin/com/antonchuraev/homesearchchecklist/feature/aichat/impl/presentation/ChatViewModelTest.kt` — `prefillAndSend_layer2InsufficientCredits_takesTheSameRefusalPathAsSend`
+- Задача: `docs/archive/onboarding-refresh-2026-11-04.md`

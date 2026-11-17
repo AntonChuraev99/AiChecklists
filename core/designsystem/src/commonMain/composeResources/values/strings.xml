@@ -119,7 +119,6 @@
     <string name="onboarding_demo_write_item_3">Snacks</string>
     <string name="onboarding_demo_talk_user">Move dentist to Fri?</string>
     <string name="onboarding_demo_talk_reply">Done</string>
-    <string name="onboarding_try_title">Make your first list</string>
     <string name="onboarding_sample_title">No file at hand?</string>
     <string name="onboarding_sample_body">Watch Gisti turn this note into a list.</string>
     <string name="onboarding_sample_cta">Try with this note</string>
@@ -143,23 +142,42 @@
     <string name="onboarding_sample_item_4">Pay the electricity bill by the 15th</string>
     <string name="onboarding_sample_item_5">Return the library books</string>
     <string name="onboarding_sample_item_6">Yoga class on Thursday</string>
-    <string name="onboarding_try_own_file_title">Use your own file</string>
-    <string name="onboarding_try_type_title">Type what's on your mind</string>
     <string name="onboarding_try_type_placeholder">e.g. Pack for a beach trip</string>
     <string name="onboarding_try_type_empty_hint">Type a goal first — or pick an idea below</string>
-    <string name="onboarding_try_send_a11y">Make a list with AI</string>
     <string name="onboarding_try_talk_title">Talk it through with Gisti</string>
-    <string name="onboarding_try_talk_caption_call">Plan your day out loud or in chat. Gisti adds the tasks.</string>
-    <string name="onboarding_try_talk_caption_chat">Plan your day in chat. Gisti adds the tasks.</string>
-    <string name="onboarding_try_talk_caption_typed">The chat starts with your text.</string>
-    <string name="onboarding_try_chat">Chat</string>
-    <string name="onboarding_try_call">Call</string>
     <string name="onboarding_try_ai_error">Gisti can't reach the AI right now. Try the sample or save your text as a list.</string>
     <string name="onboarding_try_ai_signin">Sign in with Google to use AI here. Meanwhile, try the sample or save your text as a list.</string>
     <string name="onboarding_try_ai_error_sample">Try the sample</string>
     <string name="onboarding_try_ai_error_save">Save as a plain list</string>
     <string name="onboarding_try_generating_slow">Still working on it…</string>
     <string name="onboarding_try_generating_prompt">“%1$s”</string>
+    <string name="onboarding_ai_step_read">Reading your goal</string>
+    <string name="onboarding_ai_step_ideas">Gathering ideas</string>
+    <string name="onboarding_ai_step_order">Putting steps in order</string>
+    <string name="onboarding_ai_step_magic">Adding a little magic</string>
+    <string name="onboarding_ai_slow_longer">Some lists take a bit longer</string>
+    <string name="onboarding_ai_slow_thanks">Thanks for your patience</string>
+    <!-- Onboarding step 2, one screen per choice (docs/designs/onboarding-steps-2026-11-17) -->
+    <string name="onboarding_showcase_example">Show me an example</string>
+    <string name="onboarding_write_title">What do you want to get done?</string>
+    <string name="onboarding_write_subtitle">Type a goal or hold the mic. Gisti breaks it into steps.</string>
+    <string name="onboarding_write_subtitle_no_voice">Type a goal. Gisti breaks it into steps.</string>
+    <string name="onboarding_write_ideas_title">Or start from an idea</string>
+    <string name="onboarding_mic_denied">Microphone access is off. You can type your goal instead.</string>
+    <string name="onboarding_attach_title">Turn a photo or file into a list</string>
+    <string name="onboarding_attach_own_title">Or use your own</string>
+    <string name="onboarding_source_photo_caption">Note, whiteboard, receipt</string>
+    <string name="onboarding_source_pdf_caption">Tickets, plans, docs</string>
+    <string name="onboarding_source_link_caption">Recipe or article</string>
+    <string name="onboarding_source_voice_caption">Just say it</string>
+    <string name="onboarding_talk_greeting">Hi! Tell me what's on your plate — I'll turn it into tasks.</string>
+    <string name="onboarding_talk_greeting_hint_call">Type, hold the mic for a voice message, or call me.</string>
+    <string name="onboarding_talk_greeting_hint_chat">Type or hold the mic for a voice message.</string>
+    <string name="onboarding_talk_starters_title">Try asking</string>
+    <string name="onboarding_talk_starter_1">Plan my week</string>
+    <string name="onboarding_talk_starter_2">Help me pack for a trip</string>
+    <string name="onboarding_talk_starter_3">What can you do?</string>
+    <string name="onboarding_sample_found">Found %1$d of %2$d tasks</string>
 
     <!-- Navigation Drawer -->
     <string name="drawer_section_navigate">Navigate</string>
@@ -1470,6 +1488,8 @@
     <string name="chat_attach_file_action">Attach file</string>
     <string name="chat_record_voice">Record voice message</string>
     <string name="chat_voice_press_hold_hint">Hold to record voice</string>
+    <string name="chat_voice_a11y_stop">Stop recording</string>
+    <string name="chat_voice_a11y_cancel">Cancel recording</string>
     <string name="chat_voice_drag_cancel_hint">Slide up to cancel</string>
     <string name="chat_voice_release_cancel_hint">Release to cancel</string>
     <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>

@@ -19,7 +19,7 @@
     <!-- Онбординг: чипы-пресеты, стартовые подсказки, ошибки (раньше падали на английский) -->
     <string name="onboarding_welcome_create_error">Не получилось создать список. Попробуйте ещё раз.</string>
     <string name="onboarding_welcome_default_checklist_name">Мой чек-лист</string>
-    <string name="onboarding_welcome_generating">Создаём чек-лист…</string>
+    <string name="onboarding_welcome_generating">Создаём чек‑лист…</string>
     <string name="onboarding_welcome_chip_groceries">Продукты</string>
     <string name="onboarding_welcome_chip_trip">Сборы в поездку</string>
     <string name="onboarding_welcome_chip_workout">Тренировка</string>
@@ -95,7 +95,6 @@
     <string name="onboarding_demo_write_item_3">Перекус</string>
     <string name="onboarding_demo_talk_user">Стоматолога на пт?</string>
     <string name="onboarding_demo_talk_reply">Готово</string>
-    <string name="onboarding_try_title">Соберите первый список</string>
     <string name="onboarding_sample_title">Нет файла под рукой?</string>
     <string name="onboarding_sample_body">Посмотрите, как Gisti превратит эту записку в список.</string>
     <string name="onboarding_sample_cta">Попробовать на записке</string>
@@ -119,23 +118,42 @@
     <string name="onboarding_sample_item_4">Оплатить электричество до 15-го</string>
     <string name="onboarding_sample_item_5">Вернуть книги в библиотеку</string>
     <string name="onboarding_sample_item_6">Йога в четверг</string>
-    <string name="onboarding_try_own_file_title">Свой файл</string>
-    <string name="onboarding_try_type_title">Напишите, что нужно</string>
     <string name="onboarding_try_type_placeholder">Например: собраться на море</string>
     <string name="onboarding_try_type_empty_hint">Сначала напишите цель — или выберите идею ниже</string>
-    <string name="onboarding_try_send_a11y">Создать список с ИИ</string>
     <string name="onboarding_try_talk_title">Обсудите с Gisti</string>
-    <string name="onboarding_try_talk_caption_call">Спланируйте день голосом или в чате — Gisti сам добавит задачи.</string>
-    <string name="onboarding_try_talk_caption_chat">Спланируйте день в чате — Gisti сам добавит задачи.</string>
-    <string name="onboarding_try_talk_caption_typed">Чат начнётся с вашего текста.</string>
-    <string name="onboarding_try_chat">Чат</string>
-    <string name="onboarding_try_call">Звонок</string>
     <string name="onboarding_try_ai_error">Gisti сейчас не может подключиться к ИИ. Попробуйте пример или сохраните текст списком.</string>
     <string name="onboarding_try_ai_signin">Чтобы пользоваться ИИ здесь, войдите через Google. А пока попробуйте пример или сохраните текст списком.</string>
     <string name="onboarding_try_ai_error_sample">Попробовать пример</string>
     <string name="onboarding_try_ai_error_save">Сохранить как список</string>
     <string name="onboarding_try_generating_slow">Ещё работаю…</string>
     <string name="onboarding_try_generating_prompt">«%1$s»</string>
+    <string name="onboarding_ai_step_read">Читаю вашу цель</string>
+    <string name="onboarding_ai_step_ideas">Собираю идеи</string>
+    <string name="onboarding_ai_step_order">Расставляю шаги по порядку</string>
+    <string name="onboarding_ai_step_magic">Добавляю немного магии</string>
+    <string name="onboarding_ai_slow_longer">Бывает, нужно чуть больше времени</string>
+    <string name="onboarding_ai_slow_thanks">Спасибо, что ждёте</string>
+    <!-- Onboarding step 2, one screen per choice (docs/designs/onboarding-steps-2026-11-17) -->
+    <string name="onboarding_showcase_example">Показать на примере</string>
+    <string name="onboarding_write_title">Что нужно сделать?</string>
+    <string name="onboarding_write_subtitle">Напишите цель или зажмите микрофон — Gisti разложит её по шагам.</string>
+    <string name="onboarding_write_subtitle_no_voice">Напишите цель — Gisti разложит её по шагам.</string>
+    <string name="onboarding_write_ideas_title">Или начните с идеи</string>
+    <string name="onboarding_mic_denied">Доступ к микрофону выключен. Можно написать цель текстом.</string>
+    <string name="onboarding_attach_title">Превратите фото или файл в список</string>
+    <string name="onboarding_attach_own_title">Или свой файл</string>
+    <string name="onboarding_source_photo_caption">Записка, доска, чек</string>
+    <string name="onboarding_source_pdf_caption">Билеты, планы, документы</string>
+    <string name="onboarding_source_link_caption">Рецепт или статья</string>
+    <string name="onboarding_source_voice_caption">Просто скажите</string>
+    <string name="onboarding_talk_greeting">Привет! Расскажите, что у вас на уме, — я разложу это по задачам.</string>
+    <string name="onboarding_talk_greeting_hint_call">Напишите, зажмите микрофон для голосового или позвоните мне.</string>
+    <string name="onboarding_talk_greeting_hint_chat">Напишите или зажмите микрофон для голосового.</string>
+    <string name="onboarding_talk_starters_title">Например</string>
+    <string name="onboarding_talk_starter_1">Спланируй мою неделю</string>
+    <string name="onboarding_talk_starter_2">Помоги собраться в поездку</string>
+    <string name="onboarding_talk_starter_3">Что ты умеешь?</string>
+    <string name="onboarding_sample_found">Нашёл %1$d из %2$d задач</string>
 
 
     <!-- Боковое меню -->
@@ -1352,6 +1370,8 @@
     <string name="chat_attach_file_action">Прикрепить файл</string>
     <string name="chat_record_voice">Записать голосовое сообщение</string>
     <string name="chat_voice_press_hold_hint">Удерживайте, чтобы записать голос</string>
+    <string name="chat_voice_a11y_stop">Остановить запись</string>
+    <string name="chat_voice_a11y_cancel">Отменить запись</string>
     <string name="chat_voice_drag_cancel_hint">Сдвиньте вверх для отмены</string>
     <string name="chat_voice_release_cancel_hint">Отпустите для отмены</string>
     <string name="chat_voice_too_short">Запись слишком короткая. Удерживайте кнопку дольше.</string>

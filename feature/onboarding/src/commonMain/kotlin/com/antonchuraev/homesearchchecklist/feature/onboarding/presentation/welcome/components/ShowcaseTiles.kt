@@ -337,16 +337,20 @@ private fun BoxScope.WriteStage(progress: State<Float>) {
 
 @Composable
 private fun BoxScope.AttachStage(progress: State<Float>) {
-    SampleNote(
+    // The real sample photo's handwriting crop (DESIGN_SPEC 2026-11-17 §3.3 `Text`), not a drawn note.
+    val band = MaterialTheme.colorScheme.primary
+    SamplePhoto(
+        crop = SampleCrop.Text,
         modifier = Modifier
-            .offset(x = 8.dp, y = 10.dp)
+            .offset(x = 8.dp, y = 8.dp)
             .graphicsLayer { translationX = -NOTE_SHIFT.toPx() * seg(progress.value, SCAN_MS, SHIFT_MS) }
-            .size(46.dp, 60.dp)
-            .rotate(-4f),
-        scan = {
-            val t = seg(progress.value, 0, SCAN_MS)
-            if (t > 0f && t < 1f) t else NO_SCAN
-        },
+            .size(46.dp, 62.dp)
+            .rotate(-4f)
+            .clip(AppShapes.extraSmall)
+            .scanBand(band) {
+                val t = seg(progress.value, 0, SCAN_MS)
+                if (t > 0f && t < 1f) t else -1f
+            },
     )
     Icon(
         Icons.AutoMirrored.Filled.ArrowForward,
