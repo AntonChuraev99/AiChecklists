@@ -2,7 +2,7 @@
 title: Per-item createdAt timestamp for Layer 3 chat context (absolute-time questions)
 date: 2026-06-17
 status: deferred
-parent_task: docs/todos/2026-05-17-aichat-deep-thinking-no-item-history.md (resolved — context expanded with item text + position)
+parent_task: docs/todos/done/2026-05-17-aichat-deep-thinking-no-item-history.md (resolved — context expanded with item text + position)
 blocking_reason: needs Room migration + Firestore sync field — out of scope of the 2026-06-17 context-expansion
 resume_trigger: User says «чтобы AI отвечал КОГДА я добавил пункт / absolute time в чате» OR a user reports the chat can't answer "when did I add X"
 estimated_complexity: Standard

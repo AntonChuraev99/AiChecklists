@@ -27,7 +27,7 @@ picker row + `settings_language_<lang>` endonym key + androidMain res `values-<l
    - AVOID: Google AutoML Translation API (deprecated 2025-09-30); old Gradle auto-translate plugins (abandoned).
 3. **Finish RU** — `values-ru/strings.xml` is ~172 keys behind EN (1063 vs 1235). Also revisit the
    18 `folder_*` keys deliberately kept English-only (owner decision 2026-07-15,
-   `docs/todos/2026-07-15-folder-strings-missing-ru-translation.md`).
+   `docs/todos/done/2026-07-15-folder-strings-missing-ru-translation.md`).
 
 ## Reusable pipeline (from MIN)
 Scripts in the MIN scratchpad: `extract.py` (split EN → chunks, skip `debug_*`+`app_name`),

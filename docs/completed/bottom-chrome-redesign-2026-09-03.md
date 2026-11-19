@@ -218,7 +218,7 @@ Five `V2ShellBottomBarScreenshotTest` `*_captureOpen*` goldens recorded 2026-08-
 
 **Баги/проблемы:** None blocking.
 
-**Решение:** All gate findings incorporated. Standards: `TrailingActionGap = 4.dp` replaced with `AppDimens.SpacingXs` (consistency). Spec deferred to owner (Calendar default preset `×` button behaviour — recorded in `docs/active/r1-due-rail-2026-08-19.md`). Standards judgments left as-is (duplicated due-outcome block, duplicated `when` branches in R1 code — not scope of this task). Device verification: Pixel 9 debug APK tested by owner — design approved, all interactions functional, colors harmonious. Totals: designsystem 123/0 lines, feature:home 656/0, composeApp 199/0, aichat:impl 539/0; wasmJs compiles; `verifyRoborazzi` green. Ready for merge.
+**Решение:** All gate findings incorporated. Standards: `TrailingActionGap = 4.dp` replaced with `AppDimens.SpacingXs` (consistency). Spec deferred to owner (Calendar default preset `×` button behaviour — recorded in `docs/archive/r1-due-rail-2026-08-19.md`). Standards judgments left as-is (duplicated due-outcome block, duplicated `when` branches in R1 code — not scope of this task). Device verification: Pixel 9 debug APK tested by owner — design approved, all interactions functional, colors harmonious. Totals: designsystem 123/0 lines, feature:home 656/0, composeApp 199/0, aichat:impl 539/0; wasmJs compiles; `verifyRoborazzi` green. Ready for merge.
 
 ## Implementation (2026-09-03)
 

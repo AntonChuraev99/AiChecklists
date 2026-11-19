@@ -54,5 +54,5 @@ ChecklistDetailSmartAddTest.
 4. Рассмотреть добавление `testAndroidHostTest` в CI-гейт, чтобы silent test rot не повторился.
 
 ## Связано
-- Редизайн: [redesign-gisti-variant-d-2026-05-30](../active/redesign-gisti-variant-d-2026-05-30.md)
+- Редизайн: `docs/completed/redesign-gisti-variant-d-2026-05-30.md` (файл не в git — лежит неотслеживаемым в основном checkout)
 - Memory: Navigation 3 SavedStateHandle pitfall, web single-pane layout.

@@ -91,7 +91,7 @@ CF `voice_session` (start / heartbeat / end; списание по сервер�
 
 - Звонок собран из движка AiTeacher (on-device распознавание → `chat_agent` в голосовом режиме → системный TTS) с UI Gisti в новых модулях `:core:voice:api|impl` и `:feature:voicecall`; ход звонка идёт через тот же `ToolCallDispatcher`, что и текстовый чат. Тариф — минуты по heartbeat в CF `voice_session`, чат-кредиты в звонке не тратятся.
 - Отгружается за двумя флагами: клиентский RC `voice_call_enabled` (debug — вкл, release — выкл) прячет кнопку; одноимённый ключ в Firestore `remote_config/current` — серверный kill switch. Раскатка = оба слоя.
-- Неделя паузы 11-04..11-11 — не дефект ветки: у Gemini API кончилась предоплата (prepay, 402). Разбор и варианты ухода с prepay — `docs/todos/2026-11-11-gemini-prepay-to-vertex-ai.md`.
+- Неделя паузы 11-04..11-11 — не дефект ветки: у Gemini API кончилась предоплата (prepay, 402). Разбор и варианты ухода с prepay — `docs/todos/done/2026-11-11-gemini-prepay-to-vertex-ai.md`.
 - `android preview render` не снимает KMP-модуль без app-потребителя — для `:feature:voicecall` заведён Roborazzi (34 кадра).
 - Ревью нашло потерю причины серверного конца звонка: без неё любой конец с остатком минут выглядел как «потолок звонка». Урок: поле ответа сервера, которое меняет экран, должно доходить до маппера типом, а не только в лог.
 - Осталось: раскатка (бамп версии, AAB, включить оба флага), после полной раскатки — пункт звонка в каталог фич ассистента (приватный промпт) и редеплой `chat_agent`; транскрипт звонка в историю чата — `docs/backlog/2026-08-09-voice-call-background-and-transcript-handoff.md`; web/iOS — `docs/todos/2026-08-09-voice-call-web-ios-parity.md`. Проверить на устройстве сценарии `disabled` и `idle` после фикса итерации 12.
