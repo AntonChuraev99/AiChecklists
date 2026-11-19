@@ -1,11 +1,16 @@
 ---
-status: deferred
+status: cancelled
+resolved: 2026-11-19
 blocking_reason: решение владельца — пока пополнен prepay-баланс Gemini API в AI Studio; переход на Vertex AI ждёт его решения и следующего пополнения
 resume_trigger: User says «переводим Gemini на Vertex / уходим с prepay» OR в логах Cloud Run снова `402 RESOURCE_EXHAUSTED ... prepayment credits are depleted`
 keywords: [gemini, prepay, 402, RESOURCE_EXHAUSTED, vertex ai, billing, auto-reload, alert, ai studio]
 ---
 
 # Gemini API на prepay — убрать риск молчаливого простоя AI
+
+> **Отменено 2026-11-19.** Решение владельца: баланс и оплата Gemini — его зона, повторения не будет;
+> ни переход на Vertex AI, ни auto-reload, ни алерт не делаем. Запись оставлена ради разбора причины
+> простоя 11-04..11-11 и вариантов ниже — если вопрос вернётся, начинать отсюда.
 
 ## Что случилось
 
