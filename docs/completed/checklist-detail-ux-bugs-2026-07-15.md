@@ -40,7 +40,7 @@ Three user-reported UX defects on ChecklistDetail (Android + Web): (1) red delet
 
 **Баги/проблемы:**
 - Bug 4 was dormant: before `1430fac2` the only `OnDeleteFolder` call site deleted a **child** folder, so `viewingDeletedSubtree` was never true through the UI. Fix 3 made the branch live on every use.
-- RU strings for the folder feature: closed as **wont-do** by the owner on 2026-07-15 (`docs/todos/2026-07-15-folder-strings-missing-ru-translation.md`). Fix 3 turned one translated row ("Удалить чек-лист") into an untranslated one ("Delete folder") on RU; accepted, consistent with the English-only policy.
+- RU strings for the folder feature: closed as **wont-do** by the owner on 2026-07-15 (`docs/todos/done/2026-07-15-folder-strings-missing-ru-translation.md`). Fix 3 turned one translated row ("Удалить чек-лист") into an untranslated one ("Delete folder") on RU; accepted, consistent with the English-only policy.
 - Two failed attempts at the test fixtures (`CoroutineScope(testDispatcher)` → leaks past `runTest`; `backgroundScope` → Standard dispatcher, asserts read unwritten state). Stopped after two rather than guessing a third, and handed it to @test-expert, who landed `backgroundScope.coroutineContext + testDispatcher`.
 - A full-module baseline run (33 failed **without** any of these changes, vs 21 and 31 with) prevented misreading a pre-existing flake as a fresh regression.
 
