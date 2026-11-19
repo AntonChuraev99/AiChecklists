@@ -59,4 +59,4 @@ Use the project skill **`/ai-chat-feedback-fixer`** — it encodes this mine-fee
 
 ## Cloud Function deploy / diagnostics
 
-All AI inference is server-side (`analyze_and_fill_checklist`, `generate_checklist`, `chat_completion`, `classify_chat_intent`, `transcribe_audio`) in `aichecklists-40230`. Client holds **zero** Gemini credentials. Deploy with `gcloud functions deploy <fn> ... --set-secrets="GEMINI_API_KEY=gemini-api-key:latest"`. Debugging "AI не ответил": `docs/cloud-functions-diagnostics.md` (server) + `docs/client-diagnostics.md` (client HTTP layer).
+All AI inference is server-side (`analyze_and_fill_checklist`, `generate_checklist`, `chat_completion`, `classify_chat_intent`, `transcribe_audio`) in `aichecklists-40230`. Client holds **zero** Gemini credentials. Deploy with `gcloud functions deploy <fn> ... --update-secrets="GEMINI_API_KEY=gemini-api-key:latest"` (as `firebase-functions/deploy.sh` does) — the replace-all `set` variant wipes the service's other secrets. Debugging "AI не ответил": `docs/cloud-functions-diagnostics.md` (server) + `docs/client-diagnostics.md` (client HTTP layer).

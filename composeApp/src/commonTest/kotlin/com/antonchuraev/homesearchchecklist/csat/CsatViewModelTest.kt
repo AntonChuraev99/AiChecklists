@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -56,10 +57,15 @@ class CsatViewModelTest {
      * [CsatManager.startObserving] exits early when analyticsTracker is not
      * [ObservableAnalyticsTracker], so the auto-show delay never fires — tests
      * are fully deterministic.
+     *
+     * The DataStore runs in the test's [TestScope.backgroundScope], not in the factory's default
+     * `CoroutineScope(Dispatchers.IO + SupervisorJob())`: a write left on that real IO pool outlives
+     * the test, resumes the VM on `Dispatchers.Main` after [tearDown] has reset it, and surfaces as
+     * `UncaughtExceptionsBeforeTest` in whichever unrelated `runTest` the JVM runs next.
      */
-    private fun createViewModel(): CsatViewModel {
+    private fun TestScope.createViewModel(): CsatViewModel {
         val datastore = AppDatastore(
-            PreferenceDataStoreFactory.createWithPath {
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
                 "build/csat_test_prefs_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher,

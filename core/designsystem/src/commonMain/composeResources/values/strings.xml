@@ -2074,4 +2074,46 @@
         <item quantity="one">%1$d second</item>
         <item quantity="other">%1$d seconds</item>
     </plurals>
+    <!-- Telegram bot account linking (docs/designs/telegram-screen-2026-11-19/spec.md) -->
+    <string name="drawer_item_telegram">Telegram</string>
+    <string name="telegram_title">Telegram</string>
+    <string name="telegram_hero_title">Your checklists in Telegram</string>
+    <string name="telegram_hero_body">Send anything to the Gisti bot and get a checklist — on the same account as the app.</string>
+    <string name="telegram_benefit_capture">Send a note, photo or voice — get a checklist</string>
+    <string name="telegram_benefit_lists">Open and tick off your lists right in the chat</string>
+    <string name="telegram_benefit_sync">One account — everything syncs with the app</string>
+    <string name="telegram_signin_title">Sign in to connect Telegram</string>
+    <string name="telegram_signin_body">The bot uses your Google account, so your checklists stay the same everywhere.</string>
+    <string name="telegram_signin_cta">Sign in</string>
+    <string name="telegram_connect_cta">Connect Telegram</string>
+    <string name="telegram_connect_hint">Opens Telegram. Tap Start in the bot to finish.</string>
+    <string name="telegram_pending_title">Waiting for Telegram</string>
+    <string name="telegram_pending_step_open">Open the Gisti bot in Telegram</string>
+    <string name="telegram_pending_step_start">Tap Start</string>
+    <string name="telegram_pending_body">We'll update this screen once you're connected.</string>
+    <string name="telegram_pending_open_cta">Open Telegram</string>
+    <string name="telegram_pending_check_cta">Check again</string>
+    <string name="telegram_pending_not_yet">Not connected yet. Tap Start in the bot, then check again.</string>
+    <string name="telegram_linked_since">Connected since %1$s</string>
+    <!-- %1$s = localized day + month (due_date), %2$s = year. Order is locale data, not Kotlin. -->
+    <string name="telegram_linked_date">%1$s, %2$s</string>
+    <string name="telegram_linked_no_username">Telegram account</string>
+    <string name="telegram_status_cd">Telegram connected as %1$s since %2$s</string>
+    <string name="telegram_open_bot_cta">Open bot</string>
+    <string name="telegram_disconnect_cta">Disconnect</string>
+    <string name="telegram_disconnecting">Disconnecting…</string>
+    <string name="telegram_disconnect_dialog_title">Disconnect Telegram?</string>
+    <string name="telegram_disconnect_dialog_body">The bot will stop working with your account. Your checklists stay in the app.</string>
+    <string name="telegram_disconnect_confirm">Disconnect</string>
+    <string name="telegram_disconnected_snackbar">Telegram disconnected</string>
+    <string name="telegram_disconnect_failed">Couldn't disconnect. Try again.</string>
+    <string name="telegram_linked_snackbar">Telegram connected: @%1$s</string>
+    <string name="telegram_linked_snackbar_plain">Telegram connected</string>
+    <string name="telegram_error_network">Couldn't reach Gisti. Check your connection and try again.</string>
+    <string name="telegram_error_server">Something went wrong on our side. Try again in a moment.</string>
+    <string name="telegram_error_account">We couldn't find your account. Sign out, sign in again, then retry.</string>
+    <string name="telegram_retry">Try again</string>
+    <string name="telegram_open_failed">Couldn't open Telegram on this device.</string>
+    <string name="telegram_link_expired">This link has expired. Send /start to the bot to get a new one.</string>
+    <string name="telegram_link_failed">Couldn't connect Telegram. Open the link from the bot again.</string>
 </resources>

@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gisti-telegram",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Same Cloudflare account as gisti-mcp (gisti-ai.com zone owner). Pinned so a wrangler logged
+  // into another account cannot deploy this worker there — run `npx wrangler@4 whoami` first.
+  "account_id": "2c9dfaadbca94b44f59f13dbf70519d7",
+  "durable_objects": {
+    "bindings": [{ "name": "TELEGRAM_CHAT", "class_name": "TelegramChat" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TelegramChat"] }],
+  "vars": {
+    "CF_BASE_URL": "https://us-central1-aichecklists-40230.cloudfunctions.net"
+  },
+  // Secrets (wrangler secret put, never committed):
+  //   TELEGRAM_BOT_TOKEN       — BotFather token; webhook secret + internal CF key are derived from it
+  //   FIREBASE_SERVICE_ACCOUNT — service-account JSON key, one string (same format as gisti-mcp)
+  //   AMPLITUDE_SERVER_API_KEY — optional, Amplitude project key; unset → tg_* analytics off
+  "observability": { "enabled": true }
+}

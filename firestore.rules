@@ -44,6 +44,23 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Telegram account linking — SERVER-ONLY. Written exclusively by the Python Cloud Functions
+    // telegram_account / telegram_bot_internal (Admin SDK, bypasses these rules) and read by the
+    // gisti-telegram worker with a service account. Spelled out although the default deny above
+    // already covers them: a link token is a one-time credential (stored only as its sha256) and
+    // a link doc maps a Telegram id to an account, so no future broad rule may open either.
+    match /telegram_link_tokens/{tokenHash} {
+      allow read, write: if false;
+    }
+    match /telegram_links/{telegramUserId} {
+      allow read, write: if false;
+    }
+    // Telegram Stars payments — idempotency key + audit (telegram_bot_internal, Admin SDK only).
+    // Money records: no client may read another user's payments or forge an "applied" one.
+    match /telegram_payments/{chargeId} {
+      allow read, write: if false;
+    }
+
     // Existing collections used by Cloud Functions (server-side access via Admin SDK)
     // usage, credits_restore_log, credits_refill_log, premium_events_log,
     // rc_customers, rc_events — accessed only by Admin SDK, default deny is correct.

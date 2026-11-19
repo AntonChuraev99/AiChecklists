@@ -1838,4 +1838,46 @@
         <item quantity="many">%1$d секунд</item>
         <item quantity="other">%1$d секунды</item>
     </plurals>
+    <!-- Telegram bot account linking (docs/designs/telegram-screen-2026-11-19/spec.md) -->
+    <string name="drawer_item_telegram">Telegram</string>
+    <string name="telegram_title">Telegram</string>
+    <string name="telegram_hero_title">Ваши чек-листы в Telegram</string>
+    <string name="telegram_hero_body">Отправьте боту Gisti что угодно — и получите чек-лист в том же аккаунте, что и в приложении.</string>
+    <string name="telegram_benefit_capture">Заметка, фото или голос — и готов чек-лист</string>
+    <string name="telegram_benefit_lists">Открывайте списки и отмечайте пункты прямо в чате</string>
+    <string name="telegram_benefit_sync">Один аккаунт — всё синхронизируется с приложением</string>
+    <string name="telegram_signin_title">Войдите, чтобы подключить Telegram</string>
+    <string name="telegram_signin_body">Бот работает с вашим аккаунтом Google — чек-листы везде одни и те же.</string>
+    <string name="telegram_signin_cta">Войти</string>
+    <string name="telegram_connect_cta">Подключить Telegram</string>
+    <string name="telegram_connect_hint">Откроется Telegram. Нажмите «Запустить» в боте, чтобы завершить.</string>
+    <string name="telegram_pending_title">Ждём вас в Telegram</string>
+    <string name="telegram_pending_step_open">Откройте бота Gisti в Telegram</string>
+    <string name="telegram_pending_step_start">Нажмите «Запустить»</string>
+    <string name="telegram_pending_body">Экран обновится сам, когда всё подключится.</string>
+    <string name="telegram_pending_open_cta">Открыть Telegram</string>
+    <string name="telegram_pending_check_cta">Проверить ещё раз</string>
+    <string name="telegram_pending_not_yet">Пока не подключено. Нажмите «Запустить» в боте и проверьте ещё раз.</string>
+    <string name="telegram_linked_since">Подключено с %1$s</string>
+    <!-- %1$s = число и месяц (due_date, родительный падеж), %2$s = год. -->
+    <string name="telegram_linked_date">%1$s %2$s г.</string>
+    <string name="telegram_linked_no_username">Аккаунт Telegram</string>
+    <string name="telegram_status_cd">Telegram подключён: %1$s, с %2$s</string>
+    <string name="telegram_open_bot_cta">Открыть бота</string>
+    <string name="telegram_disconnect_cta">Отключить</string>
+    <string name="telegram_disconnecting">Отключаем…</string>
+    <string name="telegram_disconnect_dialog_title">Отключить Telegram?</string>
+    <string name="telegram_disconnect_dialog_body">Бот перестанет работать с вашим аккаунтом. Чек-листы останутся в приложении.</string>
+    <string name="telegram_disconnect_confirm">Отключить</string>
+    <string name="telegram_disconnected_snackbar">Telegram отключён</string>
+    <string name="telegram_disconnect_failed">Не удалось отключить. Попробуйте ещё раз.</string>
+    <string name="telegram_linked_snackbar">Telegram подключён: @%1$s</string>
+    <string name="telegram_linked_snackbar_plain">Telegram подключён</string>
+    <string name="telegram_error_network">Не удалось связаться с Gisti. Проверьте интернет и попробуйте ещё раз.</string>
+    <string name="telegram_error_server">Что-то пошло не так на нашей стороне. Попробуйте чуть позже.</string>
+    <string name="telegram_error_account">Не нашли ваш аккаунт. Выйдите, войдите снова и повторите.</string>
+    <string name="telegram_retry">Повторить</string>
+    <string name="telegram_open_failed">Не удалось открыть Telegram на этом устройстве.</string>
+    <string name="telegram_link_expired">Ссылка устарела. Отправьте боту /start, чтобы получить новую.</string>
+    <string name="telegram_link_failed">Не удалось подключить Telegram. Откройте ссылку из бота ещё раз.</string>
 </resources>

@@ -10,6 +10,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsUtm
 import com.antonchuraev.homesearchchecklist.deeplink.GalleryDeepLink
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.di.appModule
+import com.antonchuraev.homesearchchecklist.telegram.PendingTelegramLink
+import com.antonchuraev.homesearchchecklist.telegram.TelegramConfig
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.koin.core.context.startKoin
@@ -80,6 +82,18 @@ fun main() {
         // The holder already has the link, so clearing the URL cannot lose it.
         window.history.replaceState(null, "", window.location.pathname)
     }
+
+    // Telegram bot sign-in link (https://app.gisti-ai.com/?tg_link=<token>): hand the one-time token
+    // to PendingTelegramLink; App.kt waits for Google sign-in, claims it and shows the outcome. The
+    // marker is stripped right away for the same reasons as the gallery link above, plus one more:
+    // the token is a credential and must not linger in the address bar, history or a shared URL.
+    parseQuery(window.location.search)[TelegramConfig.TG_LINK_QUERY_PARAM]
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { token ->
+            koin.get<PendingTelegramLink>().submit(token)
+            window.history.replaceState(null, "", window.location.pathname)
+        }
 
     // Teach the singleton Coil ImageLoader how to read "opfs://..." attachment paths
     // (OPFS-backed image previews). setSafe never overwrites an already-created loader,

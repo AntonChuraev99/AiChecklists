@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Campaign
@@ -70,6 +71,7 @@ import aichecklists.core.designsystem.generated.resources.nav_ai_chat
 import aichecklists.core.designsystem.generated.resources.drawer_account
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
 import aichecklists.core.designsystem.generated.resources.drawer_item_mcp
+import aichecklists.core.designsystem.generated.resources.drawer_item_telegram
 import aichecklists.core.designsystem.generated.resources.drawer_sign_in
 import aichecklists.core.designsystem.generated.resources.drawer_sign_out
 import aichecklists.core.designsystem.generated.resources.today_title
@@ -106,6 +108,7 @@ object DrawerDestination {
     const val Calendar = "calendar"
     const val AiChat = "ai_chat"
     const val Mcp = "mcp"
+    const val Telegram = "telegram"
 }
 
 /**
@@ -122,6 +125,22 @@ internal fun safeOpenUri(uriHandler: UriHandler, logger: AppLogger, url: String)
         .onFailure { logger.warning("DrawerLink", "openUri failed for $url: ${it.message}") }
 }
 
+/**
+ * [safeOpenUri] for callers that must tell the user when nothing could open the link (the Telegram
+ * screen's `telegram_open_failed`). Returns true when [UriHandler.openUri] returned normally.
+ *
+ * ⚠️ True means "no handler threw", not "the target app is on screen": a browser that swallows the
+ * URL, or a web popup blocker (window.open returning null without throwing), still yields true.
+ *
+ * Logged as an error (not a warning like the drawer variant): here the failure is a dead action the
+ * user tapped, and the throwable reaches Crashlytics.
+ */
+internal fun safeOpenUriResult(uriHandler: UriHandler, logger: AppLogger, url: String, tag: String): Boolean =
+    runCatching { uriHandler.openUri(url) }
+        // Query stripped: it can carry a one-time link token, which must not reach Crashlytics.
+        .onFailure { logger.error(tag, "openUri failed for ${url.substringBefore('?')}: ${it.message}", it) }
+        .isSuccess
+
 @Composable
 fun AppNavigationDrawerContent(
     selectedItemId: String,
@@ -131,6 +150,7 @@ fun AppNavigationDrawerContent(
     onCalendarClick: () -> Unit = {},
     onAiChatClick: () -> Unit = {},
     onMcpClick: () -> Unit = {},
+    onTelegramClick: () -> Unit = {},
     onUpdateFeedClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onRateAppClick: () -> Unit,
@@ -271,6 +291,17 @@ fun AppNavigationDrawerContent(
             onClick = {
                 onCloseDrawer()
                 onMcpClick()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.padding(itemPadding)
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.drawer_item_telegram)) },
+            icon = { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null) },
+            selected = selectedItemId == DrawerDestination.Telegram,
+            onClick = {
+                onCloseDrawer()
+                onTelegramClick()
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(itemPadding)

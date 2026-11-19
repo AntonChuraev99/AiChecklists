@@ -975,6 +975,27 @@ object AnalyticsEvents {
          */
         const val INSTALL_ATTRIBUTED = "install_attributed"
     }
+
+    // ─── Telegram bot account link (composeApp/commonMain/telegram) ──────────
+    object Telegram {
+        /** The Telegram screen was entered (every push of the route). */
+        const val SCREEN_OPENED = "telegram_screen_opened"
+
+        /** Connect tapped on the screen (fires per tap, whether or not the link token was ready). */
+        const val CONNECT_TAPPED = "telegram_connect_tapped"
+
+        /**
+         * The account became linked. Param [AnalyticsParams.SOURCE] = [SOURCE_SCREEN] (Pending →
+         * Linked on the screen) | [SOURCE_WEB_LINK] (`?tg_link` claim). Exactly one per link.
+         */
+        const val LINK_COMPLETED = "telegram_link_completed"
+
+        /** Disconnect confirmed and `unlink` succeeded. */
+        const val UNLINKED = "telegram_unlinked"
+
+        const val SOURCE_SCREEN = "screen"
+        const val SOURCE_WEB_LINK = "web_link"
+    }
 }
 
 /**

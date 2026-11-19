@@ -1915,4 +1915,46 @@
         <item quantity="one">%1$d सेकंड</item>
         <item quantity="other">%1$d सेकंड</item>
     </plurals>
+    <!-- Telegram bot account linking (docs/designs/telegram-screen-2026-11-19/spec.md) -->
+    <string name="drawer_item_telegram">Telegram</string>
+    <string name="telegram_title">Telegram</string>
+    <string name="telegram_hero_title">आपकी चेकलिस्ट अब Telegram में</string>
+    <string name="telegram_hero_body">Gisti बॉट को कुछ भी भेजें और चेकलिस्ट पाएं — उसी अकाउंट पर जो ऐप में है।</string>
+    <string name="telegram_benefit_capture">नोट, फ़ोटो या वॉइस भेजें — चेकलिस्ट तैयार</string>
+    <string name="telegram_benefit_lists">चैट में ही अपनी लिस्ट खोलें और टिक करें</string>
+    <string name="telegram_benefit_sync">एक ही अकाउंट — सब कुछ ऐप के साथ सिंक</string>
+    <string name="telegram_signin_title">Telegram जोड़ने के लिए साइन इन करें</string>
+    <string name="telegram_signin_body">बॉट आपके Google अकाउंट से काम करता है, इसलिए आपकी चेकलिस्ट हर जगह एक जैसी रहती हैं।</string>
+    <string name="telegram_signin_cta">साइन इन करें</string>
+    <string name="telegram_connect_cta">Telegram जोड़ें</string>
+    <string name="telegram_connect_hint">Telegram खुलेगा। पूरा करने के लिए बॉट में Start दबाएं।</string>
+    <string name="telegram_pending_title">Telegram का इंतज़ार है</string>
+    <string name="telegram_pending_step_open">Telegram में Gisti बॉट खोलें</string>
+    <string name="telegram_pending_step_start">Start दबाएं</string>
+    <string name="telegram_pending_body">जुड़ते ही यह स्क्रीन अपने आप अपडेट हो जाएगी।</string>
+    <string name="telegram_pending_open_cta">Telegram खोलें</string>
+    <string name="telegram_pending_check_cta">फिर से जांचें</string>
+    <string name="telegram_pending_not_yet">अभी जुड़ा नहीं है। बॉट में Start दबाएं, फिर दोबारा जांचें।</string>
+    <string name="telegram_linked_since">%1$s से जुड़ा हुआ</string>
+    <!-- %1$s = day + month (due_date), %2$s = year. -->
+    <string name="telegram_linked_date">%1$s %2$s</string>
+    <string name="telegram_linked_no_username">Telegram अकाउंट</string>
+    <string name="telegram_status_cd">Telegram %1$s के रूप में %2$s से जुड़ा है</string>
+    <string name="telegram_open_bot_cta">बॉट खोलें</string>
+    <string name="telegram_disconnect_cta">डिस्कनेक्ट करें</string>
+    <string name="telegram_disconnecting">डिस्कनेक्ट हो रहा है…</string>
+    <string name="telegram_disconnect_dialog_title">Telegram डिस्कनेक्ट करें?</string>
+    <string name="telegram_disconnect_dialog_body">बॉट आपके अकाउंट के साथ काम करना बंद कर देगा। आपकी चेकलिस्ट ऐप में बनी रहेंगी।</string>
+    <string name="telegram_disconnect_confirm">डिस्कनेक्ट करें</string>
+    <string name="telegram_disconnected_snackbar">Telegram डिस्कनेक्ट हो गया</string>
+    <string name="telegram_disconnect_failed">डिस्कनेक्ट नहीं हो सका। फिर से कोशिश करें।</string>
+    <string name="telegram_linked_snackbar">Telegram जुड़ गया: @%1$s</string>
+    <string name="telegram_linked_snackbar_plain">Telegram जुड़ गया</string>
+    <string name="telegram_error_network">Gisti से कनेक्ट नहीं हो सका। अपना इंटरनेट जांचें और फिर से कोशिश करें।</string>
+    <string name="telegram_error_server">हमारी तरफ़ से कुछ गड़बड़ हुई। थोड़ी देर बाद फिर कोशिश करें।</string>
+    <string name="telegram_error_account">आपका अकाउंट नहीं मिला। साइन आउट करके फिर से साइन इन करें, फिर दोबारा कोशिश करें।</string>
+    <string name="telegram_retry">फिर से कोशिश करें</string>
+    <string name="telegram_open_failed">इस डिवाइस पर Telegram नहीं खुल सका।</string>
+    <string name="telegram_link_expired">यह लिंक एक्सपायर हो गया है। नया लिंक पाने के लिए बॉट को /start भेजें।</string>
+    <string name="telegram_link_failed">Telegram नहीं जुड़ सका। बॉट से लिंक फिर से खोलें।</string>
 </resources>
