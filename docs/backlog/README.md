@@ -49,7 +49,8 @@ project: gisti-ai-checklists
 | [feature-catalog-coverage-gaps](2026-08-03-feature-catalog-coverage-gaps.md) | Чат не знает про 5 своих же зарелиженных фич | medium |
 | [play-services-auth-22-legacy-signin](2026-10-23-play-services-auth-22-legacy-signin.md) | play-services-auth 22 удаляет `GoogleSignIn`, поэтому legacy-fallback входа держит библиотеку на 21.x | low |
 | [python-handler-tests-expect-tuple-return](2026-08-03-python-handler-tests-expect-tuple-return.md) | 5 тестов Cloud Functions падают на чистом `master` | low |
-| [reminder-list-key-collisions-followups](2026-11-19-reminder-list-key-collisions-followups.md) | Три находки ревью vc92 того же класса, что FATAL дубля ключа: `interval = 0`, дубли `itemId`, ключ Calendar без `fillId` | medium || [telegram-bot-reminders](2026-08-03-telegram-bot-reminders.md) | Напоминания сообщением от ТГ-бота (ориентир Toki). Упирается в отсутствие СЕРВЕРНОГО планировщика: сейчас напоминания на AlarmManager устройства | medium |
+| [reminder-list-key-collisions-followups](2026-11-19-reminder-list-key-collisions-followups.md) | Три находки ревью vc92 того же класса, что FATAL дубля ключа: `interval = 0`, дубли `itemId`, ключ Calendar без `fillId` | medium |
+| [telegram-bot-reminders](2026-08-03-telegram-bot-reminders.md) | Напоминания сообщением от ТГ-бота (ориентир Toki). Упирается в отсутствие СЕРВЕРНОГО планировщика: сейчас напоминания на AlarmManager устройства | medium |
 
 ⚠️ **Таблица выше — ручной индекс, а значит кандидат на тот же дрейф, из-за которого этот каталог
 и появился.** Прецедент уже есть: `docs/todos/INDEX.md` отстал на ~15 записей. Перед тем как
