@@ -38,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
@@ -57,6 +56,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
+import com.antonchuraev.homesearchchecklist.integrations.IntegrationNoteRow
+import com.antonchuraev.homesearchchecklist.integrations.ValuePropRow
 import com.antonchuraev.homesearchchecklist.navigation.safeOpenUri
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.mcp_cta_guide
@@ -120,7 +121,7 @@ fun McpScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun McpContent(
+internal fun McpContent(
     onCopyEndpoint: () -> Unit,
     onOpenGuide: () -> Unit,
 ) {
@@ -209,55 +210,10 @@ private fun HeroSparkleTile() {
     }
 }
 
-/** Icon-tile + label row. Tile is monochrome (primaryContainer), icon decorative. */
-@Composable
-private fun ValuePropRow(icon: ImageVector, label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-        )
-    }
-}
-
 /** Small cloud-synced caption under the value props. */
 @Composable
 private fun SyncCaption(text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.CloudDone,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    IntegrationNoteRow(icon = Icons.Outlined.CloudDone, text = text)
 }
 
 /**
@@ -311,20 +267,5 @@ private fun EndpointCard(onCopy: () -> Unit) {
 /** "Requires signing in with Google" footnote. */
 @Composable
 private fun RequiresGoogleNote() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Info,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            text = stringResource(Res.string.mcp_requires_google),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    IntegrationNoteRow(icon = Icons.Outlined.Info, text = stringResource(Res.string.mcp_requires_google))
 }

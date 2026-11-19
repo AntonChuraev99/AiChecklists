@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-11-17_
+_Last updated: 2026-11-19_
 
 Быстрый поиск по 93 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-11-19 | decision | telegram, stars, XTR, premium, verify_premium, anti-steering, refund | [Премиум за Telegram Stars — второй канал оплаты, общий на все платформы](../decisions/2026-11-19-telegram-stars-second-billing-channel.md) |
 | 2026-11-17 | decision | generate_checklist, item-count, prompts_private, onboarding, analyze, prompt | [Размер AI-чек-листа: из идеи 8–12 пунктов, из источника — все](../decisions/2026-11-17-ai-checklist-size-from-idea.md) |
 | 2026-11-16 | pattern | theme, edge-to-edge, navigationBars, AppScaffold, bottomBarInsetColor, titleRevealedOnScroll, derivedStateOf | [AppScaffold: полоса навбара под bottomBar не красится; название в toolbar при скролле](appscaffold-bottombar-inset-strip-and-title-reveal-2026-11-16.md) |
 | 2026-11-16 | pattern | layout-debug, LayoutDebugBridge, LocalInspectionTables, SubcomposeLayout, ui-tooling, debug-source-set, ServerSocket | [Агент layout-debug в debug-сборке Android: мост в androidMain, сервер в src/debug, только loopback](layout-debug-agent-android-2026-11-16.md) |

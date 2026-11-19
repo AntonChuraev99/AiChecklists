@@ -76,6 +76,29 @@ endpoints:
     region: us-central1
     platform: gcfv2
 
+  # Telegram bot account linking (phase 1). Both read the bot token from Secret Manager.
+  telegram_account:
+    entryPoint: telegram_account
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+    availableMemoryMb: 512
+    secretEnvironmentVariables:
+      - key: TELEGRAM_BOT_TOKEN
+        secret: telegram-bot-token
+
+  telegram_bot_internal:
+    entryPoint: telegram_bot_internal
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+    availableMemoryMb: 512
+    secretEnvironmentVariables:
+      - key: TELEGRAM_BOT_TOKEN
+        secret: telegram-bot-token
+      - key: REVENUECAT_API_KEY
+        secret: revenuecat-api-key
+
   on_rc_event_created:
     entryPoint: on_rc_event_created
     eventTrigger:

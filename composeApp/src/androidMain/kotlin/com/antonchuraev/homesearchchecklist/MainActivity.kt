@@ -38,6 +38,8 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPu
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.deeplink.GalleryDeepLink
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
+import com.antonchuraev.homesearchchecklist.telegram.PendingTelegramLink
+import com.antonchuraev.homesearchchecklist.telegram.TelegramConfig
 import com.antonchuraev.homesearchchecklist.layoutdebug.LayoutDebugRoot
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
     private val retentionPrefs: RetentionPrefs by inject()
     private val logger: AppLogger by inject()
     private val pendingGalleryDeepLink: PendingGalleryDeepLink by inject()
+    private val pendingTelegramLink: PendingTelegramLink by inject()
     private val debugMenuDetector = if (AppBuildConfig.isDebug) {
         DebugMenuDetector { appNavigator.navigateToDebugMenu() }
     } else {
@@ -154,6 +157,9 @@ class MainActivity : ComponentActivity() {
         // re-submit is indistinguishable from a genuinely new tap at that layer.
         if (savedInstanceState == null) {
             submitGalleryDeepLinkIfPresent(intent)
+            // Same guard, same reason: a recreate re-delivers the launch intent, and re-submitting a
+            // spent tg_link token would answer a successful link with "expired".
+            submitTelegramLinkIfPresent(intent)
         }
 
         setContent {
@@ -332,6 +338,7 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val RETENTION_TAG = "Retention"
         const val PUSH_TAG = "PushToken"
+        const val TELEGRAM_LINK_HOST = "app.gisti-ai.com"
 
         /** Outlives any single Activity instance; the writes are tiny and fire-and-forget. */
         val retentionWriteScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -358,6 +365,7 @@ class MainActivity : ComponentActivity() {
         // Warm start from a gallery App Link — submit the slug; App.kt's collector re-fires on the
         // distinct value and invokes the create-from-template UseCase.
         submitGalleryDeepLinkIfPresent(intent)
+        submitTelegramLinkIfPresent(intent)
         // Warm-start push tap: emit push_opened. Cold vs warm are mutually exclusive per tap
         // (onCreate handles cold, onNewIntent handles warm), so this fires exactly once.
         emitPushOpenedIfPresent(intent)
@@ -405,6 +413,20 @@ class MainActivity : ComponentActivity() {
                 utm = AnalyticsUtm.from { key -> uri.getQueryParameter(key) },
             )
         )
+    }
+
+    /**
+     * App Link entry for the Telegram bot's sign-in link `https://app.gisti-ai.com/?tg_link=<token>`.
+     * The manifest already claims the whole `app.gisti-ai.com` host (see the gallery link above), so
+     * no manifest change is needed — the query is inspected here. The token goes to
+     * [PendingTelegramLink]; App.kt claims it after Google sign-in.
+     */
+    private fun submitTelegramLinkIfPresent(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.host != TELEGRAM_LINK_HOST) return
+        val token = uri.getQueryParameter(TelegramConfig.TG_LINK_QUERY_PARAM)?.trim()
+            ?.takeIf { it.isNotEmpty() } ?: return
+        pendingTelegramLink.submit(token)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

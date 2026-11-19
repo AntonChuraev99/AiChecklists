@@ -172,6 +172,40 @@ gcloud functions deploy link_google_account \
     --memory=512MB \
     --timeout=30s
 
+# ── Telegram bot account linking (phase 1) ──────────────────────────────────
+# telegram_account      — app / web (Firebase ID token); best-effort Bot API notice on unlink.
+# telegram_bot_internal — the gisti-telegram worker (X-Gisti-Internal-Key derived from the token).
+# Both read TELEGRAM_BOT_TOKEN from Secret Manager `telegram-bot-token` (created 2026-11-19, not by
+# this script). --update-secrets merges; the replace-all set-variant would wipe the other secrets
+# of the service.
+echo "Deploying telegram_account..."
+gcloud functions deploy telegram_account \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=telegram_account \
+    --trigger-http \
+    --allow-unauthenticated \
+    --update-secrets="TELEGRAM_BOT_TOKEN=telegram-bot-token:latest" \
+    --memory=512MB \
+    --timeout=30s
+
+# Phase 3 (Stars): premium_status / revoke_payment ask RevenueCat whether the store pays for
+# premium (verify_store_premium) — without REVENUECAT_API_KEY only the rc_customers mirror is read.
+echo "Deploying telegram_bot_internal..."
+gcloud functions deploy telegram_bot_internal \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=telegram_bot_internal \
+    --trigger-http \
+    --allow-unauthenticated \
+    --update-secrets="TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,REVENUECAT_API_KEY=revenuecat-api-key:latest" \
+    --memory=512MB \
+    --timeout=30s
+
 # ── AI Chat functions (all use GEMINI_API_KEY) ──────────────────────────────
 
 # Deploy classify_chat_intent (Layer 2 — cheap classifier)
@@ -261,6 +295,8 @@ echo "  voice_session: https://$REGION-$PROJECT_ID.cloudfunctions.net/voice_sess
 echo "  transcribe_audio: https://$REGION-$PROJECT_ID.cloudfunctions.net/transcribe_audio"
 echo "  send_promotions_batch: https://$REGION-$PROJECT_ID.cloudfunctions.net/send_promotions_batch"
 echo "  register_push_token: https://$REGION-$PROJECT_ID.cloudfunctions.net/register_push_token"
+echo "  telegram_account: https://$REGION-$PROJECT_ID.cloudfunctions.net/telegram_account"
+echo "  telegram_bot_internal: https://$REGION-$PROJECT_ID.cloudfunctions.net/telegram_bot_internal"
 
 # ============================================================================
 # Cloud Scheduler — promotional push (CONFIG ONLY, DO NOT auto-run).

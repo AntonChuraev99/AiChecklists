@@ -135,6 +135,14 @@ sealed interface AppNavRoute : NavKey {
     @Serializable
     data object Mcp : AppNavRoute
 
+    /**
+     * "Telegram" account-link screen (bot @gisti_app_bot). Same placement as [Mcp]: a pushed
+     * read-and-return detail page from the drawer / v2 Overview, also opened by the `?tg_link`
+     * sign-in link handler in App.kt.
+     */
+    @Serializable
+    data object Telegram : AppNavRoute
+
     @Serializable
     data object Onboardings : AppNavRoute
 

@@ -49,6 +49,7 @@ from credits_logic import reservation_decision  # local module: reserve-credits 
 from chat_agent_logic import scan_current_turn  # local module: chat_agent turn boundary (unit-testable)
 import voice_logic  # local module: voice-call minutes / session / rate-limit decisions (unit-testable)
 import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
+import telegram_link  # local module: Telegram account link tokens / 1:1 link transaction (unit-testable)
 
 # Module logger — replaces bare print(); logger.exception() in except blocks emits the
 # traceback to Cloud Logging stderr so real 5xx causes are no longer invisible.
@@ -646,14 +647,34 @@ def verify_premium_from_firestore(user_id: str) -> str:
 
 def verify_premium(user_id: str) -> str:
     """
-    Premium verification with defence-in-depth:
+    Premium = store (RevenueCat) OR Telegram Stars (telegram_premium_until > now).
+
+    The store chain (verify_store_premium) runs first and its answer is returned unchanged for
+    everyone without an active Telegram subscription. Only when the store does not verify is the
+    credit doc read for telegram_premium_until — without this, refill_premium_credits would flip
+    is_premium to false on every Stars buyer the next morning.
+
+    Callsites: restore_credits_after_purchase, refill_premium_credits.
+    """
+    store_result = verify_store_premium(user_id)
+    if store_result == VERIFIED:
+        return VERIFIED
+    if telegram_link.telegram_premium_active(get_user_data(user_id), datetime.now(timezone.utc)):
+        return VERIFIED
+    return store_result
+
+
+def verify_store_premium(user_id: str) -> str:
+    """
+    Store (RevenueCat) premium verification with defence-in-depth:
     1. Read from Firestore (rc_customers/{user_id}) — fast, no external call,
        race-condition-free because the Extension writes before webhook ACK.
     2. Fall back to RevenueCat REST when Firestore has no active record. This
        protects against (a) extension not yet installed, (b) transient sync
        lag, (c) historical users created before the extension went live.
 
-    Callsites: restore_credits_after_purchase, refill_premium_credits.
+    Callsites: verify_premium; the Telegram bot's premium_status / revoke_payment (which must
+    tell a store subscriber apart from a Stars one).
     """
     firestore_result = verify_premium_from_firestore(user_id)
     if firestore_result == VERIFIED:
@@ -1521,7 +1542,10 @@ def generate_checklist(request: Request):
         "is_premium": boolean (optional),
         "prompt": "string (user's description of what checklist they need)",
         "input_type": "text" | "url" | "image_base64" | "audio_base64" | "none" (optional),
-        "input_data": "string (additional context data, base64 image, or base64 audio)" (optional)
+        "input_data": "string (additional context data, base64 image, or base64 audio)" (optional),
+        "mime_type": "audio/ogg | audio/mpeg | ..." (optional; audio_base64 only — normalized by
+                     normalize_audio_mime, absent = audio/mp4. The Telegram bot sends OGG/Opus
+                     voice notes; the app does not send it.)
     }
 
     Response:
@@ -1607,13 +1631,23 @@ def generate_checklist(request: Request):
     model_id, model_arm = resolve_experiment_model(user_id, "generate", "gemini-3.5-flash-lite", data)
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "generate"}
 
+    # Audio container: the Telegram bot sends OGG/Opus voice notes and says so in `mime_type`.
+    # The app sends no mime_type, which normalizes to call_gemini's own default (audio/mp4), so
+    # app traffic is unchanged. Non-audio calls keep call_gemini's signature exactly as before.
+    gemini_kwargs = {"model_id": model_id}
+    if input_type == "audio_base64":
+        raw_mime = data.get("mime_type")
+        gemini_kwargs["audio_mime_type"] = normalize_audio_mime(
+            raw_mime if isinstance(raw_mime, str) else ""
+        )
+
     # An empty or non-JSON completion is a transient generation blip, not a property of the
     # input — retry the SAME call ONCE before failing the request (prod: three 500s in eleven
     # seconds for one user, all "Expecting value: line 1 column 1 (char 0)"). The final parse
     # error is re-raised into the handler below, so the refund stays in one place per outcome.
     try:
         for attempt in (1, 2):
-            response = call_gemini(prompt, input_type, input_data, model_id=model_id)
+            response = call_gemini(prompt, input_type, input_data, **gemini_kwargs)
             try:
                 result = parse_gemini_json(response.text)
                 break
@@ -2361,6 +2395,12 @@ def _handle_rc_event_payload(data: dict, event_id: str | None) -> None:
                     "credits_restored_at": now_iso,
                     "updated_at": now_iso,
                 })
+        elif event_type in _RC_REVOKE_EVENT_TYPES and telegram_link.telegram_premium_active(prev, now_dt):
+            # The store subscription ended, but a Telegram Stars subscription still pays for
+            # premium on the same credit doc: leave is_premium alone. When the Telegram period
+            # runs out, the daily refill (verify_premium -> NOT_VERIFIED) clears it.
+            logger.info("on_rc_event_created: %s kept premium — Telegram subscription active",
+                        event_type)
         elif event_type in _RC_REVOKE_EVENT_TYPES:
             # Credits stay untouched on revoke — the user keeps what they have
             # until the next daily refill cycle, which will see is_premium=False.
@@ -4423,3 +4463,281 @@ def voice_session(request: Request):
     except Exception:
         logger.exception("voice_session: %s failed for user=%s", action, user_id[:8])
         return create_error_response("Voice session step failed", 500)
+
+
+# ============================================================================
+# Telegram bot — account linking (phase 1)
+#
+# Two thin HTTP shells over telegram_link.py (pure decisions + the one link transaction):
+#   telegram_account       app / web caller, authenticated ONLY by a Firebase ID token
+#   telegram_bot_internal  the gisti-telegram worker, authenticated ONLY by X-Gisti-Internal-Key
+# Spec: docs/active/telegram-bot-phase1-2026-11-19.md. Link state lives in server-only
+# collections (firestore.rules denies telegram_link_tokens / telegram_links to every client).
+# Never log a raw link token, the bot token or the internal key.
+# ============================================================================
+
+_TELEGRAM_ACCOUNT_ACTIONS = ("create_token", "claim", "status", "unlink")
+_TELEGRAM_INTERNAL_ACTIONS = (
+    "consume_app_token", "create_login_token", "unlink",
+    # Phase 3 — Stars subscription
+    "premium_status", "apply_payment", "subscription_update", "revoke_payment",
+)
+
+
+def _store_premium_for_bot(credit_user_id: str):
+    """RevenueCat-only premium as True / False / None (unreachable) for telegram_link."""
+    return {VERIFIED: True, NOT_VERIFIED: False}.get(verify_store_premium(credit_user_id))
+
+
+def _telegram_price_stars() -> int:
+    return telegram_link.price_stars_or_default(
+        get_remote_config_value("telegram_premium_price_stars", telegram_link.DEFAULT_PRICE_STARS)
+    )
+
+
+def _telegram_now() -> datetime:
+    """Server clock for token expiry and link timestamps. A function so tests can drive it."""
+    return datetime.now(timezone.utc)
+
+
+def _telegram_bot_token() -> str:
+    """Read per request, not at import: the secret is mounted as env, and tests set it late."""
+    return os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+
+
+def _telegram_body(request: Request) -> dict | None:
+    try:
+        data = request.get_json(silent=True)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _telegram_response(outcome: "telegram_link.Outcome"):
+    if outcome.status == 200:
+        return create_success_response(outcome.body)
+    return create_error_response(outcome.body.get("error", "error"), outcome.status)
+
+
+def _notify_telegram_unlinked(notify) -> None:
+    """Best-effort "you were unlinked" message to each removed chat; never affects the response."""
+    if not notify:
+        return
+    bot_token = _telegram_bot_token()
+    if not bot_token:
+        logger.error("telegram_account: unlink notice skipped — TELEGRAM_BOT_TOKEN is not configured")
+        return
+    for chat_id, language_code in notify:
+        delivered, reason = telegram_link.notify_unlinked(
+            bot_token, chat_id, language_code, http_requests.post
+        )
+        if not delivered:
+            # `reason` is an exception type or Telegram's status/description — never the
+            # exception text, whose URL would carry the bot token.
+            logger.warning("telegram_account: unlink notice not delivered (%s)", reason)
+
+
+@functions_framework.http
+def telegram_account(request: Request):
+    """
+    Telegram link, app / web side. Headers: Authorization: Bearer <Firebase ID token> (only).
+    Body: {"action": ..., ...}. Error bodies are {"success": false, "error": "<code>"}.
+
+    create_token {"user_id"?}  — app → bot
+        200 -> {"success": true, "token": "...", "deep_link": "https://t.me/gisti_app_bot?start=<token>",
+                "expires_in_sec": 600}
+        409 -> "no_account"  (no credit doc carries this google_uid)
+    claim {"token", "user_id"?}  — bot → app (token from ?tg_link=)
+        200 -> {"success": true, "linked": true, "telegram_username": str | null,
+                "telegram_first_name": str | null, "premium_applied"?: int}
+               premium_applied — present only when the link applied that Telegram account's
+               unassigned Stars payments whose period is still running (count)
+        404 -> "unknown_token" (also a token minted for the other direction — not consumed)
+        410 -> "token_used" | "token_expired"
+        409 -> "no_account"
+    status
+        200 -> {"success": true, "linked": false}
+             | {"success": true, "linked": true, "telegram_username": str | null,
+                "telegram_first_name": str | null, "linked_at_ms": int}
+    unlink  — idempotent; best-effort Bot API notice to the removed chat
+        200 -> {"success": true, "linked": false}
+
+    401 missing/invalid token · 403 disabled user · 400 bad body/action · 500 internal.
+    """
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+    if request.method != "POST":
+        return create_error_response("Only POST method is allowed", 405)
+
+    decoded_token, error = verify_firebase_token(request)
+    if error:
+        return create_error_response(error[0], error[1])
+    if not decoded_token:
+        return create_error_response("Firebase ID token required in Authorization header", 401)
+
+    data = _telegram_body(request)
+    if data is None:
+        return create_error_response("Invalid JSON body", 400)
+    action = data.get("action")
+    if action not in _TELEGRAM_ACCOUNT_ACTIONS:
+        return create_error_response("action must be create_token/claim/status/unlink", 400)
+    if action == "claim" and not isinstance(data.get("token"), str):
+        return create_error_response("token is required", 400)
+
+    google_uid = decoded_token["uid"]
+    try:
+        now = _telegram_now()
+        if action == "status":
+            outcome = telegram_link.status(db, google_uid)
+        elif action == "unlink":
+            outcome = telegram_link.unlink(db, google_uid)
+        else:
+            credit_user_id = telegram_link.resolve_credit_user_id(db, google_uid, data.get("user_id"))
+            if credit_user_id is None:
+                outcome = telegram_link.Outcome(409, {"error": telegram_link.ERR_NO_ACCOUNT})
+            elif action == "create_token":
+                outcome = telegram_link.create_token(
+                    db, now, google_uid=google_uid, credit_user_id=credit_user_id
+                )
+            else:
+                outcome = telegram_link.claim(
+                    db, now, data["token"], google_uid=google_uid, credit_user_id=credit_user_id,
+                    credits_cap=get_credits_config()["premium_daily_credits_cap"],
+                )
+    except Exception as e:
+        logger.exception("telegram_account: %s failed (%s)", action, type(e).__name__)
+        return create_error_response("Telegram account step failed", 500)
+
+    if outcome.status != 200:
+        logger.info("telegram_account: %s refused: %s %s",
+                    action, outcome.status, outcome.body.get("error"))
+    _notify_telegram_unlinked(outcome.notify)
+    return _telegram_response(outcome)
+
+
+@functions_framework.http
+def telegram_bot_internal(request: Request):
+    """
+    Telegram link, worker side. Header X-Gisti-Internal-Key = derive_key(TELEGRAM_BOT_TOKEN,
+    "gisti-telegram-internal-v1") — the only accepted credential. Body: {"action": ..., ...}.
+    Error bodies are {"success": false, "error": "<code>"}.
+
+    consume_app_token {"token", "telegram_user_id", "chat_id", "username"?, "first_name"?,
+                       "language_code"?}
+        200 -> {"success": true, "google_uid": "...", "credit_user_id": "...",
+                "premium_applied"?: int}  — present only when unassigned live Stars payments
+                                            of this Telegram account were applied (count)
+        404 -> "unknown_token" · 410 -> "token_used" | "token_expired" · 409 -> "no_account"
+    create_login_token {"telegram_user_id", "chat_id", "username"?, "first_name"?, "language_code"?}
+        200 -> {"success": true, "token": "...", "url": "https://app.gisti-ai.com/?tg_link=<token>"}
+    unlink {"telegram_user_id"}  — idempotent
+        200 -> {"success": true, "ok": true}
+
+    Phase 3 — Stars subscription:
+    premium_status {"telegram_user_id"}
+        200 -> {"success": true, "linked": bool, "is_premium": bool,
+                "source": "store" | "telegram" | null, "telegram_premium_until_ms": int | null,
+                "subscription_state": "active" | "canceled" | "failed" | null, "price_stars": int}
+    apply_payment {"telegram_user_id", "telegram_payment_charge_id", "currency": "XTR",
+                   "total_amount", "invoice_payload"?, "is_recurring"?, "is_first_recurring"?,
+                   "subscription_expiration_date"? (unix seconds)}  — idempotent by charge id
+        200 -> {"success": true, "applied": bool, "status": "applied" | "unassigned" | "refunded",
+                "telegram_premium_until_ms": int | null, "duplicate": bool}
+        400 -> currency other than XTR / bad fields
+    subscription_update {"telegram_user_id", "state": "active" | "canceled" | "failed",
+                         "telegram_payment_charge_id"?}
+        200 -> {"success": true, "updated": bool, "subscription_state": str | null}
+    revoke_payment {"telegram_payment_charge_id"}  — after refundStarPayment; idempotent
+        200 -> {"success": true, "revoked": true, "status": "refunded", "duplicate": bool,
+                "is_premium": bool, "telegram_premium_until_ms": int | null}
+        404 -> "unknown_payment"
+
+    401 "unauthorized" (bad/missing key) · 503 "bot_not_configured" (no TELEGRAM_BOT_TOKEN)
+    · 400 bad body/action · 405 non-POST · 500 internal.
+    """
+    if request.method != "POST":
+        return create_error_response("Only POST method is allowed", 405)
+
+    bot_token = _telegram_bot_token()
+    if not bot_token:
+        logger.error("telegram_bot_internal: TELEGRAM_BOT_TOKEN is not configured — refusing")
+        return create_error_response("bot_not_configured", 503)
+    if not telegram_link.internal_key_matches(request.headers.get("X-Gisti-Internal-Key"), bot_token):
+        logger.warning("telegram_bot_internal: rejected a request without a valid internal key")
+        return create_error_response("unauthorized", 401)
+
+    data = _telegram_body(request)
+    if data is None:
+        return create_error_response("Invalid JSON body", 400)
+    action = data.get("action")
+    if action not in _TELEGRAM_INTERNAL_ACTIONS:
+        return create_error_response("action must be one of " + "/".join(_TELEGRAM_INTERNAL_ACTIONS), 400)
+
+    telegram = None
+    payment = None
+    charge_id = data.get("telegram_payment_charge_id")
+    if action in ("unlink", "premium_status", "subscription_update"):
+        if not telegram_link.is_telegram_user_id(data.get("telegram_user_id")):
+            return create_error_response("telegram_user_id must be a positive integer", 400)
+    elif action in ("consume_app_token", "create_login_token"):
+        telegram, field_error = telegram_link.parse_telegram_fields(data)
+        if field_error:
+            return create_error_response(field_error, 400)
+    elif action == "apply_payment":
+        payment, field_error = telegram_link.parse_payment(data)
+        if field_error:
+            return create_error_response(field_error, 400)
+    elif not telegram_link.is_charge_id(charge_id):  # revoke_payment
+        return create_error_response("telegram_payment_charge_id is required", 400)
+    if action == "consume_app_token" and not isinstance(data.get("token"), str):
+        return create_error_response("token is required", 400)
+    if action == "subscription_update":
+        if data.get("state") not in telegram_link.SUBSCRIPTION_STATES:
+            return create_error_response("state must be active/canceled/failed", 400)
+        if charge_id is not None and not telegram_link.is_charge_id(charge_id):
+            return create_error_response("telegram_payment_charge_id is invalid", 400)
+
+    try:
+        now = _telegram_now()
+        if action == "consume_app_token":
+            outcome = telegram_link.consume_app_token(
+                db, now, data["token"], telegram,
+                credits_cap=get_credits_config()["premium_daily_credits_cap"],
+            )
+        elif action == "create_login_token":
+            outcome = telegram_link.create_login_token(db, now, telegram)
+        elif action == "unlink":
+            outcome = telegram_link.unlink_by_telegram(db, data["telegram_user_id"])
+        elif action == "premium_status":
+            outcome = telegram_link.premium_status(
+                db, now, data["telegram_user_id"],
+                store_premium=_store_premium_for_bot, price_stars=_telegram_price_stars(),
+            )
+        elif action == "apply_payment":
+            outcome = telegram_link.apply_payment(
+                db, now, payment, credits_cap=get_credits_config()["premium_daily_credits_cap"],
+            )
+        elif action == "subscription_update":
+            outcome = telegram_link.subscription_update(
+                db, now, data["telegram_user_id"], data["state"], charge_id,
+            )
+        else:
+            outcome = telegram_link.revoke_payment(
+                db, now, charge_id, store_premium=_store_premium_for_bot,
+            )
+    except Exception as e:
+        logger.exception("telegram_bot_internal: %s failed (%s)", action, type(e).__name__)
+        return create_error_response("Telegram link step failed", 500)
+
+    if outcome.status != 200:
+        logger.info("telegram_bot_internal: %s refused: %s %s",
+                    action, outcome.status, outcome.body.get("error"))
+    elif action == "apply_payment" and outcome.body.get("status") == telegram_link.PAYMENT_UNASSIGNED:
+        # Money was taken but there is no account to credit. Needs a human: refund it
+        # (scripts/refund.mjs) or link the account and apply by hand. The charge id is in
+        # telegram_payments (status == "unassigned"); it is not repeated in the log.
+        logger.error("telegram_bot_internal: Stars payment from an unlinked Telegram account "
+                     "recorded as unassigned (duplicate=%s)", outcome.body.get("duplicate"))
+    elif action == "subscription_update" and not outcome.body.get("updated"):
+        logger.warning("telegram_bot_internal: subscription_update for an unlinked Telegram account")
+    return _telegram_response(outcome)

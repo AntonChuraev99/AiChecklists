@@ -31,6 +31,7 @@ import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.InitialUploadGate
 import com.antonchuraev.homesearchchecklist.sync.InitialUploadGateImpl
 import com.antonchuraev.homesearchchecklist.sync.UserCreditsSync
+import com.antonchuraev.homesearchchecklist.telegram.telegramModule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -61,6 +62,7 @@ val appModule = module {
         aiChatDispatcherModule,
         voiceCallFeatureModule,
         googleAuthModule,
+        telegramModule,
         platformModule()
     )
     single<AppDatastore> { UserAppDatastoreProvider.instance }

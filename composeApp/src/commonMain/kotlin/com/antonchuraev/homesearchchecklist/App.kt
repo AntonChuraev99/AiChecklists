@@ -27,6 +27,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
@@ -277,6 +278,12 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.Subscri
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
 import com.antonchuraev.homesearchchecklist.mcp.McpScreen
+import com.antonchuraev.homesearchchecklist.telegram.PendingTelegramLink
+import com.antonchuraev.homesearchchecklist.telegram.TelegramLinkRepository
+import com.antonchuraev.homesearchchecklist.telegram.TelegramRoute
+import com.antonchuraev.homesearchchecklist.telegram.handleTelegramLinkClaim
+import com.antonchuraev.homesearchchecklist.telegram.resolveTelegramSnackbar
+import com.antonchuraev.homesearchchecklist.telegram.telegramAuthPhaseFlow
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
@@ -553,6 +560,50 @@ fun App() {
                         },
                         showNotFoundMessage = { snackbarHostState.showSnackbar(galleryNotFoundMessage) },
                         showErrorMessage = { snackbarHostState.showSnackbar(galleryErrorMessage) },
+                    )
+                }
+            }
+
+            // ── Telegram screen + bot sign-in link (app.gisti-ai.com/?tg_link=<token>) ──────
+            // Pushed as a detail screen like MCP, with the same top-of-stack dedupe.
+            val openTelegramScreen: () -> Unit = {
+                if (navigator.backStack.lastOrNull() != AppNavRoute.Telegram) {
+                    navigator.backStack.add(AppNavRoute.Telegram)
+                }
+            }
+            // Platform entry points (wasmJs main.kt / Android MainActivity) push the token into
+            // PendingTelegramLink; handleTelegramLinkClaim waits for Google sign-in, claims it and
+            // answers with an app-level snackbar (spec §4.7) — the body lives in
+            // telegram/TelegramLinkClaimHandler.kt so it is unit-testable.
+            val pendingTelegramLink: PendingTelegramLink = koinInject()
+            val telegramLinkRepository: TelegramLinkRepository = koinInject()
+            LaunchedEffect(Unit) {
+                val telegramAuthPhase = telegramAuthPhaseFlow(googleAuthRepository, userDataRepository)
+                pendingTelegramLink.pending.collect { token ->
+                    if (token.isNullOrBlank()) return@collect
+                    handleTelegramLinkClaim(
+                        token = token,
+                        pending = pendingTelegramLink,
+                        authPhase = telegramAuthPhase,
+                        repository = telegramLinkRepository,
+                        analyticsTracker = analyticsTracker,
+                        // Cold start: the stack is [Splash] / [WelcomeOnboarding]; both end in a
+                        // replaceStack that would wipe a Telegram route pushed earlier. Wait for a
+                        // shell root (Main / Inbox / any v2 tab) — the same set the navigator treats
+                        // as the stack's root.
+                        awaitAppShell = {
+                            snapshotFlow {
+                                navigator.backStack.any { isV2TabRoute(it) }
+                            }.first { it }
+                        },
+                        openTelegramScreen = openTelegramScreen,
+                        showSnackbar = { message ->
+                            val withDuration = resolveTelegramSnackbar(message)
+                            snackbarHostState.showSnackbar(
+                                message = withDuration.text,
+                                duration = withDuration.duration,
+                            )
+                        },
                     )
                 }
             }
@@ -1610,6 +1661,7 @@ fun App() {
                             navigator.backStack.add(AppNavRoute.Mcp)
                         }
                     }
+                    DrawerDestination.Telegram -> openTelegramScreen()
                     DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
                     DrawerDestination.Settings -> navigator.navigateToSettings()
                 }
@@ -2336,6 +2388,13 @@ fun App() {
 
                     entry<AppNavRoute.Mcp> {
                         McpScreen(onBack = { navigator.onBack() })
+                    }
+
+                    entry<AppNavRoute.Telegram> {
+                        TelegramRoute(
+                            onBack = { navigator.onBack() },
+                            onSignInClick = handleSignIn,
+                        )
                     }
 
                     entry<AppNavRoute.Today>(

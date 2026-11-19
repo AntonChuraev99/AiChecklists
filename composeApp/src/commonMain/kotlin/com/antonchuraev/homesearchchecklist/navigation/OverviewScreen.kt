@@ -128,6 +128,7 @@ fun OverviewScreen(
                 onCalendarClick = { onNavigate(DrawerDestination.Calendar) },
                 onAiChatClick = { onNavigate(DrawerDestination.AiChat) },
                 onMcpClick = { onNavigate(DrawerDestination.Mcp) },
+                onTelegramClick = { onNavigate(DrawerDestination.Telegram) },
                 onUpdateFeedClick = { onNavigate(DrawerDestination.UpdateFeed) },
                 onSettingsClick = { onNavigate(DrawerDestination.Settings) },
                 onRateAppClick = onRateApp,
