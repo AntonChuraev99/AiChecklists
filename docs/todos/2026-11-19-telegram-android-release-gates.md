@@ -13,9 +13,8 @@ keywords: [telegram, data safety, play console, privacy policy, botfather, relea
 1. **Play Data Safety** — объявить «User IDs» (Telegram user id, хранится вместе с аккаунтом) →
    назначение «App functionality», не продаётся, не для рекламы. Прецедент: релиз 1.18.7 отклонён
    за расхождение декларации с фактом. Делает `@google-play-console-expert` или владелец в консоли.
-2. **Политика конфиденциальности** — раздел «Telegram Bot (optional)» добавлен в
-   `hosting/public/privacy-policy.html`; проверить, что он задеплоен на Firebase Hosting
-   (`https://gisti-app.web.app/privacy-policy` содержит «Telegram Bot»).
+2. ~~**Политика конфиденциальности**~~ — ✅ 2026-11-19: раздел «Telegram Bot (optional)» в
+   `hosting/public/privacy-policy.html` задеплоен на Firebase Hosting (живая страница содержит его).
 3. **BotFather** `/setjoingroups` → Disable (действие владельца; код и так игнорирует не-private чаты).
 
 Источник требований — документ задачи `docs/archive/telegram-bot-phase1-2026-11-19.md`, раздел
