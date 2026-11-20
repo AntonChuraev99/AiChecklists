@@ -282,12 +282,24 @@ class ChecklistRepositoryImpl(
     }
 
     // One-shot reminders
+    //
+    // Every checklist-level reminder column below is a synced field (the server-side Telegram
+    // reminder trigger reads it from Firestore), and none of the column UPDATEs touches
+    // syncStatus/updatedAt — so each one is followed by touchForSync, exactly like setFoldersEnabled.
     override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {
         checklistDao.updateReminder(checklistId, reminderAt)
+        checklistDao.touchForSync(checklistId, currentTimeMillis())
+    }
+
+    // Alarm bookkeeping: local only, no touchForSync (see ChecklistRepository's schedule comment —
+    // a dirty stale row would be pushed over a newer cloud edit).
+    override suspend fun clearFiredReminder(checklistId: Long) {
+        checklistDao.updateReminder(checklistId, null)
     }
 
     override suspend fun setReminderFullScreen(checklistId: Long, fullScreen: Boolean) {
         checklistDao.updateReminderFullScreen(checklistId, fullScreen)
+        checklistDao.touchForSync(checklistId, currentTimeMillis())
     }
 
     override suspend fun countActiveReminders(): Int {
@@ -326,6 +338,7 @@ class ChecklistRepositoryImpl(
     ) {
         val ruleJson = reminderConverters.repeatRuleToString(rule)
         checklistDao.setRepeatSchedule(checklistId, ruleJson, timeOfDayMinutes, firstTriggerAt)
+        checklistDao.touchForSync(checklistId, currentTimeMillis())
     }
 
     override suspend fun advanceRepeatSchedule(
@@ -333,10 +346,19 @@ class ChecklistRepositoryImpl(
         nextAt: Long?,
         newCount: Int
     ) {
+        // Alarm/recovery bookkeeping: local only, NO touchForSync. Marking a possibly stale row
+        // PENDING_UPLOAD makes the merge skip the remote snapshot and push this copy over it,
+        // wiping newer edits from web / the bot / MCP. The server computes occurrences itself.
         checklistDao.advanceRepeatSchedule(checklistId, nextAt, newCount)
     }
 
     override suspend fun clearRepeatSchedule(checklistId: Long) {
+        checklistDao.clearRepeatSchedule(checklistId)
+        checklistDao.touchForSync(checklistId, currentTimeMillis())
+    }
+
+    // End condition reached in the background: local only, same reason as advanceRepeatSchedule.
+    override suspend fun clearFinishedRepeatSchedule(checklistId: Long) {
         checklistDao.clearRepeatSchedule(checklistId)
     }
 
@@ -608,6 +630,23 @@ class ChecklistRepositoryImpl(
         // Touch the parent so the trigger fires immediately and the document's updatedAt
         // advances for cross-device LWW. Fills are embedded in the parent's cloud document.
         checklistDao.touchForSync(fill.checklistId, now)
+    }
+
+    override suspend fun updateFillLocalOnlyFromAlarm(fill: ChecklistFill) {
+        // Keep the row's STORED sync metadata (not the caller's copy, which may be older): no
+        // PENDING_UPLOAD, no updatedAt bump, no parent touch — see the interface KDoc.
+        val stored = fillDao.getById(fill.id)
+        if (stored == null) {
+            logger.warning(TAG, "updateFillLocalOnlyFromAlarm: fill ${fill.id} is gone, alarm bookkeeping skipped")
+            return
+        }
+        fillDao.insert(
+            fill.toEntity().copy(
+                updatedAt = stored.updatedAt,
+                syncStatus = stored.syncStatus,
+                isDeleted = stored.isDeleted,
+            ),
+        )
     }
 
     override suspend fun deleteFill(fill: ChecklistFill) {

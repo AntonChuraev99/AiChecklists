@@ -544,6 +544,86 @@ class ChecklistRepositoryImplTest {
         )
     }
 
+    // ─── Checklist-level reminder edits must reach the cloud ─────────────────
+
+    /**
+     * The checklist-level reminder columns (`reminderAt`, `reminderFullScreen`, the repeat schedule)
+     * are synced fields, and the Telegram reminder trigger reads them from Firestore. Each column
+     * UPDATE leaves `syncStatus`/`updatedAt` alone, so without a `touchForSync` the edit stays on the
+     * device until some unrelated edit of the same checklist happens to push the row.
+     */
+    @Test
+    fun checklistLevelReminderEdits_markTheRowForSync() = runTest {
+        val edits: List<Pair<String, suspend ChecklistRepositoryImpl.() -> Unit>> = listOf(
+            "setReminder" to { setReminder(1L, 1_800_000_000_000L) },
+            "setReminderFullScreen" to { setReminderFullScreen(1L, true) },
+            "setRepeatSchedule" to {
+                setRepeatSchedule(1L, ReminderRepeatRule(type = RepeatType.DAILY), 9 * 60, 1_800_000_000_000L)
+            },
+            "clearRepeatSchedule" to { clearRepeatSchedule(1L) },
+        )
+        for ((name, edit) in edits) {
+            checklistDao.checklists.clear()
+            checklistDao.checklists.add(Checklist(id = 1L, name = "Groceries", items = emptyList()).toEntityRow())
+
+            newRepo().edit()
+
+            val row = checklistDao.checklists.single()
+            assertEquals(SyncStatus.PENDING_UPLOAD.value, row.syncStatus, "$name must mark the row dirty")
+            assertTrue(row.updatedAt > 100L, "$name must bump updatedAt for the cross-device merge")
+        }
+    }
+
+    /**
+     * Alarm / recovery bookkeeping must stay LOCAL. A PENDING_UPLOAD row skips the remote snapshot
+     * on merge and is pushed over the cloud copy, so dirtying a stale row from a background alarm
+     * would wipe a newer edit made on web, in the Telegram bot or via MCP.
+     */
+    @Test
+    fun backgroundReminderBookkeeping_doesNotMarkTheRowForSync() = runTest {
+        val writes: List<Pair<String, suspend ChecklistRepositoryImpl.() -> Unit>> = listOf(
+            "advanceRepeatSchedule" to { advanceRepeatSchedule(1L, 1_800_086_400_000L, 1) },
+            "clearFiredReminder" to { clearFiredReminder(1L) },
+            "clearFinishedRepeatSchedule" to { clearFinishedRepeatSchedule(1L) },
+        )
+        for ((name, write) in writes) {
+            checklistDao.checklists.clear()
+            checklistDao.checklists.add(Checklist(id = 1L, name = "Groceries", items = emptyList()).toEntityRow())
+
+            newRepo().write()
+
+            val row = checklistDao.checklists.single()
+            assertEquals(SyncStatus.SYNCED.value, row.syncStatus, "$name must not mark the row dirty")
+            assertEquals(100L, row.updatedAt, "$name must not bump updatedAt")
+        }
+    }
+
+    /**
+     * Item twin of the test above: an item reminder fired and the alarm clears it. If this dirtied
+     * the fill / parent, the merge would skip the cloud copy and revert a «✅ Done» tapped on the
+     * Telegram reminder meanwhile.
+     */
+    @Test
+    fun updateFillLocalOnlyFromAlarm_writesItemsButDoesNotMarkFillOrParentForSync() = runTest {
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Groceries", items = emptyList()).toEntityRow())
+        val item = ChecklistFillItem(text = "Milk", checked = false).withReminderAt(TONIGHT)
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = listOf(item)))
+        // The caller's copy carries different sync metadata than the stored row: the stored wins.
+        val fired = fillDao.fills.single().toDomain().let {
+            it.copy(items = listOf(item.withReminderAt(null)), updatedAt = 999L, syncStatus = SyncStatus.PENDING_UPLOAD.value)
+        }
+
+        newRepo().updateFillLocalOnlyFromAlarm(fired)
+
+        val fill = fillDao.fills.single()
+        assertEquals(null, fill.items.single().reminderAt, "the bookkeeping itself is written")
+        assertEquals(SyncStatus.SYNCED.value, fill.syncStatus, "fill must not be marked dirty")
+        assertEquals(100L, fill.updatedAt, "fill updatedAt must not move")
+        val parent = checklistDao.checklists.single()
+        assertEquals(SyncStatus.SYNCED.value, parent.syncStatus, "parent must not be touched")
+        assertEquals(100L, parent.updatedAt)
+    }
+
     // ─── System under test factory + fakes ───────────────────────────────────
 
     private val checklistDao = FakeChecklistDao()

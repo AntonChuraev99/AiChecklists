@@ -18,6 +18,9 @@ const ALL: Record<TgEvent["type"], TgEvent> = {
   tg_chat_opened: { type: "tg_chat_opened", source: "button" },
   tg_chat_turn: { type: "tg_chat_turn", result: "final", rounds: 2 },
   tg_chat_tool: { type: "tg_chat_tool", tool: "delete_item", status: "declined" },
+  tg_reminder_sent: { type: "tg_reminder_sent", kind: "repeat" },
+  tg_reminder_action: { type: "tg_reminder_action", action: "snooze" },
+  tg_reminder_channel_set: { type: "tg_reminder_channel_set", channel: "both", source: "offer" },
 };
 
 const ALLOWED_PROPS: Record<TgEvent["type"], string[]> = {
@@ -34,6 +37,9 @@ const ALLOWED_PROPS: Record<TgEvent["type"], string[]> = {
   tg_chat_opened: ["source"],
   tg_chat_turn: ["result", "rounds"],
   tg_chat_tool: ["status", "tool"],
+  tg_reminder_sent: ["kind"],
+  tg_reminder_action: ["action"],
+  tg_reminder_channel_set: ["channel", "source"],
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -86,6 +92,18 @@ describe("chat events", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect((JSON.parse(String(init.body)) as { events: unknown[] }).events).toHaveLength(2);
+  });
+});
+
+describe("reminder events", () => {
+  it("carry only fixed vocabularies — no item text, checklist name or id", async () => {
+    const identity = await tgIdentity(1, CREDIT_ID);
+    expect(buildAmplitudeEvent(identity, ALL.tg_reminder_sent, 0).event_properties).toEqual({ kind: "repeat" });
+    expect(buildAmplitudeEvent(identity, ALL.tg_reminder_action, 0).event_properties).toEqual({ action: "snooze" });
+    expect(buildAmplitudeEvent(identity, ALL.tg_reminder_channel_set, 0).event_properties).toEqual({
+      channel: "both",
+      source: "offer",
+    });
   });
 });
 

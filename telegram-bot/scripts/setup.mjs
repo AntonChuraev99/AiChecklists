@@ -54,6 +54,8 @@ async function call(method, params) {
   if (dryRun) {
     const shown = { ...params };
     if (shown.secret_token) shown.secret_token = `<derived, ${shown.secret_token.length} chars>`;
+    // The full menu JSON outgrows the 300-char line below; the names are what a dry run checks.
+    if (Array.isArray(shown.commands)) shown.commands = shown.commands.map((c) => c.command).join(",");
     console.log(`DRY ${label} ${JSON.stringify(shown).slice(0, 300)}`);
     return;
   }

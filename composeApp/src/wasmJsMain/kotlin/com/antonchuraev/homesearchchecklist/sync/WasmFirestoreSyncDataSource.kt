@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.Checklis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryTemplateSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.UserDocSyncData
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.js.Promise
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -15,12 +16,17 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 @JsFun("(collectionPath, docId, dataJson) => globalThis.__firestoreSetDoc(collectionPath, docId, dataJson)")
 private external fun jsFirestoreSetDoc(collectionPath: String, docId: String, dataJson: String): Promise<JsAny?>
+
+@JsFun("(collectionPath, docId, dataJson) => globalThis.__firestoreMergeDoc(collectionPath, docId, dataJson)")
+private external fun jsFirestoreMergeDoc(collectionPath: String, docId: String, dataJson: String): Promise<JsAny?>
 
 @JsFun("(collectionPath, docId) => globalThis.__firestoreGetDoc(collectionPath, docId)")
 private external fun jsFirestoreGetDoc(collectionPath: String, docId: String): Promise<JsAny?>
@@ -263,6 +269,29 @@ internal class WasmFirestoreSyncDataSource : FirestoreSyncDataSource {
                 AppResult.Error(Exception(resp.error ?: "google_uid query failed"))
             }
         }.getOrElse { AppResult.Error(Exception(it.message ?: "findUserIdByGoogleUid failed")) }
+
+    /**
+     * MERGE write via `globalThis.__firestoreMergeDoc` (`setDoc(ref, data, {merge: true})`). Never
+     * routed through [jsFirestoreSetDoc]: `users/{uid}` carries server-owned fields (credits,
+     * premium, `reminder_channel`) that a full set would wipe.
+     */
+    override suspend fun mergeUserDocFields(userId: String, fields: Map<String, String>): AppResult<Unit> =
+        try {
+            require(userId.isNotBlank()) { "mergeUserDocFields: blank userId" }
+            val dataJson = jsonParser.encodeToString(MapSerializer(String.serializer(), String.serializer()), fields)
+            val response = jsFirestoreMergeDoc("users", userId, dataJson).awaitAsString()
+            if (response == null) {
+                AppResult.Error(Exception("users doc merge: null response"))
+            } else {
+                val resp = jsonParser.decodeFromString(JsResponse.serializer(), response)
+                if (resp.ok) AppResult.Success(Unit)
+                else AppResult.Error(Exception(resp.error ?: "users doc merge failed"))
+            }
+        } catch (e: CancellationException) {
+            throw e // the caller (ReminderProfileSync.collectLatest) cancels on identity change
+        } catch (e: Exception) {
+            AppResult.Error(Exception(e.message ?: "users doc merge failed", e))
+        }
 
     override suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?> =
         runCatching {

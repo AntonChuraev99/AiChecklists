@@ -37,6 +37,18 @@ import aichecklists.core.designsystem.generated.resources.telegram_pending_open_
 import aichecklists.core.designsystem.generated.resources.telegram_pending_step_open
 import aichecklists.core.designsystem.generated.resources.telegram_pending_step_start
 import aichecklists.core.designsystem.generated.resources.telegram_pending_title
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_benefit
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_disconnect_note
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_disconnect_note_web
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_option_both
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_option_push
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_option_telegram
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_option_telegram_body
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_saving_cd
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_title
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_web_off
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_web_on
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_web_on_body
 import aichecklists.core.designsystem.generated.resources.telegram_retry
 import aichecklists.core.designsystem.generated.resources.telegram_signin_body
 import aichecklists.core.designsystem.generated.resources.telegram_signin_cta
@@ -62,6 +74,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -72,6 +86,7 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Login
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
@@ -79,6 +94,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -94,11 +111,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -107,18 +126,25 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDes
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSectionHeader
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSkeletonLine
 import com.antonchuraev.homesearchchecklist.desingsystem.components.GroupPosition
+import com.antonchuraev.homesearchchecklist.desingsystem.components.groupPositionOf
 import com.antonchuraev.homesearchchecklist.desingsystem.components.groupSegment
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
+import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import com.antonchuraev.homesearchchecklist.integrations.IntegrationNoteRow
 import com.antonchuraev.homesearchchecklist.integrations.IntegrationRowTile
 import com.antonchuraev.homesearchchecklist.integrations.ValuePropRow
+import com.antonchuraev.homesearchchecklist.integrations.firstLineCentring
+import com.antonchuraev.homesearchchecklist.integrations.lineHeightDp
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
@@ -134,6 +160,15 @@ private val SpinnerSize = 20.dp
 private val SpinnerStroke = 2.dp
 private val ErrorIconSize = 24.dp
 private val AccountCardMinHeight = 72.dp
+
+/** Control slot of a reminder row: the 24dp radio, or the spinner while saving (addendum §3). */
+private val ChannelControlBox = 24.dp
+
+/** M3 disabled content alpha for the reminder row text while disconnecting (no DS alpha token). */
+private const val DisabledContentAlpha = 0.38f
+
+/** `getPlatformName()` value of the wasmJs build. */
+private const val PLATFORM_WEB = "web"
 
 /**
  * Stateless Telegram account-link screen (`docs/designs/telegram-screen-2026-11-19/spec.md`).
@@ -152,6 +187,7 @@ fun TelegramScreen(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onAction: (TelegramAction) -> Unit,
+    isWeb: Boolean = remember { getPlatformName() == PLATFORM_WEB },
 ) {
     var showDisconnectDialog by rememberSaveable { mutableStateOf(false) }
     TelegramScreenLayout(
@@ -161,10 +197,16 @@ fun TelegramScreen(
         onAction = onAction,
         showDisconnectDialog = showDisconnectDialog,
         onDisconnectDialogChange = { showDisconnectDialog = it },
+        isWeb = isWeb,
     )
 }
 
-/** [TelegramScreen] with the dialog visibility hoisted — lets screenshot tests pin the dialog open. */
+/**
+ * [TelegramScreen] with the dialog visibility hoisted — lets screenshot tests pin the dialog open.
+ *
+ * @param isWeb the web build: the Reminders section shows 2 rows ("Send to Telegram" / "Don't send")
+ *   instead of the 3 phone rows, and the Disconnect note uses the web copy (addendum §2.1, §4.1).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TelegramScreenLayout(
@@ -174,11 +216,18 @@ internal fun TelegramScreenLayout(
     onAction: (TelegramAction) -> Unit,
     showDisconnectDialog: Boolean,
     onDisconnectDialogChange: (Boolean) -> Unit,
+    isWeb: Boolean,
 ) {
     AppScaffold(
         title = stringResource(Res.string.telegram_title),
         onBackButtonClick = onBack,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            // Action on its own line: the "Try again" snackbars carry 2-line texts, and side by side
+            // with the action they wrapped mid-word at 320dp × fontScale 2.0 (RU / HI).
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(data, actionOnNewLine = data.visuals.actionLabel != null)
+            }
+        },
     ) {
         // Outer Column centres the capped content column on wide (tablet / web) viewports.
         Column(
@@ -196,6 +245,7 @@ internal fun TelegramScreenLayout(
                 Spacer(Modifier.height(AppDimens.SpacingXl))
                 StateSlot(
                     state = state,
+                    isWeb = isWeb,
                     onAction = onAction,
                     onDisconnectClick = { onDisconnectDialogChange(true) },
                 )
@@ -209,6 +259,11 @@ internal fun TelegramScreenLayout(
     if (showDisconnectDialog) {
         when (state) {
             is TelegramScreenState.Linked -> DisconnectDialog(
+                note = when {
+                    !state.showsDisconnectReminderNote -> null
+                    isWeb -> stringResource(Res.string.telegram_reminders_disconnect_note_web)
+                    else -> stringResource(Res.string.telegram_reminders_disconnect_note)
+                },
                 onConfirm = {
                     onDisconnectDialogChange(false)
                     onAction(TelegramAction.DisconnectConfirm)
@@ -254,6 +309,7 @@ private fun TelegramHero() {
 @Composable
 private fun StateSlot(
     state: TelegramScreenState,
+    isWeb: Boolean,
     onAction: (TelegramAction) -> Unit,
     onDisconnectClick: () -> Unit,
 ) {
@@ -280,7 +336,7 @@ private fun StateSlot(
                 is TelegramScreenState.SignedOut -> SignedOutContent(target, onAction)
                 is TelegramScreenState.NotLinked -> NotLinkedContent(target, onAction)
                 is TelegramScreenState.Pending -> PendingCard(target, onAction)
-                is TelegramScreenState.Linked -> LinkedContent(target, onAction, onDisconnectClick)
+                is TelegramScreenState.Linked -> LinkedContent(target, isWeb, onAction, onDisconnectClick)
                 is TelegramScreenState.Error -> ErrorCard(target, onAction)
             }
         }
@@ -435,6 +491,7 @@ private fun StepRow(number: Int, text: String) {
 @Composable
 private fun LinkedContent(
     state: TelegramScreenState.Linked,
+    isWeb: Boolean,
     onAction: (TelegramAction) -> Unit,
     onDisconnectClick: () -> Unit,
 ) {
@@ -447,8 +504,13 @@ private fun LinkedContent(
         enabled = !state.isDisconnecting,
         modifier = Modifier.fillMaxWidth().testTag("telegram_open_bot"),
     )
+    if (state.showsReminderSection) {
+        // SpacingLg + the header's own 12dp top = a 28dp section break (addendum §1).
+        Spacer(Modifier.height(AppDimens.SpacingLg))
+        ReminderChannelSection(state, isWeb, onAction)
+    }
     Spacer(Modifier.height(AppDimens.SpacingXl))
-    Benefits()
+    Benefits(showReminders = state.showsReminderSection)
     Spacer(Modifier.height(AppDimens.SpacingXl))
     AppButtonSecondary(
         text = stringResource(Res.string.telegram_disconnect_cta),
@@ -545,9 +607,152 @@ private fun ErrorCard(state: TelegramScreenState.Error, onAction: (TelegramActio
     }
 }
 
-/** The three phase-1 benefits, identical in every state that shows them. */
+/**
+ * Reminder channel picker (`reminders-addendum.md` §2): one grouped radio group. Android / iOS: 3
+ * rows (push · telegram · both). Web: 2 rows ("Send to Telegram" selected for telegram/both,
+ * "Don't send" for push) — the VM maps a web tap to the stored value.
+ *
+ * While [TelegramScreenState.Linked.channelSaving] is set, the target row shows the spinner in its
+ * control slot and no row is selected. The whole group is disabled while disconnecting.
+ */
 @Composable
-private fun Benefits() {
+private fun ReminderChannelSection(
+    state: TelegramScreenState.Linked,
+    isWeb: Boolean,
+    onAction: (TelegramAction) -> Unit,
+) {
+    val confirmed = state.reminderChannel ?: return
+    val saving = state.channelSaving
+    val enabled = !state.isDisconnecting
+    AppSectionHeader(
+        label = stringResource(Res.string.telegram_reminders_title),
+        icon = Icons.Outlined.NotificationsActive,
+        iconContainer = MaterialTheme.colorScheme.primaryContainer,
+        iconContent = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
+    Column(Modifier.fillMaxWidth().selectableGroup()) {
+        if (isWeb) {
+            val webOptions = listOf(true, false)
+            webOptions.forEachIndexed { index, on ->
+                ChannelRow(
+                    title = stringResource(
+                        if (on) Res.string.telegram_reminders_web_on else Res.string.telegram_reminders_web_off,
+                    ),
+                    supporting = if (on) stringResource(Res.string.telegram_reminders_web_on_body) else null,
+                    selected = saving == null && confirmed.isWebOn() == on,
+                    saving = saving != null && saving.isWebOn() == on,
+                    enabled = enabled,
+                    position = groupPositionOf(index, webOptions.size),
+                    onClick = { onAction(TelegramAction.WebReminderClick(on)) },
+                    modifier = Modifier.testTag(if (on) "telegram_reminders_web_on" else "telegram_reminders_web_off"),
+                )
+            }
+        } else {
+            ReminderChannelOptions.forEachIndexed { index, option ->
+                ChannelRow(
+                    title = stringResource(option.titleRes()),
+                    supporting = option.supportingRes()?.let { stringResource(it) },
+                    selected = saving == null && confirmed == option,
+                    saving = saving == option,
+                    enabled = enabled,
+                    position = groupPositionOf(index, ReminderChannelOptions.size),
+                    onClick = { onAction(TelegramAction.ReminderChannelClick(option)) },
+                    modifier = Modifier.testTag("telegram_reminders_${option.name.lowercase()}"),
+                )
+            }
+        }
+    }
+}
+
+/** Android / iOS row order, as the owner gave it (addendum §2.1). */
+private val ReminderChannelOptions = listOf(ReminderChannel.Push, ReminderChannel.Telegram, ReminderChannel.Both)
+
+private fun ReminderChannel.titleRes(): StringResource = when (this) {
+    ReminderChannel.Push -> Res.string.telegram_reminders_option_push
+    ReminderChannel.Telegram -> Res.string.telegram_reminders_option_telegram
+    ReminderChannel.Both -> Res.string.telegram_reminders_option_both
+}
+
+/** Only the row whose consequence is not obvious from its title gets a supporting line. */
+private fun ReminderChannel.supportingRes(): StringResource? = when (this) {
+    ReminderChannel.Telegram -> Res.string.telegram_reminders_option_telegram_body
+    else -> null
+}
+
+/**
+ * One radio row of the reminder group: the whole row is the click target (≥ 48dp), the RadioButton
+ * itself is not clickable. The 24dp control slot is centred on the FIRST title line, so at
+ * fontScale 2.0 the radio sits next to the first line, not the middle of the block. [saving] swaps
+ * the radio for a spinner in the same box (no reflow) and announces "Saving" as the row state.
+ */
+@Composable
+private fun ChannelRow(
+    title: String,
+    supporting: String?,
+    selected: Boolean,
+    saving: Boolean,
+    enabled: Boolean,
+    position: GroupPosition,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val titleStyle = MaterialTheme.typography.bodyLarge
+    val (controlPad, textPad) = firstLineCentring(ChannelControlBox, lineHeightDp(titleStyle))
+    val savingCd = stringResource(Res.string.telegram_reminders_saving_cd)
+    val contentAlpha = if (enabled) 1f else DisabledContentAlpha
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = AppDimens.MinTouchTarget)
+            .groupSegment(position)
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .then(if (saving) Modifier.semantics { stateDescription = savingCd } else Modifier)
+            .padding(horizontal = AppDensity.GroupRowPaddingHorizontal, vertical = AppDimens.SpacingMd),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(AppDensity.GroupRowGap),
+    ) {
+        Box(
+            modifier = Modifier.padding(top = controlPad).size(ChannelControlBox),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (saving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(SpinnerSize).clearAndSetSemantics { },
+                    strokeWidth = SpinnerStroke,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                RadioButton(selected = selected, onClick = null, enabled = enabled)
+            }
+        }
+        Column(Modifier.weight(1f).padding(top = textPad)) {
+            Text(
+                text = title,
+                style = titleStyle,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The phase-1 benefits, identical in every state that shows them. [showReminders] adds the
+ * Telegram-reminders row (addendum §5.1) — gated like the section, on the server reporting a channel.
+ */
+@Composable
+private fun Benefits(showReminders: Boolean = false) {
     val style = MaterialTheme.typography.bodyLarge
     ValuePropRow(
         icon = Icons.Outlined.EditNote,
@@ -569,14 +774,34 @@ private fun Benefits() {
         textStyle = style,
         alignToTileTop = true,
     )
+    if (showReminders) {
+        Spacer(Modifier.height(AppDimens.SpacingLg))
+        ValuePropRow(
+            icon = Icons.Outlined.NotificationsActive,
+            label = stringResource(Res.string.telegram_reminders_benefit),
+            textStyle = style,
+            alignToTileTop = true,
+        )
+    }
 }
 
+/** [note] — the reminder consequence paragraph (addendum §4.1), null when the channel is `push`. */
 @Composable
-private fun DisconnectDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun DisconnectDialog(note: String?, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.telegram_disconnect_dialog_title)) },
-        text = { Text(stringResource(Res.string.telegram_disconnect_dialog_body)) },
+        text = {
+            if (note == null) {
+                Text(stringResource(Res.string.telegram_disconnect_dialog_body))
+            } else {
+                Column {
+                    Text(stringResource(Res.string.telegram_disconnect_dialog_body))
+                    Spacer(Modifier.height(AppDimens.SpacingSm))
+                    Text(note)
+                }
+            }
+        },
         confirmButton = {
             AppButtonDestructive(
                 text = stringResource(Res.string.telegram_disconnect_confirm),

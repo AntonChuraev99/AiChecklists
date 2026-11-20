@@ -21,6 +21,10 @@
  * the plan of every tool call — so a queue retry of the update that drives a turn resumes it where
  * it stopped (`turn.updateId`) and never runs a write twice; the closed turn's reply waits in an
  * outbox, so a failed send is re-sent instead of re-asking (and re-charging) the agent.
+ *
+ * Phase 4 — reminders (reminders.ts). `deliverReminders()` (RPC from the cron) sends this chat's
+ * already-claimed reminders, one attempt each, outside the queue; their buttons and `/reminders` run
+ * through the queue like every other update.
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -77,14 +81,25 @@ import {
   getAiConfig,
   getCreditInfo,
   getLink,
+  getReminderSettings,
   getUserTimezone,
   identityBody,
   InternalApiError,
   linkIds,
+  setReminderChannel,
   setUserTimezone,
   type TelegramIdentity,
   type TelegramLink,
 } from "./backend";
+import {
+  deliverReminders as deliverReminderBatch,
+  offerChannelIfPush,
+  onReminderTap,
+  showReminderSettings,
+  type DeliveryOutcome,
+  type DueReminder,
+  type TapDeps,
+} from "./reminders";
 import {
   decodeCallback,
   emptyRegistry,
@@ -271,6 +286,25 @@ export class TelegramChat extends DurableObject<Env> {
     const result = await this.queue.enqueue(update, Date.now());
     if (result === "queued") await this.scheduleAt(Date.now());
     return result;
+  }
+
+  /**
+   * Phase 4 — called by the cron fan-out (index.ts `scheduled`) with this chat's reminders, already
+   * claimed on the server. ONE send attempt each, never repeated (reminders.ts "AT MOST ONCE"); runs
+   * outside the update queue, which it does not touch (only `rem:<rid>` keys).
+   */
+  async deliverReminders(batch: DueReminder[]): Promise<DeliveryOutcome[]> {
+    return deliverReminderBatch(
+      {
+        store: this.store,
+        now: () => Date.now(),
+        getLink: (telegramUserId) => getLink(this.env, telegramUserId),
+        findChecklist: (ids, cloudId) => findChecklistWithOwner(this.env, ids, cloudId),
+        send: (chatId, text, keyboard) => sendMessage(this.env, chatId, text, keyboard),
+        track: (r, creditUserId, event) => this.track(r.telegramUserId, creditUserId, event),
+      },
+      batch,
+    );
   }
 
   async alarm(): Promise<void> {
@@ -481,6 +515,8 @@ export class TelegramChat extends DurableObject<Env> {
         return this.cmdChat(arg, who, lang, updateId);
       case "timezone":
         return this.cmdTimezone(who, lang);
+      case "reminders":
+        return showReminderSettings(this.reminderTapDeps(), who, lang);
       case "credits":
         return this.cmdCredits(who, lang);
       case "premium":
@@ -607,9 +643,11 @@ export class TelegramChat extends DurableObject<Env> {
       return;
     }
     let creditUserId: string | null = null;
+    let googleUid: string | null = null;
     try {
       const r = await callInternal(this.env, "consume_app_token", { token: arg, ...identityBody(who) });
       creditUserId = typeof r["credit_user_id"] === "string" ? (r["credit_user_id"] as string) : null;
+      googleUid = typeof r["google_uid"] === "string" ? (r["google_uid"] as string) : null;
     } catch (e) {
       if (!(e instanceof InternalApiError)) throw e;
       if (e.status === 409) {
@@ -625,12 +663,39 @@ export class TelegramChat extends DurableObject<Env> {
           return;
         }
         creditUserId = existing.creditUserId;
+        googleUid = existing.googleUid;
       } else {
         throw e;
       }
     }
     await sendMessage(this.env, who.chatId, `${s.linked}\n\n${s.help}`);
+    await this.offerReminderChannel(googleUid, who, lang);
     await this.track(who.telegramUserId, creditUserId, { type: "tg_link_completed" });
+  }
+
+  /**
+   * App → bot link (Phase 4): «reminders here?» while `users/{google_uid}.reminder_channel` is push or
+   * absent (bot → app, Python sends the same offer). Best-effort: the link is done and confirmed, and
+   * a throw here would make the queue replay `/start` — a second «linked» message.
+   */
+  private async offerReminderChannel(googleUid: string | null, who: TelegramIdentity, lang: Lang): Promise<void> {
+    if (!googleUid) {
+      console.warn("[gisti-tg] link without google_uid in the response — no reminder channel offer");
+      return;
+    }
+    try {
+      await offerChannelIfPush(
+        {
+          getSettings: (uid) => getReminderSettings(this.env, uid),
+          send: (chatId, text, keyboard) => sendMessage(this.env, chatId, text, keyboard),
+        },
+        googleUid,
+        who.chatId,
+        lang,
+      );
+    } catch (e) {
+      console.warn(`[gisti-tg] reminder channel offer after link failed: ${errText(e)}`);
+    }
   }
 
   private async cmdCredits(who: TelegramIdentity, lang: Lang): Promise<void> {
@@ -841,7 +906,33 @@ export class TelegramChat extends DurableObject<Env> {
         return this.openChecklist(cb.key, cb.page, who, messageId, lang, answer);
       case "toggle":
         return this.toggle(cb.key, cb.checked, cb.page, who, messageId, lang, answer);
+      case "remDone":
+      case "remSnooze":
+      case "remOpen":
+      case "channel":
+        return onReminderTap(this.reminderTapDeps(), cb, who, messageId, lang, answer);
     }
+  }
+
+  /** The I/O behind the reminder buttons and `/reminders` (reminders.ts). */
+  private reminderTapDeps(): TapDeps {
+    return {
+      store: this.store,
+      now: () => Date.now(),
+      getLink: (telegramUserId) => getLink(this.env, telegramUserId),
+      findChecklist: (ids, cloudId) => findChecklistWithOwner(this.env, ids, cloudId),
+      writeChecklist: (ownerId, c) => writeChecklist(this.env, ownerId, c),
+      snooze: (rid, minutes, telegramUserId) =>
+        callInternal(this.env, "snooze_reminder", { rid, minutes, telegram_user_id: telegramUserId }),
+      getSettings: (googleUid) => getReminderSettings(this.env, googleUid),
+      setChannel: (googleUid, channel) => setReminderChannel(this.env, googleUid, channel),
+      send: (chatId, text, keyboard) => sendMessage(this.env, chatId, text, keyboard),
+      edit: (chatId, messageId, text, keyboard) => editOrSend(this.env, chatId, messageId, text, keyboard),
+      loginPrompt: (who, lang) => this.sendLoginPrompt(who, lang, false),
+      loadKeys: () => this.loadKeys(),
+      saveKeys: (keys) => this.saveKeys(keys),
+      track: (who, creditUserId, event) => this.track(who.telegramUserId, creditUserId, event),
+    };
   }
 
   private async onDraftAction(

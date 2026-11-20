@@ -14,6 +14,9 @@ import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.MainActivity
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderDeliveryPrefsRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.computeNextOccurrence
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
@@ -21,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.koin.core.Koin
 import org.koin.core.context.GlobalContext
 
 /**
@@ -33,6 +37,16 @@ import org.koin.core.context.GlobalContext
  */
 internal fun shouldUseFullScreenIntent(fullScreenFlag: Boolean, permitted: Boolean): Boolean =
     fullScreenFlag && permitted
+
+/**
+ * Pure decision for whether a fired reminder posts anything on this phone (heads-up notification
+ * and, through its full-screen intent, [FullScreenReminderActivity]). Only [ReminderChannel.Telegram]
+ * suppresses it — the server delivers that reminder as a Telegram message instead. A null channel
+ * (repository not in the graph, unknown wire value) means [ReminderChannel.Push], so the phone never
+ * goes quiet by accident. Bookkeeping (clear, advance, re-arm, reset checks) is NOT gated by this.
+ */
+internal fun shouldPostReminderNotification(channel: ReminderChannel?): Boolean =
+    channel != ReminderChannel.Telegram
 
 class ReminderReceiver : BroadcastReceiver() {
 
@@ -69,13 +83,16 @@ class ReminderReceiver : BroadcastReceiver() {
                 val defaultFill = repository.getDefaultFillOneShot(checklistId)
                 val uncheckedCount = defaultFill?.items?.count { !it.checked } ?: 0
 
-                // One-shot: clear reminderAt after firing
-                repository.setReminder(checklistId, null)
+                // One-shot: clear reminderAt after firing. Local-only clear — background bookkeeping
+                // must not mark the row dirty over a newer cloud edit.
+                repository.clearFiredReminder(checklistId)
 
-                showNotification(
-                    context, checklistId, checklist.name, uncheckedCount,
-                    checklist.reminderFullScreen
-                )
+                if (koin.shouldPostReminder("checklist one-shot", checklistId)) {
+                    showNotification(
+                        context, checklistId, checklist.name, uncheckedCount,
+                        checklist.reminderFullScreen
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -136,7 +153,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     }
                 } else {
                     // End condition reached — stop repeating
-                    repository.clearRepeatSchedule(checklistId)
+                    repository.clearFinishedRepeatSchedule(checklistId)
                     analytics?.eventOutOfSession(AnalyticsEvents.Reminder.RECURRING_ENDED, mapOf(
                         "checklist_id" to checklistId.toString(),
                         "end_reason" to repeatRule.endCondition::class.simpleName.orEmpty(),
@@ -144,10 +161,12 @@ class ReminderReceiver : BroadcastReceiver() {
                     ))
                 }
 
-                showNotification(
-                    context, checklistId, checklist.name, uncheckedCount,
-                    checklist.reminderFullScreen
-                )
+                if (koin.shouldPostReminder("checklist repeat", checklistId)) {
+                    showNotification(
+                        context, checklistId, checklist.name, uncheckedCount,
+                        checklist.reminderFullScreen
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -172,15 +191,19 @@ class ReminderReceiver : BroadcastReceiver() {
                 if (item.checked) return@launch
 
                 // Clear one-shot field so it doesn't re-fire after reboot rescheduling
+                // Local-only write: updateFill would mark the parent PENDING_UPLOAD, and the next sync
+                // would push this stale fill over a newer cloud edit (e.g. "Done" tapped in Telegram).
                 val updatedItems = fill.items.map { if (it.id == itemId) it.withReminderAt(null) else it }
-                repository.updateFill(fill.copy(items = updatedItems))
+                repository.updateFillLocalOnlyFromAlarm(fill.copy(items = updatedItems))
 
-                val checklist = repository.getChecklistById(checklistId)
-                val checklistName = checklist?.name ?: context.getString(R.string.app_name)
-                showItemNotification(
-                    context, checklistId, fillId, itemId, checklistName, item.text,
-                    item.reminderFullScreen
-                )
+                if (koin.shouldPostReminder("item one-shot", checklistId)) {
+                    val checklist = repository.getChecklistById(checklistId)
+                    val checklistName = checklist?.name ?: context.getString(R.string.app_name)
+                    showItemNotification(
+                        context, checklistId, fillId, itemId, checklistName, item.text,
+                        item.reminderFullScreen
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -225,20 +248,23 @@ class ReminderReceiver : BroadcastReceiver() {
                         .withReminderAt(null)
                 }
 
+                // Local-only write — see handleItemOneShot.
                 val updatedItems = fill.items.map { if (it.id == itemId) updatedItem else it }
-                repository.updateFill(fill.copy(items = updatedItems))
+                repository.updateFillLocalOnlyFromAlarm(fill.copy(items = updatedItems))
 
                 // Reschedule next occurrence if schedule continues
                 if (nextOccurrence != null) {
                     scheduler.scheduleItemRepeat(checklistId, fillId, itemId, nextOccurrence)
                 }
 
-                val checklist = repository.getChecklistById(checklistId)
-                val checklistName = checklist?.name ?: context.getString(R.string.app_name)
-                showItemNotification(
-                    context, checklistId, fillId, itemId, checklistName, item.text,
-                    item.reminderFullScreen
-                )
+                if (koin.shouldPostReminder("item repeat", checklistId)) {
+                    val checklist = repository.getChecklistById(checklistId)
+                    val checklistName = checklist?.name ?: context.getString(R.string.app_name)
+                    showItemNotification(
+                        context, checklistId, fillId, itemId, checklistName, item.text,
+                        item.reminderFullScreen
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -247,6 +273,22 @@ class ReminderReceiver : BroadcastReceiver() {
                 pendingResult.finish()
             }
         }
+    }
+
+    /**
+     * Reads the delivery channel (one DataStore read, never throws) and decides via
+     * [shouldPostReminderNotification]. Called once per fire, AFTER the bookkeeping, so the clear /
+     * advance / re-arm never depend on it. A suppressed post is logged, never silent.
+     */
+    private suspend fun Koin.shouldPostReminder(kind: String, checklistId: Long): Boolean {
+        val channel = getOrNull<ReminderDeliveryPrefsRepository>()?.getReminderChannel()
+        val post = shouldPostReminderNotification(channel)
+        if (!post) {
+            val message = "$kind reminder for checklist $checklistId delivered via Telegram — " +
+                "local notification suppressed (bookkeeping done)"
+            getOrNull<AppLogger>()?.info(LOG_TAG_REMINDERS, message) ?: Log.i(LOG_TAG_REMINDERS, message)
+        }
+        return post
     }
 
     private fun showItemNotification(
@@ -411,6 +453,7 @@ class ReminderReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "ReminderReceiver"
+        private const val LOG_TAG_REMINDERS = "Reminders"
         const val ACTION_REMINDER_FIRE = "com.antonchuraev.aichecklists.ACTION_REMINDER_FIRE"
         const val ACTION_REPEAT_FIRE = "com.antonchuraev.aichecklists.ACTION_REPEAT_FIRE"
         const val ACTION_ITEM_REMINDER_FIRE = "com.antonchuraev.aichecklists.ACTION_ITEM_REMINDER_FIRE"

@@ -10,6 +10,8 @@ import com.antonchuraev.homesearchchecklist.MainActivity
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderDeliveryPrefsRepository
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -17,6 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.context.GlobalContext
 import kotlin.random.Random
 
@@ -67,6 +71,21 @@ internal class GistiFirebaseMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(message)
 
         val data = message.data
+
+        // Control message (reminder channel changed on the server) — persist and stop: no
+        // notification, no push_received (it is not a user-visible push).
+        when (val decision = parseReminderChannelPush(data)) {
+            ReminderChannelPushDecision.NotAChannelUpdate -> Unit
+            is ReminderChannelPushDecision.Ignore -> {
+                logger?.warning(TAG, "reminder_channel push with unknown channel='${decision.rawChannel}' — cache kept")
+                return
+            }
+            is ReminderChannelPushDecision.Apply -> {
+                persistReminderChannel(decision.channel)
+                return
+            }
+        }
+
         val payload = PushPayload(
             title = data[KEY_TITLE] ?: message.notification?.title ?: getString(R.string.app_name),
             body = data[KEY_BODY] ?: message.notification?.body,
@@ -95,6 +114,31 @@ internal class GistiFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         showNotification(payload)
+    }
+
+    /**
+     * Writes the channel synchronously: onMessageReceived runs on FCM's worker thread (not main), and
+     * the process may be frozen as soon as it returns, so a fire-and-forget launch could lose the
+     * write. Bounded well below FCM's ~20 s handling window.
+     */
+    private fun persistReminderChannel(channel: ReminderChannel) {
+        val repository: ReminderDeliveryPrefsRepository? = GlobalContext.getOrNull()?.getOrNull()
+        if (repository == null) {
+            logger?.warning(TAG, "reminder_channel push: no ReminderDeliveryPrefsRepository — '${channel.wire}' not cached")
+            return
+        }
+        val written = runCatching {
+            runBlocking { withTimeoutOrNull(CHANNEL_WRITE_TIMEOUT_MS) { repository.setReminderChannel(channel) } }
+        }
+        written.onFailure { e ->
+            logger?.error(TAG, "reminder_channel push: failed to cache '${channel.wire}' — ${e.message}", e)
+        }.onSuccess { result ->
+            if (result == null) {
+                logger?.warning(TAG, "reminder_channel push: cache write of '${channel.wire}' timed out")
+            } else {
+                logger?.info(TAG, "reminder_channel push: cached '${channel.wire}'")
+            }
+        }
     }
 
     private fun emitReceived(payload: PushPayload) {
@@ -228,6 +272,7 @@ internal class GistiFirebaseMessagingService : FirebaseMessagingService() {
 
     private companion object {
         const val TAG = "PushFcm"
+        const val CHANNEL_WRITE_TIMEOUT_MS = 10_000L
         const val KEY_TITLE = "title"
         const val KEY_BODY = "body"
         const val KEY_CHANNEL = "channel"

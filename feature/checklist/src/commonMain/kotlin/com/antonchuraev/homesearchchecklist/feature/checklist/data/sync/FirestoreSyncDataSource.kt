@@ -51,7 +51,23 @@ interface FirestoreSyncDataSource {
      * - [AppResult.Error] on a transport/decode failure.
      */
     suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?>
+
+    /**
+     * MERGE-writes string [fields] into `users/{userId}` (create the doc if absent, never replace
+     * it — that doc also carries server-owned fields: credits, premium, `reminder_channel`).
+     * [userId] here is the Firebase Auth uid (= `google_uid`), which `firestore.rules` lets the
+     * owner write.
+     *
+     * Implemented on Android (`SetOptions.merge()`) and wasmJs (`__firestoreMergeDoc`, `setDoc` with
+     * `{merge: true}`). Default = [UserDocMergeUnsupported] (iOS today): a platform without a
+     * merge-capable write must report it, never fall back to a full `set`.
+     */
+    suspend fun mergeUserDocFields(userId: String, fields: Map<String, String>): AppResult<Unit> =
+        AppResult.Error(UserDocMergeUnsupported())
 }
+
+/** [FirestoreSyncDataSource.mergeUserDocFields] is not available on this platform yet. */
+class UserDocMergeUnsupported : Exception("users/{uid} merge write is not supported on this platform")
 
 @Serializable
 data class UserDocSyncData(

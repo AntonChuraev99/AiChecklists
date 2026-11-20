@@ -111,3 +111,36 @@ endpoints:
         document: rc_events/{eventId}
     region: us-central1
     platform: gcfv2
+
+  # Telegram reminders (phase 4): keep the server-only telegram_reminders index in sync.
+  # Firestore is in nam5 — deploy.sh passes --trigger-location=nam5 and --cpu=1 (see there).
+  # 512MB like the HTTP endpoints: same main.py module graph, and the checklist trigger runs on
+  # every checklist write of every user.
+  on_checklist_written_tg:
+    entryPoint: on_checklist_written_tg
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.written
+      retry: false
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: users/{uid}/checklists/{checklistId}
+    region: us-central1
+    platform: gcfv2
+    availableMemoryMb: 512
+
+  # Returns before any read unless timezone / reminder_channel changed (credit docs are hot).
+  on_user_settings_written_tg:
+    entryPoint: on_user_settings_written_tg
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.written
+      retry: false
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: users/{uid}
+    region: us-central1
+    platform: gcfv2
+    availableMemoryMb: 512

@@ -594,6 +594,10 @@ def main(monkeypatch, db):
 
     monkeypatch.setattr(main_mod, "db", db)
     monkeypatch.setattr(main_mod, "_telegram_now", lambda: NOW)
+    # No real Bot API call from an offline test: a bot → app claim now sends the reminder-channel
+    # offer (phase 4). Tests that check what is sent patch `post` themselves.
+    monkeypatch.setattr(main_mod.http_requests, "post",
+                        MagicMock(return_value=MagicMock(status_code=200)))
     # Bearer <uid> -> that uid; anything else is an invalid token.
     monkeypatch.setattr(main_mod.firebase_auth, "verify_id_token", lambda tok: {"uid": tok})
     return main_mod

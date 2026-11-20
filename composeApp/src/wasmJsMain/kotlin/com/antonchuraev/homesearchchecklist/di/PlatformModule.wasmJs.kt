@@ -15,6 +15,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.Ca
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.sync.WasmFirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.telegram.BrowserDeviceTimeZoneProvider
+import com.antonchuraev.homesearchchecklist.telegram.DeviceTimeZoneProvider
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -54,4 +56,8 @@ actual fun platformModule(): Module = module {
 
     // Firestore sync data source backed by globalThis.__firestore* bridges in init.js.
     single<FirestoreSyncDataSource> { WasmFirestoreSyncDataSource() }
+
+    // Overrides telegramModule's kotlinx-based default (platformModule loads after it in appModule):
+    // kotlinx-datetime on Wasm reports `SYSTEM`, the browser's Intl knows the IANA id.
+    single<DeviceTimeZoneProvider> { BrowserDeviceTimeZoneProvider(logger = get()) }
 }

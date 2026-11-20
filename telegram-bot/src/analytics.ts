@@ -30,6 +30,8 @@ export interface AnalyticsEnv {
 }
 
 import type { AgentToolName, ToolStatus } from "./agentTools";
+import type { ReminderChannel } from "./backend";
+import type { ChannelSource } from "./callback";
 
 export type ChecklistMode = "free" | "ai";
 export type ChecklistInput = "text" | "photo" | "voice" | "audio" | "document" | "url";
@@ -62,7 +64,17 @@ export type TgEvent =
   /** `rounds` = tool rounds the turn ran (0..5). */
   | { type: "tg_chat_turn"; result: ChatTurnResult; rounds: number }
   /** One per tool call the agent made; `tool` is one of the 11 fixed tool names. */
-  | { type: "tg_chat_tool"; tool: AgentToolName; status: ToolStatus };
+  | { type: "tg_chat_tool"; tool: AgentToolName; status: ToolStatus }
+  // Phase 4 — reminders in Telegram
+  /** A reminder message was delivered (the server's entry kind). */
+  | { type: "tg_reminder_sent"; kind: ReminderKind }
+  /** A reminder button did its job (Done ticked or found ticked, snoozed, list opened). */
+  | { type: "tg_reminder_action"; action: ReminderAction }
+  | { type: "tg_reminder_channel_set"; channel: ReminderChannel; source: ChannelSource };
+
+/** `claim_due_reminders` entry kind. */
+export type ReminderKind = "oneshot" | "repeat" | "snooze";
+export type ReminderAction = "done" | "snooze" | "open";
 
 export interface TgAnalyticsIdentity {
   /** `users/{credit_user_id}` when linked, else null. */
@@ -120,6 +132,12 @@ function eventProperties(e: TgEvent): Record<string, string | number | boolean> 
       return { result: e.result, rounds: e.rounds };
     case "tg_chat_tool":
       return { tool: e.tool, status: e.status };
+    case "tg_reminder_sent":
+      return { kind: e.kind };
+    case "tg_reminder_action":
+      return { action: e.action };
+    case "tg_reminder_channel_set":
+      return { channel: e.channel, source: e.source };
   }
 }
 
