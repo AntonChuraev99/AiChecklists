@@ -72,6 +72,33 @@ describe("callback_data", () => {
   });
 });
 
+describe("callback_data — Phase 2 (AI chat, time zone)", () => {
+  it("round-trips the chat and time-zone kinds within 64 bytes", () => {
+    const all: Callback[] = [
+      { t: "draft", draftId: "mi4x9z2a", action: "chat" },
+      { t: "confirm", turn: 1, yes: true },
+      { t: "confirm", turn: 999_999_999_999, yes: false },
+      { t: "option", turn: 999_999_999_999, index: 5 },
+      { t: "option", turn: 3, index: 0 },
+      { t: "endChat" },
+      { t: "tz", offset: 330 },
+      { t: "tz", offset: -480 },
+      { t: "tz", offset: 0 },
+    ];
+    for (const cb of all) {
+      const data = encodeCallback(cb);
+      expect(byteLength(data)).toBeLessThanOrEqual(CALLBACK_MAX_BYTES);
+      expect(decodeCallback(data)).toEqual(cb);
+    }
+  });
+
+  it("rejects malformed chat data", () => {
+    for (const bad of ["a:1:x", "a::y", "p:1:10", "p:x:1", "z:abc", "z:12345", "d:abc:q", "ee"]) {
+      expect(decodeCallback(bad)).toBeNull();
+    }
+  });
+});
+
 describe("key registry", () => {
   it("maps a short key to the checklist / item ids and reuses it for the same target", () => {
     const reg = emptyRegistry();

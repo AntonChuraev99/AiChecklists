@@ -2,7 +2,7 @@
 
 A Cloudflare Worker that lets a Gisti user work with their checklists from Telegram, on the **same
 Google account** as the app: same checklists, same AI-credit wallet. Phase 1 (design:
-`docs/active/telegram-bot-phase1-2026-11-19.md`):
+`docs/archive/telegram-bot-phase1-2026-11-19.md`):
 
 - **Link** — `/start <token>` from the app's deep link, or «Sign in with Google» from the bot.
 - **Any message → checklist** — text becomes a checklist line by line for free, or with AI
@@ -14,8 +14,42 @@ Google account** as the app: same checklists, same AI-credit wallet. Phase 1 (de
   subscription (`telegram_premium_price_stars`, default 100 ⭐). One Premium for Telegram, the Android
   app and the web. `/paysupport` has the support contact and terms. `/app` (menu «Mobile app») opens
   the Google Play listing.
+- **Phase 2 — AI chat** — the app's assistant (`chat_agent`) in the bot: «💬 Ask AI» under a text
+  draft or `/chat [text]`; `/timezone` for reminders at local time.
 
-Not built yet: AI chat (phase 2), reminders (phase 4).
+Not built yet: reminders in Telegram (phase 4).
+
+### AI chat (Phase 2)
+
+- **Entry.** A text-only draft gets a third button «💬 Ask AI (3 credits)»: the draft text becomes the
+  first message. `/chat` opens chat mode with a short intro; `/chat <text>` opens it and sends the
+  text. While chat mode is open, plain text goes straight to the agent (no draft); photos, voice,
+  files and links keep the draft flow; commands always work. It closes on «End chat» (under every
+  reply that leaves the chat open), on `/unlink`, on 402 (out of credits / no user — the next text is
+  a draft again), or after 30 min without any user message or button tap (checked on the next one).
+- **Loop.** `chat_agent` runs one Gemini step per call; the Durable Object keeps the transcript
+  (40 turns stored, a window of 6 turns / 30 entries / 8000 chars sent — the app's <!-- docs-leak-scan: reviewed — transcript window limits, not a metric -->
+  `AgentTranscriptWindow`) and calls back after each tool round, ≤ 6 calls a turn (the server caps 5
+  tool rounds). One `request_id = tg-chat-<chat_id>-<turn>` per turn → the 3 credits
+  (`CHAT_AGENT_COST`, hardcoded in `main.py`) are charged once, on round 1; `thought_signature` is <!-- docs-leak-scan: reviewed — constant name, no prompt text -->
+  echoed verbatim. `checklists_summary`: 8 lists, 6 recent items each, most recently updated first.
+- **Tools** run in the worker (`src/agentTools.ts`) over the MCP data layer, with the app
+  dispatcher's semantics and result shapes. Writes run at once; only `delete_item`,
+  `clear_completed_items` and `move_item` show ONE «Yes / Cancel» card for the whole batch. The batch
+  is planned before the card, so the card names the row and list that will really change (or says a
+  call changes nothing) and «Yes» applies exactly those plans. Cancel answers every call `declined`;
+  a new message declines the card first.
+- **Retries.** Each call's plan (targets by exact id, deterministic ids for new nodes) is stored
+  before its write and marked applied after it; a retried update resumes the turn from there and
+  never writes twice. A closed turn's reply waits in an outbox — a failed send is re-sent, the agent
+  is not asked (and paid) again.
+- **Errors.** 402 `no_user` → sign-in prompt; 402 `insufficient_credits` → out-of-credits + `/premium`
+  (both close chat mode); 400 → «rephrase or shorten»; 5xx / network → queue retry, then «the AI
+  didn't respond» (with «End chat»).
+- **Time zone.** `users/{google_uid}.timezone` (IANA). `/timezone` offers the current local time of 18
+  offsets and stores `Etc/GMT∓N` (sign inverted: UTC+3 = `Etc/GMT-3`) or `Asia/Kolkata` (+5:30),
+  with `timezone_source: "telegram"`, by a masked PATCH. Unknown zone → no `timezone_offset_minutes`,
+  and `set_item_reminder` answers `timezone_unknown` (the reply then points to `/timezone`).
 
 ### Payments (Phase 3)
 
@@ -87,7 +121,7 @@ npx wrangler@4 deploy
 
 # 4. register the webhook, command menu and descriptions (EN / RU / HI). Re-run it after Phase 3:
 #    allowed_updates now include pre_checkout_query and subscription, and the menu gained
-#    premium / app / paysupport.
+#    premium / app / paysupport — and after Phase 2 (menu: chat / timezone).
 TELEGRAM_BOT_TOKEN=... WEBHOOK_URL=https://gisti-telegram.<subdomain>.workers.dev/telegram/webhook \
   node scripts/setup.mjs            # add --dry-run to print the calls without sending
 ```
@@ -113,6 +147,9 @@ Amplitude HTTP V2 (same endpoint and identity rules as `mcp-server/src/analytics
 | `tg_payment_succeeded` | `amount` (Stars), `is_recurring` |
 | `tg_subscription_updated` | `state` active / canceled / failed |
 | `tg_app_link_opened` | — (`/app`; a tap on the Play button itself is not observable) |
+| `tg_chat_opened` | `source` button / command (chat mode went from closed to open) |
+| `tg_chat_turn` | `result` final / options / declined / no_credits / error · `rounds` 0..5 |
+| `tg_chat_tool` | `tool` one of the 11 agent tools · `status` success / not_found / ambiguous / declined / error |
 
 `user_id` = the credit doc id `users/{credit_user_id}` (the id the app passes to `setUserId`), set
 once the account is linked; `device_id` = `tg_<sha256(telegram_user_id)[0:16]>` on every event;
@@ -131,3 +168,11 @@ type is a closed union of fixed vocabularies (`analytics.test.ts` pins the key a
   worker already sends `mime_type`, which the CF ignores today — verify voice with a live smoke test.
 - A link is passed to the model as the URL string (the CF does not fetch the page), same as the app.
 - AI output language: `ru` for Russian users, English otherwise (the CF supports only these two).
+- AI chat: `create_checklist` does not enforce the free «5 checklists» limit (true for every bot
+  create path and for the MCP). A list-less command targets the most recently updated checklist
+  (the app takes the first by position — Telegram has no open list). Cancel on the card declines
+  read-only calls of that batch too (the app runs those regardless). A reminder set from the chat
+  writes `reminderAt` only — the app arms it when it syncs; Telegram delivery is Phase 4. Answers are
+  plain text (Markdown marks stripped), split at 4096 chars; options show up to 6 buttons.
+- `response_language` is the bot UI language (en / ru / hi from the Telegram language, fallback
+  en), so one chat never mixes two languages; the app defaults to auto-detect per message.

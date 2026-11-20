@@ -8,16 +8,23 @@
  * mutates them (contract: "Money, credits and link state are mutated only by Python").
  */
 
-import { getAccessToken, getUserChecklists, type FirestoreEnv } from "../../mcp-server/src/firestore";
+import { getAccessToken, getUserChecklists, type FirestoreEnv, type OwnedChecklist } from "../../mcp-server/src/firestore";
 import { CfError, type GenerateChecklistResult, type GeneratedNode } from "../../mcp-server/src/cf";
 import type { ChecklistSyncData } from "../../mcp-server/src/model";
+import type { AgentToolCall } from "./agentTools";
 import { derivedKey, INTERNAL_KEY_LABEL } from "./keys";
+import { isValidZone } from "./timezone";
 
 const FIRESTORE_BASE =
   "https://firestore.googleapis.com/v1/projects/aichecklists-40230/databases/(default)/documents";
 
 /** main.py DEFAULT_AI_ACTION_COST — used when remote_config/current has no `ai_action_cost`. */
 export const DEFAULT_AI_ACTION_COST = 30;
+/**
+ * main.py:3217 `CHAT_AGENT_COST = 3` — a hardcoded constant there (not a remote_config key), charged
+ * once per chat turn. Shown on the «Ask AI» button and in the chat intro; the CF charges the real one.
+ */
+export const CHAT_AGENT_COST = 3;
 /** main.py DEFAULT_MAX_INPUT_LENGTH — `ai_analysis_max_input_length` fallback. */
 export const DEFAULT_MAX_INPUT_LENGTH = 10_000;
 const AI_CONFIG_TTL_MS = 5 * 60 * 1000;
@@ -106,14 +113,58 @@ export function linkIds(link: TelegramLink): string[] {
  * `getUserChecklists` already drops `isDeleted` and the system Inbox.
  */
 export async function collectChecklists(env: FirestoreEnv, ids: string[]): Promise<ChecklistSyncData[]> {
-  const byId = new Map<string, ChecklistSyncData>();
+  return (await collectOwnedChecklists(env, ids)).map((o) => o.checklist);
+}
+
+/**
+ * `collectChecklists` keeping the doc each winning copy lives in, so a mutation writes back to THAT
+ * doc (the `findChecklistWithOwner` rule) — the AI chat edits checklists found by name, not by id.
+ */
+export async function collectOwnedChecklists(env: FirestoreEnv, ids: string[]): Promise<OwnedChecklist[]> {
+  const byId = new Map<string, OwnedChecklist>();
   for (const uid of ids) {
     for (const c of await getUserChecklists(env, uid)) {
       const prev = byId.get(c.cloudId);
-      if (!prev || c.updatedAt > prev.updatedAt) byId.set(c.cloudId, c);
+      if (!prev || c.updatedAt > prev.checklist.updatedAt) byId.set(c.cloudId, { checklist: c, ownerId: uid });
     }
   }
   return [...byId.values()];
+}
+
+// ── time zone (users/{google_uid}.timezone) ─────────────────────────────────────
+
+/** The stored IANA zone, or null when absent or not a zone this runtime knows (logged). */
+export async function getUserTimezone(env: FirestoreEnv, googleUid: string): Promise<string | null> {
+  const o = await getDocument(env, `users/${googleUid}`);
+  const tz = o?.["timezone"];
+  if (tz === undefined || tz === null) return null;
+  if (isValidZone(tz)) return tz;
+  console.warn(`[gisti-tg] users/{google_uid}.timezone is not a valid IANA zone — treated as unknown`);
+  return null;
+}
+
+/**
+ * PATCH string fields of one document with an `updateMask` of exactly those fields — every other
+ * field of the doc is left untouched (never a full-document write). Throws on failure.
+ */
+export async function patchStringFields(env: FirestoreEnv, path: string, fields: Record<string, string>): Promise<void> {
+  const token = await getAccessToken(env);
+  const mask = Object.keys(fields)
+    .map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
+    .join("&");
+  const body: Record<string, { stringValue: string }> = {};
+  for (const [k, v] of Object.entries(fields)) body[k] = { stringValue: v };
+  const resp = await fetch(`${FIRESTORE_BASE}/${path}?${mask}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: body }),
+  });
+  if (!resp.ok) throw new Error(`firestore PATCH ${path} failed: ${resp.status} ${(await resp.text()).slice(0, 300)}`);
+}
+
+/** `/timezone`: `timezone` + `timezone_source: "telegram"` on the data doc (Phase 4 has the app write it too). */
+export function setUserTimezone(env: FirestoreEnv, googleUid: string, timezone: string): Promise<void> {
+  return patchStringFields(env, `users/${googleUid}`, { timezone, timezone_source: "telegram" });
 }
 
 export interface CreditInfo {
@@ -281,6 +332,116 @@ export async function callInternal(
     throw new InternalApiError(resp.status, code, action);
   }
   return data;
+}
+
+// ── chat_agent ──────────────────────────────────────────────────────────────────
+
+/** Upper bound for one chat_agent round (one Gemini step + its single empty-candidate retry). */
+const CHAT_AGENT_TIMEOUT_MS = 90_000;
+/** The server's present_options caps (main.py:3226-3227). */
+const MAX_OPTIONS = 6;
+const MIN_OPTIONS = 2;
+
+/** A `chat_agent` answer the loop handles in place. 5xx / network / malformed 200 → CfError (queue retry). */
+export type AgentStep =
+  | { kind: "tool_calls"; calls: AgentToolCall[] }
+  | { kind: "final"; content: string }
+  | { kind: "options"; prompt: string; options: string[] }
+  /** 402 `reason: "insufficient_credits"` — the user exists and is out of credits. */
+  | { kind: "no_credits" }
+  /** 402 `reason: "no_user"` — no credit doc (main.py:395-419). */
+  | { kind: "no_user" }
+  /** 400 — the server validated and refused this payload; deterministic, never retried. */
+  | { kind: "rejected"; error: string };
+
+function parseToolCall(raw: unknown): AgentToolCall | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o["name"] !== "string" || !o["name"]) return null;
+  const args = o["args"] && typeof o["args"] === "object" && !Array.isArray(o["args"]) ? (o["args"] as Record<string, unknown>) : {};
+  return {
+    id: typeof o["id"] === "string" ? o["id"] : "",
+    name: o["name"],
+    args,
+    // Echoed byte-for-byte: Gemini 3.x 400s a replayed function_call without it (main.py:3549-3569).
+    ...(typeof o["thought_signature"] === "string" ? { thought_signature: o["thought_signature"] } : {}),
+  };
+}
+
+/**
+ * Status + parsed body → AgentStep, or null for an answer that must be retried (5xx, success:false,
+ * an unknown type, empty tool_calls, a blank final). Options are cleaned like the app
+ * (trim, drop blanks, dedupe case-insensitively); fewer than 2 left → the prompt as a final.
+ * Pure; exported for tests.
+ */
+export function parseAgentResponse(status: number, data: Record<string, unknown>): AgentStep | null {
+  if (status === 402) return data["reason"] === "no_user" ? { kind: "no_user" } : { kind: "no_credits" };
+  if (status === 400) return { kind: "rejected", error: typeof data["error"] === "string" ? data["error"] : "bad request" };
+  if (status < 200 || status >= 300 || data["success"] !== true) return null;
+  switch (data["type"]) {
+    case "tool_calls": {
+      const raw = Array.isArray(data["tool_calls"]) ? data["tool_calls"] : [];
+      const calls = raw.map(parseToolCall).filter((c): c is AgentToolCall => c !== null);
+      if (calls.length === 0) return null;
+      calls.forEach((c, i) => {
+        if (!c.id) c.id = `call_${i}`; // the server's own fallback id shape (main.py:3648)
+      });
+      return { kind: "tool_calls", calls };
+    }
+    case "final": {
+      const content = typeof data["content"] === "string" ? data["content"].trim() : "";
+      return content ? { kind: "final", content } : null;
+    }
+    case "options": {
+      const prompt = [data["prompt"], data["content"]].find((p): p is string => typeof p === "string" && p.trim().length > 0);
+      if (!prompt) return null;
+      const seen = new Set<string>();
+      const options: string[] = [];
+      for (const o of Array.isArray(data["options"]) ? data["options"] : []) {
+        const label = typeof o === "string" ? o.trim() : "";
+        if (!label || seen.has(label.toLowerCase())) continue;
+        seen.add(label.toLowerCase());
+        options.push(label);
+        if (options.length >= MAX_OPTIONS) break;
+      }
+      if (options.length < MIN_OPTIONS) return { kind: "final", content: prompt.trim() };
+      return { kind: "options", prompt: prompt.trim(), options };
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * POST `chat_agent` (no auth header — `user_id` in the body, like every AI CF). Handled outcomes come
+ * back as AgentStep; a network error, a 5xx, a malformed 200 or any other status throws CfError so
+ * the queue retries the update (a 5xx refunded a round-1 reservation and dropped its dedup doc, so
+ * the retry re-reserves cleanly — main.py:4122-4134).
+ */
+export async function callChatAgent(env: BackendEnv, body: Record<string, unknown>): Promise<AgentStep> {
+  const fn = "chat_agent";
+  let resp: Response;
+  try {
+    resp = await fetch(`${env.CF_BASE_URL}/${fn}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(CHAT_AGENT_TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new CfError(0, `network error: ${e instanceof Error ? e.message : "unknown"}`, fn);
+  }
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await resp.json()) as Record<string, unknown>;
+  } catch {
+    // non-JSON → judged by status below
+  }
+  const step = parseAgentResponse(resp.status, data);
+  if (step) return step;
+  const msg = typeof data["error"] === "string" ? data["error"] : resp.ok ? "malformed response" : resp.statusText;
+  // A malformed 200 is worth a retry (the same request_id replays the reservation, no second charge).
+  throw new CfError(resp.ok ? 502 : resp.status, msg, fn);
 }
 
 // ── generate_checklist ──────────────────────────────────────────────────────────

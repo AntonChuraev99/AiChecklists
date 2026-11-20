@@ -12,25 +12,76 @@
  * Identity (contract "Firestore schema"): reads fan out over [google_uid, credit_user_id]; creates
  * write to `users/{google_uid}`; mutations write back to the doc the checklist was found in; AI
  * calls charge `credit_user_id`. Same rules as the MCP tools, same data-layer calls.
+ *
+ * Phase 2 — AI chat (agent.ts, agentTools.ts). Chat mode opens from «💬 Ask AI» under a text draft
+ * or `/chat`; while it is open, plain TEXT goes straight to `chat_agent` (photos, voice, files and
+ * links keep the draft flow, commands always work); it closes on «End chat» or lazily after 30 min
+ * without a user message. One turn = one `request_id` = `tg-chat-<chat_id>-<turn_seq>`. State is one
+ * storage key ("chat"): the transcript, the active turn and, persisted per call BEFORE any write,
+ * the plan of every tool call — so a queue retry of the update that drives a turn resumes it where
+ * it stopped (`turn.updateId`) and never runs a write twice; the closed turn's reply waits in an
+ * outbox, so a failed send is re-sent instead of re-asking (and re-charging) the agent.
  */
 
 import { DurableObject } from "cloudflare:workers";
 import { CfError } from "../../mcp-server/src/cf";
 import { newCloudId } from "../../mcp-server/src/encode";
-import { findChecklistWithOwner, writeChecklist } from "../../mcp-server/src/firestore";
+import { findChecklistWithOwner, writeChecklist, type OwnedChecklist } from "../../mcp-server/src/firestore";
 import { leafItemCount } from "../../mcp-server/src/model";
 import { buildAiChecklist, createEmptyChecklist, toggleItem } from "../../mcp-server/src/mutate";
-import { sendTgEvent, tgIdentity, type AiFailReason, type TgEvent } from "./analytics";
 import {
+  appendRound,
+  beginTurn,
+  buildAgentRequest,
+  buildChecklistsSummary,
+  callSeed,
+  closeChat,
+  closeTurn,
+  confirmKeyboard,
+  emptyChatState,
+  endChatKeyboard,
+  finishTurn,
+  isChatOpen,
+  noteUserActivity,
+  plainText,
+  planBatch,
+  pruneTranscript,
+  renderConfirmCard,
+  renderOptions,
+  renderReply,
+  toolCallsAction,
+  toolEvents,
+  tooLongForChat,
+  type ChatState,
+  type ClosedTurn,
+  type OutMsg,
+  type TurnEnd,
+} from "./agent";
+import { applyOps, declinedResults, planTool, type AgentToolResult } from "./agentTools";
+import {
+  sendTgEvent,
+  sendTgEvents,
+  tgIdentity,
+  type AiFailReason,
+  type ChatTurnResult,
+  type TgAnalyticsIdentity,
+  type TgEvent,
+} from "./analytics";
+import {
+  callChatAgent,
   callInternal,
+  CHAT_AGENT_COST,
   collectChecklists,
+  collectOwnedChecklists,
   generateChecklistViaCf,
   getAiConfig,
   getCreditInfo,
   getLink,
+  getUserTimezone,
   identityBody,
   InternalApiError,
   linkIds,
+  setUserTimezone,
   type TelegramIdentity,
   type TelegramLink,
 } from "./backend";
@@ -49,7 +100,9 @@ import {
   aiRequestId,
   ALBUM_MERGE_MS,
   classifyMessage,
+  draftText,
   freeOption,
+  isTextOnly,
   newDraft,
   nextDraftId,
   type Draft,
@@ -76,8 +129,10 @@ import {
   downloadFile,
   editOrSend,
   FileTooLargeError,
+  isNotModified,
   MAX_FILE_MB,
   sendMessage,
+  sendTyping,
   TelegramError,
   tgCall,
   type InlineKeyboard,
@@ -96,10 +151,13 @@ import {
   renderListsPage,
   renderPremiumView,
 } from "./views";
+import { formatHm, offsetLabel, offsetMinutesAt, renderTimezonePicker, TZ_CHOICES, zoneForOffset } from "./timezone";
 
 const DRAFTS_KEY = "drafts";
 const DRAFT_SEQ_KEY = "draftSeq";
 const KEYS_KEY = "keys";
+/** The AI chat state (agent.ts ChatState) — one key. */
+const CHAT_KEY = "chat";
 /** Drafts older than this are forgotten (their buttons then answer "expired"). */
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_STORED_DRAFTS = 10;
@@ -177,6 +235,11 @@ function draftIdentity(d: Draft): TelegramIdentity {
 /** A keyboard with no rows is sent as no keyboard at all. */
 function keyboardOrNone(k: InlineKeyboard): InlineKeyboard | undefined {
   return k.inline_keyboard.length > 0 ? k : undefined;
+}
+
+/** The `tg_chat_turn.result` of a turn end. */
+function turnResult(end: TurnEnd): ChatTurnResult {
+  return end === "final" || end === "options" || end === "no_credits" ? end : "error";
 }
 
 function collectingDraft(drafts: Drafts): Draft | undefined {
@@ -277,6 +340,16 @@ export class TelegramChat extends DurableObject<Env> {
     await this.store.put(KEYS_KEY, keys);
   }
 
+  private async loadChat(): Promise<ChatState> {
+    return (await this.store.get<ChatState>(CHAT_KEY)) ?? emptyChatState();
+  }
+
+  /** Persist the chat state; the stored transcript is capped by whole turns (the current one stays). */
+  private async saveChat(state: ChatState): Promise<void> {
+    state.transcript = pruneTranscript(state.transcript);
+    await this.store.put(CHAT_KEY, state);
+  }
+
   /**
    * One Amplitude event, AWAITED inside the alarm (a floating send can be lost — MCP precedent).
    * Never throws; called after the user-visible reply so it never delays it.
@@ -288,8 +361,10 @@ export class TelegramChat extends DurableObject<Env> {
   // ── dispatch ──────────────────────────────────────────────────────────────────
 
   private async process(update: TgUpdate, attempt: number): Promise<void> {
-    if (update.callback_query) return this.onCallback(update.callback_query);
-    if (update.message) return this.onMessage(update.message, attempt);
+    // A retried update that drives a chat turn resumes that turn instead of starting a new one.
+    if (attempt > 1 && (await this.resumeChat(update))) return;
+    if (update.callback_query) return this.onCallback(update.callback_query, update.update_id);
+    if (update.message) return this.onMessage(update.message, attempt, update.update_id);
     if (update.subscription) return this.onSubscriptionUpdated(update.subscription);
   }
 
@@ -314,6 +389,24 @@ export class TelegramChat extends DurableObject<Env> {
       return;
     }
 
+    // A chat turn this update was driving: close it with a valid transcript, then say so.
+    const chat = await this.loadChat();
+    if (chat.turn?.updateId === update.update_id) {
+      const closed = closeTurn(chat);
+      chat.outbox = undefined;
+      await this.saveChat(chat);
+      // Chat mode stays open (a retry is the user's next message), so the way out stays on screen.
+      await sendMessage(this.env, chatId, s.chatFailed, endChatKeyboard(s));
+      const user = update.message?.from ?? cq?.from;
+      if (user) await this.track(user.id, null, { type: "tg_chat_turn", result: "error", rounds: closed?.rounds ?? 0 });
+      return;
+    }
+    if (chat.outbox?.updateId === update.update_id) {
+      // The turn's reply could not be delivered — drop it; the generic error below still says so.
+      chat.outbox = undefined;
+      await this.saveChat(chat);
+    }
+
     // A failed AI create must not leave the prompt stuck on "Creating…" with no buttons.
     const cb = cq ? decodeCallback(cq.data) : null;
     if (cb?.t === "draft") {
@@ -333,36 +426,61 @@ export class TelegramChat extends DurableObject<Env> {
 
   // ── messages ──────────────────────────────────────────────────────────────────
 
-  private async onMessage(msg: TgMessage, attempt: number): Promise<void> {
+  private async onMessage(msg: TgMessage, attempt: number, updateId: number): Promise<void> {
     const user = msg.from;
     if (!user) return; // private-chat messages always carry `from`
     const lang = pickLang(user.language_code);
     const s = t(lang);
     const c = classifyMessage(msg);
+    const who = identityOf(user, msg.chat.id);
+    // Any user message keeps an open chat alive (photo, voice, file, command, text); one idle past
+    // 30 min is closed here first, so a text after that takes the draft flow below.
+    const chat = await this.loadChat();
+    const activity = noteUserActivity(chat, Date.now());
+    if (activity === "expired") await this.expireChat(chat, who, lang);
+    else if (activity === "refreshed") await this.saveChat(chat);
     switch (c.type) {
       case "command":
-        return this.onCommand(c.command, c.arg, identityOf(user, msg.chat.id), lang, attempt);
+        return this.onCommand(c.command, c.arg, who, lang, attempt, updateId);
       case "reject":
         await sendMessage(this.env, msg.chat.id, rejectText(s, c.reason));
         // No link lookup just for analytics: the pseudonymous device id still attributes it.
         await this.track(user.id, null, { type: "tg_ai_failed", reason: "unsupported" });
         return;
-      case "content":
+      case "content": {
+        // Chat mode: a plain text message goes to the agent. A link, photo, voice or file — and any
+        // text once the chat is closed or idle past 30 min — takes the draft flow as before.
+        const only = c.parts.length === 1 ? c.parts[0] : undefined;
+        if (typeof msg.text === "string" && only?.kind === "text" && activity === "refreshed") {
+          return this.onChatText(only.text, who, lang, updateId);
+        }
         return this.addToDraft(msg.chat.id, user, lang, c.parts, c.mediaGroupId);
+      }
       case "payment":
-        return this.onSuccessfulPayment(c.payment, identityOf(user, msg.chat.id), lang, attempt);
+        return this.onSuccessfulPayment(c.payment, who, lang, attempt);
       case "service":
         return;
     }
   }
 
-  private async onCommand(command: string, arg: string, who: TelegramIdentity, lang: Lang, attempt: number): Promise<void> {
+  private async onCommand(
+    command: string,
+    arg: string,
+    who: TelegramIdentity,
+    lang: Lang,
+    attempt: number,
+    updateId: number,
+  ): Promise<void> {
     const s = t(lang);
     switch (resolveCommand(command)) {
       case "start":
         return this.cmdStart(arg, who, lang, attempt);
       case "lists":
         return this.showLists(who, lang, 0, undefined);
+      case "chat":
+        return this.cmdChat(arg, who, lang, updateId);
+      case "timezone":
+        return this.cmdTimezone(who, lang);
       case "credits":
         return this.cmdCredits(who, lang);
       case "premium":
@@ -525,11 +643,23 @@ export class TelegramChat extends DurableObject<Env> {
   private async cmdUnlink(who: TelegramIdentity, lang: Lang): Promise<void> {
     const s = t(lang);
     if (!(await getLink(this.env, who.telegramUserId))) {
+      await this.closeChatQuietly(who, lang);
       await sendMessage(this.env, who.chatId, s.notConnected);
       return;
     }
     await callInternal(this.env, "unlink", { telegram_user_id: who.telegramUserId });
+    await this.closeChatQuietly(who, lang); // an unlinked chat would answer every text with a sign-in prompt
     await sendMessage(this.env, who.chatId, s.unlinked);
+  }
+
+  /** Close chat mode without a message of its own (a pending card is declined and marked). */
+  private async closeChatQuietly(who: TelegramIdentity, lang: Lang): Promise<void> {
+    const s = t(lang);
+    const state = await this.loadChat();
+    if (!state.open && !state.turn && !state.pending) return;
+    const closed = closeChat(state);
+    await this.saveChat(state);
+    await this.afterClose(closed, who, s, null, s.confirmDeclined);
   }
 
   /**
@@ -650,7 +780,7 @@ export class TelegramChat extends DurableObject<Env> {
 
   // ── callbacks ─────────────────────────────────────────────────────────────────
 
-  private async onCallback(cq: TgCallbackQuery): Promise<void> {
+  private async onCallback(cq: TgCallbackQuery, updateId: number): Promise<void> {
     let answered = false;
     const answer: Answer = async (text) => {
       if (answered) return;
@@ -669,7 +799,7 @@ export class TelegramChat extends DurableObject<Env> {
         return;
       }
       const who = identityOf(cq.from, chatId);
-      await this.onCallbackData(cb, who, messageId, lang, answer);
+      await this.onCallbackData(cb, who, messageId, lang, answer, updateId);
     } finally {
       await answer(); // always clear the button spinner, even when the work threw
     }
@@ -681,12 +811,29 @@ export class TelegramChat extends DurableObject<Env> {
     messageId: number | undefined,
     lang: Lang,
     answer: Answer,
+    updateId: number,
   ): Promise<void> {
+    // Any other button also keeps an open chat alive; the chat's own buttons (card, options, End
+    // chat) check expiry themselves and answer «chat ended» rather than act on a closed chat.
+    if (cb.t !== "confirm" && cb.t !== "option" && cb.t !== "endChat") {
+      const chat = await this.loadChat();
+      const activity = noteUserActivity(chat, Date.now());
+      if (activity === "expired") await this.expireChat(chat, who, lang);
+      else if (activity === "refreshed") await this.saveChat(chat);
+    }
     switch (cb.t) {
       case "noop":
         return;
       case "draft":
-        return this.onDraftAction(cb.draftId, cb.action, who, messageId, lang, answer);
+        return this.onDraftAction(cb.draftId, cb.action, who, messageId, lang, answer, updateId);
+      case "confirm":
+        return this.onConfirm(cb.turn, cb.yes, who, messageId, lang, answer, updateId);
+      case "option":
+        return this.onOption(cb.turn, cb.index, who, messageId, lang, answer, updateId);
+      case "endChat":
+        return this.onEndChat(who, lang, answer);
+      case "tz":
+        return this.onTimezonePick(cb.offset, who, messageId, lang, answer);
       case "lists":
         await answer();
         return this.showLists(who, lang, cb.page, messageId);
@@ -704,6 +851,7 @@ export class TelegramChat extends DurableObject<Env> {
     messageId: number | undefined,
     lang: Lang,
     answer: Answer,
+    updateId: number,
   ): Promise<void> {
     const s = t(lang);
     const drafts = await this.loadDrafts();
@@ -731,6 +879,7 @@ export class TelegramChat extends DurableObject<Env> {
       return;
     }
     if (action === "free") return this.createFromLines(drafts, d, link, who.chatId, target, s, answer);
+    if (action === "chat") return this.askAiFromDraft(drafts, d, link, who, target, lang, answer, updateId);
     return this.createWithAi(drafts, d, link, who.chatId, target, lang, answer);
   }
 
@@ -923,5 +1072,493 @@ export class TelegramChat extends DurableObject<Env> {
     await this.saveKeys(keys);
     await editOrSend(this.env, who.chatId, messageId, view.text, view.keyboard);
     await this.track(who.telegramUserId, link.creditUserId, { type: "tg_item_toggled" });
+  }
+
+  // ── AI chat (Phase 2) — entry points ──────────────────────────────────────────
+
+  /** `/chat` opens chat mode (intro + «End chat»); `/chat <text>` opens it and sends the text as the first turn. */
+  private async cmdChat(arg: string, who: TelegramIdentity, lang: Lang, updateId: number): Promise<void> {
+    const s = t(lang);
+    const link = await getLink(this.env, who.telegramUserId);
+    if (!link) return this.sendLoginPrompt(who, lang, false);
+    const state = await this.loadChat();
+    const now = Date.now();
+    const wasOpen = isChatOpen(state, now);
+    const expired = !wasOpen && state.open ? closeChat(state) : null; // idle past 30 min: retire that session first
+    if (tooLongForChat(arg)) {
+      await this.saveChat(state);
+      await sendMessage(this.env, who.chatId, s.chatTooLong);
+      await this.afterClose(expired, who, s, link.creditUserId, s.confirmDeclined);
+      return;
+    }
+    if (!arg) {
+      state.open = true;
+      state.lastUserAt = now;
+      await this.saveChat(state);
+      await sendMessage(this.env, who.chatId, s.chatIntro(CHAT_AGENT_COST), endChatKeyboard(s));
+      await this.afterClose(expired, who, s, link.creditUserId, s.confirmDeclined);
+      if (!wasOpen) await this.track(who.telegramUserId, link.creditUserId, { type: "tg_chat_opened", source: "command" });
+      return;
+    }
+    if (!wasOpen) await this.sendBestEffort(who.chatId, s.chatIntro(CHAT_AGENT_COST), endChatKeyboard(s));
+    await this.openTurn(state, arg, who, s, link, updateId);
+    await this.afterClose(expired, who, s, link.creditUserId, s.confirmDeclined);
+    if (!wasOpen) await this.track(who.telegramUserId, link.creditUserId, { type: "tg_chat_opened", source: "command" });
+    await this.driveTurn(state, who, lang, link);
+  }
+
+  /** «💬 Ask AI» under a text draft: open chat mode with the draft text as the first turn. */
+  private async askAiFromDraft(
+    drafts: Drafts,
+    d: Draft,
+    link: TelegramLink,
+    who: TelegramIdentity,
+    messageId: number | undefined,
+    lang: Lang,
+    answer: Answer,
+    updateId: number,
+  ): Promise<void> {
+    const s = t(lang);
+    const text = isTextOnly(d) ? draftText(d) : "";
+    if (!text) {
+      await answer(s.draftExpired);
+      return;
+    }
+    if (tooLongForChat(text)) {
+      await answer();
+      const cfg = await getAiConfig(this.env);
+      const view = renderDraftPrompt(d, cfg.actionCost, s, s.chatTooLong); // buttons stay: lines / AI still work
+      await editOrSend(this.env, who.chatId, messageId, view.text, view.keyboard);
+      return;
+    }
+    await answer();
+    const state = await this.loadChat();
+    const wasOpen = isChatOpen(state, Date.now());
+    // The turn is saved FIRST: its updateId is what lets a retry of this tap resume it, whereas a
+    // draft marked done with no turn behind it would make the retry a silent no-op.
+    await this.openTurn(state, text, who, s, link, updateId);
+    d.status = "done";
+    d.updatedAt = Date.now();
+    await this.saveDrafts(drafts);
+    await this.editBestEffort(who.chatId, messageId, s.chatIntro(CHAT_AGENT_COST), endChatKeyboard(s));
+    if (!wasOpen) await this.track(who.telegramUserId, link.creditUserId, { type: "tg_chat_opened", source: "button" });
+    await this.driveTurn(state, who, lang, link);
+  }
+
+  /** A plain text message while chat mode is open. */
+  private async onChatText(text: string, who: TelegramIdentity, lang: Lang, updateId: number): Promise<void> {
+    const s = t(lang);
+    const link = await getLink(this.env, who.telegramUserId);
+    if (!link) {
+      // Unlinked meanwhile (e.g. from the app): close chat mode so the next texts draft again.
+      await this.closeChatQuietly(who, lang);
+      return this.sendLoginPrompt(who, lang, true);
+    }
+    if (tooLongForChat(text)) {
+      await sendMessage(this.env, who.chatId, s.chatTooLong, endChatKeyboard(s));
+      return;
+    }
+    const state = await this.loadChat();
+    await this.openTurn(state, text, who, s, link, updateId);
+    await this.driveTurn(state, who, lang, link);
+  }
+
+  /** Chat mode idle past 30 min, found on the next text: close it (declining a pending card); the text then drafts. */
+  private async expireChat(state: ChatState, who: TelegramIdentity, lang: Lang): Promise<void> {
+    const s = t(lang);
+    const closed = closeChat(state);
+    await this.saveChat(state);
+    await this.afterClose(closed, who, s, null, s.confirmDeclined);
+  }
+
+  /** «Yes» / «Cancel» on the confirmation card: run the batch, or answer every call with `declined`. */
+  private async onConfirm(
+    turnSeq: number,
+    yes: boolean,
+    who: TelegramIdentity,
+    messageId: number | undefined,
+    lang: Lang,
+    answer: Answer,
+    updateId: number,
+  ): Promise<void> {
+    const s = t(lang);
+    const state = await this.loadChat();
+    const p = state.pending;
+    const turn = state.turn;
+    if (!p || !turn || p.turnSeq !== turnSeq || turn.seq !== turnSeq) {
+      await answer(s.chatOutdated);
+      return;
+    }
+    const link = await this.chatButtonGate(state, who, lang, answer);
+    if (!link) return;
+    state.lastUserAt = Date.now();
+    state.pending = undefined;
+    turn.updateId = updateId; // this tap now drives the turn — a retry of it resumes here
+    const declined = declinedResults(p.calls);
+    if (yes) {
+      // The plans the card showed — applied as stored (exact ids), never re-resolved by text.
+      turn.inflight = { calls: p.calls, records: p.records };
+    } else {
+      appendRound(state, p.calls, declined);
+    }
+    await this.saveChat(state);
+    await this.editBestEffort(who.chatId, messageId ?? p.cardMessageId, `${p.cardText}\n\n${yes ? s.confirmApproved : s.confirmDeclined}`);
+    if (!yes) await sendTgEvents(this.env, await tgIdentity(who.telegramUserId, link.creditUserId), toolEvents(p.calls, declined));
+    await this.driveTurn(state, who, lang, link); // the agent sees the results (or the refusals) and answers
+  }
+
+  /** A `present_options` button: its label becomes the next user turn (charged, as in the app). */
+  private async onOption(
+    turnSeq: number,
+    index: number,
+    who: TelegramIdentity,
+    messageId: number | undefined,
+    lang: Lang,
+    answer: Answer,
+    updateId: number,
+  ): Promise<void> {
+    const s = t(lang);
+    const state = await this.loadChat();
+    const options = state.options;
+    const label = options && options.turnSeq === turnSeq ? options.labels[index] : undefined;
+    if (!options || label === undefined) {
+      await answer(s.chatOutdated);
+      return;
+    }
+    const link = await this.chatButtonGate(state, who, lang, answer);
+    if (!link) return;
+    await this.editBestEffort(who.chatId, messageId, `${plainText(options.prompt)}\n\n› ${label}`);
+    await this.openTurn(state, label, who, s, link, updateId);
+    await this.driveTurn(state, who, lang, link);
+  }
+
+  /**
+   * The shared gate of the card / option buttons, run after their own "is this button current"
+   * check: a chat idle past 30 min is closed (answered «chat ended»), an unlinked user gets the
+   * sign-in prompt. The callback is answered either way. Returns the link to act with, or null.
+   */
+  private async chatButtonGate(state: ChatState, who: TelegramIdentity, lang: Lang, answer: Answer): Promise<TelegramLink | null> {
+    const s = t(lang);
+    if (!isChatOpen(state, Date.now())) {
+      const closed = closeChat(state);
+      await this.saveChat(state);
+      await answer(s.chatExpired);
+      await this.afterClose(closed, who, s, null, s.confirmDeclined);
+      return null;
+    }
+    const link = await getLink(this.env, who.telegramUserId);
+    await answer();
+    if (!link) {
+      await this.sendLoginPrompt(who, lang, false);
+      return null;
+    }
+    return link;
+  }
+
+  /** «End chat»: close chat mode (a pending card is declined); texts become drafts again. */
+  private async onEndChat(who: TelegramIdentity, lang: Lang, answer: Answer): Promise<void> {
+    const s = t(lang);
+    const state = await this.loadChat();
+    const closed = closeChat(state);
+    await this.saveChat(state);
+    await answer();
+    await sendMessage(this.env, who.chatId, s.chatEnded);
+    await this.afterClose(closed, who, s, null, s.confirmDeclined);
+  }
+
+  /** `/timezone`: «what time is it for you now?» with the current local time of each offered offset. */
+  private async cmdTimezone(who: TelegramIdentity, lang: Lang): Promise<void> {
+    const link = await getLink(this.env, who.telegramUserId);
+    if (!link) return this.sendLoginPrompt(who, lang, false);
+    const view = renderTimezonePicker(Date.now(), await getUserTimezone(this.env, link.googleUid), t(lang));
+    await sendMessage(this.env, who.chatId, view.text, view.keyboard);
+  }
+
+  /** A `/timezone` pick → `users/{google_uid}` {timezone, timezone_source:"telegram"} (masked PATCH). */
+  private async onTimezonePick(
+    offset: number,
+    who: TelegramIdentity,
+    messageId: number | undefined,
+    lang: Lang,
+    answer: Answer,
+  ): Promise<void> {
+    const s = t(lang);
+    const zone = TZ_CHOICES.includes(offset) ? zoneForOffset(offset) : null;
+    if (!zone) {
+      await answer(s.viewOutdated);
+      return;
+    }
+    const link = await getLink(this.env, who.telegramUserId);
+    if (!link) {
+      await answer();
+      return this.sendLoginPrompt(who, lang, false);
+    }
+    await setUserTimezone(this.env, link.googleUid, zone);
+    await answer();
+    await editOrSend(this.env, who.chatId, messageId, s.timezoneSaved(offsetLabel(offset), formatHm(Date.now(), zone)));
+  }
+
+  // ── AI chat — the turn loop ───────────────────────────────────────────────────
+
+  /**
+   * A queue retry of an update that drives a chat turn (attempt > 1): re-send the closed turn's
+   * undelivered reply, or resume the turn from its persisted progress. False → not a chat retry.
+   */
+  private async resumeChat(update: TgUpdate): Promise<boolean> {
+    const user = update.message?.from ?? update.callback_query?.from;
+    const chatId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
+    if (!user || chatId === undefined) return false;
+    const state = await this.loadChat();
+    if (state.outbox?.updateId === update.update_id) {
+      await this.flushOutbox(state, chatId);
+      return true;
+    }
+    if (state.turn?.updateId !== update.update_id) return false;
+    if (update.callback_query) await answerCallback(this.env, update.callback_query.id);
+    const lang = pickLang(user.language_code);
+    const who = identityOf(user, chatId);
+    const link = await getLink(this.env, user.id);
+    if (!link) {
+      closeTurn(state);
+      await this.saveChat(state);
+      await this.sendLoginPrompt(who, lang, true);
+      return true;
+    }
+    await this.driveTurn(state, who, lang, link);
+    return true;
+  }
+
+  /** Close whatever turn is open (a pending card is declined), start a new one with `text`, persist. */
+  private async openTurn(
+    state: ChatState,
+    text: string,
+    who: TelegramIdentity,
+    s: Strings,
+    link: TelegramLink,
+    updateId: number,
+  ): Promise<void> {
+    const closed = closeTurn(state);
+    beginTurn(state, text, who.chatId, updateId, Date.now());
+    await this.saveChat(state);
+    await this.afterClose(closed, who, s, link.creditUserId, s.confirmSuperseded);
+  }
+
+  /**
+   * Run the active turn until it ends or pauses: call `chat_agent` with the windowed transcript,
+   * execute tool rounds that need no confirmation, pause on a destructive batch (card), and finish
+   * on a final / options / refusal. A transient failure throws — the queue retries the update and
+   * `resumeChat` comes back here with the progress persisted so far.
+   */
+  private async driveTurn(state: ChatState, who: TelegramIdentity, lang: Lang, link: TelegramLink): Promise<void> {
+    const s = t(lang);
+    const turn = state.turn;
+    if (!turn) return;
+    if (state.pending) {
+      if (state.pending.cardMessageId === null) await this.sendCard(state, who.chatId, s);
+      return;
+    }
+    const [lists, timezone, identity] = await Promise.all([
+      collectOwnedChecklists(this.env, linkIds(link)),
+      getUserTimezone(this.env, link.googleUid),
+      tgIdentity(who.telegramUserId, link.creditUserId),
+    ]);
+    if (turn.inflight) await this.executeBatch(state, lists, link, timezone, identity);
+
+    for (;;) {
+      await sendTyping(this.env, who.chatId);
+      const step = await callChatAgent(
+        this.env,
+        buildAgentRequest({
+          creditUserId: link.creditUserId,
+          requestId: turn.requestId,
+          lang,
+          offsetMinutes: timezone ? offsetMinutesAt(timezone, Date.now()) : null,
+          summary: buildChecklistsSummary(lists),
+          transcript: state.transcript,
+        }),
+      );
+
+      if (step.kind === "tool_calls") {
+        const action = toolCallsAction(step.calls, turn.round);
+        if (action === "execute") {
+          turn.inflight = { calls: step.calls, records: {} };
+          await this.saveChat(state);
+          await this.executeBatch(state, lists, link, timezone, identity);
+          continue;
+        }
+        if (action === "pause") {
+          // Plan the whole batch now and show THOSE plans: the card names the row and list that
+          // will really change, and «Yes» applies exactly these records.
+          const records = planBatch(step.calls, lists, turn, timezone, Date.now());
+          const card = renderConfirmCard(step.calls, records, turn.seq, s, timezone);
+          state.pending = { turnSeq: turn.seq, calls: step.calls, records, cardText: card.text, cardMessageId: null };
+          await this.saveChat(state);
+          await this.sendCard(state, who.chatId, s);
+          return;
+        }
+        // The server answers its own round cap with a final (main.py:3904-3917); this is the local guard.
+        console.warn(`[gisti-tg] chat turn ${turn.requestId}: tool calls after ${turn.round} rounds — stopped locally`);
+        return this.endTurn(state, who, identity, "limit", [{ text: s.chatRoundLimit, keyboard: endChatKeyboard(s) }], null);
+      }
+
+      const tzHint = turn.timezoneUnknown ? [s.tzUnknownHint] : [];
+      switch (step.kind) {
+        case "final":
+          return this.endTurn(state, who, identity, "final", renderReply(step.content, s, tzHint), step.content);
+        case "options": {
+          state.options = { turnSeq: turn.seq, prompt: step.prompt, labels: step.options };
+          const shown = [step.prompt, ...tzHint].join("\n\n");
+          return this.endTurn(state, who, identity, "options", [renderOptions(shown, step.options, turn.seq, s)], step.prompt);
+        }
+        case "no_credits":
+          // finishTurn closes chat mode: the message says so, and the next text is a draft again.
+          return this.endTurn(state, who, identity, "no_credits", [{ text: s.chatNoCredits }], null);
+        case "rejected":
+          console.warn(`[gisti-tg] chat_agent refused turn ${turn.requestId} (400): ${step.error.slice(0, 200)}`);
+          return this.endTurn(state, who, identity, "rejected", [{ text: s.chatRejected, keyboard: endChatKeyboard(s) }], null);
+        case "no_user": {
+          const ended = finishTurn(state, "no_user", null); // also closes chat mode
+          await this.saveChat(state);
+          await this.sendLoginPrompt(who, lang, true);
+          await sendTgEvents(this.env, identity, [{ type: "tg_chat_turn", result: "error", rounds: ended?.rounds ?? 0 }]);
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute the in-flight batch call by call. Per call: plan (resolve to exact ids) → persist the
+   * plan → apply + write to Firestore → persist "applied". A retry skips applied calls and re-applies
+   * a persisted plan idempotently (agentTools.ts), so no write ever runs twice. The calls and their
+   * results reach the transcript only together, once every call has a result.
+   */
+  private async executeBatch(
+    state: ChatState,
+    lists: OwnedChecklist[],
+    link: TelegramLink,
+    timezone: string | null,
+    identity: TgAnalyticsIdentity,
+  ): Promise<void> {
+    const turn = state.turn;
+    const inflight = turn?.inflight;
+    if (!turn || !inflight) return;
+    const results: AgentToolResult[] = [];
+    for (let i = 0; i < inflight.calls.length; i++) {
+      const call = inflight.calls[i]!;
+      const key = String(i);
+      let rec = inflight.records[key];
+      if (!rec) {
+        const plan = planTool(call, lists, { timezone, seed: callSeed(turn, i) });
+        rec = { plan, applied: plan.ops.length === 0 };
+        inflight.records[key] = rec;
+        await this.saveChat(state);
+      }
+      if (!rec.applied) {
+        for (const owned of applyOps(lists, rec.plan.ops, link.googleUid, Date.now())) {
+          await writeChecklist(this.env, owned.ownerId, owned.checklist);
+        }
+        rec.applied = true;
+        await this.saveChat(state);
+      }
+      if (rec.plan.timezoneUnknown) turn.timezoneUnknown = true;
+      results.push({ id: call.id, name: call.name, result: rec.plan.result });
+    }
+    appendRound(state, inflight.calls, results);
+    await this.saveChat(state);
+    await sendTgEvents(this.env, identity, toolEvents(inflight.calls, results));
+  }
+
+  /**
+   * End the turn (`finishTurn`: the model's text for final / options, else a closed turn; chat mode
+   * closes on no_credits), park the replies in the outbox, persist, then deliver. A failed send is
+   * retried from the outbox by `resumeChat` — the agent is never asked (or paid) twice for one message.
+   * Every reply that leaves chat mode open carries «End chat».
+   */
+  private async endTurn(
+    state: ChatState,
+    who: TelegramIdentity,
+    identity: TgAnalyticsIdentity,
+    end: TurnEnd,
+    messages: OutMsg[],
+    modelText: string | null,
+  ): Promise<void> {
+    const ended = finishTurn(state, end, modelText);
+    if (!ended) return;
+    state.outbox = { updateId: ended.updateId, messages };
+    await this.saveChat(state);
+    await this.flushOutbox(state, who.chatId);
+    await sendTgEvents(this.env, identity, [{ type: "tg_chat_turn", result: turnResult(end), rounds: ended.rounds }]);
+  }
+
+  /** Deliver the outbox in order, persisting progress between messages. */
+  private async flushOutbox(state: ChatState, chatId: number): Promise<void> {
+    const box = state.outbox;
+    if (!box) return;
+    while (box.messages.length > 0) {
+      const m = box.messages[0]!;
+      await sendMessage(this.env, chatId, m.text, m.keyboard);
+      box.messages.shift();
+      if (box.messages.length > 0) await this.saveChat(state);
+    }
+    state.outbox = undefined;
+    await this.saveChat(state);
+  }
+
+  /** Send the pending card and remember its message id (to mark it «Cancelled» if it is superseded). */
+  private async sendCard(state: ChatState, chatId: number, s: Strings): Promise<void> {
+    const p = state.pending;
+    if (!p) return;
+    const sent = await sendMessage(this.env, chatId, p.cardText, confirmKeyboard(p.turnSeq, s));
+    p.cardMessageId = sent.message_id;
+    await this.saveChat(state);
+  }
+
+  /** After a turn was closed by something else: mark its card, count the declined calls. Best-effort. */
+  private async afterClose(
+    closed: ClosedTurn | null,
+    who: TelegramIdentity,
+    s: Strings,
+    creditUserId: string | null,
+    note: string,
+  ): Promise<void> {
+    if (!closed) return;
+    if (closed.cardMessageId !== null && closed.cardText) {
+      await this.editBestEffort(who.chatId, closed.cardMessageId, `${closed.cardText}\n\n${note}`);
+    }
+    const events: TgEvent[] = [
+      ...toolEvents(closed.declined, declinedResults(closed.declined)),
+      { type: "tg_chat_turn", result: closed.declined.length > 0 ? "declined" : "error", rounds: closed.rounds },
+    ];
+    await sendTgEvents(this.env, await tgIdentity(who.telegramUserId, creditUserId), events);
+  }
+
+  /** Edit a bot message (buttons replaced by `keyboard`, else dropped); failure is only logged — never a fresh message. */
+  private async editBestEffort(
+    chatId: number,
+    messageId: number | null | undefined,
+    text: string,
+    keyboard?: InlineKeyboard,
+  ): Promise<void> {
+    if (messageId === null || messageId === undefined) return;
+    try {
+      await tgCall(this.env, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        link_preview_options: { is_disabled: true },
+        reply_markup: keyboard ?? { inline_keyboard: [] },
+      });
+    } catch (e) {
+      if (!isNotModified(e)) console.warn(`[gisti-tg] best-effort edit failed: ${errText(e)}`);
+    }
+  }
+
+  private async sendBestEffort(chatId: number, text: string, keyboard?: InlineKeyboard): Promise<void> {
+    try {
+      await sendMessage(this.env, chatId, text, keyboard);
+    } catch (e) {
+      console.warn(`[gisti-tg] best-effort message failed: ${errText(e)}`);
+    }
   }
 }

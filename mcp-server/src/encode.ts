@@ -15,22 +15,42 @@
  *
  * Round-trip fidelity: `repeatRule` (item-level, nested object) and `attachments` are carried
  * VERBATIM from the read model, so a decode→encode of an app-written item reproduces its bytes.
+ * Keys the mirror does not model at all ride in `item.extra` and are appended after the known
+ * keys — every write re-encodes the WHOLE item list, so anything dropped here is deleted from
+ * every item of that list on the next MCP / Telegram-bot write (re-verified 2026-11-20: that is
+ * how `alarmEnabled=false` got re-armed and `reminderFullScreen=true` got cleared).
  */
 
-import type {
-  ChecklistFillItem,
-  ChecklistItem,
-  ChecklistSyncData,
-  FillSyncData,
+import {
+  FILL_ITEM_KEYS,
+  TEMPLATE_ITEM_KEYS,
+  type ChecklistFillItem,
+  type ChecklistItem,
+  type ChecklistSyncData,
+  type FillSyncData,
 } from "./model";
 
 // ── Layer 1: itemsJson (kotlinx encodeDefaults=false, constructor order) ─────────
 
 /**
- * Encode ONE template item. Key order (Checklist.kt:47-55): text, checked, id, weekday,
- * priority, type, parentId. Omit when equal to Kotlin default: checked=false, weekday=null,
- * priority=0, type=ITEM, parentId=null. `id` is always emitted (no stable default). `text`
- * required.
+ * Append the keys the mirror does not model, in the order they were read. A key that is also a
+ * known key is skipped — the typed field is the source of truth for it, even when it was omitted
+ * as a default.
+ */
+function appendExtra(
+  o: Record<string, unknown>,
+  extra: Record<string, unknown> | undefined,
+  known: readonly string[],
+): void {
+  if (!extra) return;
+  for (const [k, v] of Object.entries(extra)) if (!known.includes(k)) o[k] = v;
+}
+
+/**
+ * Encode ONE template item. Key order = TEMPLATE_ITEM_KEYS (Checklist.kt:95-103): text, checked,
+ * id, weekday, priority, type, parentId, then `extra`. Omit when equal to Kotlin default:
+ * checked=false, weekday=null, priority=0, type=ITEM, parentId=null. `id` is always emitted (no
+ * stable default). `text` required.
  */
 function encodeTemplateItem(it: ChecklistItem): Record<string, unknown> {
   const o: Record<string, unknown> = {};
@@ -41,6 +61,7 @@ function encodeTemplateItem(it: ChecklistItem): Record<string, unknown> {
   if (it.priority !== 0) o["priority"] = it.priority;
   if (it.type === "FOLDER") o["type"] = "FOLDER";
   if (it.parentId !== null) o["parentId"] = it.parentId;
+  appendExtra(o, it.extra, TEMPLATE_ITEM_KEYS);
   return o;
 }
 
@@ -50,11 +71,12 @@ export function encodeTemplateItems(items: ChecklistItem[]): string {
 }
 
 /**
- * Encode ONE fill item. Key order (Checklist.kt:152-169): text, checked, note, id, weekday,
- * priority, reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
- * attachments, templateItemId. ⚠ `checked` has NO Kotlin default → ALWAYS emitted (even false).
- * Everything else omits its default. `repeatRule` (nested object) and `attachments` pass through
- * verbatim.
+ * Encode ONE fill item. Key order = FILL_ITEM_KEYS (Checklist.kt:207-234): text, checked, note,
+ * id, weekday, priority, reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt,
+ * repeatOccurrenceCount, attachments, templateItemId, reminderFullScreen, alarmEnabled, then
+ * `extra`. ⚠ `checked` has NO Kotlin default → ALWAYS emitted (even false). Everything else omits
+ * its default — note `alarmEnabled` defaults to TRUE, so only `false` is emitted.
+ * `repeatRule` (nested object) and `attachments` pass through verbatim.
  */
 function encodeFillItem(it: ChecklistFillItem): Record<string, unknown> {
   const o: Record<string, unknown> = {};
@@ -71,6 +93,9 @@ function encodeFillItem(it: ChecklistFillItem): Record<string, unknown> {
   if (it.repeatOccurrenceCount !== 0) o["repeatOccurrenceCount"] = it.repeatOccurrenceCount;
   if (Array.isArray(it.attachments) && it.attachments.length > 0) o["attachments"] = it.attachments;
   if (it.templateItemId !== null) o["templateItemId"] = it.templateItemId;
+  if (it.reminderFullScreen) o["reminderFullScreen"] = true; // default false
+  if (!it.alarmEnabled) o["alarmEnabled"] = false; // default TRUE
+  appendExtra(o, it.extra, FILL_ITEM_KEYS);
   return o;
 }
 
@@ -83,7 +108,10 @@ export function encodeFillItems(items: ChecklistFillItem[]): string {
 
 /**
  * Build the plain document object for one fill (embedded in the checklist doc's `fills[]`).
- * Key order = FillSyncData.toMap (AndroidFirestoreSyncDataSource.kt:40-49). All keys present.
+ * Key order = FillSyncData.toMap (AndroidFirestoreSyncDataSource.kt:201-210). All keys present.
+ * `fills` is an array, so every write replaces it whole — the app's `set(merge)` does the same,
+ * and both sides emit the same 8 keys (FillSyncData, ChecklistSyncData.kt:34-43), so nothing is
+ * lost at this level today. A NEW fill-level key would be dropped by this builder: add it here.
  */
 function toFillDoc(f: FillSyncData): Record<string, unknown> {
   return {
@@ -100,9 +128,11 @@ function toFillDoc(f: FillSyncData): Record<string, unknown> {
 
 /**
  * Build the plain Firestore document object for a checklist. Key order = ChecklistSyncData.toMap
- * (AndroidFirestoreSyncDataSource.kt:51-68). EVERY key present (null → nullValue). `itemsJson`
- * here is the already-encoded string on the model — the caller re-encodes it (encodeTemplateItems)
- * whenever it mutates the item tree.
+ * (AndroidFirestoreSyncDataSource.kt:212-231) minus `reminderFullScreen` and `isInbox`, which the
+ * worker never writes: `writeChecklist` PATCHes with CHECKLIST_DOC_FIELD_PATHS as the updateMask,
+ * so app-set values of those two (and of any future top-level field) are left untouched. EVERY key
+ * listed here is present (null → nullValue). `itemsJson` here is the already-encoded string on the
+ * model — the caller re-encodes it (encodeTemplateItems) whenever it mutates the item tree.
  */
 export function toChecklistDoc(c: ChecklistSyncData): Record<string, unknown> {
   return {
@@ -125,7 +155,11 @@ export function toChecklistDoc(c: ChecklistSyncData): Record<string, unknown> {
   };
 }
 
-/** Ordered top-level field paths of the checklist doc — used as the Firestore PATCH updateMask. */
+/**
+ * Ordered top-level field paths of the checklist doc — used as the Firestore PATCH updateMask.
+ * ⚠ Must equal the keys toChecklistDoc writes: a path listed here but missing from the doc is
+ * written as a DELETE of that field. Fields outside this list survive every worker write.
+ */
 export const CHECKLIST_DOC_FIELD_PATHS: readonly string[] = [
   "cloudId",
   "name",

@@ -15,6 +15,13 @@
  *   - enums serialized by constant name (no @SerialName): "ITEM" / "FOLDER".
  *   - decode is tolerant: absent field → its default.
  *
+ * Forward compatibility: the Kotlin classes keep growing (new fields are appended at the END of
+ * the constructor), and every write here re-encodes a whole item list. So the decoders capture
+ * any key they do not model into `extra`, and the encoders re-emit it after the known keys — a
+ * field the app adds tomorrow survives an MCP/bot read-modify-write instead of being deleted.
+ * The known-key lists (TEMPLATE_ITEM_KEYS / FILL_ITEM_KEYS) are the single definition of what is
+ * "modelled"; encode.ts emits exactly those keys, in that order.
+ *
  * This module works on PLAIN JS objects. Un-wrapping the Firestore REST value format
  * ({stringValue,integerValue,arrayValue,...}) is the firestore layer's job, not this one.
  *
@@ -27,6 +34,42 @@
 
 export type ChecklistNodeType = "ITEM" | "FOLDER";
 
+/**
+ * Keys of a template item this mirror models, in Kotlin primary-constructor order
+ * (Checklist.kt:95-103, `ChecklistItem`). Anything else in the JSON goes to `extra`.
+ */
+export const TEMPLATE_ITEM_KEYS: readonly string[] = [
+  "text",
+  "checked",
+  "id",
+  "weekday",
+  "priority",
+  "type",
+  "parentId",
+];
+
+/**
+ * Keys of a fill item this mirror models, in Kotlin primary-constructor order
+ * (Checklist.kt:207-234, `ChecklistFillItem`). Anything else in the JSON goes to `extra`.
+ */
+export const FILL_ITEM_KEYS: readonly string[] = [
+  "text",
+  "checked",
+  "note",
+  "id",
+  "weekday",
+  "priority",
+  "reminderAt",
+  "repeatRule",
+  "repeatTimeOfDayMinutes",
+  "repeatNextAt",
+  "repeatOccurrenceCount",
+  "attachments",
+  "templateItemId",
+  "reminderFullScreen",
+  "alarmEnabled",
+];
+
 /** A node in the template folder tree. Leaf (ITEM) or container (FOLDER). */
 export interface ChecklistItem {
   text: string;
@@ -36,6 +79,12 @@ export interface ChecklistItem {
   priority: number; // 0 = normal, 1 = starred
   type: ChecklistNodeType; // default ITEM
   parentId: string | null; // parent FOLDER id; null = checklist root
+  /**
+   * Keys the app wrote that TEMPLATE_ITEM_KEYS does not list (a Kotlin field newer than this
+   * mirror), captured verbatim at parse time and re-emitted after the known keys. Absent when the
+   * item had none and on nodes created here.
+   */
+  extra?: Record<string, unknown>;
 }
 
 /** State of one item inside a fill (fill.itemsJson = List<ChecklistFillItem>). */
@@ -59,6 +108,15 @@ export interface ChecklistFillItem {
   attachments: unknown[]; // Attachment[] — preserved verbatim for round-trip fidelity
   /** Stable link to the template ChecklistItem.id — the reconciliation key. */
   templateItemId: string | null;
+  /** Alarm-style full-screen delivery over the lock screen (Checklist.kt:227). Default false. */
+  reminderFullScreen: boolean;
+  /**
+   * Is an OS alarm actually armed for `reminderAt` (Checklist.kt:233)? Default TRUE — an absent key
+   * means "armed". `false` = "date set, no alarm"; dropping the key would silently re-arm it.
+   */
+  alarmEnabled: boolean;
+  /** Keys FILL_ITEM_KEYS does not list — see ChecklistItem.extra. */
+  extra?: Record<string, unknown>;
 }
 
 // ── Firestore envelope (users/{userId}/checklists/{cloudId}) ────────────────────
@@ -114,9 +172,19 @@ function numOrNull(v: unknown): number | null {
   return typeof v === "number" ? v : null;
 }
 
+/** The keys of `raw` that `known` does not list, in their original order; undefined if none. */
+function unknownKeys(raw: Record<string, unknown>, known: readonly string[]): Record<string, unknown> | undefined {
+  let out: Record<string, unknown> | undefined;
+  for (const [k, v] of Object.entries(raw)) {
+    if (known.includes(k)) continue;
+    (out ??= {})[k] = v;
+  }
+  return out;
+}
+
 function decodeTemplateItem(raw: Record<string, unknown>): ChecklistItem {
   const rawType = raw["type"];
-  return {
+  const item: ChecklistItem = {
     text: typeof raw["text"] === "string" ? (raw["text"] as string) : "",
     checked: raw["checked"] === true, // absent → false (kotlinx default)
     id: typeof raw["id"] === "string" ? (raw["id"] as string) : "",
@@ -125,10 +193,13 @@ function decodeTemplateItem(raw: Record<string, unknown>): ChecklistItem {
     type: rawType === "FOLDER" ? "FOLDER" : "ITEM", // absent/unknown → ITEM
     parentId: typeof raw["parentId"] === "string" ? (raw["parentId"] as string) : null,
   };
+  const extra = unknownKeys(raw, TEMPLATE_ITEM_KEYS);
+  if (extra) item.extra = extra;
+  return item;
 }
 
 function decodeFillItem(raw: Record<string, unknown>): ChecklistFillItem {
-  return {
+  const item: ChecklistFillItem = {
     text: typeof raw["text"] === "string" ? (raw["text"] as string) : "",
     checked: raw["checked"] === true,
     note: typeof raw["note"] === "string" ? (raw["note"] as string) : null,
@@ -144,7 +215,12 @@ function decodeFillItem(raw: Record<string, unknown>): ChecklistFillItem {
     attachments: Array.isArray(raw["attachments"]) ? (raw["attachments"] as unknown[]) : [],
     templateItemId:
       typeof raw["templateItemId"] === "string" ? (raw["templateItemId"] as string) : null,
+    reminderFullScreen: raw["reminderFullScreen"] === true, // absent → false (kotlinx default)
+    alarmEnabled: raw["alarmEnabled"] !== false, // absent → TRUE (kotlinx default) — only an explicit false disarms
   };
+  const extra = unknownKeys(raw, FILL_ITEM_KEYS);
+  if (extra) item.extra = extra;
+  return item;
 }
 
 /** Parse a checklist's `itemsJson` blob into the typed template tree. Tolerant of "[]"/empty. */
