@@ -99,6 +99,56 @@ export interface Strings {
   paySupport: (email: string, termsUrl: string) => string;
   appText: string;
   btnOpenPlay: string;
+
+  // Phase 2 — AI chat, time zone
+  btnAskAi: (cost: number) => string;
+  chatIntro: (cost: number) => string;
+  btnEndChat: string;
+  chatEnded: string;
+  /** A tap on a chat button after the chat closed (End chat, or 30 min idle). */
+  chatExpired: string;
+  /** A tap on a chat button of an older turn (a card or options the chat has moved past). */
+  chatOutdated: string;
+  confirmTitle: string;
+  btnConfirmYes: string;
+  confirmApproved: string;
+  confirmDeclined: string;
+  /** A pending confirmation card declined because the user wrote a new message instead. */
+  confirmSuperseded: string;
+  chatNoCredits: string;
+  chatTooLong: string;
+  chatRejected: string;
+  chatFailed: string;
+  chatRoundLimit: string;
+  tzUnknownHint: string;
+  timezoneQuestion: (current: string | null) => string;
+  timezoneSaved: (label: string, time: string) => string;
+  /** One line per agent action on the confirmation card. */
+  act: ActionTexts;
+}
+
+/**
+ * Confirmation-card lines. A line for a call that will write names the RESOLVED row and list; a call
+ * that will change nothing shows the model's arguments (`list` null = none named) + one of the suffixes.
+ */
+export interface ActionTexts {
+  add: (text: string, list: string | null) => string;
+  addMany: (n: number, list: string | null) => string;
+  create: (name: string, items: number) => string;
+  complete: (text: string, list: string | null) => string;
+  delete: (text: string, list: string | null) => string;
+  /** `count` null = unknown (the model's arguments only). */
+  clear: (list: string | null, count: number | null) => string;
+  willNotFind: string;
+  willAsk: (names: string) => string;
+  noChange: string;
+  blocked: string;
+  cannot: string;
+  reminder: (text: string, when: string) => string;
+  rename: (from: string, to: string) => string;
+  move: (text: string, from: string | null, to: string) => string;
+  find: (query: string) => string;
+  read: (name: string) => string;
 }
 
 const DATE_LOCALE: Record<Lang, string> = { en: "en-GB", ru: "ru-RU", hi: "hi-IN" };
@@ -150,7 +200,8 @@ const EN: Strings = {
   welcome: "Hi! I'm Gisti — I turn anything into a checklist.",
   help:
     "Send me anything — a list, notes, a photo, a voice message or a link — and I'll turn it into a checklist.\n\n" +
-    "/lists — your checklists\n/credits — AI credit balance\n/premium — subscription\n/app — mobile app\n" +
+    "/lists — your checklists\n/chat — chat with the AI assistant\n/credits — AI credit balance\n" +
+    "/premium — subscription\n/app — mobile app\n/timezone — your time zone\n" +
     "/paysupport — payment help\n/unlink — disconnect Telegram\n/help — this help",
   tokenExpired: "This link has expired or was already used. Create a new one in the app: menu → Telegram.",
   noAccount: "Sign in to the Gisti app with Google first, then create a new link: menu → Telegram.",
@@ -255,6 +306,53 @@ const EN: Strings = {
     "📱 Gisti for Android — your checklists, reminders and home-screen widgets on your phone. " +
     "Sign in with the same Google account and everything syncs with this bot.",
   btnOpenPlay: "Open in Google Play",
+
+  btnAskAi: (cost) => `💬 Ask AI (${en(cost, "credit", "credits")})`,
+  chatIntro: (cost) =>
+    "💬 AI chat is on. Ask anything about your checklists — I can add, tick off, find, move and delete items " +
+    "and set reminders.\n\n" +
+    `Each message costs ${en(cost, "credit", "credits")} (shared with the Gisti app). Photos, voice messages and ` +
+    "links still become checklists. Tap «End chat» when you're done.",
+  btnEndChat: "✖ End chat",
+  chatEnded: "Chat ended. Your messages turn into checklists again. Send /chat to talk to the AI.",
+  chatExpired: "This chat has ended — send /chat to start a new one.",
+  chatOutdated: "This button is outdated — the chat has moved on.",
+  confirmTitle: "Do this?",
+  btnConfirmYes: "✅ Yes",
+  confirmApproved: "✅ Confirmed.",
+  confirmDeclined: "Cancelled.",
+  confirmSuperseded: "Cancelled — you sent a new message.",
+  chatNoCredits:
+    "You're out of AI credits — the balance is shared with the Gisti app. Premium refills credits every day: /premium\n\n" +
+    "The chat is closed: your messages turn into checklists again (a checklist from lines is free).",
+  chatTooLong: "This message is too long for the AI chat — please send a shorter one.",
+  chatRejected: "The AI couldn't take this message. Please rephrase it or make it shorter.",
+  chatFailed: "The AI didn't respond. Please send your message again.",
+  chatRoundLimit: "I did several steps but reached the limit for one message. Tell me what else to do.",
+  tzUnknownHint: "To set reminders at your local time, tell me your time zone: /timezone",
+  timezoneQuestion: (current) =>
+    "What time is it for you now? Tap your current time — reminders from the AI chat will use this time zone." +
+    (current ? `\n\nCurrent: ${current}` : ""),
+  timezoneSaved: (label, time) => `✅ Time zone saved: ${label} (it's ${time} for you now).`,
+  act: {
+    add: (t, l) => `Add «${t}»${l ? ` to «${l}»` : ""}`,
+    addMany: (n, l) => `Add ${en(n, "item", "items")}${l ? ` to «${l}»` : ""}`,
+    create: (name, n) => `Create checklist «${name}»${n ? ` with ${en(n, "item", "items")}` : ""}`,
+    complete: (t, l) => `Mark «${t}» as done${l ? ` in «${l}»` : ""}`,
+    delete: (t, l) => `🗑 Delete «${t}»${l ? ` from «${l}»` : ""}`,
+    clear: (l, n) =>
+      `🗑 Remove ${n === null ? "all completed items" : en(n, "completed item", "completed items")}${l ? ` from «${l}»` : ""}`,
+    willNotFind: "not found — nothing will change",
+    willAsk: (names) => `several lists match (${names}) — nothing will change`,
+    noChange: "already done — nothing will change",
+    blocked: "it has a reminder, repeat or attachment — it stays where it is",
+    cannot: "can't be done — nothing will change",
+    reminder: (t, w) => `Remind about «${t}» at ${w}`,
+    rename: (f, to) => `Rename «${f}» to «${to}»`,
+    move: (t, f, to) => `↪ Move «${t}»${f ? ` from «${f}»` : ""} to «${to}»`,
+    find: (q) => `Search for «${q}»`,
+    read: (n) => `Read «${n}»`,
+  },
 };
 
 // ── RU ──────────────────────────────────────────────────────────────────────────
@@ -270,7 +368,8 @@ const RU: Strings = {
   welcome: "Привет! Я Gisti — превращаю что угодно в чек-лист.",
   help:
     "Пришлите мне что угодно — список, заметки, фото, голосовое или ссылку — и я сделаю из этого чек-лист.\n\n" +
-    "/lists — ваши чек-листы\n/credits — баланс AI-кредитов\n/premium — подписка\n/app — мобильное приложение\n" +
+    "/lists — ваши чек-листы\n/chat — чат с AI-ассистентом\n/credits — баланс AI-кредитов\n" +
+    "/premium — подписка\n/app — мобильное приложение\n/timezone — ваш часовой пояс\n" +
     "/paysupport — помощь с оплатой\n/unlink — отключить Telegram\n/help — эта справка",
   tokenExpired: "Ссылка устарела или уже использована. Создайте новую в приложении: меню → Telegram.",
   noAccount: "Сначала войдите в приложение Gisti через Google, затем создайте новую ссылку: меню → Telegram.",
@@ -373,6 +472,53 @@ const RU: Strings = {
     "📱 Gisti для Android — чек-листы, напоминания и виджеты на главном экране телефона. " +
     "Войдите тем же Google-аккаунтом — всё синхронизируется с этим ботом.",
   btnOpenPlay: "Открыть в Google Play",
+
+  btnAskAi: (cost) => `💬 Спросить AI (${ru(cost, "кредит", "кредита", "кредитов")})`,
+  chatIntro: (cost) =>
+    "💬 AI-чат включён. Спрашивайте что угодно о ваших чек-листах — я умею добавлять, отмечать, искать, " +
+    "переносить и удалять пункты и ставить напоминания.\n\n" +
+    `Каждое сообщение стоит ${ru(cost, "кредит", "кредита", "кредитов")} (баланс общий с приложением Gisti). ` +
+    "Фото, голосовые и ссылки по-прежнему превращаются в чек-листы. Когда закончите, нажмите «Завершить чат».",
+  btnEndChat: "✖ Завершить чат",
+  chatEnded: "Чат завершён. Сообщения снова превращаются в чек-листы. Чтобы поговорить с AI, отправьте /chat.",
+  chatExpired: "Этот чат уже завершён — отправьте /chat, чтобы начать новый.",
+  chatOutdated: "Эта кнопка устарела — разговор уже ушёл дальше.",
+  confirmTitle: "Выполнить?",
+  btnConfirmYes: "✅ Да",
+  confirmApproved: "✅ Подтверждено.",
+  confirmDeclined: "Отменено.",
+  confirmSuperseded: "Отменено — вы отправили новое сообщение.",
+  chatNoCredits:
+    "AI-кредиты закончились — баланс общий с приложением Gisti. С Premium кредиты пополняются каждый день: /premium\n\n" +
+    "Чат закрыт: сообщения снова превращаются в чек-листы (чек-лист из пунктов — бесплатно).",
+  chatTooLong: "Сообщение слишком длинное для AI-чата — отправьте покороче.",
+  chatRejected: "AI не смог принять это сообщение. Переформулируйте или сократите его.",
+  chatFailed: "AI не ответил. Отправьте сообщение ещё раз.",
+  chatRoundLimit: "Я выполнил несколько шагов, но достиг лимита на одно сообщение. Напишите, что ещё сделать.",
+  tzUnknownHint: "Чтобы ставить напоминания по вашему времени, укажите часовой пояс: /timezone",
+  timezoneQuestion: (current) =>
+    "Сколько у вас сейчас времени? Нажмите на ваше текущее время — напоминания из AI-чата будут ставиться по этому поясу." +
+    (current ? `\n\nСейчас выбран: ${current}` : ""),
+  timezoneSaved: (label, time) => `✅ Часовой пояс сохранён: ${label} (у вас сейчас ${time}).`,
+  act: {
+    add: (t, l) => `Добавить «${t}»${l ? ` в «${l}»` : ""}`,
+    addMany: (n, l) => `Добавить ${ru(n, "пункт", "пункта", "пунктов")}${l ? ` в «${l}»` : ""}`,
+    create: (name, n) => `Создать чек-лист «${name}»${n ? ` (${ru(n, "пункт", "пункта", "пунктов")})` : ""}`,
+    complete: (t, l) => `Отметить «${t}» выполненным${l ? ` в «${l}»` : ""}`,
+    delete: (t, l) => `🗑 Удалить «${t}»${l ? ` из «${l}»` : ""}`,
+    clear: (l, n) =>
+      `🗑 Удалить ${n === null ? "все выполненные пункты" : `выполненные: ${ru(n, "пункт", "пункта", "пунктов")}`}${l ? ` из «${l}»` : ""}`,
+    willNotFind: "не найдено — ничего не изменится",
+    willAsk: (names) => `подходит несколько списков (${names}) — ничего не изменится`,
+    noChange: "уже сделано — ничего не изменится",
+    blocked: "у пункта есть напоминание, повтор или вложение — он останется на месте",
+    cannot: "так нельзя — ничего не изменится",
+    reminder: (t, w) => `Напомнить о «${t}» — ${w}`,
+    rename: (f, to) => `Переименовать «${f}» в «${to}»`,
+    move: (t, f, to) => `↪ Перенести «${t}»${f ? ` из «${f}»` : ""} в «${to}»`,
+    find: (q) => `Найти «${q}»`,
+    read: (n) => `Прочитать «${n}»`,
+  },
 };
 
 // ── HI ──────────────────────────────────────────────────────────────────────────
@@ -388,7 +534,8 @@ const HI: Strings = {
   welcome: "नमस्ते! मैं Gisti हूँ — किसी भी चीज़ को चेकलिस्ट में बदल देता हूँ।",
   help:
     "मुझे कुछ भी भेजें — लिस्ट, नोट्स, फ़ोटो, वॉइस मैसेज या लिंक — मैं उसे चेकलिस्ट बना दूँगा।\n\n" +
-    "/lists — आपकी चेकलिस्ट\n/credits — AI क्रेडिट बैलेंस\n/premium — सब्सक्रिप्शन\n/app — मोबाइल ऐप\n" +
+    "/lists — आपकी चेकलिस्ट\n/chat — AI असिस्टेंट से चैट\n/credits — AI क्रेडिट बैलेंस\n" +
+    "/premium — सब्सक्रिप्शन\n/app — मोबाइल ऐप\n/timezone — आपका टाइम ज़ोन\n" +
     "/paysupport — भुगतान सहायता\n/unlink — Telegram को अलग करें\n/help — यह मदद",
   tokenExpired: "यह लिंक पुराना हो गया है या पहले ही इस्तेमाल हो चुका है। ऐप में नया बनाएँ: मेनू → Telegram।",
   noAccount: "पहले Gisti ऐप में Google से साइन इन करें, फिर नया लिंक बनाएँ: मेनू → Telegram।",
@@ -491,6 +638,52 @@ const HI: Strings = {
     "📱 Android के लिए Gisti — आपकी चेकलिस्ट, रिमाइंडर और होम-स्क्रीन विजेट आपके फ़ोन पर। " +
     "उसी Google अकाउंट से साइन इन करें — सब कुछ इस बॉट के साथ सिंक रहेगा।",
   btnOpenPlay: "Google Play में खोलें",
+
+  btnAskAi: (cost) => `💬 AI से पूछें (${cost} क्रेडिट)`,
+  chatIntro: (cost) =>
+    "💬 AI चैट चालू है। अपनी चेकलिस्ट के बारे में कुछ भी पूछें — मैं आइटम जोड़, पूरे मार्क कर, ढूँढ, " +
+    "दूसरी लिस्ट में ले जा और हटा सकता हूँ, और रिमाइंडर लगा सकता हूँ।\n\n" +
+    `हर मैसेज पर ${cost} क्रेडिट लगते हैं (Gisti ऐप के साथ साझा बैलेंस)। फ़ोटो, वॉइस मैसेज और लिंक पहले की तरह ` +
+    "चेकलिस्ट बनेंगे। काम पूरा होने पर «चैट खत्म करें» दबाएँ।",
+  btnEndChat: "✖ चैट खत्म करें",
+  chatEnded: "चैट खत्म हो गई। अब आपके मैसेज फिर से चेकलिस्ट बनेंगे। AI से बात करने के लिए /chat भेजें।",
+  chatExpired: "यह चैट खत्म हो चुकी है — नई शुरू करने के लिए /chat भेजें।",
+  chatOutdated: "यह बटन पुराना हो गया है — बातचीत आगे बढ़ चुकी है।",
+  confirmTitle: "क्या यह करूँ?",
+  btnConfirmYes: "✅ हाँ",
+  confirmApproved: "✅ पुष्टि हो गई।",
+  confirmDeclined: "रद्द कर दिया।",
+  confirmSuperseded: "रद्द कर दिया — आपने नया मैसेज भेजा।",
+  chatNoCredits:
+    "AI क्रेडिट खत्म हो गए — बैलेंस Gisti ऐप के साथ साझा है। Premium में क्रेडिट हर दिन भरते हैं: /premium\n\n" +
+    "चैट बंद हो गई: आपके मैसेज फिर से चेकलिस्ट बनेंगे (लाइनों से चेकलिस्ट मुफ़्त है)।",
+  chatTooLong: "यह मैसेज AI चैट के लिए बहुत लंबा है — कृपया छोटा मैसेज भेजें।",
+  chatRejected: "AI यह मैसेज नहीं ले पाया। कृपया इसे दूसरे शब्दों में या छोटा करके भेजें।",
+  chatFailed: "AI ने जवाब नहीं दिया। कृपया अपना मैसेज फिर से भेजें।",
+  chatRoundLimit: "मैंने कई कदम पूरे किए, लेकिन एक मैसेज की सीमा तक पहुँच गया। बताइए और क्या करना है।",
+  tzUnknownHint: "अपने स्थानीय समय पर रिमाइंडर के लिए अपना टाइम ज़ोन बताएँ: /timezone",
+  timezoneQuestion: (current) =>
+    "आपके यहाँ अभी कितने बजे हैं? अपना मौजूदा समय दबाएँ — AI चैट के रिमाइंडर इसी टाइम ज़ोन में लगेंगे।" +
+    (current ? `\n\nअभी चुना हुआ: ${current}` : ""),
+  timezoneSaved: (label, time) => `✅ टाइम ज़ोन सेव हो गया: ${label} (आपके यहाँ अभी ${time} बजे हैं)।`,
+  act: {
+    add: (t, l) => `«${t}» जोड़ें${l ? ` («${l}» में)` : ""}`,
+    addMany: (n, l) => `${n} आइटम जोड़ें${l ? ` («${l}» में)` : ""}`,
+    create: (name, n) => `चेकलिस्ट «${name}» बनाएँ${n ? ` (${n} आइटम)` : ""}`,
+    complete: (t, l) => `«${t}» को पूरा मार्क करें${l ? ` («${l}» में)` : ""}`,
+    delete: (t, l) => `🗑 «${t}» हटाएँ${l ? ` («${l}» से)` : ""}`,
+    clear: (l, n) => `🗑 ${n === null ? "सभी पूरे आइटम" : `${n} पूरे आइटम`} हटाएँ${l ? ` («${l}» से)` : ""}`,
+    willNotFind: "नहीं मिला — कुछ नहीं बदलेगा",
+    willAsk: (names) => `कई लिस्ट मेल खाती हैं (${names}) — कुछ नहीं बदलेगा`,
+    noChange: "पहले से हो चुका है — कुछ नहीं बदलेगा",
+    blocked: "इस आइटम में रिमाइंडर, रिपीट या अटैचमेंट है — यह अपनी जगह रहेगा",
+    cannot: "यह नहीं हो सकता — कुछ नहीं बदलेगा",
+    reminder: (t, w) => `«${t}» के लिए रिमाइंडर — ${w}`,
+    rename: (f, to) => `«${f}» का नाम बदलकर «${to}» करें`,
+    move: (t, f, to) => `↪ «${t}» को${f ? ` «${f}» से` : ""} «${to}» में ले जाएँ`,
+    find: (q) => `«${q}» खोजें`,
+    read: (n) => `«${n}» पढ़ें`,
+  },
 };
 
 const STRINGS: Record<Lang, Strings> = { en: EN, ru: RU, hi: HI };
@@ -510,30 +703,36 @@ export interface BotCommand {
 export const BOT_COMMANDS: Record<Lang, BotCommand[]> = {
   en: [
     { command: "lists", description: "My checklists" },
+    { command: "chat", description: "AI chat" },
     { command: "credits", description: "AI credit balance" },
     { command: "premium", description: "Subscription" },
     { command: "app", description: "Mobile app" },
     { command: "help", description: "How it works" },
+    { command: "timezone", description: "Time zone" },
     { command: "paysupport", description: "Payment help" },
     { command: "start", description: "Connect your account" },
     { command: "unlink", description: "Disconnect Telegram" },
   ],
   ru: [
     { command: "lists", description: "Мои чек-листы" },
+    { command: "chat", description: "AI-чат" },
     { command: "credits", description: "Баланс AI-кредитов" },
     { command: "premium", description: "Подписка" },
     { command: "app", description: "Мобильное приложение" },
     { command: "help", description: "Как это работает" },
+    { command: "timezone", description: "Часовой пояс" },
     { command: "paysupport", description: "Помощь с оплатой" },
     { command: "start", description: "Подключить аккаунт" },
     { command: "unlink", description: "Отключить Telegram" },
   ],
   hi: [
     { command: "lists", description: "मेरी चेकलिस्ट" },
+    { command: "chat", description: "AI चैट" },
     { command: "credits", description: "AI क्रेडिट बैलेंस" },
     { command: "premium", description: "सब्सक्रिप्शन" },
     { command: "app", description: "मोबाइल ऐप" },
     { command: "help", description: "यह कैसे काम करता है" },
+    { command: "timezone", description: "टाइम ज़ोन" },
     { command: "paysupport", description: "भुगतान सहायता" },
     { command: "start", description: "अकाउंट जोड़ें" },
     { command: "unlink", description: "Telegram अलग करें" },

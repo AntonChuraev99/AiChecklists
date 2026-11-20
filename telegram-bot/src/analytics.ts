@@ -29,10 +29,19 @@ export interface AnalyticsEnv {
   AMPLITUDE_SERVER_API_KEY?: string;
 }
 
+import type { AgentToolName, ToolStatus } from "./agentTools";
+
 export type ChecklistMode = "free" | "ai";
 export type ChecklistInput = "text" | "photo" | "voice" | "audio" | "document" | "url";
 export type AiFailReason = "no_credits" | "cf_error" | "unsupported";
 export type SubscriptionStateValue = "active" | "canceled" | "failed";
+/** How chat mode was opened: the «Ask AI» button under a text draft, or `/chat`. */
+export type ChatOpenSource = "button" | "command";
+/**
+ * How a chat turn ended: an answer (`final`), tappable options, its confirmation card declined by a
+ * new message / End chat / idle (`declined`), out of credits, or any failure (`error`).
+ */
+export type ChatTurnResult = "final" | "options" | "declined" | "no_credits" | "error";
 
 /** Every event the bot emits. Adding a field means adding it here first. */
 export type TgEvent =
@@ -47,7 +56,13 @@ export type TgEvent =
   /** `amount` = Stars charged (XTR integer), not money. */
   | { type: "tg_payment_succeeded"; amount: number; isRecurring: boolean }
   | { type: "tg_subscription_updated"; state: SubscriptionStateValue }
-  | { type: "tg_app_link_opened" };
+  | { type: "tg_app_link_opened" }
+  // Phase 2 — AI chat
+  | { type: "tg_chat_opened"; source: ChatOpenSource }
+  /** `rounds` = tool rounds the turn ran (0..5). */
+  | { type: "tg_chat_turn"; result: ChatTurnResult; rounds: number }
+  /** One per tool call the agent made; `tool` is one of the 11 fixed tool names. */
+  | { type: "tg_chat_tool"; tool: AgentToolName; status: ToolStatus };
 
 export interface TgAnalyticsIdentity {
   /** `users/{credit_user_id}` when linked, else null. */
@@ -99,6 +114,12 @@ function eventProperties(e: TgEvent): Record<string, string | number | boolean> 
       return { amount: e.amount, is_recurring: e.isRecurring };
     case "tg_subscription_updated":
       return { state: e.state };
+    case "tg_chat_opened":
+      return { source: e.source };
+    case "tg_chat_turn":
+      return { result: e.result, rounds: e.rounds };
+    case "tg_chat_tool":
+      return { tool: e.tool, status: e.status };
   }
 }
 
@@ -119,6 +140,12 @@ let warnedMissingKey = false;
 
 /** POST one event. Resolves on every outcome — analytics must never fail or stall a user action. */
 export async function sendTgEvent(env: AnalyticsEnv, identity: TgAnalyticsIdentity, event: TgEvent): Promise<void> {
+  await sendTgEvents(env, identity, [event]);
+}
+
+/** POST several events in ONE request (a chat round's tool calls). Same guarantees as sendTgEvent. */
+export async function sendTgEvents(env: AnalyticsEnv, identity: TgAnalyticsIdentity, events: TgEvent[]): Promise<void> {
+  if (events.length === 0) return;
   const apiKey = env.AMPLITUDE_SERVER_API_KEY;
   if (!apiKey) {
     if (!warnedMissingKey) {
@@ -127,15 +154,17 @@ export async function sendTgEvent(env: AnalyticsEnv, identity: TgAnalyticsIdenti
     }
     return;
   }
+  const label = events.map((e) => e.type).join(",");
   try {
+    const now = Date.now();
     const resp = await fetch(AMPLITUDE_HTTP_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: apiKey, events: [buildAmplitudeEvent(identity, event, Date.now())] }),
+      body: JSON.stringify({ api_key: apiKey, events: events.map((e) => buildAmplitudeEvent(identity, e, now)) }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
-    if (!resp.ok) console.warn(`[gisti-tg] amplitude upload ${event.type} non-200: ${resp.status}`);
+    if (!resp.ok) console.warn(`[gisti-tg] amplitude upload ${label} non-200: ${resp.status}`);
   } catch (e) {
-    console.warn(`[gisti-tg] amplitude upload ${event.type} failed: ${e instanceof Error ? e.name : "unknown"}`);
+    console.warn(`[gisti-tg] amplitude upload ${label} failed: ${e instanceof Error ? e.name : "unknown"}`);
   }
 }

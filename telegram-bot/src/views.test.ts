@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { CHAT_AGENT_COST } from "./backend";
 import { emptyRegistry, resolveKey, decodeCallback } from "./callback";
+import { addParts, newDraft, type DraftPart } from "./draft";
 import { t } from "./i18n";
-import { checklistRows, ITEMS_PAGE_SIZE, progress, renderItemsPage, renderListsPage, LISTS_PAGE_SIZE } from "./views";
+import {
+  checklistRows,
+  ITEMS_PAGE_SIZE,
+  progress,
+  renderDraftPrompt,
+  renderItemsPage,
+  renderListsPage,
+  LISTS_PAGE_SIZE,
+} from "./views";
 import { buildAiChecklist, createEmptyChecklist, toggleItem } from "../../mcp-server/src/mutate";
 import { parseTemplateItems } from "../../mcp-server/src/model";
 
@@ -43,6 +53,43 @@ describe("renderItemsPage", () => {
   it("clamps an out-of-range page", () => {
     const c = createEmptyChecklist("Small", ["a"], 1);
     expect(renderItemsPage(c, 99, t("en"), emptyRegistry()).text).toContain("page 1/1");
+  });
+});
+
+describe("renderDraftPrompt — «Ask AI» (Phase 2)", () => {
+  function draftWith(parts: DraftPart[]) {
+    const d = newDraft({
+      id: "abc",
+      chatId: 42,
+      user: { id: 42, username: null, firstName: null, languageCode: "en" },
+      lang: "en",
+      cloudId: "cloud",
+      now: 0,
+    });
+    addParts(d, parts, null, 0);
+    return d;
+  }
+  const actions = (d: ReturnType<typeof draftWith>) =>
+    renderDraftPrompt(d, 30, t("en"), undefined)
+      .keyboard.inline_keyboard.map((r) => r[0]!)
+      .map((b) => ("callback_data" in b ? decodeCallback(b.callback_data) : null))
+      .map((cb) => (cb?.t === "draft" ? cb.action : null));
+
+  it("a text-only draft keeps lines / AI and gets Ask AI as the third button", () => {
+    const d = draftWith([{ kind: "text", text: "milk\nbread" }]);
+    expect(actions(d)).toEqual(["free", "ai", "chat", "cancel"]);
+    const ask = renderDraftPrompt(d, 30, t("en")).keyboard.inline_keyboard[2]![0]!;
+    expect(ask.text).toBe(`💬 Ask AI (${CHAT_AGENT_COST} credits)`);
+  });
+
+  it("photos, files and links do not get Ask AI", () => {
+    expect(actions(draftWith([{ kind: "image", fileId: "f", size: 1, origin: "photo" }]))).toEqual(["ai", "cancel"]);
+    expect(actions(draftWith([{ kind: "link", url: "https://x.y" }]))).toEqual(["ai", "cancel"]);
+    // text + link: no free option either (links count as non-text — freeOption), and no Ask AI
+    expect(actions(draftWith([{ kind: "text", text: "notes" }, { kind: "link", url: "https://x.y" }]))).toEqual([
+      "ai",
+      "cancel",
+    ]);
   });
 });
 

@@ -6,8 +6,9 @@
  *    10 rows per page; folders are header rows (tap = no-op), leaves are toggle buttons.
  */
 
+import { CHAT_AGENT_COST } from "./backend";
 import { encodeCallback, keyFor, type KeyRegistryState } from "./callback";
-import { aiPlan, draftCounts, freeOption, hasMultipleFiles, MAX_PARTS, type Draft } from "./draft";
+import { aiPlan, draftCounts, freeOption, hasMultipleFiles, isTextOnly, MAX_PARTS, type Draft } from "./draft";
 import { formatDate, type Lang, type Strings } from "./i18n";
 import { PLAY_STORE_URL } from "./links";
 import type { PremiumStatus } from "./payments";
@@ -116,7 +117,8 @@ export function sortChecklists(list: ChecklistSyncData[]): ChecklistSyncData[] {
 /**
  * The one prompt a draft turns into: what was received, then the buttons it qualifies for. `notice`
  * (an error from a failed AI attempt) goes on top while the buttons stay, so the user can retry or
- * pick the free option.
+ * pick the free option. A text-only draft also gets «💬 Ask AI» (Phase 2: the text becomes the
+ * first message of the AI chat).
  */
 export function renderDraftPrompt(d: Draft, aiCost: number, s: Strings, notice?: string): View {
   const free = freeOption(d, s.defaultChecklistName);
@@ -132,6 +134,9 @@ export function renderDraftPrompt(d: Draft, aiCost: number, s: Strings, notice?:
   if (free) rows.push([{ text: s.btnFree, callback_data: encodeCallback({ t: "draft", draftId: d.id, action: "free" }) }]);
   if (aiPlan(d)) {
     rows.push([{ text: s.btnAi(aiCost), callback_data: encodeCallback({ t: "draft", draftId: d.id, action: "ai" }) }]);
+  }
+  if (isTextOnly(d)) {
+    rows.push([{ text: s.btnAskAi(CHAT_AGENT_COST), callback_data: encodeCallback({ t: "draft", draftId: d.id, action: "chat" }) }]);
   }
   rows.push([{ text: s.btnCancel, callback_data: encodeCallback({ t: "draft", draftId: d.id, action: "cancel" }) }]);
   return { text: lines.join("\n"), keyboard: { inline_keyboard: rows } };

@@ -29,6 +29,7 @@ AI-чат отказывает в 5-м чек-листе, который раз�
 |---|---|---|---|
 | Вложений на пункт | RC `max_attachments_per_item_free` = 3 (`RemoteConfigKeys.kt:86`) | `FREE_ATTACHMENT_LIMIT_PER_ITEM = 3` (`ChecklistDetailViewModel.kt:3588`) · `FREE_ATTACH_LIMIT_PER_ITEM = 3` (`ToolCallDispatcherImpl.kt:80`) | значения совпадают — **пока** |
 | Чек-листов Free | RC `max_checklists_free` = 5 (`:82`) | комментарий `MAX_CHECKLISTS_FREE=4` (`PaywallScreen.kt:572`) · `init.js` веба = 4 | комментарий и веб-слой уже разошлись |
+| Цена хода AI-чата (2026-11-20) | константа `chat_agent` в `firebase-functions/main.py` (ключа в `remote_config/current` нет) | `CHAT_AGENT_COST` в `telegram-bot/src/backend.ts` — бот показывает её на кнопке «Ask AI» и во вступлении чата | значения совпадают — **пока**; пина между Python и TS нет | <!-- docs-leak-scan: reviewed — constant name, no prompt text -->
 | Дневной лимит Premium | клиент `ai_daily_limit_premium` = 300 (`:76`) | сервер `DEFAULT_DAILY_LIMIT_PREMIUM = 100` (`main.py:292`) · `DEFAULT_PREMIUM_DAILY_CREDITS_CAP = 300` (`main.py:297`) | 🔴 **три значения**, требует решения владельца — какое верно |
 
 Отдельно: RC-ключи `max_weekly_checklists_free`, `max_attachments_per_item_free` и

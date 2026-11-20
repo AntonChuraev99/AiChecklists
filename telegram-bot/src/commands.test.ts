@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COMMANDS, resolveCommand } from "./commands";
 import { classifyMessage, parseCommand } from "./draft";
-import { BOT_COMMANDS, LANGS } from "./i18n";
+import { BOT_COMMANDS, LANGS, t } from "./i18n";
 
 describe("commands", () => {
   it("parses the new commands, with and without the @bot suffix", () => {
@@ -29,6 +29,19 @@ describe("commands", () => {
     expect(BOT_COMMANDS.ru.find((c) => c.command === "premium")?.description).toBe("Подписка");
     expect(BOT_COMMANDS.en.find((c) => c.command === "app")?.description).toBe("Mobile app");
     expect(BOT_COMMANDS.ru.find((c) => c.command === "app")?.description).toBe("Мобильное приложение");
+  });
+
+  it("Phase 2: /chat and /timezone have handlers, are in every menu and in /help", () => {
+    expect(resolveCommand("chat")).toBe("chat");
+    expect(resolveCommand("timezone")).toBe("timezone");
+    expect(parseCommand("/chat what's due today?")).toEqual({ command: "chat", arg: "what's due today?" });
+    for (const lang of LANGS) {
+      const names = BOT_COMMANDS[lang].map((c) => c.command);
+      expect(names).toContain("chat");
+      expect(names).toContain("timezone");
+      expect(t(lang).help).toContain("/chat");
+      expect(t(lang).help).toContain("/timezone");
+    }
   });
 
   it("classifies a successful_payment service message as a payment, refunded_payment as silent", () => {
