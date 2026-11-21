@@ -37,6 +37,10 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.deeplink.GalleryDeepLink
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisReadySignal
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.DeliveryClaimant
+import com.antonchuraev.homesearchchecklist.feature.analyze.platform.AnalysisNotificationIntents
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.navigateToReadyDestination
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.telegram.PendingTelegramLink
 import com.antonchuraev.homesearchchecklist.telegram.TelegramConfig
@@ -84,6 +88,36 @@ class MainActivity : ComponentActivity() {
     private var pendingProcessText: ProcessTextRequest? = null
 
     private data class ProcessTextRequest(val text: String, val mode: ProcessTextMode)
+
+    /**
+     * Job id from a "your checklist is ready" notification tap on cold start, consumed once navigation
+     * can run (same as [pendingChecklistId]).
+     */
+    private var pendingAnalysisJobId: String? = null
+
+    /**
+     * Notification tap → claim the delivery, navigate only on a win. A null from `onOpen` means the
+     * outcome was already delivered in-app (row 26): the app simply opens where it was. Idempotent, so
+     * a config-change recreate re-delivering the launch intent cannot navigate twice.
+     */
+    private suspend fun openAnalysisResult(jobId: String) {
+        val signal: AnalysisReadySignal? = GlobalContext.getOrNull()?.getOrNull()
+        if (signal == null) {
+            logger.error(ANALYSIS_TAG, "no AnalysisReadySignal bound — notification tap for $jobId ignored", IllegalStateException("missing binding"))
+            return
+        }
+        val destination = runCatching { signal.onOpen(jobId, DeliveryClaimant.NOTIFICATION) }
+            .getOrElse { e ->
+                if (e is CancellationException) throw e
+                logger.error(ANALYSIS_TAG, "onOpen($jobId) from notification failed: ${e.message}", e)
+                return
+            }
+        if (destination == null) {
+            logger.info(ANALYSIS_TAG, "notification tap for $jobId: already delivered — no navigation")
+            return
+        }
+        appNavigator.navigateToReadyDestination(destination)
+    }
 
     private fun extractProcessTextRequest(intent: Intent?): ProcessTextRequest? {
         if (intent?.action != ProcessTextContract.ACTION_PROCESS_TEXT) return null
@@ -133,6 +167,9 @@ class MainActivity : ComponentActivity() {
         extractDeepLinkChecklistId(intent)?.let { id ->
             pendingChecklistId = id
         }
+        // Cold start from an analysis-ready notification. No savedInstanceState guard needed: onOpen
+        // claims the delivery once, a re-delivered intent gets null and does nothing.
+        pendingAnalysisJobId = AnalysisNotificationIntents.jobIdFrom(intent)
         // Cold-start push tap: emit push_opened once. Guarded on savedInstanceState == null so a
         // config-change recreate (which re-delivers the same launch intent) never double-counts.
         if (savedInstanceState == null) {
@@ -250,6 +287,12 @@ class MainActivity : ComponentActivity() {
                     pendingProcessText = null
                     routeProcessText(request)
                 }
+
+                // Consume a pending analysis-ready notification tap (cold start).
+                pendingAnalysisJobId?.let { jobId ->
+                    pendingAnalysisJobId = null
+                    openAnalysisResult(jobId)
+                }
             }
         }
     }
@@ -338,6 +381,7 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val RETENTION_TAG = "Retention"
         const val PUSH_TAG = "PushToken"
+        const val ANALYSIS_TAG = "AnalysisJob"
         const val TELEGRAM_LINK_HOST = "app.gisti-ai.com"
 
         /** Outlives any single Activity instance; the writes are tiny and fire-and-forget. */
@@ -357,6 +401,11 @@ class MainActivity : ComponentActivity() {
                     "checklist_id" to id.toString()
                 ))
             }
+        }
+        // Warm start from an analysis-ready notification — its own action, never ACTION_OPEN_CHECKLIST,
+        // so it is not counted as reminder_notification_tapped above.
+        AnalysisNotificationIntents.jobIdFrom(intent)?.let { jobId ->
+            lifecycleScope.launch { openAnalysisResult(jobId) }
         }
         // Warm start from the ACTION_PROCESS_TEXT selection toolbar — navigate immediately.
         extractProcessTextRequest(intent)?.let { request ->

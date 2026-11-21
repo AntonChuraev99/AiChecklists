@@ -7,6 +7,7 @@ import aichecklists.core.designsystem.generated.resources.chat_voice_release_can
 import aichecklists.core.designsystem.generated.resources.onboarding_try_ai_error
 import aichecklists.core.designsystem.generated.resources.onboarding_try_ai_error_sample
 import aichecklists.core.designsystem.generated.resources.onboarding_try_ai_error_save
+import aichecklists.core.designsystem.generated.resources.onboarding_try_ai_nothing_found
 import aichecklists.core.designsystem.generated.resources.onboarding_try_ai_signin
 import aichecklists.core.designsystem.generated.resources.onboarding_try_type_placeholder
 import androidx.compose.animation.core.RepeatMode
@@ -358,6 +359,7 @@ internal fun AiErrorBox(
                     when (error) {
                         OnboardingAiError.Unavailable -> Res.string.onboarding_try_ai_error
                         OnboardingAiError.SignInRequired -> Res.string.onboarding_try_ai_signin
+                        OnboardingAiError.NothingFound -> Res.string.onboarding_try_ai_nothing_found
                     },
                 ),
                 style = MaterialTheme.typography.bodyMedium,

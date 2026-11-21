@@ -126,6 +126,20 @@ class UserDataRepositoryImpl(
         }
     }
 
+    override suspend fun setOnboardingPassed(passed: Boolean) {
+        // Single-key write on purpose: credits/premium are owned by the server sync paths
+        // (register, link, restore, credit listener) and must never be rewritten from a stale
+        // or default snapshot here.
+        appDatastore.saveBoolean(IS_ONBOARDING_PASSED_KEY, passed)
+    }
+
+    override suspend fun setAiCredits(credits: Int) {
+        // Single-key write: the balance the server returned after an AI action. A background
+        // analysis finishes long after the snapshot it started from, so `update(snapshot.copy(...))`
+        // would roll premium / onboarding back to whatever they were at enqueue time.
+        appDatastore.saveInt(AI_CREDITS_KEY, credits)
+    }
+
     override suspend fun ensureUserRegistered(): Result<RegistrationData> {
         logger.debug(TAG, "ensureUserRegistered: starting...")
 

@@ -1957,4 +1957,47 @@
     <string name="telegram_open_failed">इस डिवाइस पर Telegram नहीं खुल सका।</string>
     <string name="telegram_link_expired">यह लिंक एक्सपायर हो गया है। नया लिंक पाने के लिए बॉट को /start भेजें।</string>
     <string name="telegram_link_failed">Telegram नहीं जुड़ सका। बॉट से लिंक फिर से खोलें।</string>
+    <string name="analysis_notification_channel_results">AI परिणाम</string>
+    <string name="analysis_notification_channel_results_desc">जब AI से बनी चेकलिस्ट तैयार हो</string>
+    <string name="analysis_notification_channel_progress">विश्लेषण जारी है</string>
+    <string name="analysis_notification_progress_title">आपकी सामग्री का विश्लेषण हो रहा है</string>
+    <string name="analysis_notification_checklist_ready_title">आपकी चेकलिस्ट तैयार है</string>
+    <string name="analysis_notification_tap_to_open">खोलने के लिए टैप करें</string>
+    <string name="analysis_notification_fill_ready_title">जवाब समीक्षा के लिए तैयार हैं</string>
+    <string name="analysis_notification_failed_title">चेकलिस्ट नहीं बन सकी</string>
+    <string name="analysis_notification_failed_body">क्या हुआ, यह देखने के लिए टैप करें</string>
+    <string name="analyze_failed_title">चेकलिस्ट नहीं बन सकी</string>
+    <string name="analyze_error_nothing_found">चेकलिस्ट बनाने लायक कुछ नहीं मिला। साफ़ फ़ोटो या दूसरा टेक्स्ट आज़माएँ।</string>
+    <string name="analyze_error_input_too_large">यह फ़ाइल विश्लेषण के लिए बहुत बड़ी है। छोटी फ़ाइल या पेज की फ़ोटो आज़माएँ।</string>
+    <string name="analyze_error_input_unreadable">यह फ़ाइल पढ़ी नहीं जा सकी। इसे फिर से चुनें।</string>
+    <string name="analyze_error_interrupted">विश्लेषण पूरा होने से पहले पेज रीलोड हो गया। फ़ाइल फिर से चुनें।</string>
+    <string name="analyze_error_server">हमारी तरफ़ कुछ गड़बड़ हुई। थोड़ी देर में फिर कोशिश करें।</string>
+    <string name="analyze_change_input">सामग्री बदलें</string>
+    <string name="analyze_try_again">फिर कोशिश करें</string>
+    <string name="analyze_too_many_jobs">आपके %1$d विश्लेषण पहले से चल रहे हैं। किसी एक के पूरा होने तक रुकें।</string>
+    <string name="analyze_loading_slow">बड़ी फ़ाइलों में एक मिनट तक लग सकता है</string>
+    <string name="analyze_waiting_leave_hint">आप यहाँ से जा सकते हैं — तैयार होने पर हम बताएँगे</string>
+    <string name="analyze_continue_in_background">बैकग्राउंड में जारी रखें</string>
+    <string name="analyze_waiting_network_title">कनेक्शन का इंतज़ार</string>
+    <string name="analyze_waiting_network_description">इंटरनेट लौटते ही विश्लेषण अपने आप शुरू होगा</string>
+    <string name="analyze_waiting_notify_rationale">नोटिफ़िकेशन की अनुमति दें — तैयार होने पर हम बताएँगे</string>
+    <plurals name="analyze_jobs_in_progress">
+        <item quantity="one">%1$d विश्लेषण जारी है</item>
+        <item quantity="other">%1$d विश्लेषण जारी हैं</item>
+    </plurals>
+    <string name="analyze_ready_snackbar">“%1$s” तैयार है</string>
+    <string name="analyze_ready_open">खोलें</string>
+    <string name="analyze_ready_fill_snackbar">“%1$s” के जवाब तैयार हैं</string>
+    <string name="analyze_ready_review">देखें</string>
+    <plurals name="analyze_ready_many_snackbar">
+        <item quantity="one">%1$d चेकलिस्ट तैयार है</item>
+        <item quantity="other">%1$d चेकलिस्ट तैयार हैं</item>
+    </plurals>
+    <string name="analyze_ready_view">देखें</string>
+    <string name="analyze_failed_snackbar">चेकलिस्ट नहीं बन सकी</string>
+    <string name="analyze_details">विवरण</string>
+    <string name="analyze_interrupted_snackbar">पेज रीलोड होने से विश्लेषण रुक गया</string>
+    <string name="analyze_error_checklist_gone">यह चेकलिस्ट अब मौजूद नहीं है।</string>
+    <string name="analyze_error_invalid_input">यह सामग्री इस्तेमाल नहीं हो सकी। दूसरा टेक्स्ट, लिंक या फ़ाइल आज़माएँ।</string>
+    <string name="onboarding_try_ai_nothing_found">Gisti को सूची बनाने लायक कुछ नहीं मिला। इसे अलग तरह से लिखकर देखें।</string>
 </resources>

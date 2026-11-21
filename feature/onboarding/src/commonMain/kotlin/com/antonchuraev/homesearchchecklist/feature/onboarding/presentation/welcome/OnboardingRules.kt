@@ -32,7 +32,11 @@ internal fun plainListName(text: String, max: Int = PLAIN_LIST_NAME_MAX): String
  * sign-in. Everything else — and every Android failure — is "can't reach the AI right now".
  */
 internal fun resolveAiError(reason: AiFailureReason, isWeb: Boolean, isGoogleLinked: Boolean): OnboardingAiError =
-    if (isWeb && !isGoogleLinked &&
+    if (reason == AiFailureReason.NOTHING_FOUND) {
+        // The AI WAS reached and found nothing in the text: "try describing it differently", never
+        // "can't reach the AI" (that sends the user away from a working feature).
+        OnboardingAiError.NothingFound
+    } else if (isWeb && !isGoogleLinked &&
         (reason == AiFailureReason.CREDIT_GATE || reason == AiFailureReason.USER_NOT_READY)
     ) {
         OnboardingAiError.SignInRequired

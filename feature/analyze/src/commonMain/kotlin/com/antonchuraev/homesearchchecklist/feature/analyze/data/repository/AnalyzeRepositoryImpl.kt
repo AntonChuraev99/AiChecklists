@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.data.repository
 
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.AiInputType
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.AiServiceResponse
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.PreparedAnalyzeInput
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
@@ -22,12 +24,32 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class AnalyzeRepositoryImpl(
     private val firebaseAiService: FirebaseAiService,
     private val checklistRepository: ChecklistRepository,
-    private val userDataRepository: UserDataRepository
+    private val userDataRepository: UserDataRepository,
+    /** File bytes by path; injectable so the PDF / unreadable-file paths are testable without a filesystem. */
+    private val readFileBytes: (String) -> ByteArray? = FileReader::readBytes,
+    private val readFileText: (String) -> String? = FileReader::readText,
 ) : AnalyzeRepository {
 
     override suspend fun analyzeData(
         inputData: AnalyzeInputData,
         targetChecklist: Checklist?
+    ): Result<AnalyzeResult> = analyzeData(inputData, targetChecklist, requestId = null)
+
+    override suspend fun analyzeData(
+        inputData: AnalyzeInputData,
+        targetChecklist: Checklist?,
+        requestId: String?,
+    ): Result<AnalyzeResult> {
+        // Cheap guard first (no file read for a user who cannot send anyway), then the local read.
+        if (userDataRepository.getUserData().userId.isBlank()) return Result.failure(AiAnalyzeError.UserNotReady)
+        val prepared = prepare(inputData) ?: return Result.failure(AiAnalyzeError.InputUnreadable)
+        return analyzePrepared(prepared, targetChecklist, requestId)
+    }
+
+    override suspend fun analyzePrepared(
+        input: PreparedAnalyzeInput,
+        targetChecklist: Checklist?,
+        requestId: String?,
     ): Result<AnalyzeResult> {
         val userData = userDataRepository.getUserData()
         val userId = userData.userId
@@ -37,13 +59,12 @@ class AnalyzeRepositoryImpl(
         // timing). Calling the AI function with an empty user_id is a guaranteed server 400
         // ("user_id is required") that historically accounted for ~12% of ai_analyze_failed. Bail
         // early with a typed, terminal reason so presentation can prompt "signing you in… try again"
-        // instead of a silent generic error — and we skip the wasted file read / base64 encode below.
+        // instead of a silent generic error.
         if (userId.isBlank()) {
             return Result.failure(AiAnalyzeError.UserNotReady)
         }
 
-        // Convert input data to API format
-        val (inputType, inputDataString) = convertInputData(inputData)
+        val (inputType, inputDataString) = toWire(input)
 
         return if (targetChecklist != null) {
             // Use analyze_and_fill_checklist for existing checklists
@@ -52,15 +73,15 @@ class AnalyzeRepositoryImpl(
                 isPremium = isPremium,
                 checklist = targetChecklist,
                 inputType = inputType,
-                inputData = inputDataString
+                inputData = inputDataString,
+                requestId = requestId,
             ).fold(
                 onSuccess = { response ->
                     if (response.success && response.data != null) {
-                        // Update local free generations count if provided
-                        val newGenerations = response.data.aiCredits
-                        if (newGenerations >= 0) {
-                            userDataRepository.update(userData.copy(aiCredits = newGenerations))
-                        }
+                        saveBalance(response.data.aiCredits)
+                        // An older server answers an empty fill with success; the new one says
+                        // nothing_found itself. Either way there is nothing to review.
+                        if (response.data.filledItems.isEmpty()) return Result.failure(AiAnalyzeError.NothingFound)
 
                         // Build the template items first so each fill item can carry a stable
                         // link to its template counterpart (index-aligned, same source list).
@@ -90,7 +111,7 @@ class AnalyzeRepositoryImpl(
                             )
                         )
                     } else {
-                        Result.failure(Exception(response.error ?: "Analysis failed"))
+                        Result.failure(response.toError("Analysis failed"))
                     }
                 },
                 onFailure = { Result.failure(it) }
@@ -100,17 +121,17 @@ class AnalyzeRepositoryImpl(
             firebaseAiService.generateChecklist(
                 userId = userId,
                 isPremium = isPremium,
-                prompt = getPromptFromInput(inputData),
+                prompt = promptFor(input),
                 inputType = inputType,
-                inputData = inputDataString
+                inputData = inputDataString,
+                requestId = requestId,
             ).fold(
                 onSuccess = { response ->
                     if (response.success && response.data != null) {
-                        // Update local free generations count if provided
-                        val newGenerations = response.data.aiCredits
-                        if (newGenerations >= 0) {
-                            userDataRepository.update(userData.copy(aiCredits = newGenerations))
-                        }
+                        saveBalance(response.data.aiCredits)
+                        // Never create an empty checklist (older server: empty success; the new one
+                        // answers 422 nothing_found and refunds).
+                        if (response.data.items.isEmpty()) return Result.failure(AiAnalyzeError.NothingFound)
 
                         Result.success(
                             AnalyzeResult(
@@ -125,11 +146,29 @@ class AnalyzeRepositoryImpl(
                             )
                         )
                     } else {
-                        Result.failure(Exception(response.error ?: "Generation failed"))
+                        Result.failure(response.toError("Generation failed"))
                     }
                 },
                 onFailure = { Result.failure(it) }
             )
+        }
+    }
+
+    /**
+     * The server's post-action balance, as ONE key. `update(snapshot.copy(...))` from a snapshot taken
+     * before a long analysis would roll premium / onboarding back to stale values.
+     */
+    private suspend fun saveBalance(credits: Int) {
+        if (credits >= 0) userDataRepository.setAiCredits(credits)
+    }
+
+    /** A 2xx `success:false` body: keep the machine code so the classifier does not guess from text. */
+    private fun AiServiceResponse<*>.toError(fallback: String): Throwable {
+        val message = error ?: fallback
+        return when (errorCode) {
+            "nothing_found" -> AiAnalyzeError.NothingFound
+            null -> AiAnalyzeError.ServerRefusal(message)
+            else -> AiAnalyzeError.Http(statusCode = 200, serverMessage = message, errorCode = errorCode)
         }
     }
 
@@ -219,50 +258,40 @@ class AnalyzeRepositoryImpl(
         return true
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
-    private fun convertInputData(inputData: AnalyzeInputData): Pair<AiInputType, String> {
-        return when (inputData) {
-            is AnalyzeInputData.Photo -> {
-                val bytes = FileReader.readBytes(inputData.filePath)
-                if (bytes != null) {
-                    AiInputType.IMAGE_BASE64 to Base64.encode(bytes)
-                } else {
-                    AiInputType.TEXT to "Failed to read image: ${inputData.filePath}"
-                }
-            }
-            is AnalyzeInputData.PdfDocument -> {
-                // PDFs would need to be extracted as text or encoded
-                AiInputType.TEXT to "PDF content from: ${inputData.fileName}"
-            }
-            is AnalyzeInputData.TextFile -> {
-                val content = inputData.content ?: FileReader.readText(inputData.filePath)
-                AiInputType.TEXT to (content ?: "Failed to read text file: ${inputData.filePath}")
-            }
-            is AnalyzeInputData.WebLink -> {
-                AiInputType.URL to inputData.url
-            }
-            is AnalyzeInputData.RawText -> {
-                AiInputType.TEXT to inputData.text
-            }
-            is AnalyzeInputData.Audio -> {
-                val bytes = FileReader.readBytes(inputData.filePath)
-                if (bytes != null) {
-                    AiInputType.AUDIO_BASE64 to Base64.encode(bytes)
-                } else {
-                    AiInputType.TEXT to "Failed to read audio: ${inputData.filePath}"
-                }
-            }
-        }
+    /**
+     * Reads file material from its path. Null = unreadable (cache cleared, permission revoked): the
+     * caller fails locally with [AiAnalyzeError.InputUnreadable] — never send a "Failed to read …"
+     * text to the model and charge for it.
+     */
+    private fun prepare(inputData: AnalyzeInputData): PreparedAnalyzeInput? = when (inputData) {
+        is AnalyzeInputData.Photo -> readFileBytes(inputData.filePath)?.takeIf { it.isNotEmpty() }
+            ?.let { PreparedAnalyzeInput.Image(it) }
+        is AnalyzeInputData.PdfDocument -> readFileBytes(inputData.filePath)?.takeIf { it.isNotEmpty() }
+            ?.let { PreparedAnalyzeInput.Pdf(it, inputData.fileName) }
+        is AnalyzeInputData.TextFile -> (inputData.content ?: readFileText(inputData.filePath))
+            ?.takeIf { it.isNotBlank() }
+            ?.let { PreparedAnalyzeInput.Text(it) }
+        is AnalyzeInputData.WebLink -> PreparedAnalyzeInput.Url(inputData.url)
+        is AnalyzeInputData.RawText -> PreparedAnalyzeInput.Text(inputData.text)
+        is AnalyzeInputData.Audio -> readFileBytes(inputData.filePath)?.takeIf { it.isNotEmpty() }
+            ?.let { PreparedAnalyzeInput.Audio(it) }
     }
 
-    private fun getPromptFromInput(inputData: AnalyzeInputData): String {
-        return when (inputData) {
-            is AnalyzeInputData.Photo -> "Create a checklist based on this image"
-            is AnalyzeInputData.PdfDocument -> "Create a checklist from this document: ${inputData.fileName}"
-            is AnalyzeInputData.TextFile -> "Create a checklist from this text file"
-            is AnalyzeInputData.WebLink -> "Create a checklist from the content at: ${inputData.url}"
-            is AnalyzeInputData.RawText -> "Create a checklist based on: ${inputData.text}"
-            is AnalyzeInputData.Audio -> "Create a checklist from this voice recording"
-        }
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun toWire(input: PreparedAnalyzeInput): Pair<AiInputType, String> = when (input) {
+        is PreparedAnalyzeInput.Text -> AiInputType.TEXT to input.text
+        is PreparedAnalyzeInput.Url -> AiInputType.URL to input.url
+        is PreparedAnalyzeInput.Image -> AiInputType.IMAGE_BASE64 to Base64.encode(input.bytes)
+        // The file itself, not its name: the model reads the PDF (server: application/pdf part).
+        is PreparedAnalyzeInput.Pdf -> AiInputType.PDF_BASE64 to Base64.encode(input.bytes)
+        is PreparedAnalyzeInput.Audio -> AiInputType.AUDIO_BASE64 to Base64.encode(input.bytes)
+    }
+
+    private fun promptFor(input: PreparedAnalyzeInput): String = when (input) {
+        is PreparedAnalyzeInput.Image -> "Create a checklist based on this image"
+        is PreparedAnalyzeInput.Pdf -> "Create a checklist from this document: ${input.fileName}"
+        is PreparedAnalyzeInput.Url -> "Create a checklist from the content at: ${input.url}"
+        is PreparedAnalyzeInput.Text -> "Create a checklist based on: ${input.text}"
+        is PreparedAnalyzeInput.Audio -> "Create a checklist from this voice recording"
     }
 }

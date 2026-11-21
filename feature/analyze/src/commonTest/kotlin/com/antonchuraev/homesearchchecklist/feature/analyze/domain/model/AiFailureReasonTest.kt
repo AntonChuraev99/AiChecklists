@@ -79,4 +79,65 @@ class AiFailureReasonTest {
     fun classify_null_isUnknown() {
         assertEquals(AiFailureReason.UNKNOWN, AiFailureReason.classify(null))
     }
+
+    // ── Server error_code (FEATURE_SPEC analyze-reliability-background-2026-11-20 §6.8) ─────────
+
+    @Test
+    fun classify_errorCodeInputTooLarge_isInputTooLarge() {
+        assertEquals(
+            AiFailureReason.INPUT_TOO_LARGE,
+            AiFailureReason.classify(AiAnalyzeError.Http(413, "File is too large. The limit is 20 MB.", "input_too_large")),
+        )
+    }
+
+    @Test
+    fun classify_bareHttp413_isInputTooLarge() {
+        // A platform body limit answers 413 before our code runs: no JSON, no error_code.
+        assertEquals(AiFailureReason.INPUT_TOO_LARGE, AiFailureReason.classify(AiAnalyzeError.Http(413, null)))
+    }
+
+    @Test
+    fun classify_errorCodeNothingFound_isNothingFound() {
+        assertEquals(
+            AiFailureReason.NOTHING_FOUND,
+            AiFailureReason.classify(AiAnalyzeError.Http(422, "Nothing to turn into a checklist", "nothing_found")),
+        )
+    }
+
+    @Test
+    fun classify_localTypedErrors() {
+        assertEquals(AiFailureReason.NOTHING_FOUND, AiFailureReason.classify(AiAnalyzeError.NothingFound))
+        assertEquals(AiFailureReason.INPUT_UNREADABLE, AiFailureReason.classify(AiAnalyzeError.InputUnreadable))
+        assertEquals(AiFailureReason.INTERRUPTED, AiFailureReason.classify(AiAnalyzeError.Interrupted))
+        assertEquals(AiFailureReason.CANCELLED, AiFailureReason.classify(AiAnalyzeError.Cancelled))
+    }
+
+    @Test
+    fun inputFailures_areNotRetryableWithTheSameInput_transportOnesAre() {
+        listOf(
+            AiFailureReason.INPUT_TOO_LARGE, AiFailureReason.NOTHING_FOUND, AiFailureReason.INPUT_UNREADABLE,
+            AiFailureReason.INTERRUPTED, AiFailureReason.CREDIT_GATE, AiFailureReason.DAILY_LIMIT,
+        ).forEach { assertEquals(false, it.retryableWithSameInput, "$it") }
+        listOf(AiFailureReason.NETWORK, AiFailureReason.TIMEOUT, AiFailureReason.SERVER_5XX, AiFailureReason.AUTH_403)
+            .forEach { assertEquals(true, it.retryableWithSameInput, "$it") }
+    }
+
+    /** F6b: a refused input used to be UNKNOWN (retryable) → "Try again" re-sent what the server refused. */
+    @Test
+    fun classify_invalidInputCodes_areANonRetryableInputReason() {
+        listOf("invalid_input", "unsupported_input_type").forEach { code ->
+            val reason = AiFailureReason.classify(AiAnalyzeError.Http(400, "Bad input", code))
+            assertEquals(AiFailureReason.INVALID_INPUT, reason, code)
+            assertEquals(false, reason.retryableWithSameInput, code)
+        }
+    }
+
+    @Test
+    fun newWireValues_areTheSpecifiedStrings() {
+        assertEquals("input_too_large", AiFailureReason.INPUT_TOO_LARGE.wireValue)
+        assertEquals("nothing_found", AiFailureReason.NOTHING_FOUND.wireValue)
+        assertEquals("input_unreadable", AiFailureReason.INPUT_UNREADABLE.wireValue)
+        assertEquals("interrupted", AiFailureReason.INTERRUPTED.wireValue)
+        assertEquals("cancelled", AiFailureReason.CANCELLED.wireValue)
+    }
 }

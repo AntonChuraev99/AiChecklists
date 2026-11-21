@@ -18,6 +18,8 @@ import com.antonchuraev.homesearchchecklist.core.common.impl.AndroidAppLogger
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
+import com.antonchuraev.aichecklists.R
+import com.antonchuraev.homesearchchecklist.feature.analyze.platform.AnalysisNotificationStyle
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
@@ -110,4 +112,8 @@ actual fun platformModule(): Module = module {
     single { RetentionPrefs(get()) }
     single { PushTimingResolver(remoteConfig = get(), prefs = get(), analytics = get(), logger = get()) }
     single { RetentionPushScheduler(context = AppContextHolder.context, timingResolver = get()) }
+
+    // Small icon of the background-analysis notifications (feature:analyze cannot reach this
+    // module's drawables) — the same one every app notification uses.
+    single { AnalysisNotificationStyle(smallIconRes = R.drawable.ic_checkbox_checked) }
 }

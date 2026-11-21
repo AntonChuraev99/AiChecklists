@@ -182,6 +182,12 @@ enum class OnboardingAiError(val wire: String) {
 
     /** Web, not signed in with Google, out of credits — "Sign in with Google to use AI here". */
     SignInRequired("sign_in_required"),
+
+    /**
+     * The AI answered, but found nothing to turn into a list (server `nothing_found`, credits refunded)
+     * — "try describing it differently". Not "can't reach the AI": the AI was reached.
+     */
+    NothingFound("nothing_found"),
 }
 
 /** Where a "Try the sample" tap came from (analytics `origin` on `onboarding_sample_used`). */

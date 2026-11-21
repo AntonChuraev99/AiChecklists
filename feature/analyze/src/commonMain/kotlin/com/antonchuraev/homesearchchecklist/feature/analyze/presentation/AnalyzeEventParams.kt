@@ -17,6 +17,21 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
  */
 object AnalyzeEventParams {
 
+    /**
+     * Additive dimension of a background job's completed / failed event: `foreground` or
+     * `background` at the moment it finished. NOT `surface` — CSAT reads `surface == onboarding`.
+     */
+    const val APP_STATE = "app_state"
+    const val APP_STATE_FOREGROUND = "foreground"
+    const val APP_STATE_BACKGROUND = "background"
+
+    /** `ai_analyze_result_opened`: the user opened a finished job's outcome ([VIA] / [OUTCOME]). */
+    const val EVENT_RESULT_OPENED = "ai_analyze_result_opened"
+    const val VIA = "via"
+    const val OUTCOME = "outcome"
+
+    fun resultOpened(via: String, outcome: String): Map<String, Any> = mapOf(VIA to via, OUTCOME to outcome)
+
     fun started(inputType: String, source: String, surface: String? = null): Map<String, Any> = buildMap {
         put(AnalyticsParams.INPUT_TYPE, inputType)
         put(AnalyticsParams.SOURCE, source)
@@ -28,10 +43,12 @@ object AnalyzeEventParams {
         source: String,
         result: AnalyzeResult,
         surface: String? = null,
+        appState: String? = null,
     ): Map<String, Any> = buildMap {
         put(AnalyticsParams.INPUT_TYPE, inputType)
         put(AnalyticsParams.SOURCE, source)
         surface?.let { put(AnalyticsParams.SURFACE, it) }
+        appState?.let { put(APP_STATE, it) }
         put(AnalyticsParams.ITEM_COUNT, result.suggestedItems.size)
         // Guardrail dimensions — present only when the server sent an arm; omitted otherwise so the
         // event schema stays clean (matches ai_chat_response_received).
@@ -46,10 +63,12 @@ object AnalyzeEventParams {
         reason: AiFailureReason,
         error: Throwable,
         surface: String? = null,
+        appState: String? = null,
     ): Map<String, Any> = buildMap {
         put(AnalyticsParams.INPUT_TYPE, inputType)
         put(AnalyticsParams.SOURCE, source)
         surface?.let { put(AnalyticsParams.SURFACE, it) }
+        appState?.let { put(APP_STATE, it) }
         put(AnalyticsParams.FAILURE_REASON, reason.wireValue)
         put(AnalyticsParams.ERROR, error.message ?: "unknown")
     }

@@ -36,6 +36,26 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSu
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AiActionCostProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.AlwaysForegroundMonitor
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.AnalysisJobManager
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.InMemoryAnalysisJobStore
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.InMemoryAnalysisPayloadStore
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.RecordingLauncher
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.SilentAppLogger
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.queuedJob
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisJobFailure
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisJobHandoff
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisJobInput
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisJobScheduler
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisJobStatus
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisNotificationAskLatch
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.DeliveryClaimant
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.InMemoryAnalysisNotificationAskLatch
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiFailureReason
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.job.inProcessAnalysisJobScheduler
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -118,6 +138,11 @@ class AnalyzeViewModelTest {
         autoAnalyze: Boolean = false,
         initialInputKind: AnalyzeInputKind? = null,
         entrySource: AiEntrySource? = null,
+        actionCostProvider: AiActionCostProvider? = null,
+        launchJobs: Boolean = true,
+        jobScheduler: AnalysisJobScheduler? = null,
+        jobHandoff: AnalysisJobHandoff = AnalysisJobHandoff(),
+        notificationAskLatch: AnalysisNotificationAskLatch = InMemoryAnalysisNotificationAskLatch(),
     ): AnalyzeViewModel = AnalyzeViewModel(
         checklistId = checklistId,
         fillDefault = fillDefault,
@@ -132,7 +157,270 @@ class AnalyzeViewModelTest {
         getSubscriptionStatusUseCase = GetSubscriptionStatusUseCase(fakePaywallRepository),
         analyticsTracker = fakeAnalyticsTracker,
         activationCoordinator = fakeActivationCoordinator,
+        actionCostProvider = actionCostProvider,
+        // Compose Resources do not resolve on the plain JVM host; the key stands in for the copy.
+        resolveString = { it.key },
+        // Default (null) = the in-process job graph running on the test dispatcher. `launchJobs = false`
+        // swaps in the same graph with a launcher that never runs: the job stays Queued (offline).
+        jobHandoff = jobHandoff,
+        notificationAskLatch = notificationAskLatch,
+        jobScheduler = jobScheduler ?: if (launchJobs) null else inProcessAnalysisJobScheduler(
+            scope = CoroutineScope(testDispatcher),
+            analyzeRepository = fakeAnalyzeRepository,
+            checklistRepository = fakeChecklistRepository,
+            analyticsTracker = fakeAnalyticsTracker,
+            foregroundMonitor = AlwaysForegroundMonitor(),
+            defaultChecklistName = { "Checklist" },
+            launch = false,
+        ),
     )
+
+    // ── Background analysis (FEATURE_SPEC analyze-reliability-background-2026-11-20 §6) ─────────
+
+    /** Red-repro 1: the Activity-scoped VM reopened on an endless "Analyzing" loader. */
+    @Test
+    fun reEntryAfterSuccessfulCreate_showsTheForm_notTheLoader() = runTest {
+        fakeAnalyzeRepository.resultName = "Groceries"
+        val vm = createViewModel()
+        advanceUntilIdle() // the intent collector subscribes on the first dispatch
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t1"))
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("weekly groceries")
+        advanceUntilIdle()
+        assertTrue(fakeNavigator.navigatedToChecklistDetail, "precondition: the first visit delivered")
+
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t2"))
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(AnalyzeJobPhase.Editing, state.jobPhase, "a new visit must open on the form")
+        assertFalse(state.isAnalyzing, "a new visit must not show the previous visit's loader")
+        assertEquals("", state.inputText, "the form is reseeded from the route arguments")
+    }
+
+    /** Red-repro 2: Back during the analysis, then the result yanked the user onto the checklist. */
+    @Test
+    fun backDuringAnalysis_thenSuccess_neverNavigates() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        fakeAnalyzeRepository.gate = gate
+        val vm = createViewModel()
+        advanceUntilIdle() // the intent collector subscribes on the first dispatch
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t1"))
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("weekly groceries")
+        advanceUntilIdle()
+        assertEquals(1, fakeAnalyzeRepository.analyzeCallCount, "precondition: the request is in flight")
+
+        vm.sendIntent(AnalyzeScreenIntent.OnBackClick)
+        vm.sendIntent(AnalyzeJobIntent.OnScreenLeft)
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(fakeNavigator.navigatedToChecklistDetail, "the user left; nothing may navigate them back")
+        assertEquals(1, fakeAnalyzeRepository.createCallCount, "the result is still saved, not lost")
+    }
+
+    /** Red-repro 3: the client hardcoded 30 while the server charged 20 (two served values, never a constant). */
+    @Test
+    fun actionCost_isTheServerValue() = runTest {
+        fakeUserDataRepository.update(UserData(aiCredits = 20))
+
+        val atTwenty = createViewModel(actionCostProvider = FakeActionCostProvider(20))
+        advanceUntilIdle()
+        assertEquals(20, atTwenty.screenState.value.aiActionCost)
+        assertTrue(atTwenty.screenState.value.hasEnoughCredits, "20 credits must cover a cost of 20")
+
+        val atThirtyFive = createViewModel(actionCostProvider = FakeActionCostProvider(35))
+        advanceUntilIdle()
+        assertEquals(35, atThirtyFive.screenState.value.aiActionCost)
+        assertFalse(atThirtyFive.screenState.value.hasEnoughCredits, "20 credits do not cover 35")
+    }
+
+    /** Red-repro 5: "hello world" went to the server as a URL and was charged. */
+    @Test
+    fun invalidUrl_isRejectedBeforeAnyRequest() = runTest {
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.WEB_LINK)
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnUrlInputChanged("hello world"))
+        vm.sendIntent(AnalyzeScreenIntent.OnAnalyzeClick)
+        advanceUntilIdle()
+
+        assertNotNull(vm.screenState.value.inputError, "the field must say what is wrong")
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount, "nothing may be sent")
+        assertNull(
+            fakeAnalyticsTracker.events.firstOrNull { it.first == AnalyticsEvents.Analyze.STARTED },
+            "no analysis started, so no started event",
+        )
+    }
+
+    @Test
+    fun urlWithoutScheme_isSentAsHttps() = runTest {
+        val vm = createViewModel(initialInputKind = AnalyzeInputKind.WEB_LINK)
+        advanceUntilIdle()
+
+        vm.sendIntent(AnalyzeScreenIntent.OnUrlInputChanged("example.com/x"))
+        vm.sendIntent(AnalyzeScreenIntent.OnAnalyzeClick)
+        advanceUntilIdle()
+
+        assertNull(vm.screenState.value.inputError)
+        assertEquals(AnalyzeInputData.WebLink("https://example.com/x"), fakeAnalyzeRepository.lastInput)
+    }
+
+    @Test
+    fun cancelWhileWaitingForNetwork_returnsToTheFormWithInputKept() = runTest {
+        // Nothing launches the job (no connectivity): it stays Queued and is cancellable.
+        val vm = createViewModel(launchJobs = false)
+        advanceUntilIdle() // the intent collector subscribes on the first dispatch
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t1"))
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("weekly groceries")
+        advanceUntilIdle()
+        assertTrue(vm.screenState.value.jobPhase is AnalyzeJobPhase.Waiting)
+
+        vm.sendIntent(AnalyzeJobIntent.OnCancelWaitingClick)
+        advanceUntilIdle()
+
+        assertEquals(AnalyzeJobPhase.Editing, vm.screenState.value.jobPhase)
+        assertEquals("weekly groceries", vm.screenState.value.inputText)
+        assertEquals(0, fakeAnalyzeRepository.analyzeCallCount)
+        val failed = assertNotNull(fakeAnalyticsTracker.events.firstOrNull { it.first == AnalyticsEvents.Analyze.FAILED })
+        assertEquals("cancelled", failed.second["failure_reason"])
+    }
+
+    @Test
+    fun analyzeTwiceInOneVisit_enqueuesOneJob() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        fakeAnalyzeRepository.gate = gate
+        val vm = createViewModel()
+        advanceUntilIdle() // the intent collector subscribes on the first dispatch
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t1"))
+        vm.startManualRawTextAnalysis("weekly groceries")
+        vm.sendIntent(AnalyzeScreenIntent.OnAnalyzeClick)
+        advanceUntilIdle()
+
+        assertEquals(1, fakeAnalyticsTracker.events.count { it.first == AnalyticsEvents.Analyze.STARTED })
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, fakeAnalyzeRepository.createCallCount)
+    }
+
+    /**
+     * F2 (review 2026-11-20): "Try again" / "Details" on a failure snackbar opened an EMPTY form (a link
+     * or file job lost its input and its reason). The screen must open on that job, Failed, with the
+     * input restored, and "Try again" must reuse the captured input.
+     */
+    @Test
+    fun handedOverFailedJob_opensInTheFailedPhase_withItsInput_andRetryReusesIt() = runTest {
+        val store = InMemoryAnalysisJobStore()
+        val launcher = RecordingLauncher()
+        val manager = AnalysisJobManager(
+            store = store,
+            payloadStore = InMemoryAnalysisPayloadStore(),
+            launcher = launcher,
+            analyticsTracker = fakeAnalyticsTracker,
+            logger = SilentAppLogger,
+            scope = CoroutineScope(testDispatcher),
+            readFileBytes = { null },
+            readFileText = { null },
+        )
+        store.put(
+            queuedJob(
+                "job-x",
+                input = AnalysisJobInput.Url("https://example.com/recipe"),
+                status = AnalysisJobStatus.Failed(AnalysisJobFailure(AiFailureReason.NETWORK, retryableWithSameInput = true)),
+            ).copy(deliveredBy = DeliveryClaimant.IN_APP_HOST),
+        )
+        val handoff = AnalysisJobHandoff().apply { offer("job-x") }
+
+        val vm = createViewModel(jobScheduler = manager, jobHandoff = handoff)
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals(AnalyzeJobPhase.Failed("analyze_error_network", FailedCta.Retry), state.jobPhase)
+        assertEquals(InputDataType.WEB_LINK, state.selectedInputType)
+        assertEquals("https://example.com/recipe", state.inputUrl)
+
+        vm.sendIntent(AnalyzeJobIntent.OnRetryClick)
+        advanceUntilIdle()
+
+        val newId = launcher.launched.single()
+        assertTrue(newId != "job-x", "a retry is a new request id")
+        assertEquals(AnalysisJobInput.Url("https://example.com/recipe"), store.get(newId)?.input)
+    }
+
+    /** F3: "ask once" was an in-memory flag — a recreated Activity / process asked again. */
+    @Test
+    fun notificationPermission_isAskedOnceEver_notOncePerViewModel() = runTest {
+        val latch = InMemoryAnalysisNotificationAskLatch() // stands for the persisted one
+        val first = createViewModel(notificationAskLatch = latch)
+        advanceUntilIdle()
+        first.startManualRawTextAnalysis("trip")
+        advanceUntilIdle()
+        assertTrue(first.screenState.value.askNotificationPermission, "precondition: the first analysis ever asks")
+
+        val afterRecreation = createViewModel(notificationAskLatch = latch, launchJobs = false)
+        advanceUntilIdle()
+        afterRecreation.startManualRawTextAnalysis("trip again")
+        advanceUntilIdle()
+
+        assertFalse(afterRecreation.screenState.value.askNotificationPermission, "asked once already — never again")
+    }
+
+    @Test
+    fun fourthParallelStart_isRefusedAsAHint_notAnError() = runTest {
+        fakeAnalyzeRepository.gate = CompletableDeferred() // three jobs stay in flight
+        val vm = createViewModel()
+        advanceUntilIdle() // the intent collector subscribes on the first dispatch
+        (1..3).forEach { visit ->
+            vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t$visit"))
+            advanceUntilIdle()
+            vm.startManualRawTextAnalysis("list $visit")
+            advanceUntilIdle()
+        }
+        assertEquals(3, fakeAnalyzeRepository.analyzeCallCount, "precondition: three analyses running")
+
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t4"))
+        advanceUntilIdle()
+        vm.startManualRawTextAnalysis("list 4")
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertEquals("analyze_too_many_jobs", state.error)
+        assertTrue(state.errorIsHint, "the limit is a hint: the dialog must not say \"Error\"")
+        assertEquals(AnalyzeJobPhase.Editing, state.jobPhase)
+        assertEquals(3, fakeAnalyzeRepository.analyzeCallCount, "the 4th job is never sent")
+
+        vm.sendIntent(AnalyzeScreenIntent.OnDismissError)
+        advanceUntilIdle()
+        assertFalse(vm.screenState.value.errorIsHint)
+
+        vm.sendIntent(AnalyzeScreenIntent.OnRecordingError("mic unavailable"))
+        advanceUntilIdle()
+        assertFalse(vm.screenState.value.errorIsHint, "a real error is never a hint")
+    }
+
+    @Test
+    fun failureWhileWatched_showsFailedPhase_andRetryRunsANewJob() = runTest {
+        fakeAnalyzeRepository.analyzeShouldFail = true
+        val vm = createViewModel()
+        advanceUntilIdle() // the intent collector subscribes on the first dispatch
+        vm.sendIntent(AnalyzeJobIntent.OnScreenEntered("t1"))
+        vm.startManualRawTextAnalysis("weekly groceries")
+        advanceUntilIdle()
+
+        val failed = vm.screenState.value.jobPhase
+        assertTrue(failed is AnalyzeJobPhase.Failed, "got $failed")
+
+        fakeAnalyzeRepository.analyzeShouldFail = false
+        fakeAnalyzeRepository.resultName = "Groceries"
+        vm.sendIntent(AnalyzeJobIntent.OnRetryClick)
+        advanceUntilIdle()
+
+        assertEquals(2, fakeAnalyzeRepository.analyzeCallCount)
+        assertTrue(fakeNavigator.navigatedToChecklistDetail)
+    }
 
     // ── v2 entry points: a door must arrive ON its material, and must be attributable ────────────
     //
@@ -456,12 +744,16 @@ class AnalyzeViewModelTest {
         var lastInput: AnalyzeInputData? = null
         var lastCreateName: String? = null
 
+        /** When set, [analyzeData] suspends on it — the request is "in flight" until the test completes it. */
+        var gate: CompletableDeferred<Unit>? = null
+
         override suspend fun analyzeData(
             inputData: AnalyzeInputData,
             targetChecklist: Checklist?,
         ): Result<AnalyzeResult> {
             analyzeCallCount++
             lastInput = inputData
+            gate?.await()
             if (analyzeShouldFail) return Result.failure(RuntimeException("analyze failed"))
             return Result.success(AnalyzeResult(suggestedItems = emptyList(), suggestedName = resultName))
         }
@@ -490,6 +782,12 @@ class AnalyzeViewModelTest {
         companion object {
             const val CREATED_ID = 42L
         }
+    }
+
+    /** Serves a fixed server-side action cost. */
+    private class FakeActionCostProvider(cost: Int) : AiActionCostProvider {
+        override val actionCost: StateFlow<Int?> = MutableStateFlow(cost)
+        override suspend fun refresh(): Result<Int> = Result.success(actionCost.value!!)
     }
 
     private class FakeAppNavigator : AppNavigator {

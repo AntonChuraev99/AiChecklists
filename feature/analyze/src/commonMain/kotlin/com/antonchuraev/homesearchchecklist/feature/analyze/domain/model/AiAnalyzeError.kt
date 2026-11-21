@@ -29,14 +29,49 @@ sealed class AiAnalyzeError(message: String) : Exception(message) {
      * distinction that is impossible from a Ktor deserialization exception alone. [message] carries
      * the server's own error string when the body was JSON, so it stays user-presentable.
      */
-    class Http(val statusCode: Int, serverMessage: String?) :
-        AiAnalyzeError(serverMessage ?: "http_$statusCode")
+    class Http(
+        val statusCode: Int,
+        serverMessage: String?,
+        /**
+         * Machine-readable `error_code` of the server envelope (`input_too_large`, `nothing_found`,
+         * `invalid_input`, `unsupported_input_type`). Null on servers that predate it — the
+         * classifier then falls back to the status code and the message.
+         */
+        val errorCode: String? = null,
+    ) : AiAnalyzeError(serverMessage ?: "http_$statusCode")
+
+    /**
+     * A 2xx `{"success": false, "error": "..."}` body: the SERVER refused and said why (credits, limit,
+     * too long). Typed so the job keeps [message] as user-presentable text — unlike a local exception,
+     * whose text must never reach the user.
+     */
+    class ServerRefusal(serverMessage: String) : AiAnalyzeError(serverMessage)
 
     /** Connect / socket / overall request timeout surfaced after retries were exhausted. */
     data object Timeout : AiAnalyzeError("timeout")
 
     /** DNS / connection / IO transport failure (e.g. "Unable to resolve host") after retries. */
     data object Network : AiAnalyzeError("network")
+
+    /**
+     * The file material could not be read on the device (cache cleared, permission revoked). Raised
+     * BEFORE any request: nothing is sent and nothing is charged. Replaces the old behaviour of
+     * sending the text "Failed to read image: <path>" to the model and charging for it.
+     */
+    data object InputUnreadable : AiAnalyzeError("input_unreadable")
+
+    /**
+     * The server answered successfully but there is nothing to put in a checklist (zero items).
+     * The new server says so itself (`error_code = nothing_found`, credits refunded); an old server
+     * returns an empty success, which the repository maps here so an empty checklist is never created.
+     */
+    data object NothingFound : AiAnalyzeError("nothing_found")
+
+    /** A web file job lost its bytes to a page reload before it was sent. */
+    data object Interrupted : AiAnalyzeError("interrupted")
+
+    /** The user cancelled a job that was still waiting for a connection. */
+    data object Cancelled : AiAnalyzeError("cancelled")
 
     companion object {
         /** Stable marker used both as [UserNotReady]'s message and for message-fallback classification. */

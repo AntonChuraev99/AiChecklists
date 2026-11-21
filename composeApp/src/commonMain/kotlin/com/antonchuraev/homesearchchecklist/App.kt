@@ -81,6 +81,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalysisReadySnackbarEffect
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AppRootSnackbar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -535,6 +537,11 @@ fun App() {
             LaunchedEffect(Unit) {
                 signInFailed.collect { snackbarHostState.showSnackbar(signInUnavailableMessage) }
             }
+
+            // Background AI analyses that finished while no Analyze screen watched them: one app
+            // snackbar "ready · Open" (never an automatic navigation), plus resumePending() once at
+            // start so jobs interrupted by process death / a web reload run again.
+            AnalysisReadySnackbarEffect(snackbarHostState = snackbarHostState, navigator = navigator)
 
             // ── Gallery deep-link (app.gisti-ai.com/?g=create&template={slug}) ─────────
             // Platform entry points (wasmJs main.kt / Android MainActivity) parse the link and
@@ -2825,6 +2832,9 @@ fun App() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding(),
+                // Same Snackbar as the default; only a ready-analysis snackbar may move its action
+                // to a new line (long copy / large font).
+                snackbar = { data -> AppRootSnackbar(data) },
             )
 
             // The voice call overlay: LAST in the root Box, outside Nav3, so a call covers every route

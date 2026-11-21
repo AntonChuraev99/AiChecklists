@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.aichat
 
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
@@ -538,6 +539,12 @@ class ToolCallDispatcherImpl(
                 )
             },
             onFailure = { e ->
+                if (e is AiAnalyzeError.NothingFound) {
+                    // The repository reports "nothing to turn into a checklist" as a typed failure
+                    // (server 422, or an old server's empty success): same answer as the empty branch.
+                    logger.warning(TAG, "CreateChecklistFromAttachment: nothing found in ${primary.fileName}")
+                    return DispatchOutcome.NotFound("chat_attach_analyze_empty", listOf(primary.fileName))
+                }
                 logger.error(TAG, "CreateChecklistFromAttachment: analyze failed — ${e.message}", e)
                 DispatchOutcome.NotFound("chat_attach_analyze_failed", listOf(primary.fileName))
             },

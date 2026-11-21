@@ -272,6 +272,14 @@ private class ConfigurableRemoteConfig(private val maxChecklistsFree: Long) : Re
  * free-tier gate runs BEFORE the paid Cloud Function call — a gate placed after it would still
  * return RequiresPremium while having already spent the user's credits.
  */
+/** The analyze path found nothing to turn into a checklist (typed failure, see AiAnalyzeError.NothingFound). */
+private object NothingFoundAnalyzer : AiAnalyzer {
+    override suspend fun analyze(inputData: AnalyzeInputData, targetChecklist: Checklist?): Result<AnalyzeResult> =
+        Result.failure(com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError.NothingFound)
+    override suspend fun isAvailable(): Boolean = true
+    override fun getSupportedInputTypes() = setOf(AnalyzeInputData.Photo::class)
+}
+
 private class RecordingAnalyzer(
     private val suggested: List<String> = listOf("Milk", "Bread"),
 ) : AiAnalyzer {
@@ -1160,6 +1168,22 @@ class ToolCallDispatcherImplTest {
             "lowering max_checklists_free to 4 must refuse a free user's 5th list",
         )
         assertTrue(atLoweredValue.calls.isEmpty(), "a refused create must write nothing; calls = ${atLoweredValue.calls}")
+    }
+
+    /**
+     * Since 2026-11-20 the repository answers "nothing to put in a checklist" with a typed failure
+     * (server 422 nothing_found, or an old server's empty success) instead of an empty success. The chat
+     * must keep saying "found nothing in the file", not "analysis failed".
+     */
+    @Test
+    fun createChecklistFromAttachment_nothingFound_saysTheFileWasEmpty_notThatAnalysisFailed() = runTest {
+        val outcome = buildDispatcher(
+            repoWithProjects(1),
+            analyzer = NothingFoundAnalyzer,
+        ).dispatch(ToolCall.CreateChecklistFromAttachment(attachments = listOf(photoAttachment)))
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_attach_analyze_empty", notFound.messageKey)
     }
 
     @Test

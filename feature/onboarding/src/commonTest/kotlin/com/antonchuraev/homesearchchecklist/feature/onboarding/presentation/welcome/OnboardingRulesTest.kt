@@ -143,6 +143,15 @@ class OnboardingRulesTest {
         assertEquals(OnboardingAiError.Unavailable, resolveAiError(AiFailureReason.NETWORK, isWeb = true, isGoogleLinked = false))
     }
 
+    @Test
+    fun resolveAiError_nothingFound_isNothingFound_onEveryPlatform() {
+        // The AI was reached and found nothing: "can't reach the AI" would send the user away from a
+        // working feature. Holds on web signed out too — it is not a credits problem.
+        assertEquals(OnboardingAiError.NothingFound, resolveAiError(AiFailureReason.NOTHING_FOUND, isWeb = false, isGoogleLinked = false))
+        assertEquals(OnboardingAiError.NothingFound, resolveAiError(AiFailureReason.NOTHING_FOUND, isWeb = true, isGoogleLinked = false))
+        assertEquals("nothing_found", OnboardingAiError.NothingFound.wire)
+    }
+
     // ── OnboardingSeed.OwnFile.wire ────────────────────────────────────────────
 
     @Test
