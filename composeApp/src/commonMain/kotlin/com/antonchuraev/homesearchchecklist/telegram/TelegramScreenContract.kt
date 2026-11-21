@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.telegram
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 
 /**
  * State of the Telegram account-link screen (`docs/designs/telegram-screen-2026-11-19/spec.md` §4).
@@ -45,14 +46,31 @@ sealed interface TelegramScreenState : State {
      * @property linkedAtMs epoch ms of the link, null when the server did not send it
      *   (hide the "Connected since" line then).
      * @property isDisconnecting `unlink` is in flight: subtitle shows `telegram_disconnecting`,
-     *   Open bot and Disconnect are disabled.
+     *   Open bot and Disconnect are disabled — and the whole reminder group is disabled.
+     * @property reminderChannel the reminder channel the server last CONFIRMED. Null = the server
+     *   does not report one (pre-phase-4) → the Reminders section is not rendered at all
+     *   (`reminders-addendum.md` §1).
+     * @property channelSaving the channel being saved right now. Non-null → that row shows the
+     *   spinner and NO row shows a selected radio. Null → the radio sits on [reminderChannel].
      */
     data class Linked(
         val username: String?,
         val firstName: String?,
         val linkedAtMs: Long?,
         val isDisconnecting: Boolean = false,
-    ) : TelegramScreenState
+        val reminderChannel: ReminderChannel? = null,
+        val channelSaving: ReminderChannel? = null,
+    ) : TelegramScreenState {
+        /** Render the Reminders section (addendum §1 visibility rule). */
+        val showsReminderSection: Boolean get() = reminderChannel != null
+
+        /**
+         * The Disconnect dialog shows the extra paragraph (`telegram_reminders_disconnect_note` on
+         * Android, `telegram_reminders_disconnect_note_web` on web) — addendum §4.1.
+         */
+        val showsDisconnectReminderNote: Boolean
+            get() = reminderChannel != null && reminderChannel != ReminderChannel.Push
+    }
 
     /** Status could not be loaded. Error card message by [reason], Retry → Loading. */
     data class Error(val reason: TelegramErrorReason) : TelegramScreenState
@@ -81,6 +99,39 @@ sealed interface TelegramAction {
     /** Confirm in the Disconnect dialog (the screen closes the dialog itself). */
     data object DisconnectConfirm : TelegramAction
     data object RetryClick : TelegramAction
+
+    /** Android/iOS reminder row tapped: the row's own value. */
+    data class ReminderChannelClick(val target: ReminderChannel) : TelegramAction
+
+    /**
+     * Web reminder row tapped: [on] = "Send to Telegram", false = "Don't send to Telegram". The VM
+     * resolves the stored value ([webReminderTarget]); the UI never picks `both` / `push` itself.
+     */
+    data class WebReminderClick(val on: Boolean) : TelegramAction
+}
+
+/**
+ * The value a reminder row should show as selected: the in-flight target while saving, else the
+ * confirmed value. Null = section hidden. While [TelegramScreenState.Linked.channelSaving] is set,
+ * the UI shows the spinner on that row and no selected radio (addendum §4 "Saving").
+ */
+val TelegramScreenState.Linked.displayedReminderChannel: ReminderChannel?
+    get() = channelSaving ?: reminderChannel
+
+/** Web: row 1 "Send to Telegram" is selected for `telegram` and `both`, row 2 for `push`. */
+fun ReminderChannel.isWebOn(): Boolean = this != ReminderChannel.Push
+
+/**
+ * Web mapping (addendum §2.1): what a tap on a web row writes, given the [current] displayed value.
+ * - on + `push` → `both` (never `telegram`: the channel is per user and `telegram` would silently
+ *   mute the user's phone from a screen that does not mention phones);
+ * - on + `telegram`/`both` → null (row already selected, no request);
+ * - off + `telegram`/`both` → `push`; off + `push` → null (already selected).
+ */
+fun webReminderTarget(current: ReminderChannel, on: Boolean): ReminderChannel? = when {
+    on && current == ReminderChannel.Push -> ReminderChannel.Both
+    !on && current != ReminderChannel.Push -> ReminderChannel.Push
+    else -> null
 }
 
 /** Why an external URL is being opened — the VM reacts to the outcome differently per purpose. */
@@ -121,6 +172,15 @@ sealed interface TelegramIntent : Intent {
     data object CheckAgainClicked : TelegramIntent
     data object DisconnectConfirmed : TelegramIntent
     data object RetryClicked : TelegramIntent
+
+    /**
+     * Save [target] as the reminder channel. Also the snackbar "Try again" of
+     * [TelegramSnackbar.ReminderSaveFailed] (with its `attempted`). Latest tap wins.
+     */
+    data class ReminderChannelClicked(val target: ReminderChannel) : TelegramIntent
+
+    /** Web row tapped; resolved through [webReminderTarget]. */
+    data class WebReminderChannelClicked(val on: Boolean) : TelegramIntent
 }
 
 sealed interface TelegramSideEffect : SideEffect {
@@ -161,4 +221,10 @@ sealed interface TelegramSnackbar {
 
     /** Long. `telegram_link_failed` — claim failed on network / server. */
     data object LinkFailed : TelegramSnackbar
+
+    /**
+     * Long, action `telegram_retry`. `telegram_reminders_save_failed` (one text for network, server
+     * and 409). The action re-sends [attempted] as [TelegramIntent.ReminderChannelClicked].
+     */
+    data class ReminderSaveFailed(val attempted: ReminderChannel) : TelegramSnackbar
 }

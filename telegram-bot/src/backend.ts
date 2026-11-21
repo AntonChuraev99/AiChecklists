@@ -167,6 +167,48 @@ export function setUserTimezone(env: FirestoreEnv, googleUid: string, timezone: 
   return patchStringFields(env, `users/${googleUid}`, { timezone, timezone_source: "telegram" });
 }
 
+// ── reminder channel (users/{google_uid}.reminder_channel) — Phase 4 ────────────
+
+/** Where reminders go: the phone only (absent = push), Telegram only, or both. */
+export type ReminderChannel = "push" | "telegram" | "both";
+export const REMINDER_CHANNELS: readonly ReminderChannel[] = ["push", "telegram", "both"];
+
+export interface ReminderSettings {
+  channel: ReminderChannel;
+  /** A valid IANA zone, or null (absent / unknown to this runtime). */
+  timezone: string | null;
+}
+
+/**
+ * `users/{google_uid}` fields → settings. Python `normalize_channel`: anything but the three values
+ * (absent included) is push. Pure; exported for tests.
+ */
+export function parseReminderSettings(o: Record<string, unknown> | null): ReminderSettings {
+  const ch = o?.["reminder_channel"];
+  const tz = o?.["timezone"];
+  return {
+    channel: typeof ch === "string" && (REMINDER_CHANNELS as readonly string[]).includes(ch) ? (ch as ReminderChannel) : "push",
+    timezone: isValidZone(tz) ? tz : null,
+  };
+}
+
+export async function getReminderSettings(env: FirestoreEnv, googleUid: string): Promise<ReminderSettings> {
+  const o = await getDocument(env, `users/${googleUid}`);
+  const settings = parseReminderSettings(o);
+  if (settings.timezone === null && o?.["timezone"] != null) {
+    console.warn("[gisti-tg] users/{google_uid}.timezone is not a valid IANA zone — treated as unknown");
+  }
+  return settings;
+}
+
+/**
+ * `reminder_channel` only (masked PATCH — every other field untouched). The users-doc trigger on the
+ * server rebuilds the reminder index by itself.
+ */
+export function setReminderChannel(env: FirestoreEnv, googleUid: string, channel: ReminderChannel): Promise<void> {
+  return patchStringFields(env, `users/${googleUid}`, { reminder_channel: channel });
+}
+
 export interface CreditInfo {
   credits: number;
   premium: boolean;
@@ -302,12 +344,16 @@ export type InternalAction =
   | "premium_status"
   | "apply_payment"
   | "subscription_update"
-  | "revoke_payment";
+  | "revoke_payment"
+  // Phase 4 — reminders in Telegram
+  | "claim_due_reminders"
+  | "snooze_reminder";
 
 export async function callInternal(
   env: BackendEnv,
   action: InternalAction,
   body: Record<string, unknown>,
+  opts: { timeoutMs?: number } = {},
 ): Promise<Record<string, unknown>> {
   const key = await derivedKey(env.TELEGRAM_BOT_TOKEN, INTERNAL_KEY_LABEL);
   let resp: Response;
@@ -316,7 +362,7 @@ export async function callInternal(
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Gisti-Internal-Key": key },
       body: JSON.stringify({ action, ...body }),
-      signal: AbortSignal.timeout(INTERNAL_TIMEOUT_MS),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? INTERNAL_TIMEOUT_MS),
     });
   } catch (e) {
     throw new InternalApiError(0, `network: ${e instanceof Error ? e.message : "unknown"}`, action);

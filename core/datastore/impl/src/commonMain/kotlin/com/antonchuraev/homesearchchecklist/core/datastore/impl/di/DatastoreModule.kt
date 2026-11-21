@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderDeliveryPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ActivationPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiChatPreferencesRepositoryImpl
@@ -17,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.impl.HintsRepositoryI
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.InboxDisplayPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.LanguageRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.NavExperimentPrefsRepositoryImpl
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.ReminderDeliveryPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ThemeRepositoryImpl
 import org.koin.dsl.module
 
@@ -33,5 +35,9 @@ val datastoreModule = module {
     // tab on Loading forever), so the reason has to reach Crashlytics or the fallback is invisible.
     single<InboxDisplayPrefsRepository> {
         InboxDisplayPrefsRepositoryImpl(dataStore = get(), logger = get())
+    }
+    // logger: read failures degrade to Push (ReminderReceiver must still notify) and are reported.
+    single<ReminderDeliveryPrefsRepository> {
+        ReminderDeliveryPrefsRepositoryImpl(dataStore = get(), logger = get())
     }
 }

@@ -125,7 +125,38 @@ export interface Strings {
   timezoneSaved: (label: string, time: string) => string;
   /** One line per agent action on the confirmation card. */
   act: ActionTexts;
+
+  // Phase 4 — reminders in Telegram
+  btnRemDone: string;
+  btnRemSnooze: string;
+  btnRemOpen: string;
+  /** A checklist-level reminder: unchecked items left of all items. */
+  remLeft: (left: number, total: number) => string;
+  /** After «In 1 hour»: the local time it comes back, or null when the time zone is unknown. */
+  remSnoozed: (time: string | null) => string;
+  /** A tap on a reminder button whose reminder the bot no longer knows (or the server dropped). */
+  remOutdated: string;
+  remItemGone: string;
+  /** «In 1 hour» refused (409 channel_off): Telegram reminders are off for this account. */
+  remChannelOff: string;
+  /** The offer after linking — the same texts Python sends (telegram_reminders.py OFFER_TEXTS). */
+  remOffer: string;
+  btnOfferTelegram: string;
+  btnOfferBoth: string;
+  btnOfferNo: string;
+  /** `/reminders`: the channel in the status line, and on the buttons. */
+  channelName: Record<Channel, string>;
+  btnChannel: Record<Channel, string>;
+  remSettings: (channel: string, zone: string | null) => string;
+  remWhere: string;
+  /** Confirmation after a channel tap. */
+  channelSet: Record<Channel, string>;
+  /** Telegram chosen while the zone is unknown: the server schedules nothing without it. */
+  remNeedsTimezone: string;
 }
+
+/** `users/{google_uid}.reminder_channel` (backend.ts ReminderChannel — no import: see the header). */
+type Channel = "push" | "telegram" | "both";
 
 /**
  * Confirmation-card lines. A line for a call that will write names the RESOLVED row and list; a call
@@ -202,6 +233,7 @@ const EN: Strings = {
     "Send me anything — a list, notes, a photo, a voice message or a link — and I'll turn it into a checklist.\n\n" +
     "/lists — your checklists\n/chat — chat with the AI assistant\n/credits — AI credit balance\n" +
     "/premium — subscription\n/app — mobile app\n/timezone — your time zone\n" +
+    "/reminders — reminders here or on the phone\n" +
     "/paysupport — payment help\n/unlink — disconnect Telegram\n/help — this help",
   tokenExpired: "This link has expired or was already used. Create a new one in the app: menu → Telegram.",
   noAccount: "Sign in to the Gisti app with Google first, then create a new link: menu → Telegram.",
@@ -353,6 +385,33 @@ const EN: Strings = {
     find: (q) => `Search for «${q}»`,
     read: (n) => `Read «${n}»`,
   },
+
+  btnRemDone: "✅ Done",
+  btnRemSnooze: "⏰ In 1 hour",
+  btnRemOpen: "📋 Open list",
+  remLeft: (left, total) => `${left} of ${total} left`,
+  remSnoozed: (time) => (time ? `⏰ I'll remind you again at ${time}.` : "⏰ I'll remind you again in an hour."),
+  remOutdated: "This reminder is outdated.",
+  remItemGone: "This item no longer exists.",
+  remChannelOff: "Reminders in Telegram are off — send /reminders to turn them on.",
+  remOffer: "Telegram is linked to Gisti. Want your reminders here?",
+  btnOfferTelegram: "Send reminders here instead of the phone",
+  btnOfferBoth: "Both",
+  btnOfferNo: "No",
+  channelName: {
+    push: "on the phone (Gisti app)",
+    telegram: "here in Telegram, not on the phone",
+    both: "here in Telegram and on the phone",
+  },
+  btnChannel: { telegram: "Telegram only", both: "Telegram and phone", push: "Phone only" },
+  remSettings: (channel, zone) => `🔔 Reminders\nThey arrive: ${channel}\nTime zone: ${zone ?? "not set — /timezone"}`,
+  remWhere: "Where should reminders arrive?",
+  channelSet: {
+    telegram: "✅ Reminders will now arrive here in Telegram instead of the phone. Change it anytime: /reminders",
+    both: "✅ Reminders will now arrive here and on the phone. Change it anytime: /reminders",
+    push: "OK, reminders stay on the phone. To get them here, send /reminders",
+  },
+  remNeedsTimezone: "One more step: tell me your time zone — without it reminders can't arrive here. /timezone",
 };
 
 // ── RU ──────────────────────────────────────────────────────────────────────────
@@ -370,6 +429,7 @@ const RU: Strings = {
     "Пришлите мне что угодно — список, заметки, фото, голосовое или ссылку — и я сделаю из этого чек-лист.\n\n" +
     "/lists — ваши чек-листы\n/chat — чат с AI-ассистентом\n/credits — баланс AI-кредитов\n" +
     "/premium — подписка\n/app — мобильное приложение\n/timezone — ваш часовой пояс\n" +
+    "/reminders — напоминания сюда или на телефон\n" +
     "/paysupport — помощь с оплатой\n/unlink — отключить Telegram\n/help — эта справка",
   tokenExpired: "Ссылка устарела или уже использована. Создайте новую в приложении: меню → Telegram.",
   noAccount: "Сначала войдите в приложение Gisti через Google, затем создайте новую ссылку: меню → Telegram.",
@@ -519,6 +579,33 @@ const RU: Strings = {
     find: (q) => `Найти «${q}»`,
     read: (n) => `Прочитать «${n}»`,
   },
+
+  btnRemDone: "✅ Готово",
+  btnRemSnooze: "⏰ Через час",
+  btnRemOpen: "📋 Открыть список",
+  remLeft: (left, total) => `Осталось ${left} из ${total}`,
+  remSnoozed: (time) => (time ? `⏰ Напомню ещё раз в ${time}.` : "⏰ Напомню ещё раз через час."),
+  remOutdated: "Это напоминание устарело.",
+  remItemGone: "Этого пункта больше нет.",
+  remChannelOff: "Напоминания в Telegram выключены — включить: /reminders",
+  remOffer: "Telegram привязан к Gisti. Присылать напоминания сюда?",
+  btnOfferTelegram: "Присылать сюда вместо телефона",
+  btnOfferBoth: "И сюда, и на телефон",
+  btnOfferNo: "Нет",
+  channelName: {
+    push: "на телефон (приложение Gisti)",
+    telegram: "сюда, в Telegram, а не на телефон",
+    both: "и сюда, в Telegram, и на телефон",
+  },
+  btnChannel: { telegram: "Только Telegram", both: "Telegram и телефон", push: "Только телефон" },
+  remSettings: (channel, zone) => `🔔 Напоминания\nПриходят: ${channel}\nЧасовой пояс: ${zone ?? "не указан — /timezone"}`,
+  remWhere: "Куда присылать напоминания?",
+  channelSet: {
+    telegram: "✅ Теперь напоминания будут приходить сюда, в Telegram, а не на телефон. Изменить можно в любой момент: /reminders",
+    both: "✅ Теперь напоминания будут приходить и сюда, и на телефон. Изменить можно в любой момент: /reminders",
+    push: "Хорошо, напоминания остаются на телефоне. Чтобы получать их здесь, отправьте /reminders",
+  },
+  remNeedsTimezone: "Остался один шаг: укажите часовой пояс — без него напоминания сюда не придут. /timezone",
 };
 
 // ── HI ──────────────────────────────────────────────────────────────────────────
@@ -536,6 +623,7 @@ const HI: Strings = {
     "मुझे कुछ भी भेजें — लिस्ट, नोट्स, फ़ोटो, वॉइस मैसेज या लिंक — मैं उसे चेकलिस्ट बना दूँगा।\n\n" +
     "/lists — आपकी चेकलिस्ट\n/chat — AI असिस्टेंट से चैट\n/credits — AI क्रेडिट बैलेंस\n" +
     "/premium — सब्सक्रिप्शन\n/app — मोबाइल ऐप\n/timezone — आपका टाइम ज़ोन\n" +
+    "/reminders — रिमाइंडर यहाँ या फ़ोन पर\n" +
     "/paysupport — भुगतान सहायता\n/unlink — Telegram को अलग करें\n/help — यह मदद",
   tokenExpired: "यह लिंक पुराना हो गया है या पहले ही इस्तेमाल हो चुका है। ऐप में नया बनाएँ: मेनू → Telegram।",
   noAccount: "पहले Gisti ऐप में Google से साइन इन करें, फिर नया लिंक बनाएँ: मेनू → Telegram।",
@@ -684,6 +772,33 @@ const HI: Strings = {
     find: (q) => `«${q}» खोजें`,
     read: (n) => `«${n}» पढ़ें`,
   },
+
+  btnRemDone: "✅ हो गया",
+  btnRemSnooze: "⏰ 1 घंटे बाद",
+  btnRemOpen: "📋 लिस्ट खोलें",
+  remLeft: (left, total) => `${total} में से ${left} बाकी`,
+  remSnoozed: (time) => (time ? `⏰ ${time} बजे फिर याद दिलाऊँगा।` : "⏰ एक घंटे बाद फिर याद दिलाऊँगा।"),
+  remOutdated: "यह रिमाइंडर पुराना हो गया है।",
+  remItemGone: "यह आइटम अब मौजूद नहीं है।",
+  remChannelOff: "Telegram में रिमाइंडर बंद हैं — चालू करने के लिए /reminders भेजें।",
+  remOffer: "Telegram अब Gisti से जुड़ गया है। क्या रिमाइंडर यहाँ भेजें?",
+  btnOfferTelegram: "फ़ोन के बजाय यहाँ भेजें",
+  btnOfferBoth: "दोनों",
+  btnOfferNo: "नहीं",
+  channelName: {
+    push: "फ़ोन पर (Gisti ऐप)",
+    telegram: "यहाँ Telegram में, फ़ोन पर नहीं",
+    both: "यहाँ Telegram में और फ़ोन पर",
+  },
+  btnChannel: { telegram: "सिर्फ़ Telegram", both: "Telegram और फ़ोन", push: "सिर्फ़ फ़ोन" },
+  remSettings: (channel, zone) => `🔔 रिमाइंडर\nकहाँ आते हैं: ${channel}\nटाइम ज़ोन: ${zone ?? "सेट नहीं — /timezone"}`,
+  remWhere: "रिमाइंडर कहाँ भेजें?",
+  channelSet: {
+    telegram: "✅ अब रिमाइंडर फ़ोन के बजाय यहाँ Telegram में आएँगे। कभी भी बदलें: /reminders",
+    both: "✅ अब रिमाइंडर यहाँ और फ़ोन पर, दोनों जगह आएँगे। कभी भी बदलें: /reminders",
+    push: "ठीक है, रिमाइंडर फ़ोन पर ही आएँगे। उन्हें यहाँ पाने के लिए /reminders भेजें",
+  },
+  remNeedsTimezone: "बस एक कदम बाकी: अपना टाइम ज़ोन बताएँ — इसके बिना रिमाइंडर यहाँ नहीं आ पाएँगे। /timezone",
 };
 
 const STRINGS: Record<Lang, Strings> = { en: EN, ru: RU, hi: HI };
@@ -709,6 +824,7 @@ export const BOT_COMMANDS: Record<Lang, BotCommand[]> = {
     { command: "app", description: "Mobile app" },
     { command: "help", description: "How it works" },
     { command: "timezone", description: "Time zone" },
+    { command: "reminders", description: "Reminders" },
     { command: "paysupport", description: "Payment help" },
     { command: "start", description: "Connect your account" },
     { command: "unlink", description: "Disconnect Telegram" },
@@ -721,6 +837,7 @@ export const BOT_COMMANDS: Record<Lang, BotCommand[]> = {
     { command: "app", description: "Мобильное приложение" },
     { command: "help", description: "Как это работает" },
     { command: "timezone", description: "Часовой пояс" },
+    { command: "reminders", description: "Напоминания" },
     { command: "paysupport", description: "Помощь с оплатой" },
     { command: "start", description: "Подключить аккаунт" },
     { command: "unlink", description: "Отключить Telegram" },
@@ -733,6 +850,7 @@ export const BOT_COMMANDS: Record<Lang, BotCommand[]> = {
     { command: "app", description: "मोबाइल ऐप" },
     { command: "help", description: "यह कैसे काम करता है" },
     { command: "timezone", description: "टाइम ज़ोन" },
+    { command: "reminders", description: "रिमाइंडर" },
     { command: "paysupport", description: "भुगतान सहायता" },
     { command: "start", description: "अकाउंट जोड़ें" },
     { command: "unlink", description: "Telegram अलग करें" },

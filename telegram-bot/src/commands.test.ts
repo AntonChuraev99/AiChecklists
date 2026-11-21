@@ -44,6 +44,15 @@ describe("commands", () => {
     }
   });
 
+  it("Phase 4: /reminders has a handler, is in every menu and in /help", () => {
+    expect(resolveCommand("reminders")).toBe("reminders");
+    expect(parseCommand("/reminders@gisti_app_bot")).toEqual({ command: "reminders", arg: "" });
+    for (const lang of LANGS) {
+      expect(BOT_COMMANDS[lang].map((c) => c.command)).toContain("reminders");
+      expect(t(lang).help).toContain("/reminders");
+    }
+  });
+
   it("classifies a successful_payment service message as a payment, refunded_payment as silent", () => {
     const chat = { id: 42, type: "private" as const };
     const payment = { currency: "XTR", total_amount: 100, invoice_payload: "premium_month_v1", telegram_payment_charge_id: "c" };

@@ -166,6 +166,18 @@ class AndroidFirestoreSyncDataSource : FirestoreSyncDataSource {
         AppResult.Error(Exception(e.message ?: "google_uid lookup failed", e))
     }
 
+    override suspend fun mergeUserDocFields(
+        userId: String,
+        fields: Map<String, String>,
+    ): AppResult<Unit> = runCatching {
+        require(userId.isNotBlank()) { "mergeUserDocFields: blank userId" }
+        // SetOptions.merge(): users/{uid} also holds server-owned fields — a plain set would wipe them.
+        firestore.collection("users").document(userId).set(fields, SetOptions.merge()).await()
+        AppResult.Success(Unit)
+    }.getOrElse { e ->
+        AppResult.Error(Exception(e.message ?: "users doc merge failed", e))
+    }
+
     override suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?> = runCatching {
         val snapshot = firestore.collection("gallery_templates").document(slug).get().await()
         val data = snapshot.data ?: return AppResult.Success(null)

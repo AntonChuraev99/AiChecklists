@@ -993,8 +993,17 @@ object AnalyticsEvents {
         /** Disconnect confirmed and `unlink` succeeded. */
         const val UNLINKED = "telegram_unlinked"
 
+        /**
+         * The reminder channel was saved (server confirmed). Same event name as the bot's
+         * (`tg_reminder_channel_set`, telegram-bot worker) so one chart covers every surface.
+         * Params: [PARAM_CHANNEL] = push|telegram|both, [AnalyticsParams.SOURCE] = [SOURCE_APP].
+         */
+        const val REMINDER_CHANNEL_SET = "tg_reminder_channel_set"
+        const val PARAM_CHANNEL = "channel"
+
         const val SOURCE_SCREEN = "screen"
         const val SOURCE_WEB_LINK = "web_link"
+        const val SOURCE_APP = "app"
     }
 }
 

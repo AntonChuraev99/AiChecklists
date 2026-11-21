@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.telegram
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramLinkStatus
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramLinkToken
@@ -48,6 +49,22 @@ internal class FakeTelegramLinkRepository : TelegramLinkRepository {
     override suspend fun unlink(): TelegramAccountResult<Unit> {
         unlinkCalls++
         return unlinkGate?.await() ?: unlinkResult
+    }
+
+    /** Requests in the order sent. */
+    val channelRequests = mutableListOf<ReminderChannel>()
+
+    /** When set, each `setReminderChannel` call suspends on the next gate (consumed in order). */
+    val channelGates = ArrayDeque<CompletableDeferred<TelegramAccountResult<ReminderChannel>>>()
+
+    /** Reply when no gate is queued: echoes the request. */
+    var channelResult: ((ReminderChannel) -> TelegramAccountResult<ReminderChannel>) =
+        { TelegramAccountResult.Success(it) }
+
+    override suspend fun setReminderChannel(channel: ReminderChannel): TelegramAccountResult<ReminderChannel> {
+        channelRequests += channel
+        val gate = channelGates.removeFirstOrNull()
+        return gate?.await() ?: channelResult(channel)
     }
 }
 

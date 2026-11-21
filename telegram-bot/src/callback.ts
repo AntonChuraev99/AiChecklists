@@ -7,10 +7,15 @@
  * not mint new keys) and evicts the oldest keys FIFO; a tap on an evicted key gets "view outdated".
  */
 
+import type { ReminderChannel } from "./backend";
+
 export const CALLBACK_MAX_BYTES = 64;
 
 /** `chat` = «💬 Ask AI»: open the AI chat with the draft text as the first message (Phase 2). */
 export type DraftAction = "free" | "ai" | "cancel" | "chat";
+
+/** Where a channel choice was tapped: the offer after linking, or `/reminders`. */
+export type ChannelSource = "offer" | "command";
 
 export type Callback =
   | { t: "draft"; draftId: string; action: DraftAction }
@@ -24,10 +29,25 @@ export type Callback =
   | { t: "option"; turn: number; index: number }
   | { t: "endChat" }
   /** `/timezone` pick: minutes east of UTC (one of TZ_CHOICES). */
-  | { t: "tz"; offset: number };
+  | { t: "tz"; offset: number }
+  // Phase 4 — reminders. `rid` = the server's reminder id (24 lowercase hex); what it points at
+  // lives in DO storage (`rem:<rid>`), so the button needs no other id.
+  | { t: "remDone"; rid: string }
+  | { t: "remSnooze"; rid: string }
+  | { t: "remOpen"; rid: string }
+  /**
+   * Reminder channel. The offer's buttons are `rc:t` / `rc:b` / `rc:p` — Python sends them too
+   * (telegram_reminders.py OFFER_CALLBACKS), so that exact form stays the offer's; `/reminders`
+   * appends `:c`.
+   */
+  | { t: "channel"; channel: ReminderChannel; source: ChannelSource };
 
 const ACTION_CODE: Record<DraftAction, string> = { free: "f", ai: "a", cancel: "x", chat: "c" };
 const CODE_ACTION: Record<string, DraftAction> = { f: "free", a: "ai", x: "cancel", c: "chat" };
+const CHANNEL_CODE: Record<ReminderChannel, string> = { telegram: "t", both: "b", push: "p" };
+const CODE_CHANNEL: Record<string, ReminderChannel> = { t: "telegram", b: "both", p: "push" };
+const REM_CODE = { remDone: "d", remSnooze: "s", remOpen: "o" } as const;
+const CODE_REM: Record<string, "remDone" | "remSnooze" | "remOpen"> = { d: "remDone", s: "remSnooze", o: "remOpen" };
 
 export function encodeCallback(cb: Callback): string {
   switch (cb.t) {
@@ -49,6 +69,12 @@ export function encodeCallback(cb: Callback): string {
       return "e";
     case "tz":
       return `z:${cb.offset}`;
+    case "remDone":
+    case "remSnooze":
+    case "remOpen":
+      return `r${REM_CODE[cb.t]}:${cb.rid}`;
+    case "channel":
+      return `rc:${CHANNEL_CODE[cb.channel]}${cb.source === "command" ? ":c" : ""}`;
   }
 }
 
@@ -62,6 +88,10 @@ const RE_TOGGLE = new RegExp(`^t:(${ID}):([01]):${PAGE}$`);
 const RE_CONFIRM = new RegExp(`^a:${TURN}:([yn])$`);
 const RE_OPTION = new RegExp(`^p:${TURN}:(\\d)$`);
 const RE_TZ = /^z:(-?\d{1,3})$/;
+/** The server's rid shape (main.py `_TELEGRAM_RID_RE`). */
+export const RID_RE = /^[0-9a-f]{24}$/;
+const RE_REM = /^r([dso]):([0-9a-f]{24})$/;
+const RE_CHANNEL = /^rc:([tbp])(:c)?$/;
 
 /** Parse callback_data; anything malformed or foreign → null (caller answers "view outdated"). */
 export function decodeCallback(data: string | undefined): Callback | null {
@@ -82,6 +112,10 @@ export function decodeCallback(data: string | undefined): Callback | null {
   if (m) return { t: "option", turn: Number(m[1]), index: Number(m[2]) };
   m = RE_TZ.exec(data);
   if (m) return { t: "tz", offset: Number(m[1]) };
+  m = RE_REM.exec(data);
+  if (m) return { t: CODE_REM[m[1]!]!, rid: m[2]! };
+  m = RE_CHANNEL.exec(data);
+  if (m) return { t: "channel", channel: CODE_CHANNEL[m[1]!]!, source: m[2] ? "command" : "offer" };
   return null;
 }
 

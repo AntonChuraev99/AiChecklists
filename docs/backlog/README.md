@@ -44,6 +44,7 @@ project: gisti-ai-checklists
 
 | Запись | Что | Severity |
 |---|---|---|
+| [alarm-writes-mark-rows-dirty](2026-11-20-alarm-writes-mark-rows-dirty.md) | «Сбросить отметки» повтора из будильника помечает строку к выгрузке и может затереть свежую правку из веба, бота или MCP; плюс два соседних пробела будильника | medium |
 | [competitive-feature-gaps](2026-08-03-competitive-feature-gaps.md) | 7 фич, которые есть у конкурентов и нет у нас | medium |
 | [duplicated-limit-constants](2026-08-03-duplicated-limit-constants.md) | Одна величина живёт в 3-4 местах и расходится | medium |
 | [feature-catalog-coverage-gaps](2026-08-03-feature-catalog-coverage-gaps.md) | Чат не знает про 5 своих же зарелиженных фич | medium |

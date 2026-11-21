@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.remote
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
@@ -30,11 +31,17 @@ sealed interface TelegramLinkStatus {
      * @property username Telegram @username without the `@`; null — Telegram users may have none.
      * @property firstName Telegram first name, the fallback label when [username] is null.
      * @property linkedAtMs link time (epoch ms); null on a `claim` reply, which does not carry it.
+     * @property reminderChannel `reminder_channel` of a phase-4 server. Null = the field is absent:
+     *   the server does not support reminder delivery yet (the screen hides the section). An
+     *   unknown value is also null — this build cannot render it.
+     * @property timezone `timezone` (IANA) the server holds for the user, null when absent.
      */
     data class Linked(
         val username: String?,
         val firstName: String?,
         val linkedAtMs: Long?,
+        val reminderChannel: ReminderChannel? = null,
+        val timezone: String? = null,
     ) : TelegramLinkStatus
 }
 
@@ -90,6 +97,22 @@ interface TelegramAccountApiService {
     suspend fun claim(idToken: String, token: String, userId: String?): TelegramAccountResult<TelegramLinkStatus.Linked>
 
     suspend fun unlink(idToken: String): TelegramAccountResult<Unit>
+
+    /**
+     * `set_reminder_channel {channel, timezone?}`. [timezone] = the device IANA zone, written in the
+     * same request (null = omitted). An invalid zone → 400 [TelegramAccountError.Server] with code
+     * [ERROR_INVALID_TIMEZONE]. Success = the channel the server stored.
+     */
+    suspend fun setReminderChannel(
+        idToken: String,
+        channel: ReminderChannel,
+        timezone: String?,
+    ): TelegramAccountResult<ReminderChannel> =
+        TelegramAccountResult.Failure(TelegramAccountError.Server(0, "not_implemented"))
+
+    companion object {
+        const val ERROR_INVALID_TIMEZONE = "invalid_timezone"
+    }
 }
 
 class TelegramAccountApiServiceImpl(
@@ -120,6 +143,17 @@ class TelegramAccountApiServiceImpl(
 
     override suspend fun unlink(idToken: String): TelegramAccountResult<Unit> =
         call(ACTION_UNLINK, idToken, emptyMap()) { Unit }
+
+    override suspend fun setReminderChannel(
+        idToken: String,
+        channel: ReminderChannel,
+        timezone: String?,
+    ): TelegramAccountResult<ReminderChannel> =
+        call(
+            ACTION_SET_REMINDER_CHANNEL,
+            idToken,
+            mapOf("channel" to channel.wire, "timezone" to timezone),
+        ) { decodeReminderChannelReply(it, requested = channel) }
 
     private suspend fun <T> call(
         action: String,
@@ -156,6 +190,7 @@ class TelegramAccountApiServiceImpl(
         internal const val ACTION_CREATE_TOKEN = "create_token"
         internal const val ACTION_CLAIM = "claim"
         internal const val ACTION_UNLINK = "unlink"
+        internal const val ACTION_SET_REMINDER_CHANNEL = "set_reminder_channel"
     }
 }
 
@@ -215,10 +250,22 @@ internal fun decodeTelegramStatus(json: JsonObject): TelegramLinkStatus? {
             username = json.string("telegram_username"),
             firstName = json.string("telegram_first_name"),
             linkedAtMs = json.long("linked_at_ms"),
+            reminderChannel = ReminderChannel.fromWire(json.string("reminder_channel")),
+            timezone = json.string("timezone"),
         )
     } else {
         TelegramLinkStatus.NotLinked
     }
+}
+
+/**
+ * `set_reminder_channel` reply. The server echoes the stored `reminder_channel`; when it does not,
+ * a `success: true` envelope means [requested] was stored. An echoed value this build does not know
+ * is a malformed reply (null → Server failure), never a silent success.
+ */
+internal fun decodeReminderChannelReply(json: JsonObject, requested: ReminderChannel): ReminderChannel? {
+    val echoed = json.string("reminder_channel") ?: return requested
+    return ReminderChannel.fromWire(echoed)
 }
 
 internal fun decodeTelegramToken(json: JsonObject): TelegramLinkToken? {

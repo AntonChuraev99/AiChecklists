@@ -16,6 +16,10 @@ keywords: [telegram, data safety, play console, privacy policy, botfather, relea
 2. ~~**Политика конфиденциальности**~~ — ✅ 2026-11-19: раздел «Telegram Bot (optional)» в
    `hosting/public/privacy-policy.html` задеплоен на Firebase Hosting (живая страница содержит его).
 3. **BotFather** `/setjoingroups` → Disable (действие владельца; код и так игнорирует не-private чаты).
+4. **Фаза 4 (напоминания, влита 2026-11-21)** — при сверке Data Safety учесть, что приложение пишет
+   в профиль часовой пояс устройства (`users/{google_uid}.timezone`, IANA) и выбранный канал
+   напоминаний, а сервер отправляет текст пунктов в Telegram. Нужен ли под это отдельный тип данных
+   в декларации — решает тот, кто сверяет (не проверено).
 
 Источник требований — документ задачи `docs/archive/telegram-bot-phase1-2026-11-19.md`, раздел
 «Release gates (Android)».

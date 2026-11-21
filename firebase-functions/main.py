@@ -17,9 +17,11 @@ Credits are deducted for all users (including premium). Premium users get daily 
 
 import asyncio
 import base64
+import dataclasses
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -50,6 +52,7 @@ from chat_agent_logic import scan_current_turn  # local module: chat_agent turn 
 import voice_logic  # local module: voice-call minutes / session / rate-limit decisions (unit-testable)
 import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
 import telegram_link  # local module: Telegram account link tokens / 1:1 link transaction (unit-testable)
+import telegram_reminders  # local module: Telegram reminder index, triggers, claim / snooze (unit-testable)
 
 # Module logger — replaces bare print(); logger.exception() in except blocks emits the
 # traceback to Cloud Logging stderr so real 5xx causes are no longer invisible.
@@ -2476,6 +2479,63 @@ def on_rc_event_created(event: firestore_fn.Event) -> None:
 
 
 # ============================================================================
+# Telegram reminders (phase 4) — Firestore triggers that keep telegram_reminders in sync.
+# Thin wrappers over telegram_reminders.py (decoded payloads in), deployed like
+# on_rc_event_created: --trigger-location=nam5, --cpu=1 (see deploy.sh).
+# ============================================================================
+
+def _snapshot_dict(snap) -> dict | None:
+    if snap is None or not getattr(snap, "exists", True):
+        return None
+    return snap.to_dict() or {}
+
+
+def _event_params(event) -> dict:
+    params = getattr(event, "params", None)
+    return params if isinstance(params, dict) else {}
+
+
+@firestore_fn.on_document_written(
+    document="users/{uid}/checklists/{checklistId}",
+    region="us-central1",
+)
+def on_checklist_written_tg(event: firestore_fn.Event) -> None:
+    """A checklist changed: rebuild its Telegram reminder entries (most writes return early —
+    no reminder data in either version means no read at all)."""
+    change = event.data
+    params = _event_params(event)
+    try:
+        telegram_reminders.on_checklist_written(
+            db, _telegram_now(), params.get("uid"), params.get("checklistId"),
+            _snapshot_dict(getattr(change, "before", None)),
+            _snapshot_dict(getattr(change, "after", None)),
+        )
+    except Exception as e:
+        logger.exception("on_checklist_written_tg: failed (%s)", type(e).__name__)
+
+
+@firestore_fn.on_document_written(
+    document="users/{uid}",
+    region="us-central1",
+)
+def on_user_settings_written_tg(event: firestore_fn.Event) -> None:
+    """users/{uid} changed. Returns at once unless timezone / reminder_channel changed — credit
+    docs in this collection are written on every AI call. A channel change is also sent to the
+    account's phones as a data-only FCM (the Android app caches the channel)."""
+    change = event.data
+    params = _event_params(event)
+    try:
+        telegram_reminders.on_user_written(
+            db, _telegram_now(), params.get("uid"),
+            _snapshot_dict(getattr(change, "before", None)),
+            _snapshot_dict(getattr(change, "after", None)),
+            messaging=messaging,
+        )
+    except Exception as e:
+        logger.exception("on_user_settings_written_tg: failed (%s)", type(e).__name__)
+
+
+# ============================================================================
 # FUNCTION: classify_chat_intent (Phase B — Layer 2 cheap classifier)
 # ============================================================================
 #
@@ -4476,12 +4536,17 @@ def voice_session(request: Request):
 # Never log a raw link token, the bot token or the internal key.
 # ============================================================================
 
-_TELEGRAM_ACCOUNT_ACTIONS = ("create_token", "claim", "status", "unlink")
+_TELEGRAM_ACCOUNT_ACTIONS = ("create_token", "claim", "status", "unlink",
+                             # Phase 4 — reminders in Telegram
+                             "set_reminder_channel")
 _TELEGRAM_INTERNAL_ACTIONS = (
     "consume_app_token", "create_login_token", "unlink",
     # Phase 3 — Stars subscription
     "premium_status", "apply_payment", "subscription_update", "revoke_payment",
+    # Phase 4 — reminders in Telegram
+    "claim_due_reminders", "snooze_reminder",
 )
+_TELEGRAM_RID_RE = re.compile(r"^[0-9a-f]{24}$")
 
 
 def _store_premium_for_bot(credit_user_id: str):
@@ -4537,6 +4602,47 @@ def _notify_telegram_unlinked(notify) -> None:
             logger.warning("telegram_account: unlink notice not delivered (%s)", reason)
 
 
+def _telegram_reminders_after_link(linked) -> bool:
+    """After a committed link: rebuild that account's reminder index (the chat may have changed)
+    and tell whether the "reminders here?" offer applies. Best-effort — never fails the link."""
+    if not linked:
+        return False
+    google_uid = linked.get("google_uid")
+    try:
+        telegram_reminders.recompute_user(db, _telegram_now(), google_uid)
+    except Exception as e:
+        logger.exception("telegram reminders: recompute after link failed (%s)", type(e).__name__)
+    try:
+        return telegram_reminders.should_offer(db, google_uid)
+    except Exception as e:
+        logger.exception("telegram reminders: channel read after link failed (%s)", type(e).__name__)
+        return False
+
+
+def _telegram_reminders_after_unlink(google_uids) -> None:
+    """After a committed unlink: drop every index entry of the accounts that lost Telegram (the
+    channel was already reset to push in the unlink transaction). The claim re-checks the link,
+    so a failure here cannot deliver to an unlinked chat."""
+    for google_uid in google_uids or ():
+        try:
+            telegram_reminders.delete_user_entries(db, google_uid)
+        except Exception as e:
+            logger.exception("telegram reminders: cleanup after unlink failed (%s)", type(e).__name__)
+
+
+def _send_telegram_channel_offer(linked) -> None:
+    """Bot → app link: the bot did not see the link happen, so Python sends the channel offer."""
+    bot_token = _telegram_bot_token()
+    if not bot_token:
+        logger.error("telegram_account: channel offer skipped — TELEGRAM_BOT_TOKEN is not configured")
+        return
+    delivered, reason = telegram_reminders.send_channel_offer(
+        bot_token, linked.get("chat_id"), linked.get("language_code"), http_requests.post
+    )
+    if not delivered:
+        logger.warning("telegram_account: channel offer not delivered (%s)", reason)
+
+
 @functions_framework.http
 def telegram_account(request: Request):
     """
@@ -4555,12 +4661,20 @@ def telegram_account(request: Request):
         404 -> "unknown_token" (also a token minted for the other direction — not consumed)
         410 -> "token_used" | "token_expired"
         409 -> "no_account"
+               After a successful claim the account's reminder index is rebuilt and, while its
+               reminder channel is push, the bot sends the "reminders here?" offer (best-effort).
     status
         200 -> {"success": true, "linked": false}
              | {"success": true, "linked": true, "telegram_username": str | null,
-                "telegram_first_name": str | null, "linked_at_ms": int}
-    unlink  — idempotent; best-effort Bot API notice to the removed chat
+                "telegram_first_name": str | null, "linked_at_ms": int,
+                "reminder_channel": "push" | "telegram" | "both", "timezone": str | null}
+    unlink  — idempotent; best-effort Bot API notice to the removed chat; the reminder channel
+              goes back to push and the account's Telegram reminders are deleted
         200 -> {"success": true, "linked": false}
+    set_reminder_channel {"channel": "push" | "telegram" | "both", "timezone"?: IANA id}
+        — one write of users/{google_uid}: reminder_channel (+ timezone, timezone_source "device")
+        200 -> {"success": true, "reminder_channel": str, "timezone"?: str}
+        400 -> "invalid_channel" | "invalid_timezone"  (nothing written)
 
     401 missing/invalid token · 403 disabled user · 400 bad body/action · 500 internal.
     """
@@ -4580,15 +4694,29 @@ def telegram_account(request: Request):
         return create_error_response("Invalid JSON body", 400)
     action = data.get("action")
     if action not in _TELEGRAM_ACCOUNT_ACTIONS:
-        return create_error_response("action must be create_token/claim/status/unlink", 400)
+        return create_error_response(
+            "action must be create_token/claim/status/unlink/set_reminder_channel", 400)
     if action == "claim" and not isinstance(data.get("token"), str):
         return create_error_response("token is required", 400)
+    if action == "set_reminder_channel":
+        if data.get("channel") not in telegram_reminders.CHANNELS:
+            return create_error_response(telegram_reminders.ERR_INVALID_CHANNEL, 400)
+        tz = data.get("timezone")
+        if tz is not None and telegram_reminders.rs.parse_zone(tz) is None:
+            return create_error_response(telegram_reminders.ERR_INVALID_TIMEZONE, 400)
 
     google_uid = decoded_token["uid"]
     try:
         now = _telegram_now()
         if action == "status":
             outcome = telegram_link.status(db, google_uid)
+            if outcome.status == 200 and outcome.body.get("linked"):
+                # Only the Linked screen shows the reminder choice.
+                outcome = telegram_link.Outcome(200, {
+                    **outcome.body, **telegram_reminders.reminder_settings(db, google_uid)})
+        elif action == "set_reminder_channel":
+            outcome = telegram_reminders.set_reminder_channel(
+                db, google_uid, data["channel"], data.get("timezone"))
         elif action == "unlink":
             outcome = telegram_link.unlink(db, google_uid)
         else:
@@ -4612,6 +4740,9 @@ def telegram_account(request: Request):
         logger.info("telegram_account: %s refused: %s %s",
                     action, outcome.status, outcome.body.get("error"))
     _notify_telegram_unlinked(outcome.notify)
+    _telegram_reminders_after_unlink(outcome.unlinked)
+    if outcome.linked and _telegram_reminders_after_link(outcome.linked):
+        _send_telegram_channel_offer(outcome.linked)
     return _telegram_response(outcome)
 
 
@@ -4627,11 +4758,28 @@ def telegram_bot_internal(request: Request):
         200 -> {"success": true, "google_uid": "...", "credit_user_id": "...",
                 "premium_applied"?: int}  — present only when unassigned live Stars payments
                                             of this Telegram account were applied (count)
+               Python sends no reminder-channel offer here: the worker reads
+               users/{google_uid}.reminder_channel and offers after its «linked» message.
         404 -> "unknown_token" · 410 -> "token_used" | "token_expired" · 409 -> "no_account"
     create_login_token {"telegram_user_id", "chat_id", "username"?, "first_name"?, "language_code"?}
         200 -> {"success": true, "token": "...", "url": "https://app.gisti-ai.com/?tg_link=<token>"}
-    unlink {"telegram_user_id"}  — idempotent
+    unlink {"telegram_user_id"}  — idempotent; the account's reminder channel goes back to push
+                                   and its Telegram reminders are deleted
         200 -> {"success": true, "ok": true}
+
+    Phase 4 — reminders in Telegram (index: telegram_reminders, see telegram_reminders.py):
+    claim_due_reminders {"limit"?: 1..200, default 50}  — every minute from the worker's cron.
+        Claimed BEFORE sending (at most once); an entry more than 6 h late is consumed but not
+        returned.
+        200 -> {"success": true, "reminders": [{"rid", "chat_id", "telegram_user_id",
+                "language_code", "kind": "oneshot" | "repeat" | "snooze", "checklist_cloud_id",
+                "checklist_owner_uid", "item_id": str | null (null = checklist-level),
+                "checklist_name", "item_text": str | null, "fire_at_ms", "google_uid",
+                "timezone"}]}
+    snooze_reminder {"rid": 24 hex, "minutes": 1..10080, "telegram_user_id"?}
+        200 -> {"success": true, "rid": "<snooze rid>", "fire_at_ms": int, "timezone": str}
+        404 -> "unknown_reminder" (also when telegram_user_id does not own the reminder)
+        409 -> "channel_off" (account unlinked, or its reminder channel is push) — nothing written
 
     Phase 3 — Stars subscription:
     premium_status {"telegram_user_id"}
@@ -4676,7 +4824,25 @@ def telegram_bot_internal(request: Request):
     telegram = None
     payment = None
     charge_id = data.get("telegram_payment_charge_id")
-    if action in ("unlink", "premium_status", "subscription_update"):
+    if action == "claim_due_reminders":
+        limit = data.get("limit", telegram_reminders.CLAIM_DEFAULT_LIMIT)
+        if (not isinstance(limit, int) or isinstance(limit, bool)
+                or not 1 <= limit <= telegram_reminders.CLAIM_MAX_LIMIT):
+            return create_error_response(
+                f"limit must be 1..{telegram_reminders.CLAIM_MAX_LIMIT}", 400)
+    elif action == "snooze_reminder":
+        rid = data.get("rid")
+        minutes = data.get("minutes")
+        if not isinstance(rid, str) or not _TELEGRAM_RID_RE.match(rid):
+            return create_error_response("rid must be 24 lowercase hex chars", 400)
+        if (not isinstance(minutes, int) or isinstance(minutes, bool)
+                or not 1 <= minutes <= telegram_reminders.SNOOZE_MAX_MINUTES):
+            return create_error_response(
+                f"minutes must be 1..{telegram_reminders.SNOOZE_MAX_MINUTES}", 400)
+        tg_owner = data.get("telegram_user_id")
+        if tg_owner is not None and not telegram_link.is_telegram_user_id(tg_owner):
+            return create_error_response("telegram_user_id must be a positive integer", 400)
+    elif action in ("unlink", "premium_status", "subscription_update"):
         if not telegram_link.is_telegram_user_id(data.get("telegram_user_id")):
             return create_error_response("telegram_user_id must be a positive integer", 400)
     elif action in ("consume_app_token", "create_login_token"):
@@ -4721,6 +4887,12 @@ def telegram_bot_internal(request: Request):
             outcome = telegram_link.subscription_update(
                 db, now, data["telegram_user_id"], data["state"], charge_id,
             )
+        elif action == "claim_due_reminders":
+            outcome = telegram_reminders.claim_due_reminders(
+                db, now, data.get("limit", telegram_reminders.CLAIM_DEFAULT_LIMIT))
+        elif action == "snooze_reminder":
+            outcome = telegram_reminders.snooze_reminder(
+                db, now, data["rid"], data["minutes"], data.get("telegram_user_id"))
         else:
             outcome = telegram_link.revoke_payment(
                 db, now, charge_id, store_premium=_store_premium_for_bot,
@@ -4728,6 +4900,12 @@ def telegram_bot_internal(request: Request):
     except Exception as e:
         logger.exception("telegram_bot_internal: %s failed (%s)", action, type(e).__name__)
         return create_error_response("Telegram link step failed", 500)
+
+    _telegram_reminders_after_unlink(outcome.unlinked)
+    if outcome.linked:
+        # app → bot: the response body stays as it was (the worker reads the profile's
+        # reminder_channel itself and sends the offer after its «linked» message).
+        _telegram_reminders_after_link(outcome.linked)
 
     if outcome.status != 200:
         logger.info("telegram_bot_internal: %s refused: %s %s",

@@ -99,6 +99,56 @@ describe("callback_data — Phase 2 (AI chat, time zone)", () => {
   });
 });
 
+describe("callback_data — Phase 4 (reminders)", () => {
+  const RID = "0123456789abcdef01234567";
+
+  it("round-trips the reminder buttons and the channel choice within 64 bytes", () => {
+    const all: Callback[] = [
+      { t: "remDone", rid: RID },
+      { t: "remSnooze", rid: RID },
+      { t: "remOpen", rid: RID },
+      { t: "channel", channel: "telegram", source: "offer" },
+      { t: "channel", channel: "both", source: "offer" },
+      { t: "channel", channel: "push", source: "offer" },
+      { t: "channel", channel: "telegram", source: "command" },
+      { t: "channel", channel: "both", source: "command" },
+      { t: "channel", channel: "push", source: "command" },
+    ];
+    for (const cb of all) {
+      const data = encodeCallback(cb);
+      expect(byteLength(data)).toBeLessThanOrEqual(CALLBACK_MAX_BYTES);
+      expect(decodeCallback(data)).toEqual(cb);
+    }
+    expect(encodeCallback({ t: "remDone", rid: RID })).toBe(`rd:${RID}`);
+    expect(encodeCallback({ t: "remSnooze", rid: RID })).toBe(`rs:${RID}`);
+    expect(encodeCallback({ t: "remOpen", rid: RID })).toBe(`ro:${RID}`);
+    expect(byteLength(`rd:${RID}`)).toBe(27);
+  });
+
+  it("decodes exactly the offer buttons Python sends (telegram_reminders.py OFFER_CALLBACKS)", () => {
+    expect(decodeCallback("rc:t")).toEqual({ t: "channel", channel: "telegram", source: "offer" });
+    expect(decodeCallback("rc:b")).toEqual({ t: "channel", channel: "both", source: "offer" });
+    expect(decodeCallback("rc:p")).toEqual({ t: "channel", channel: "push", source: "offer" });
+    expect(encodeCallback({ t: "channel", channel: "both", source: "offer" })).toBe("rc:b");
+  });
+
+  it("rejects malformed reminder data", () => {
+    for (const bad of [
+      "rd:",
+      "rd:0123456789abcdef0123456", // 23 hex
+      "rd:0123456789abcdef012345678", // 25 hex
+      "rd:0123456789ABCDEF01234567", // upper case
+      `rx:${RID}`,
+      "rc:x",
+      "rc:t:x",
+      "rc:tb",
+      "rc:",
+    ]) {
+      expect(decodeCallback(bad)).toBeNull();
+    }
+  });
+});
+
 describe("key registry", () => {
   it("maps a short key to the checklist / item ids and reuses it for the same target", () => {
     const reg = emptyRegistry();

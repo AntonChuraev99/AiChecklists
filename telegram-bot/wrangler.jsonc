@@ -11,6 +11,8 @@
     "bindings": [{ "name": "TELEGRAM_CHAT", "class_name": "TelegramChat" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TelegramChat"] }],
+  // Phase 4 — reminders: claim_due_reminders every minute (src/reminders.ts runReminderCron).
+  "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "CF_BASE_URL": "https://us-central1-aichecklists-40230.cloudfunctions.net"
   },

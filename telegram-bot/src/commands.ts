@@ -8,6 +8,7 @@ export const COMMANDS = [
   "premium",
   "app",
   "timezone",
+  "reminders",
   "paysupport",
   "unlink",
   "help",
