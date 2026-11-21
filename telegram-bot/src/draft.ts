@@ -258,6 +258,16 @@ export function freeOption(draft: Draft, defaultTitle: string): ParsedLines | nu
   return parsed.items.length > 0 ? parsed : null;
 }
 
+/** Only plain text parts (no link, no file) — the drafts that get «💬 Ask AI». */
+export function isTextOnly(draft: Draft): boolean {
+  return draft.parts.length > 0 && draft.parts.every((p) => p.kind === "text");
+}
+
+/** The text of a text-only draft as one chat message (one line per message, like the free option). */
+export function draftText(draft: Draft): string {
+  return draft.parts.map((p) => (p.kind === "text" ? p.text : "")).join("\n").trim();
+}
+
 /** One generate_checklist call, before any file is downloaded. */
 export interface AiPlan {
   inputType: "text" | "url" | "image_base64" | "audio_base64";

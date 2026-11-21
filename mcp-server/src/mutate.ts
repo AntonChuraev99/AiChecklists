@@ -50,6 +50,8 @@ function newFillItem(text: string, templateItemId: string | null, checked = fals
     repeatOccurrenceCount: 0,
     attachments: [],
     templateItemId,
+    reminderFullScreen: false,
+    alarmEnabled: true, // Kotlin default — omitted on encode
   };
 }
 

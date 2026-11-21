@@ -60,6 +60,12 @@ service cloud.firestore {
     match /telegram_payments/{chargeId} {
       allow read, write: if false;
     }
+    // Telegram reminders due index (phase 4) — written by the Firestore triggers and
+    // telegram_bot_internal (Admin SDK only). Each entry maps an account to a Telegram chat and
+    // carries checklist / item text, so no client may read or forge one.
+    match /telegram_reminders/{reminderId} {
+      allow read, write: if false;
+    }
 
     // Existing collections used by Cloud Functions (server-side access via Admin SDK)
     // usage, credits_restore_log, credits_refill_log, premium_events_log,

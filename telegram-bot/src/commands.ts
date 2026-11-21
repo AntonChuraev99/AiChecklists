@@ -1,6 +1,18 @@
 /** Bot commands. Anything unknown answers with /help. */
 
-export const COMMANDS = ["start", "lists", "credits", "premium", "app", "paysupport", "unlink", "help"] as const;
+export const COMMANDS = [
+  "start",
+  "lists",
+  "chat",
+  "credits",
+  "premium",
+  "app",
+  "timezone",
+  "reminders",
+  "paysupport",
+  "unlink",
+  "help",
+] as const;
 export type Command = (typeof COMMANDS)[number];
 
 /** Command name (already lowercased by parseCommand, "@bot" stripped) → handler key. */

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildAmplitudeEvent, sendTgEvent, tgDeviceId, tgIdentity, type TgEvent } from "./analytics";
+import { buildAmplitudeEvent, sendTgEvent, sendTgEvents, tgDeviceId, tgIdentity, type TgEvent } from "./analytics";
 
 const CREDIT_ID = "3f2b8c1e-1d2a-4c3b-9e8f-0a1b2c3d4e5f";
 
@@ -15,6 +15,12 @@ const ALL: Record<TgEvent["type"], TgEvent> = {
   tg_payment_succeeded: { type: "tg_payment_succeeded", amount: 100, isRecurring: true },
   tg_subscription_updated: { type: "tg_subscription_updated", state: "canceled" },
   tg_app_link_opened: { type: "tg_app_link_opened" },
+  tg_chat_opened: { type: "tg_chat_opened", source: "button" },
+  tg_chat_turn: { type: "tg_chat_turn", result: "final", rounds: 2 },
+  tg_chat_tool: { type: "tg_chat_tool", tool: "delete_item", status: "declined" },
+  tg_reminder_sent: { type: "tg_reminder_sent", kind: "repeat" },
+  tg_reminder_action: { type: "tg_reminder_action", action: "snooze" },
+  tg_reminder_channel_set: { type: "tg_reminder_channel_set", channel: "both", source: "offer" },
 };
 
 const ALLOWED_PROPS: Record<TgEvent["type"], string[]> = {
@@ -28,6 +34,12 @@ const ALLOWED_PROPS: Record<TgEvent["type"], string[]> = {
   tg_payment_succeeded: ["amount", "is_recurring"],
   tg_subscription_updated: ["state"],
   tg_app_link_opened: [],
+  tg_chat_opened: ["source"],
+  tg_chat_turn: ["result", "rounds"],
+  tg_chat_tool: ["status", "tool"],
+  tg_reminder_sent: ["kind"],
+  tg_reminder_action: ["action"],
+  tg_reminder_channel_set: ["channel", "source"],
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -62,6 +74,36 @@ describe("buildAmplitudeEvent", () => {
     expect("user_id" in unlinked).toBe(false);
     const short = buildAmplitudeEvent({ userId: "abc", deviceId: "tg_x" }, ALL.tg_lists_opened, 0);
     expect("user_id" in short).toBe(false);
+  });
+});
+
+describe("chat events", () => {
+  it("carry only fixed vocabularies — never message text, names or errors", async () => {
+    const identity = await tgIdentity(1, CREDIT_ID);
+    expect(buildAmplitudeEvent(identity, ALL.tg_chat_opened, 0).event_properties).toEqual({ source: "button" });
+    expect(buildAmplitudeEvent(identity, ALL.tg_chat_turn, 0).event_properties).toEqual({ result: "final", rounds: 2 });
+    expect(buildAmplitudeEvent(identity, ALL.tg_chat_tool, 0).event_properties).toEqual({ tool: "delete_item", status: "declined" });
+  });
+
+  it("sendTgEvents posts a batch in one request", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await sendTgEvents({ AMPLITUDE_SERVER_API_KEY: "k" }, await tgIdentity(1, CREDIT_ID), [ALL.tg_chat_tool, ALL.tg_chat_turn]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((JSON.parse(String(init.body)) as { events: unknown[] }).events).toHaveLength(2);
+  });
+});
+
+describe("reminder events", () => {
+  it("carry only fixed vocabularies — no item text, checklist name or id", async () => {
+    const identity = await tgIdentity(1, CREDIT_ID);
+    expect(buildAmplitudeEvent(identity, ALL.tg_reminder_sent, 0).event_properties).toEqual({ kind: "repeat" });
+    expect(buildAmplitudeEvent(identity, ALL.tg_reminder_action, 0).event_properties).toEqual({ action: "snooze" });
+    expect(buildAmplitudeEvent(identity, ALL.tg_reminder_channel_set, 0).event_properties).toEqual({
+      channel: "both",
+      source: "offer",
+    });
   });
 });
 

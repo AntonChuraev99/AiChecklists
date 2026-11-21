@@ -80,7 +80,7 @@ internal fun ValuePropRow(
 
 /** Line height of [style] in dp, or null when it is unspecified or in `em`. */
 @Composable
-private fun lineHeightDp(style: TextStyle): Dp? {
+internal fun lineHeightDp(style: TextStyle): Dp? {
     val lineHeight = style.lineHeight
     if (lineHeight.type != TextUnitType.Sp) return null
     return with(LocalDensity.current) { lineHeight.toDp() }
@@ -90,7 +90,7 @@ private fun lineHeightDp(style: TextStyle): Dp? {
  * Top paddings (leading element, text) that put the centre of the first text line on the centre of
  * a [leading]-tall element. Unknown line height → no padding.
  */
-private fun firstLineCentring(leading: Dp, line: Dp?): Pair<Dp, Dp> {
+internal fun firstLineCentring(leading: Dp, line: Dp?): Pair<Dp, Dp> {
     if (line == null) return 0.dp to 0.dp
     val diff = (leading - line) / 2
     return if (diff >= 0.dp) 0.dp to diff else (-diff) to 0.dp

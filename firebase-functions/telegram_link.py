@@ -32,6 +32,13 @@ whose paid period has not ended yet, inside the link transaction (`_consume_and_
 Premium = RevenueCat OR telegram_premium_until > now. The RevenueCat check lives in main.py and
 is passed in as a callable (`store_premium(credit_user_id) -> True | False | None`, None =
 RevenueCat unreachable), so this module stays network-free.
+
+Phase 4 — reminders in Telegram: every path that takes a Telegram account away from a Google
+account (both unlinks, and a link that moves the Telegram account to another Google account)
+resets users/{google_uid}.reminder_channel to "push" in the same transaction — otherwise an
+Android user who chose "Telegram only" would get no reminder anywhere after disconnecting. The
+Outcome reports the link it made (`linked`) and the accounts that lost their Telegram
+(`unlinked`); main.py recomputes / deletes their telegram_reminders entries after the commit.
 """
 
 import base64
@@ -105,6 +112,10 @@ SUBSCRIPTION_STATES = ("active", "canceled", "failed")
 _MAX_CHARGE_ID = 256
 _MAX_INVOICE_PAYLOAD = 128
 
+# ---- Phase 4: reminder channel on the data doc users/{google_uid} ----
+REMINDER_CHANNEL_FIELD = "reminder_channel"
+CHANNEL_PUSH = "push"
+
 UNLINK_MESSAGES = {
     "en": "Your Telegram is no longer linked to Gisti. Send /start to link it again.",
     "ru": "Telegram отвязан от Gisti. Чтобы привязать его снова, отправьте /start.",
@@ -118,11 +129,16 @@ class Outcome:
 
     `notify` is filled only by the app-side unlink: (chat_id, language_code) of every link it
     removed. Sending is the caller's job, after the transaction has committed.
+    `linked` (a successful link): {google_uid, credit_user_id, telegram_user_id, chat_id,
+    language_code}. `unlinked`: google_uids that lost their Telegram account in this commit.
+    Neither is part of the HTTP body; main.py runs the reminder-index hooks from them.
     """
 
     status: int
     body: dict
     notify: tuple = field(default_factory=tuple)
+    linked: dict | None = None
+    unlinked: tuple = field(default_factory=tuple)
 
 
 def _error(status: int, code: str) -> Outcome:
@@ -272,6 +288,18 @@ def _clear_credit_fields() -> dict:
     return {name: DELETE_FIELD for name in CREDIT_DOC_FIELDS}
 
 
+def _channel_reset_needed(profile_snap) -> bool:
+    """True when users/{google_uid} carries a reminder channel other than "push".
+
+    Absent already means push, and the data doc may not exist at all (its checklists live in a
+    sub-collection) — neither is written to, so update() never hits a missing document.
+    """
+    if profile_snap is None or not profile_snap.exists:
+        return False
+    value = (profile_snap.to_dict() or {}).get(REMINDER_CHANNEL_FIELD)
+    return value is not None and value != CHANNEL_PUSH
+
+
 def _consume_and_link(db, now: datetime, token: str, direction: str, *,
                       telegram: dict | None = None,
                       account: tuple[str, str] | None = None,
@@ -378,20 +406,34 @@ def _consume_and_link(db, now: datetime, token: str, direction: str, *,
                 to_clear[old_credit] = old.get("telegram_user_id")
         # This Telegram account linked to a different credit doc (another Google account, or
         # another credit doc of the same one): that doc loses its telegram fields.
+        lost_uid = None
         if own_link.exists:
-            old_credit = (own_link.to_dict() or {}).get("credit_user_id")
+            own = own_link.to_dict() or {}
+            old_credit = own.get("credit_user_id")
             if old_credit and old_credit != credit_user_id:
                 to_clear[old_credit] = tg_id
+            old_google = own.get("google_uid")
+            if isinstance(old_google, str) and old_google and old_google != google_uid:
+                lost_uid = old_google  # that Google account is left without Telegram
         clear_snaps = {cid: users.document(cid).get(transaction=transaction) for cid in to_clear}
+        lost_profile = (users.document(lost_uid).get(transaction=transaction)
+                        if lost_uid and _DOC_ID_RE.match(lost_uid) else None)
 
         # ---- writes ----
+        reset_uid = lost_uid if _channel_reset_needed(lost_profile) else None
         transaction.update(token_ref, {"used_at": now})
         for stale_id in stale_link_ids:
             transaction.delete(links.document(stale_id))
         for cid, snap in clear_snaps.items():
             # Only when the doc still carries THAT Telegram id — never wipe someone else's link.
             if snap.exists and (snap.to_dict() or {}).get("telegram_user_id") == to_clear[cid]:
-                transaction.update(users.document(cid), _clear_credit_fields())
+                update = _clear_credit_fields()
+                if cid == reset_uid:  # one write per doc
+                    update[REMINDER_CHANNEL_FIELD] = CHANNEL_PUSH
+                    reset_uid = None
+                transaction.update(users.document(cid), update)
+        if reset_uid and reset_uid != credit_user_id:
+            transaction.update(users.document(reset_uid), {REMINDER_CHANNEL_FIELD: CHANNEL_PUSH})
         transaction.set(link_ref, {
             "telegram_user_id": tg_id,
             "chat_id": tg.get("chat_id"),
@@ -430,18 +472,26 @@ def _consume_and_link(db, now: datetime, token: str, direction: str, *,
                                      credits_cap=credits_cap, now=now),
                 "applied_charge_ids": [doc.id for doc, _rec, _end in live],
             })
+        if reset_uid and reset_uid == credit_user_id:
+            credit_update[REMINDER_CHANNEL_FIELD] = CHANNEL_PUSH
         transaction.update(credit_ref, credit_update)
         applied = {"premium_applied": len(live)} if live else {}
+        hooks = {
+            "linked": {"google_uid": google_uid, "credit_user_id": credit_user_id,
+                       "telegram_user_id": tg_id, "chat_id": tg.get("chat_id"),
+                       "language_code": tg.get("language_code")},
+            "unlinked": (lost_uid,) if lost_uid else (),
+        }
         if direction == APP_TO_BOT:
             return Outcome(200, {"google_uid": google_uid, "credit_user_id": credit_user_id,
-                                 **applied})
+                                 **applied}, **hooks)
         return Outcome(200, {
             "linked": True,
             "telegram_username": tg.get("telegram_username"),
             # Fallback label for Telegram users without an @username.
             "telegram_first_name": tg.get("telegram_first_name"),
             **applied,
-        })
+        }, **hooks)
 
     return txn(db.transaction())
 
@@ -494,21 +544,37 @@ def _epoch_ms(link: dict):
     return None
 
 
-def _remove_links_txn(db, link_refs_and_snaps, transaction) -> list:
-    """Shared write half of both unlinks. Caller has done every read already."""
+def _remove_links_txn(db, link_refs_and_snaps, transaction, profile_snap=None) -> list:
+    """Shared write half of both unlinks. Caller has done every read already.
+
+    `profile_snap` = users/{google_uid} of the account losing its Telegram: a reminder channel
+    other than push is reset to push in the same commit (merged into the credit-doc update when
+    it is the same document).
+    """
     users = db.collection(USERS_COLLECTION)
+    reset_uid = profile_snap.id if _channel_reset_needed(profile_snap) else None
     removed = []
     for link_ref, link, credit_snap in link_refs_and_snaps:
         transaction.delete(link_ref)
         if (credit_snap is not None and credit_snap.exists
                 and (credit_snap.to_dict() or {}).get("telegram_user_id") == link.get("telegram_user_id")):
-            transaction.update(users.document(credit_snap.id), _clear_credit_fields())
+            update = _clear_credit_fields()
+            if credit_snap.id == reset_uid:
+                update[REMINDER_CHANNEL_FIELD] = CHANNEL_PUSH
+                reset_uid = None
+            transaction.update(users.document(credit_snap.id), update)
         removed.append(link)
+    if reset_uid:
+        transaction.update(users.document(reset_uid), {REMINDER_CHANNEL_FIELD: CHANNEL_PUSH})
     return removed
 
 
 def unlink(db, google_uid: str) -> Outcome:
-    """App side: remove every Telegram link of this Google account. Idempotent."""
+    """App side: remove every Telegram link of this Google account. Idempotent.
+
+    Also resets the account's reminder channel to push — even when no link was left, so a
+    repeated unlink still repairs a channel stuck on "telegram".
+    """
     users = db.collection(USERS_COLLECTION)
 
     @transactional
@@ -521,14 +587,15 @@ def unlink(db, google_uid: str) -> Outcome:
             credit_snap = (users.document(cid).get(transaction=transaction)
                            if isinstance(cid, str) and cid else None)
             entries.append((doc.reference, link, credit_snap))
-        return _remove_links_txn(db, entries, transaction)
+        profile_snap = users.document(google_uid).get(transaction=transaction)
+        return _remove_links_txn(db, entries, transaction, profile_snap)
 
     removed = txn(db.transaction())
     notify = tuple(
         (link.get("chat_id"), link.get("language_code"))
         for link in removed if _is_int(link.get("chat_id"))
     )
-    return Outcome(200, {"linked": False}, notify=notify)
+    return Outcome(200, {"linked": False}, notify=notify, unlinked=(google_uid,))
 
 
 def unlink_by_telegram(db, telegram_user_id: int) -> Outcome:
@@ -546,10 +613,15 @@ def unlink_by_telegram(db, telegram_user_id: int) -> Outcome:
         cid = link.get("credit_user_id")
         credit_snap = (users.document(cid).get(transaction=transaction)
                        if isinstance(cid, str) and cid else None)
-        return _remove_links_txn(db, [(link_ref, link, credit_snap)], transaction)
+        google_uid = link.get("google_uid")
+        profile_snap = (users.document(google_uid).get(transaction=transaction)
+                        if isinstance(google_uid, str) and _DOC_ID_RE.match(google_uid) else None)
+        return _remove_links_txn(db, [(link_ref, link, credit_snap)], transaction, profile_snap)
 
-    txn(db.transaction())
-    return Outcome(200, {"ok": True})
+    removed = txn(db.transaction())
+    unlinked = tuple(link["google_uid"] for link in removed
+                     if isinstance(link.get("google_uid"), str) and link["google_uid"])
+    return Outcome(200, {"ok": True}, unlinked=unlinked)
 
 
 # ---------------------------------------------------------------------------
@@ -567,10 +639,16 @@ def notify_unlinked(bot_token: str, chat_id: int, language_code, post) -> tuple[
     The reason is safe to log: it is the exception TYPE or Telegram's status/description, never
     the exception text — a requests error message embeds the URL, and the URL embeds the bot token.
     """
+    return send_bot_message(bot_token, {"chat_id": chat_id, "text": unlink_message(language_code)},
+                            post)
+
+
+def send_bot_message(bot_token: str, payload: dict, post) -> tuple[bool, str]:
+    """Best-effort Bot API sendMessage with `payload`; (delivered, reason), never raises.
+    Same log-safety contract as notify_unlinked."""
     url = f"{TELEGRAM_API_BASE}/bot{bot_token}/sendMessage"
     try:
-        resp = post(url, json={"chat_id": chat_id, "text": unlink_message(language_code)},
-                    timeout=NOTIFY_TIMEOUT_SEC)
+        resp = post(url, json=payload, timeout=NOTIFY_TIMEOUT_SEC)
     except Exception as e:  # noqa: BLE001 — best-effort by contract
         return False, type(e).__name__
     status_code = getattr(resp, "status_code", None)

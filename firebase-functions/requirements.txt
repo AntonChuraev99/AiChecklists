@@ -5,3 +5,4 @@ google-genai==2.*
 firebase-admin==6.*
 flask==3.*
 requests==2.*
+tzdata>=2026.1

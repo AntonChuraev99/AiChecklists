@@ -2,7 +2,9 @@ package com.antonchuraev.homesearchchecklist.telegram
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountError
+import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramLinkStatus
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -48,6 +50,50 @@ internal fun telegramAuthPhaseFlow(
     combine(authRepository.authState, userDataRepository.getUserDataFlow()) { auth, user ->
         telegramAuthPhase(auth, user.isGoogleLinked)
     }.distinctUntilChanged()
+
+/**
+ * The device's IANA time-zone id for the server (`users/{google_uid}.timezone`, `set_reminder_channel`),
+ * or null when this platform cannot name one — then the zone is simply not sent.
+ *
+ * Android/iOS use [KotlinxDeviceTimeZoneProvider] (kotlinx-datetime gives an IANA id there). wasmJs
+ * binds `BrowserDeviceTimeZoneProvider` (`Intl.DateTimeFormat().resolvedOptions().timeZone`) in its
+ * platform module: kotlinx-datetime on wasm has no zone database and reports the fixed-offset
+ * `SYSTEM` zone, which [ianaZoneOrNull] rejects.
+ */
+fun interface DeviceTimeZoneProvider {
+    fun ianaZoneId(): String?
+}
+
+object KotlinxDeviceTimeZoneProvider : DeviceTimeZoneProvider {
+    override fun ianaZoneId(): String? =
+        ianaZoneOrNull(runCatching { kotlinx.datetime.TimeZone.currentSystemDefault().id }.getOrNull())
+}
+
+private val IANA_ZONE_ID = Regex("^[A-Za-z][A-Za-z0-9_+\\-]*(/[A-Za-z0-9_+\\-]+)+$")
+
+/**
+ * Keeps only ids the server can resolve with `zoneinfo`: `Area/Location` names and `UTC`. Rejects
+ * kotlinx's JS/Wasm `SYSTEM`, bare offsets (`+03:00`, `GMT+3`) and blanks — the server answers those
+ * with 400 `invalid_timezone`, and a wrong zone shifts every reminder.
+ */
+internal fun ianaZoneOrNull(id: String?): String? {
+    val trimmed = id?.trim().orEmpty()
+    return when {
+        trimmed == "UTC" -> trimmed
+        IANA_ZONE_ID.matches(trimmed) -> trimmed
+        else -> null
+    }
+}
+
+/**
+ * The channel the device should cache after a successful `status`. Not linked → Push (the server
+ * resets the channel on unlink). Linked on a pre-phase-4 server (no field) → Push: that server never
+ * delivers to Telegram, so the phone must keep notifying.
+ */
+internal fun cachedChannelFor(status: TelegramLinkStatus): ReminderChannel = when (status) {
+    TelegramLinkStatus.NotLinked -> ReminderChannel.Push
+    is TelegramLinkStatus.Linked -> status.reminderChannel ?: ReminderChannel.Push
+}
 
 internal fun TelegramAccountError.toReason(): TelegramErrorReason = when (this) {
     is TelegramAccountError.Network -> TelegramErrorReason.Network

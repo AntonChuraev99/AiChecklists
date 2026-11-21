@@ -250,6 +250,15 @@ export async function answerCallback(env: TelegramEnv, callbackQueryId: string, 
   }
 }
 
+/** «typing…» for ~5 s. Best-effort: a failure is logged and never fails the work it decorates. */
+export async function sendTyping(env: TelegramEnv, chatId: number): Promise<void> {
+  try {
+    await tgCall(env, "sendChatAction", { chat_id: chatId, action: "typing" });
+  } catch (e) {
+    console.warn(`[gisti-tg] sendChatAction failed: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
 export function leaveChat(env: TelegramEnv, chatId: number): Promise<unknown> {
   return tgCall(env, "leaveChat", { chat_id: chatId });
 }

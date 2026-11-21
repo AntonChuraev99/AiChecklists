@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountError
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramLinkStatus
@@ -75,6 +76,9 @@ class TelegramViewModel(
 
     private var unlinkJob: Job? = null
 
+    /** The reminder-channel save loop; it keeps sending until the latest tapped target is stored. */
+    private var channelSaveJob: Job? = null
+
     init {
         viewModelScope.launch { authPhase.collect(::onAuthPhase) }
         viewModelScope.launch { linkChanged.collect { onLinkChangedOutside() } }
@@ -100,6 +104,8 @@ class TelegramViewModel(
             TelegramIntent.CheckAgainClicked -> onCheckAgain()
             TelegramIntent.DisconnectConfirmed -> onDisconnect()
             TelegramIntent.RetryClicked -> if (_screenState.value is TelegramScreenState.Error) loadStatus(showLoading = true)
+            is TelegramIntent.ReminderChannelClicked -> onReminderChannelClicked(intent.target)
+            is TelegramIntent.WebReminderChannelClicked -> onWebReminderChannelClicked(intent.on)
         }
     }
 
@@ -128,6 +134,7 @@ class TelegramViewModel(
         mintJob?.cancel()
         mintJob = null
         unlinkJob?.cancel()
+        channelSaveJob?.cancel()
         token = null
         tokenExpiresAtMs = 0L
     }
@@ -221,7 +228,7 @@ class TelegramViewModel(
                     is TelegramLinkStatus.Linked -> {
                         val wasPending = current is TelegramScreenState.Pending
                         pollJob?.cancel()
-                        _screenState.value = status.toState()
+                        _screenState.value = mergeLinkedRefresh(current, status.toState())
                         if (announce && wasPending) {
                             analyticsTracker.event(
                                 AnalyticsEvents.Telegram.LINK_COMPLETED,
@@ -422,6 +429,96 @@ class TelegramViewModel(
         }
     }
 
+    // ── Reminder channel (reminders-addendum.md §6) ─────────────────────────
+
+    private fun onWebReminderChannelClicked(on: Boolean) {
+        val state = _screenState.value as? TelegramScreenState.Linked ?: return
+        val current = state.displayedReminderChannel ?: return // section hidden — no row to tap
+        // null = the tapped row is already selected: standard radio behaviour, no request.
+        val target = webReminderTarget(current, on) ?: return
+        onReminderChannelClicked(target)
+    }
+
+    /**
+     * Latest tap wins: the tap shows at once ([TelegramScreenState.Linked.channelSaving]); while a
+     * request is in flight only the pending target is replaced, and the running loop sends it when
+     * the in-flight call returns. Failure reverts to the last CONFIRMED value.
+     *
+     * The early returns are not silent skips: the section is not rendered without a confirmed value,
+     * the group is disabled while disconnecting, and re-tapping the selected / saving row is a radio
+     * that already shows the answer.
+     */
+    private fun onReminderChannelClicked(target: ReminderChannel) {
+        val state = _screenState.value as? TelegramScreenState.Linked ?: return
+        val confirmed = state.reminderChannel ?: return
+        if (state.isDisconnecting) return
+        if (state.displayedReminderChannel == target) return
+        // Tapping the confirmed row while nothing is in flight would be a no-op, caught above.
+        // Tapping it while a save is running is a real change of mind: the in-flight value may land.
+        _screenState.value = state.copy(channelSaving = target)
+        if (channelSaveJob?.isActive == true) return
+        channelSaveJob = viewModelScope.launch { runChannelSaveLoop(target, confirmed) }
+    }
+
+    private suspend fun runChannelSaveLoop(first: ReminderChannel, confirmedAtStart: ReminderChannel) {
+        var sending = first
+        var confirmed = confirmedAtStart
+        while (true) {
+            val result = repository.setReminderChannel(sending)
+            // Left Linked meanwhile (unlinked in the bot, re-entry, sign-out): nothing to update.
+            val now = _screenState.value as? TelegramScreenState.Linked ?: return
+            when (result) {
+                is TelegramAccountResult.Success -> {
+                    confirmed = result.value
+                    analyticsTracker.event(
+                        AnalyticsEvents.Telegram.REMINDER_CHANNEL_SET,
+                        mapOf(
+                            AnalyticsEvents.Telegram.PARAM_CHANNEL to confirmed.wire,
+                            AnalyticsParams.SOURCE to AnalyticsEvents.Telegram.SOURCE_APP,
+                        ),
+                    )
+                    val latest = now.channelSaving
+                    if (latest == null || latest == confirmed || now.isDisconnecting) {
+                        _screenState.value = now.copy(reminderChannel = confirmed, channelSaving = null)
+                        return
+                    }
+                    // The user tapped another row while this one was in flight → send that one too.
+                    _screenState.value = now.copy(reminderChannel = confirmed)
+                    sending = latest
+                }
+                is TelegramAccountResult.Failure -> {
+                    if (result.error == TelegramAccountError.NotSignedIn) {
+                        goSignedOut()
+                        return
+                    }
+                    val attempted = now.channelSaving ?: sending
+                    _screenState.value = now.copy(reminderChannel = confirmed, channelSaving = null)
+                    // During an unlink the whole group is going away — no retry offer for it.
+                    if (!now.isDisconnecting) {
+                        emit(TelegramSideEffect.ShowSnackbar(TelegramSnackbar.ReminderSaveFailed(attempted)))
+                    }
+                    return
+                }
+            }
+        }
+    }
+
+    /**
+     * A background `status` must not undo a tap that is being saved (addendum §6 "Refresh while
+     * saving"): while [TelegramScreenState.Linked.channelSaving] is set, the optimistic selection and
+     * the last confirmed value are kept; the rest of the account card takes the fresh values.
+     */
+    private fun mergeLinkedRefresh(
+        current: TelegramScreenState,
+        fresh: TelegramScreenState.Linked,
+    ): TelegramScreenState.Linked {
+        if (current !is TelegramScreenState.Linked || current.channelSaving == null) return fresh
+        return fresh.copy(
+            reminderChannel = current.reminderChannel,
+            channelSaving = current.channelSaving,
+        )
+    }
+
     private fun emit(effect: TelegramSideEffect) {
         _sideEffect.tryEmit(effect)
     }
@@ -430,6 +527,7 @@ class TelegramViewModel(
         username = username,
         firstName = firstName,
         linkedAtMs = linkedAtMs,
+        reminderChannel = reminderChannel,
     )
 
     companion object {

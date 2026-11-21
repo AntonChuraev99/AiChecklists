@@ -12,6 +12,7 @@ import aichecklists.core.designsystem.generated.resources.telegram_linked_snackb
 import aichecklists.core.designsystem.generated.resources.telegram_linked_snackbar_plain
 import aichecklists.core.designsystem.generated.resources.telegram_open_failed
 import aichecklists.core.designsystem.generated.resources.telegram_pending_not_yet
+import aichecklists.core.designsystem.generated.resources.telegram_reminders_save_failed
 import aichecklists.core.designsystem.generated.resources.telegram_retry
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -81,12 +82,15 @@ fun TelegramRoute(
                         actionLabel = resolved.actionLabel,
                         duration = resolved.duration,
                     )
-                    // The only snackbar action is "Try again" on a failed Connect. The action tap is a
-                    // user gesture, so the synchronous open in [connect] is still allowed on the web.
-                    if (result == SnackbarResult.ActionPerformed &&
-                        effect.message is TelegramSnackbar.ConnectFailed
-                    ) {
-                        connect()
+                    // "Try again" actions. On a failed Connect the action tap is a user gesture, so
+                    // the synchronous open in [connect] is still allowed on the web.
+                    if (result == SnackbarResult.ActionPerformed) {
+                        when (val message = effect.message) {
+                            is TelegramSnackbar.ConnectFailed -> connect()
+                            is TelegramSnackbar.ReminderSaveFailed ->
+                                viewModel.sendIntent(TelegramIntent.ReminderChannelClicked(message.attempted))
+                            else -> Unit // no other snackbar carries an action
+                        }
                     }
                 }
             }
@@ -110,6 +114,10 @@ fun TelegramRoute(
                 TelegramAction.CheckAgainClick -> viewModel.sendIntent(TelegramIntent.CheckAgainClicked)
                 TelegramAction.DisconnectConfirm -> viewModel.sendIntent(TelegramIntent.DisconnectConfirmed)
                 TelegramAction.RetryClick -> viewModel.sendIntent(TelegramIntent.RetryClicked)
+                is TelegramAction.ReminderChannelClick ->
+                    viewModel.sendIntent(TelegramIntent.ReminderChannelClicked(action.target))
+                is TelegramAction.WebReminderClick ->
+                    viewModel.sendIntent(TelegramIntent.WebReminderChannelClicked(action.on))
             }
         },
     )
@@ -148,6 +156,11 @@ suspend fun resolveTelegramSnackbar(message: TelegramSnackbar): ResolvedTelegram
         ResolvedTelegramSnackbar(getString(Res.string.telegram_link_expired), SnackbarDuration.Long)
     TelegramSnackbar.LinkFailed ->
         ResolvedTelegramSnackbar(getString(Res.string.telegram_link_failed), SnackbarDuration.Long)
+    is TelegramSnackbar.ReminderSaveFailed -> ResolvedTelegramSnackbar(
+        text = getString(Res.string.telegram_reminders_save_failed),
+        duration = SnackbarDuration.Long,
+        actionLabel = getString(Res.string.telegram_retry),
+    )
 }
 
 /** Error text per reason — shared by the Error card and the error snackbars. */

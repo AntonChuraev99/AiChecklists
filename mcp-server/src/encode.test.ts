@@ -23,12 +23,16 @@ import {
   wrapValue,
 } from "./encode";
 import {
+  defaultFill,
+  FILL_ITEM_KEYS,
+  TEMPLATE_ITEM_KEYS,
   parseFillItems,
   parseTemplateItems,
   type ChecklistFillItem,
   type ChecklistItem,
   type ChecklistSyncData,
 } from "./model";
+import { addItem, renameItem, toggleItem } from "./mutate";
 
 // ── Golden bytes (from the Kotlin write contract, "Trip" fixture) ────────────────
 
@@ -75,6 +79,8 @@ function fillItem(p: Partial<ChecklistFillItem> & { text: string; id: string; ch
     repeatOccurrenceCount: p.repeatOccurrenceCount ?? 0,
     attachments: p.attachments ?? [],
     templateItemId: p.templateItemId ?? null,
+    reminderFullScreen: p.reminderFullScreen ?? false,
+    alarmEnabled: p.alarmEnabled ?? true,
   };
 }
 
@@ -224,5 +230,94 @@ describe("decode→encode round-trip identity (verbatim pass-through)", () => {
       `"attachments":[{"id":"a1","path":"/local/x.jpg","fileName":"x.jpg","sizeBytes":1234,"createdAt":1720000000000,"storagePath":"cloud/x.jpg"}],` +
       `"templateItemId":"t1"}]`;
     expect(encodeFillItems(parseFillItems(rich))).toBe(rich);
+  });
+});
+
+// ── App fields the encoder must never drop (read-modify-write fidelity) ──────────
+//
+// Every fill write (toggle / note / AI-fill / add / rename …) re-encodes ALL items of the fill, so
+// a key the mirror does not carry is deleted from every item on every write. These pin the two
+// fields ChecklistFillItem gained after this mirror was written (Checklist.kt:227 reminderFullScreen
+// default false, :233 alarmEnabled default TRUE) and the generic keep-unknown-keys guarantee.
+
+const ALARM_FILL_JSON =
+  `[{"text":"Pay rent","checked":false,"id":"a1","reminderAt":1720000000000,"templateItemId":"tA",` +
+  `"reminderFullScreen":true,"alarmEnabled":false},` +
+  `{"text":"Call mom","checked":false,"id":"b1","reminderAt":1720000001000,"templateItemId":"tB",` +
+  `"alarmEnabled":false}]`;
+
+describe("fill item fields added after the mirror (reminderFullScreen, alarmEnabled)", () => {
+  it("parse → encode keeps reminderFullScreen=true and alarmEnabled=false byte-for-byte", () => {
+    expect(encodeFillItems(parseFillItems(ALARM_FILL_JSON))).toBe(ALARM_FILL_JSON);
+  });
+
+  it("toggleItem on one item leaves alarmEnabled/reminderFullScreen intact on every item of the fill", () => {
+    const c: ChecklistSyncData = {
+      ...TRIP_CHECKLIST,
+      fills: [{ ...TRIP_CHECKLIST.fills[0]!, itemsJson: ALARM_FILL_JSON }],
+    };
+    const out = toggleItem(c, "tB", true, 1720000009999);
+    expect(defaultFill(out!)!.itemsJson).toBe(
+      `[{"text":"Pay rent","checked":false,"id":"a1","reminderAt":1720000000000,"templateItemId":"tA",` +
+        `"reminderFullScreen":true,"alarmEnabled":false},` +
+        `{"text":"Call mom","checked":true,"id":"b1","reminderAt":1720000001000,"templateItemId":"tB",` +
+        `"alarmEnabled":false}]`,
+    );
+  });
+
+  it("omits both fields at their Kotlin defaults (reminderFullScreen=false, alarmEnabled=true)", () => {
+    const explicitDefaults =
+      `[{"text":"A","checked":false,"id":"f1","reminderFullScreen":false,"alarmEnabled":true}]`;
+    expect(encodeFillItems(parseFillItems(explicitDefaults))).toBe(`[{"text":"A","checked":false,"id":"f1"}]`);
+  });
+
+  it("a fill item created by mutate carries the defaults and no extra keys", () => {
+    const { checklist, itemId } = addItem(TRIP_CHECKLIST, "Tickets", null, 1720000009999);
+    const added = JSON.parse(defaultFill(checklist)!.itemsJson).at(-1) as Record<string, unknown>;
+    expect(Object.keys(added)).toEqual(["text", "checked", "id", "templateItemId"]);
+    expect(added["templateItemId"]).toBe(itemId);
+  });
+});
+
+describe("keys the mirror does not model survive a read-modify-write", () => {
+  it("fill item: an unknown future key is re-emitted verbatim after the known keys", () => {
+    const future =
+      `[{"text":"X","checked":true,"id":"x1","templateItemId":"tX","alarmEnabled":false,` +
+      `"someFutureField":42,"anotherOne":{"nested":[1,2]}}]`;
+    expect(encodeFillItems(parseFillItems(future))).toBe(future);
+  });
+
+  it("template item: an unknown future key is re-emitted verbatim after the known keys", () => {
+    const future = `[{"text":"T","id":"t9","parentId":"p1","someFutureField":42}]`;
+    expect(encodeTemplateItems(parseTemplateItems(future))).toBe(future);
+  });
+
+  it("the known-key lists match what the encoders emit, in order (parser ↔ encoder drift guard)", () => {
+    // A key in the list that the encoder never writes would be silently dropped: the parser no
+    // longer treats it as `extra`, so nothing re-emits it. Every field set to a non-default value.
+    const allFill = fillItem({
+      text: "t", checked: true, note: "n", id: "i", weekday: 1, priority: 1, reminderAt: 1,
+      repeatRule: { type: "daily" }, repeatTimeOfDayMinutes: 1, repeatNextAt: 1, repeatOccurrenceCount: 1,
+      attachments: [{ id: "a" }], templateItemId: "x", reminderFullScreen: true, alarmEnabled: false,
+    });
+    expect(Object.keys(JSON.parse(encodeFillItems([allFill]))[0])).toEqual([...FILL_ITEM_KEYS]);
+    const allTemplate = templateItem({
+      text: "t", checked: true, id: "i", weekday: 1, priority: 1, type: "FOLDER", parentId: "p",
+    });
+    expect(Object.keys(JSON.parse(encodeTemplateItems([allTemplate]))[0])).toEqual([...TEMPLATE_ITEM_KEYS]);
+  });
+
+  it("template item: renameItem keeps an unknown key on the renamed node and its siblings", () => {
+    const c: ChecklistSyncData = {
+      ...TRIP_CHECKLIST,
+      itemsJson:
+        `[{"text":"Bags","id":"${BAGS}","type":"FOLDER","someFutureField":"x"},` +
+        `{"text":"Passport","id":"${PASSPORT}","parentId":"${BAGS}","someFutureField":1}]`,
+    };
+    const out = renameItem(c, PASSPORT, "ID card", 1720000009999);
+    expect(out!.itemsJson).toBe(
+      `[{"text":"Bags","id":"${BAGS}","type":"FOLDER","someFutureField":"x"},` +
+        `{"text":"ID card","id":"${PASSPORT}","parentId":"${BAGS}","someFutureField":1}]`,
+    );
   });
 });

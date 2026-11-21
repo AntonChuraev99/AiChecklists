@@ -170,9 +170,37 @@ interface ChecklistRepository {
     suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo>
 
     // Independent repeat schedule
+    //
+    // USER edits (setReminder, setReminderFullScreen, setRepeatSchedule, clearRepeatSchedule) mark
+    // the checklist dirty so they reach the cloud. DEVICE bookkeeping run from an alarm or recovery
+    // (advanceRepeatSchedule, clearFiredReminder, clearFinishedRepeatSchedule) must NOT: a
+    // PENDING_UPLOAD row skips the remote snapshot on merge and is then pushed over the cloud copy,
+    // so a background write on a stale row would wipe a newer edit made on web / in the bot / via MCP.
+    // The server computes occurrences itself and does not need this bookkeeping.
     suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long)
     suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int)
     suspend fun clearRepeatSchedule(checklistId: Long)
+
+    /**
+     * Background clear of a one-shot checklist reminder that has just FIRED (alarm receiver).
+     * The real implementation (`ChecklistRepositoryImpl`) writes it LOCAL ONLY — see the block
+     * comment above. User-initiated clears use `setReminder(id, null)`.
+     *
+     * The default body exists ONLY so the many test doubles keep compiling; it delegates to the
+     * syncing [setReminder] and is NOT local-only. Production code always gets the override.
+     */
+    suspend fun clearFiredReminder(checklistId: Long) = setReminder(checklistId, null)
+
+    /**
+     * Background clear of a repeat schedule whose end condition was reached (alarm receiver, boot
+     * recovery). The real implementation writes it LOCAL ONLY. User-initiated removal uses
+     * [clearRepeatSchedule].
+     *
+     * The default body exists ONLY for test doubles; it delegates to the syncing
+     * [clearRepeatSchedule] and is NOT local-only. Production code always gets the override.
+     */
+    suspend fun clearFinishedRepeatSchedule(checklistId: Long) = clearRepeatSchedule(checklistId)
+
     suspend fun resetDefaultFillChecks(checklistId: Long)
     suspend fun countActiveRepeatSchedules(): Int
     suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo>
@@ -245,6 +273,25 @@ interface ChecklistRepository {
     suspend fun getFillCountByChecklistId(checklistId: Long): Int
     suspend fun addFill(fill: ChecklistFill): Long
     suspend fun updateFill(fill: ChecklistFill)
+
+    /**
+     * ALARM-driven fill bookkeeping (item reminder fired: clear the one-shot, advance the item
+     * repeat) written LOCAL ONLY: no PENDING_UPLOAD, no `updatedAt` bump, no parent touch.
+     *
+     * Why: the sync merge SKIPS the remote snapshot for a PENDING_UPLOAD row and then pushes the
+     * local copy over the cloud. A background write that dirtied a stale fill would revert a newer
+     * cloud edit — e.g. «✅ Done» tapped on a Telegram reminder, or items added on web / in the bot
+     * / via MCP. User edits keep using [updateFill].
+     *
+     * Consequence, accepted: a later pull may bring the cloud value of the reminder fields back
+     * (say, an already-fired `reminderAt`). Harmless — the phone treats past times as fired and
+     * does not re-notify them.
+     *
+     * The default body exists ONLY for test doubles; it delegates to the syncing [updateFill] and
+     * is NOT local-only. `ChecklistRepositoryImpl` overrides it.
+     */
+    suspend fun updateFillLocalOnlyFromAlarm(fill: ChecklistFill) = updateFill(fill)
+
     suspend fun deleteFill(fill: ChecklistFill)
 
     /**

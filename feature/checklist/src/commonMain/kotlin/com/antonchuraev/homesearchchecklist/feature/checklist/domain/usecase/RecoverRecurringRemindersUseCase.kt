@@ -50,7 +50,7 @@ class RecoverRecurringRemindersUseCase(
                 ))
             } else {
                 // End condition reached while device was off
-                repository.clearRepeatSchedule(info.id)
+                repository.clearFinishedRepeatSchedule(info.id)
 
                 analyticsTracker?.event(AnalyticsEvents.Reminder.RECURRING_ENDED, mapOf(
                     "checklist_id" to info.id.toString(),

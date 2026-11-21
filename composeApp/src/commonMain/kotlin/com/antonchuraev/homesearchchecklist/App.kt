@@ -281,6 +281,7 @@ import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareSc
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
 import com.antonchuraev.homesearchchecklist.mcp.McpScreen
 import com.antonchuraev.homesearchchecklist.telegram.PendingTelegramLink
+import com.antonchuraev.homesearchchecklist.telegram.ReminderProfileSync
 import com.antonchuraev.homesearchchecklist.telegram.TelegramLinkRepository
 import com.antonchuraev.homesearchchecklist.telegram.TelegramRoute
 import com.antonchuraev.homesearchchecklist.telegram.handleTelegramLinkClaim
@@ -485,6 +486,12 @@ fun App() {
         // cached balance current and shared across web/Android (credits are spent server-side).
         val userCreditsSync: UserCreditsSync = koinInject()
         LaunchedEffect(Unit) { userCreditsSync.start() }
+
+        // Telegram reminders (phase 4): device zone → users/{google_uid} and the reminder-channel
+        // cache ReminderReceiver reads; re-checked on every foreground (ON_START below).
+        val reminderProfileSync: ReminderProfileSync = koinInject()
+        LaunchedEffect(Unit) { reminderProfileSync.start() }
+        LifecycleEventEffect(Lifecycle.Event.ON_START) { reminderProfileSync.onForeground() }
 
         var showWidgetInstruction by remember { mutableStateOf(false) }
         val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase = koinInject()
