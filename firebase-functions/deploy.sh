@@ -358,6 +358,7 @@ gcloud functions deploy on_rc_event_created \
     --trigger-event-filters="database=(default)" \
     --trigger-event-filters="namespace=(default)" \
     --trigger-event-filters-path-pattern="document=rc_events/{eventId}" \
+    --update-env-vars=FUNCTION_SIGNATURE_TYPE=cloudevent \
     --memory=256MB \
     --cpu=1 \
     --timeout=60s
@@ -367,6 +368,9 @@ gcloud functions deploy on_rc_event_created \
 # (trigger location = the nam5 DATABASE region, explicit --cpu=1). 512MB, not 256MB: they import
 # the same main.py module graph as every HTTP endpoint (import-time RSS near 244 MiB, see
 # functions.yaml), and on_checklist_written_tg fires on every checklist write of every user.
+# Third trap: gcloud does not set FUNCTION_SIGNATURE_TYPE for firestore_fn (CloudEvent) triggers,
+# while the Firebase CLI does. Without it functions_framework invokes the function as a legacy
+# background function (data, context), and every event fails with a TypeError.
 # No secrets: Admin SDK only. Redeploy telegram_account + telegram_bot_internal (above) with them —
 # they carry the link/unlink hooks, set_reminder_channel, claim_due_reminders, snooze_reminder.
 echo "Deploying on_checklist_written_tg..."
@@ -381,6 +385,7 @@ gcloud functions deploy on_checklist_written_tg \
     --trigger-event-filters="database=(default)" \
     --trigger-event-filters="namespace=(default)" \
     --trigger-event-filters-path-pattern="document=users/{uid}/checklists/{checklistId}" \
+    --update-env-vars=FUNCTION_SIGNATURE_TYPE=cloudevent \
     --memory=512MB \
     --cpu=1 \
     --timeout=60s
@@ -397,6 +402,7 @@ gcloud functions deploy on_user_settings_written_tg \
     --trigger-event-filters="database=(default)" \
     --trigger-event-filters="namespace=(default)" \
     --trigger-event-filters-path-pattern="document=users/{uid}" \
+    --update-env-vars=FUNCTION_SIGNATURE_TYPE=cloudevent \
     --memory=512MB \
     --cpu=1 \
     --timeout=60s

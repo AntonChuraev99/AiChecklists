@@ -58,6 +58,8 @@ Standards: в каталоге функций AI-чата (`firebase-functions/p
 
 ### Итерация 10 — 2026-11-20 — general-purpose ×2, feature-expert, android-platform-expert: фиксы ревью → бот 216, mcp-server 82, Python 223, Kotlin host-тесты + wasm + `:androidApp:assembleDebug` ok (источник: вывод Gradle в этой сессии)
 FCM data `{"type":"reminder_channel","channel":…}` при смене канала (триггер профиля) → `ReminderChannelPush.kt` пишет кэш; `carry` только для живого неотмеченного пункта с будильником; `snooze_reminder` при выключенном канале → 409 `channel_off`; бухгалтерия пункта — `updateFillLocalOnlyFromAlarm`.
+### Итерация 11 — 2026-11-21 — главный: деплой бэкенда (`firestore.rules`, 2 триггера, `telegram_account`, `telegram_bot_internal`, `chat_completion`, `chat_agent`) + general-purpose: флаг в `deploy.sh`
+Ловушка деплоя: `on_user_settings_written_tg` (выложен ещё 11-20) падал на каждом событии с `TypeError: on_user_settings_written_tg() takes 1 positional argument but 2 were given` (источник: `gcloud functions logs read`). Причина: `gcloud functions deploy` не ставит `FUNCTION_SIGNATURE_TYPE=cloudevent` для триггеров на `firestore_fn`, а Firebase CLI ставит (у `on_rc_event_created` переменная есть), и без неё functions_framework вызывает функцию в legacy-сигнатуре `(data, context)`. Оба триггера выложены заново с `--update-env-vars=FUNCTION_SIGNATURE_TYPE=cloudevent`, после этого вызовы проходят без исключений. В `deploy.sh` флаг добавлен всем трём Firestore-триггерам. Не проверено: живой вызов `on_checklist_written_tg` (записей чек-листов в окне не было).
 
 ## Выводы
 
