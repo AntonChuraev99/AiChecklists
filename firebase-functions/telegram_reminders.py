@@ -1,6 +1,6 @@
 """Telegram reminders (phase 4) — the Firestore half.
 
-Spec: docs/active/telegram-bot-phase4-reminders-2026-11-20.md. The schedule itself (recurrence,
+Spec: docs/archive/telegram-bot-phase4-reminders-2026-11-20.md. The schedule itself (recurrence,
 entry shape, at-most-once rules) is reminder_schedule.py; this module only reads and writes:
 
     users/{google_uid}                     timezone (IANA), reminder_channel push|telegram|both

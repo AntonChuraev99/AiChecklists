@@ -3,7 +3,7 @@
 - **Platform:** Android + Web (the same `commonMain` `TelegramScreen`), Material 3, design system "Soft & tactile". iOS (unreleased) follows the Android copy.
 - **Method:** native
 - **Extends:** `spec.md` in this folder (Telegram screen, 2026-11-19). Everything there stays as is. This addendum adds one section to the **Linked** state, plus one optional line in the Disconnect dialog.
-- **Product input:** `docs/active/telegram-bot-phase4-reminders-2026-11-20.md`. The owner's decisions from 2026-11-20: the channel is per user, `push` | `telegram` | `both`; a missing value means `push`; after linking the channel stays `push`; the user can change it in the bot (`/reminders`) and on this screen.
+- **Product input:** `docs/archive/telegram-bot-phase4-reminders-2026-11-20.md`. The owner's decisions from 2026-11-20: the channel is per user, `push` | `telegram` | `both`; a missing value means `push`; after linking the channel stays `push`; the user can change it in the bot (`/reminders`) and on this screen.
 - **FEATURE_SPEC:** none was provided. The states below are the full set, and `@feature-expert` turns them into the `Linked` fields and actions listed in §6.
 
 > ⛔ **Anti-steering.** This section never mentions Stars, payment, premium or prices. All strings below are checked against that rule.

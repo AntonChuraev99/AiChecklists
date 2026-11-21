@@ -21,7 +21,7 @@ Google account** as the app: same checklists, same AI-credit wallet. Phase 1 (de
 
 ### Reminders (Phase 4)
 
-Plan and log: `docs/active/telegram-bot-phase4-reminders-2026-11-20.md`. The schedule lives on the
+Plan and log: `docs/archive/telegram-bot-phase4-reminders-2026-11-20.md`. The schedule lives on the
 server (`firebase-functions/telegram_reminders.py`, `reminder_schedule.py`); the worker only sends.
 
 - **Cron.** `triggers.crons: ["* * * * *"]` → `scheduled()` calls `claim_due_reminders` (50 per tick,
