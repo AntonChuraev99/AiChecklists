@@ -126,6 +126,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDes
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.core.common.api.isWebOn
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSectionHeader
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSkeletonLine

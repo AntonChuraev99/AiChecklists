@@ -1,27 +1,10 @@
 package com.antonchuraev.homesearchchecklist.core.datastore.api
 
 /**
- * Where the user's reminders are delivered (Telegram bot phase 4). Per USER, not per device: the
- * server stores it in `users/{google_uid}.reminder_channel`, the bot and the Telegram screen change it.
- *
- * [wire] is the server / Firestore value and the persisted format.
+ * The class moved to `core:common:api` so feature modules without a datastore dependency can name
+ * it (reminder sheet). Kept here as an alias so existing callers compile unchanged.
  */
-enum class ReminderChannel(val wire: String) {
-    /** Phone notification only — the default, and what an absent value means. */
-    Push("push"),
-
-    /** Telegram message only: the phone posts NO notification (bookkeeping still runs). */
-    Telegram("telegram"),
-
-    /** Phone notification and Telegram message. */
-    Both("both"),
-    ;
-
-    companion object {
-        /** Null for an absent or unknown value — callers decide what "unknown" means for them. */
-        fun fromWire(value: String?): ReminderChannel? = entries.firstOrNull { it.wire == value }
-    }
-}
+typealias ReminderChannel = com.antonchuraev.homesearchchecklist.core.common.api.ReminderChannel
 
 /**
  * Device-local cache of the reminder delivery settings.

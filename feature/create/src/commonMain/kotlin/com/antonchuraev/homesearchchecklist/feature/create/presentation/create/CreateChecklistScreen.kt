@@ -105,6 +105,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.Remind
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.formatReminderDateTime
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.resolveRepeatSummaryLabel
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.rememberReminderDelivery
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.withDelivery
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -614,6 +617,7 @@ private fun ReminderUi(
     onIntent: (CreateChecklistIntent) -> Unit,
 ) {
     if (state.reminderSheetOpen) {
+        val delivery = rememberReminderDelivery(AnalyticsEvents.Telegram.SURFACE_CREATE)
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = state.activeReminderTab,
@@ -626,7 +630,7 @@ private fun ReminderUi(
                 pendingRepeatConfig = state.pendingRepeatConfig,
                 showEndConditionPicker = state.showEndConditionPicker,
                 isLocked = state.reminderSheetLocked,
-            ),
+            ).withDelivery(delivery),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(CreateChecklistIntent.OnReminderTabSelected(it)) },
                 onPresetSelected = { onIntent(CreateChecklistIntent.OnReminderPresetSelected(it)) },
@@ -645,7 +649,7 @@ private fun ReminderUi(
                 onRemoveRepeat = { onIntent(CreateChecklistIntent.OnRemoveRepeat) },
                 onDismiss = { onIntent(CreateChecklistIntent.OnDismissReminderUI) },
                 onUpgradeClick = { onIntent(CreateChecklistIntent.OnReminderUpgradeClick) },
-            ),
+            ).withDelivery(delivery),
         )
     }
 

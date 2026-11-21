@@ -88,6 +88,12 @@ private class FakeHintsRepository(
     override suspend fun incrementSyncBannerDismissCount() {
         _dismissCount.value += 1
     }
+
+    private val _telegramPromoRetired = MutableStateFlow(false)
+    override val telegramPromoRetired: Flow<Boolean> = _telegramPromoRetired
+    override suspend fun markTelegramPromoRetired() {
+        _telegramPromoRetired.value = true
+    }
 }
 
 private class FakeGoogleAuthRepository(

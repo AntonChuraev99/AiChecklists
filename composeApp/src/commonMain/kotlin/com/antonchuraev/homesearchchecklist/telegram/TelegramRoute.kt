@@ -42,11 +42,13 @@ private const val TAG = "Telegram"
  * user gesture is blocked as a popup, and a VM side effect arrives on a later tick. The outcome is
  * reported back as [TelegramIntent.UrlOpened].
  *
+ * @param source entry point for `telegram_screen_opened` (`AnalyticsEvents.Telegram.SCREEN_SOURCE_*`).
  * @param onSignInClick the app's Google sign-in (`handleSignIn` in App.kt); its progress and result
  *   reach the VM through the auth state, not through this callback.
  */
 @Composable
 fun TelegramRoute(
+    source: String,
     onBack: () -> Unit,
     onSignInClick: () -> Unit,
 ) {
@@ -66,7 +68,7 @@ fun TelegramRoute(
         if (link != null) openNow(link, TelegramUrlPurpose.Connect)
     }
 
-    LaunchedEffect(Unit) { viewModel.sendIntent(TelegramIntent.ScreenEntered) }
+    LaunchedEffect(Unit) { viewModel.sendIntent(TelegramIntent.ScreenEnteredFrom(source)) }
     LifecycleResumeEffect(Unit) {
         viewModel.sendIntent(TelegramIntent.ScreenResumed)
         onPauseOrDispose { viewModel.sendIntent(TelegramIntent.ScreenPaused) }

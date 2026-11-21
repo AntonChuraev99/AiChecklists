@@ -3,7 +3,6 @@ package com.antonchuraev.homesearchchecklist.telegram
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
-import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderDeliveryPrefsRepository
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountApiService
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountError
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountResult
@@ -35,31 +34,44 @@ interface TelegramLinkRepository {
 }
 
 /**
- * Besides the HTTP calls, this is the single writer of the device's reminder-channel cache
- * ([ReminderDeliveryPrefsRepository]): every successful `status`, `unlink` and `set_reminder_channel`
- * updates it, whoever made the call (the Telegram screen, the app-foreground refresh).
+ * Besides the HTTP calls, this is the single writer of the device's Telegram caches
+ * ([TelegramLinkCacheWriter]: the reminder channel for `ReminderReceiver`, the per-account link
+ * snapshot behind `TelegramReminderLink.telegramLink`, the promo `retired` flag). Every successful
+ * `status`, `claim`, `unlink` and `set_reminder_channel` updates them, whoever made the call (the
+ * Telegram screen, the `?tg_link` claim handler, the app-foreground refresh, the reminder sheet).
+ * A failed call writes nothing: the cache keeps the last known state (or stays empty → Unknown).
  */
 internal class TelegramLinkRepositoryImpl(
     private val api: TelegramAccountApiService,
     private val authRepository: GoogleAuthRepository,
     private val userDataRepository: UserDataRepository,
-    private val reminderPrefs: ReminderDeliveryPrefsRepository,
+    private val cacheWriter: TelegramLinkCacheWriter,
     private val deviceTimeZone: DeviceTimeZoneProvider,
     private val logger: AppLogger,
 ) : TelegramLinkRepository {
 
-    override suspend fun status() = withToken("status") { api.status(it) }
-        .also { if (it is TelegramAccountResult.Success) cacheChannel(cachedChannelFor(it.value)) }
+    override suspend fun status(): TelegramAccountResult<TelegramLinkStatus> {
+        val account = currentAccountId()
+        return withToken("status") { api.status(it) }
+            .also { if (it is TelegramAccountResult.Success) cacheWriter.onStatus(account, it.value) }
+    }
 
     override suspend fun createToken() = withToken("create_token") { api.createToken(it, creditUserId()) }
 
-    override suspend fun claim(token: String) = withToken("claim") { api.claim(it, token, creditUserId()) }
+    override suspend fun claim(token: String): TelegramAccountResult<TelegramLinkStatus.Linked> {
+        val account = currentAccountId()
+        return withToken("claim") { api.claim(it, token, creditUserId()) }
+            .also { if (it is TelegramAccountResult.Success) cacheWriter.onClaimed(account, it.value) }
+    }
 
-    override suspend fun unlink() = withToken("unlink") { api.unlink(it) }
-        // The server resets the channel to push on unlink; mirror it so the phone notifies again.
-        .also { if (it is TelegramAccountResult.Success) cacheChannel(ReminderChannel.Push) }
+    override suspend fun unlink(): TelegramAccountResult<Unit> {
+        val account = currentAccountId()
+        return withToken("unlink") { api.unlink(it) }
+            .also { if (it is TelegramAccountResult.Success) cacheWriter.onUnlinked(account) }
+    }
 
     override suspend fun setReminderChannel(channel: ReminderChannel): TelegramAccountResult<ReminderChannel> {
+        val account = currentAccountId()
         val zone = deviceTimeZone.ianaZoneId()
         var result = withToken("set_reminder_channel") { api.setReminderChannel(it, channel, zone) }
         val failure = (result as? TelegramAccountResult.Failure)?.error
@@ -71,21 +83,12 @@ internal class TelegramLinkRepositoryImpl(
             logger.warning(TAG, "set_reminder_channel: server rejected zone '$zone', retrying without it")
             result = withToken("set_reminder_channel") { api.setReminderChannel(it, channel, null) }
         }
-        if (result is TelegramAccountResult.Success) cacheChannel(result.value)
+        if (result is TelegramAccountResult.Success) cacheWriter.onChannelSaved(account, result.value)
         return result
     }
 
-    private suspend fun cacheChannel(channel: ReminderChannel) {
-        try {
-            reminderPrefs.setReminderChannel(channel)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // The server call itself succeeded; a stale cache only affects the next reminder on
-            // this phone and is corrected by the next status refresh.
-            logger.error(TAG, "reminder channel cache write failed: ${e.message}", e)
-        }
-    }
+    /** Firebase uid of the account a request is made for — captured before the request. */
+    private fun currentAccountId(): String? = authRepository.currentUser?.firebaseUid?.takeIf { it.isNotBlank() }
 
     /** The credit-doc id (USER_ID_KEY); the server prefers it among the docs carrying this google_uid. */
     private suspend fun creditUserId(): String? =

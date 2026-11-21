@@ -105,7 +105,7 @@ sealed interface TelegramAction {
 
     /**
      * Web reminder row tapped: [on] = "Send to Telegram", false = "Don't send to Telegram". The VM
-     * resolves the stored value ([webReminderTarget]); the UI never picks `both` / `push` itself.
+     * resolves the stored value (`core.common.api.webReminderTarget`); the UI never picks `both` / `push` itself.
      */
     data class WebReminderClick(val on: Boolean) : TelegramAction
 }
@@ -117,22 +117,6 @@ sealed interface TelegramAction {
  */
 val TelegramScreenState.Linked.displayedReminderChannel: ReminderChannel?
     get() = channelSaving ?: reminderChannel
-
-/** Web: row 1 "Send to Telegram" is selected for `telegram` and `both`, row 2 for `push`. */
-fun ReminderChannel.isWebOn(): Boolean = this != ReminderChannel.Push
-
-/**
- * Web mapping (addendum §2.1): what a tap on a web row writes, given the [current] displayed value.
- * - on + `push` → `both` (never `telegram`: the channel is per user and `telegram` would silently
- *   mute the user's phone from a screen that does not mention phones);
- * - on + `telegram`/`both` → null (row already selected, no request);
- * - off + `telegram`/`both` → `push`; off + `push` → null (already selected).
- */
-fun webReminderTarget(current: ReminderChannel, on: Boolean): ReminderChannel? = when {
-    on && current == ReminderChannel.Push -> ReminderChannel.Both
-    !on && current != ReminderChannel.Push -> ReminderChannel.Push
-    else -> null
-}
 
 /** Why an external URL is being opened — the VM reacts to the outcome differently per purpose. */
 enum class TelegramUrlPurpose {
@@ -147,8 +131,14 @@ enum class TelegramUrlPurpose {
 }
 
 sealed interface TelegramIntent : Intent {
-    /** The screen entered composition (every push of the route). Re-entry starts with Loading. */
+    /**
+     * The screen entered composition (every push of the route). Re-entry starts with Loading.
+     * Sends `telegram_screen_opened` without a `source`; the app host sends [ScreenEnteredFrom].
+     */
     data object ScreenEntered : TelegramIntent
+
+    /** [ScreenEntered] with the entry point (`AnalyticsEvents.Telegram.SCREEN_SOURCE_*`) for analytics. */
+    data class ScreenEnteredFrom(val source: String) : TelegramIntent
 
     /** Lifecycle ON_RESUME: the screen is visible — refresh, run the poll / token refresh. */
     data object ScreenResumed : TelegramIntent
@@ -179,7 +169,7 @@ sealed interface TelegramIntent : Intent {
      */
     data class ReminderChannelClicked(val target: ReminderChannel) : TelegramIntent
 
-    /** Web row tapped; resolved through [webReminderTarget]. */
+    /** Web row tapped; resolved through `core.common.api.webReminderTarget`. */
     data class WebReminderChannelClicked(val on: Boolean) : TelegramIntent
 }
 

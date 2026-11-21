@@ -183,6 +183,11 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToOnboardings() = push(AppNavRoute.Onboardings)
 
+    // `is`, not `==`: a second tap from a different door must not stack a second Telegram screen.
+    override fun navigateToTelegram(source: String) {
+        if (backStack.lastOrNull() !is AppNavRoute.Telegram) backStack.add(AppNavRoute.Telegram(source))
+    }
+
     override fun navigateToAddToChecklistPicker(text: String, purpose: AddToChecklistPurpose) =
         push(AppNavRoute.AddToChecklistPicker(text, purpose))
 

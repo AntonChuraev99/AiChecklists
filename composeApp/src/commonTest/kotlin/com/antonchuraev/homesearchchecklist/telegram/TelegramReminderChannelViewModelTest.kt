@@ -6,6 +6,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.isWebOn
+import com.antonchuraev.homesearchchecklist.core.common.api.webReminderTarget
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountError
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountResult
@@ -177,6 +179,21 @@ class TelegramReminderChannelViewModelTest {
         vm.onIntent(TelegramIntent.ReminderChannelClicked(ReminderChannel.Telegram))
         runCurrent()
         assertEquals(ReminderChannel.Telegram, vm.linkedState().reminderChannel)
+    }
+
+    @Test
+    fun failedEvent_carriesTheFailedRequestsChannel_notTheTapWaitingBehindIt() = runTest(dispatcher) {
+        val (vm, _) = openLinked(ReminderChannel.Push)
+        val first = gate()
+        vm.onIntent(TelegramIntent.ReminderChannelClicked(ReminderChannel.Telegram))
+        runCurrent()
+        vm.onIntent(TelegramIntent.ReminderChannelClicked(ReminderChannel.Both))
+        first.complete(TelegramAccountResult.Failure(TelegramAccountError.Server(500, null)))
+        runCurrent()
+        assertEquals(
+            listOf<Map<String, Any>>(mapOf("channel" to "telegram", "source" to "app", "reason" to "server")),
+            analytics.params(AnalyticsEvents.Telegram.REMINDER_CHANNEL_SET_FAILED),
+        )
     }
 
     @Test

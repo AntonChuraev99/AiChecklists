@@ -279,6 +279,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.Remind
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.formatReminderDateTime
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.rememberReminderDelivery
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.withDelivery
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.notif_granted_snackbar
 import aichecklists.core.designsystem.generated.resources.*
@@ -2210,6 +2213,7 @@ private fun ChecklistDetailContent(
 
     // Unified reminder / repeat bottom sheet with tabs
     if (state.showReminderSheet) {
+        val delivery = rememberReminderDelivery(AnalyticsEvents.Telegram.SURFACE_CHECKLIST)
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = state.activeReminderTab,
@@ -2221,7 +2225,7 @@ private fun ChecklistDetailContent(
                 isLocked = state.reminderSheetLocked,
                 showFullScreenOption = true,
                 fullScreenEnabled = state.checklist.reminderFullScreen,
-            ),
+            ).withDelivery(delivery),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnReminderTabSelected(it)) },
                 onPresetSelected = { onIntent(ChecklistDetailIntent.OnReminderPresetSelected(it)) },
@@ -2242,7 +2246,7 @@ private fun ChecklistDetailContent(
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnReminderUpgradeClick) },
                 onFullScreenToggled = { onIntent(ChecklistDetailIntent.OnChecklistReminderFullScreenToggled(it)) },
-            )
+            ).withDelivery(delivery)
         )
     }
 
@@ -2251,6 +2255,7 @@ private fun ChecklistDetailContent(
         state.defaultFill?.items?.firstOrNull { it.id == id }
     }
     if (state.itemReminderSheetFor != null) {
+        val delivery = rememberReminderDelivery(AnalyticsEvents.Telegram.SURFACE_ITEM)
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = state.activeItemReminderTab,
@@ -2265,7 +2270,7 @@ private fun ChecklistDetailContent(
                 isLocked = state.itemReminderSheetLocked,
                 showFullScreenOption = true,
                 fullScreenEnabled = state.itemReminderFullScreen,
-            ),
+            ).withDelivery(delivery),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnItemReminderTabSelected(it)) },
                 onPresetSelected = { triggerAt ->
@@ -2313,7 +2318,7 @@ private fun ChecklistDetailContent(
                 onFullScreenToggled = { onIntent(ChecklistDetailIntent.OnItemReminderFullScreenToggled(it)) },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnItemReminderUpgradeClick) },
-            )
+            ).withDelivery(delivery)
         )
     }
 
@@ -2322,6 +2327,7 @@ private fun ChecklistDetailContent(
     // of persisting to an existing item. The ONCE tab stays functional (one-shot reminder for the new
     // item) so neither tab is dead.
     if (state.itemCreateRepeatSheetOpen) {
+        val delivery = rememberReminderDelivery(AnalyticsEvents.Telegram.SURFACE_DRAFT)
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = state.activeReminderTab,
@@ -2331,7 +2337,7 @@ private fun ChecklistDetailContent(
                 pendingRepeatConfig = state.pendingRepeatConfig,
                 showEndConditionPicker = state.showEndConditionPicker,
                 isLocked = state.itemCreateRepeatSheetLocked,
-            ),
+            ).withDelivery(delivery),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnItemCreateRepeatTabSelected(it)) },
                 onPresetSelected = { triggerAt -> onIntent(ChecklistDetailIntent.OnItemCreateReminderSet(triggerAt)) },
@@ -2350,7 +2356,7 @@ private fun ChecklistDetailContent(
                 onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnItemCreateRepeatRemoved) },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemCreateRepeatSheet) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnReminderUpgradeClick) },
-            )
+            ).withDelivery(delivery)
         )
     }
 

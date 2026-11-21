@@ -31,6 +31,9 @@ val homeFeatureModule = module {
             datastore = get(),
             notificationsBannerSession = get(),
             activationCoordinator = get(),
+            telegramLink = get(),
+            hintsRepository = get(),
+            telegramPromoPrefs = get(),
         )
     }
     // v2 Projects tab. Registered unconditionally for the same reason as InboxViewModel: the entry
