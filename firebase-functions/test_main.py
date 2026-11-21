@@ -607,7 +607,9 @@ class TestUsageLimits:
                     with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
                         with patch.object(main, "call_gemini") as mock_gemini:
                             mock_response = MagicMock()
-                            mock_response.text = '{"filled_items": [], "summary": "ok", "confidence": 0.9}'
+                            # A non-empty result: an empty one is now `nothing_found` (422, refunded),
+                            # which is not what this premium-daily-limit test is about.
+                            mock_response.text = '{"filled_items": [{"index": 1, "text": "item1", "checked": true}], "summary": "ok", "confidence": 0.9}'
                             mock_gemini.return_value = mock_response
                             with patch.object(main, "increment_usage"):
                                 with app.test_request_context():

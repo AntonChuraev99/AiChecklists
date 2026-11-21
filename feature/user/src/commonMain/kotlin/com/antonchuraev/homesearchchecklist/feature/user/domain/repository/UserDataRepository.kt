@@ -14,6 +14,25 @@ interface UserDataRepository {
     suspend fun update(userData: UserData)
 
     /**
+     * Writes ONLY the onboarding flag. Use this instead of [update] for flag-only changes:
+     * [update] overwrites credits and premium too, so a `UserData(isOnboardingPassed = true)`
+     * built from defaults wiped a freshly registered balance to 0 for the whole first session.
+     * The default (read-modify-write) keeps test fakes compiling; the real impl writes one key.
+     */
+    suspend fun setOnboardingPassed(passed: Boolean) {
+        update(getUserData().copy(isOnboardingPassed = passed))
+    }
+
+    /**
+     * Writes ONLY the AI-credit balance (the server's post-action balance). Same reason as
+     * [setOnboardingPassed]: [update] from a snapshot taken before a long-running analysis would
+     * overwrite premium / onboarding with stale values. Default keeps test fakes compiling.
+     */
+    suspend fun setAiCredits(credits: Int) {
+        update(getUserData().copy(aiCredits = credits))
+    }
+
+    /**
      * Ensures the user is registered with the server.
      * If the user is already registered locally, syncs with server.
      * If not, registers with the server using device ID and saves the result.

@@ -61,3 +61,15 @@ def sanitize_generated_items(items, max_depth=MAX_FOLDER_DEPTH, max_total=MAX_GE
         return result
 
     return walk(items, 0)
+
+
+def has_leaf_item(items) -> bool:
+    """True when a sanitized item tree holds at least one checkable (non-folder) item.
+
+    generate_checklist refunds a result without one: a tree of empty folders gives the user a
+    checklist with nothing to check, which is as empty as an empty list.
+    """
+    for node in items or []:
+        if node.get("type") != "folder" or has_leaf_item(node.get("children")):
+            return True
+    return False

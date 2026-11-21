@@ -94,16 +94,27 @@ class FirebaseAiServiceImpl(
         checklist: Checklist,
         inputType: AiInputType,
         inputData: String
+    ): Result<AiServiceResponse<FillChecklistResult>> =
+        analyzeAndFillChecklist(userId, isPremium, checklist, inputType, inputData, requestId = null)
+
+    override suspend fun analyzeAndFillChecklist(
+        userId: String,
+        isPremium: Boolean,
+        checklist: Checklist,
+        inputType: AiInputType,
+        inputData: String,
+        requestId: String?,
     ): Result<AiServiceResponse<FillChecklistResult>> = aiRunCatching {
         logger.debug(TAG, "analyzeAndFillChecklist: userId=${userId.take(8)}..., checklistId=${checklist.id}, inputType=$inputType")
 
         val request = FillChecklistRequest(
             userId = userId,
             isPremium = isPremium,
-            // Idempotency key generated ONCE here. HttpRequestRetry re-sends the SAME request
-            // body on a transport-drop retry, so the server sees an identical request_id and
-            // dedups the credit reservation (no double-charge). See reserve_credits (server).
-            requestId = newRequestId(),
+            // Idempotency key: the background job's id (same on every attempt of that job), or one
+            // generated ONCE here. HttpRequestRetry re-sends the SAME request body on a
+            // transport-drop retry, so the server sees an identical request_id and dedups the
+            // credit reservation (no double-charge). See reserve_credits (server).
+            requestId = requestId ?: newRequestId(),
             checklist = ChecklistDto(
                 id = checklist.id,
                 name = checklist.name,
@@ -145,10 +156,11 @@ class FirebaseAiServiceImpl(
                 aiFlow = responseBody.aiFlow,
             )
         } else {
-            logger.error(TAG, "analyzeAndFillChecklist: FAILED - ${responseBody.error}")
+            logger.error(TAG, "analyzeAndFillChecklist: FAILED - ${responseBody.error} (code=${responseBody.errorCode})")
             AiServiceResponse(
                 success = false,
-                error = responseBody.error ?: "Unknown error"
+                error = responseBody.error ?: "Unknown error",
+                errorCode = responseBody.errorCode,
             )
         }
     }
@@ -159,6 +171,16 @@ class FirebaseAiServiceImpl(
         prompt: String,
         inputType: AiInputType,
         inputData: String?
+    ): Result<AiServiceResponse<GenerateChecklistResult>> =
+        generateChecklist(userId, isPremium, prompt, inputType, inputData, requestId = null)
+
+    override suspend fun generateChecklist(
+        userId: String,
+        isPremium: Boolean,
+        prompt: String,
+        inputType: AiInputType,
+        inputData: String?,
+        requestId: String?,
     ): Result<AiServiceResponse<GenerateChecklistResult>> = aiRunCatching {
         logger.debug(TAG, "generateChecklist: userId=${userId.take(8)}..., inputType=$inputType, promptLength=${prompt.length}")
 
@@ -166,7 +188,7 @@ class FirebaseAiServiceImpl(
             userId = userId,
             isPremium = isPremium,
             // See analyzeAndFillChecklist: stable idempotency key, reused across retries.
-            requestId = newRequestId(),
+            requestId = requestId ?: newRequestId(),
             prompt = prompt,
             inputType = inputType.toApiString(),
             inputData = inputData
@@ -210,12 +232,28 @@ class FirebaseAiServiceImpl(
                 aiFlow = responseBody.aiFlow,
             )
         } else {
-            logger.error(TAG, "generateChecklist: FAILED - ${responseBody.error}")
+            logger.error(TAG, "generateChecklist: FAILED - ${responseBody.error} (code=${responseBody.errorCode})")
             AiServiceResponse(
                 success = false,
-                error = responseBody.error ?: "Unknown error"
+                error = responseBody.error ?: "Unknown error",
+                errorCode = responseBody.errorCode,
             )
         }
+    }
+
+    override suspend fun getCreditsInfo(userId: String): Result<CreditsInfo> = aiRunCatching {
+        val response: HttpResponse = httpClient.post("$baseUrl/get_credits_info") {
+            contentType(ContentType.Application.Json)
+            setBody(CreditsInfoRequest(userId = userId))
+        }
+        response.throwIfHttpError()
+        val body = response.body<CreditsInfoResponseDto>()
+        val cost = body.config?.actionCost
+        if (!body.success || cost == null || cost <= 0) {
+            throw IllegalStateException("get_credits_info returned no action_cost: ${body.error}")
+        }
+        logger.debug(TAG, "getCreditsInfo: action_cost=$cost")
+        CreditsInfo(actionCost = cost, userCredits = body.userCredits)
     }
 
     override suspend fun getUsageStats(
@@ -300,13 +338,7 @@ class FirebaseAiServiceImpl(
     @OptIn(ExperimentalUuidApi::class)
     private fun newRequestId(): String = Uuid.random().toString()
 
-    private fun AiInputType.toApiString(): String = when (this) {
-        AiInputType.TEXT -> "text"
-        AiInputType.URL -> "url"
-        AiInputType.IMAGE_BASE64 -> "image_base64"
-        AiInputType.AUDIO_BASE64 -> "audio_base64"
-        AiInputType.NONE -> "none"
-    }
+    private fun AiInputType.toApiString(): String = wire
 
     private fun UsageDto.toUsageInfo() = UsageInfo(
         count = today ?: count ?: 0,
@@ -350,17 +382,22 @@ class FirebaseAiServiceImpl(
     private suspend fun HttpResponse.throwIfHttpError() {
         if (status.isSuccess()) return
         val bodyText = runCatching { bodyAsText() }.getOrNull()
-        val serverError = bodyText
-            ?.let { runCatching { json.decodeFromString(ErrorEnvelopeDto.serializer(), it).error }.getOrNull() }
-            ?: bodyText?.take(MAX_ERROR_BODY_CHARS)
-        logger.error(TAG, "HTTP ${status.value} from AI function: ${serverError ?: "<no body>"}")
-        throw AiAnalyzeError.Http(status.value, serverError)
+        val envelope = bodyText
+            ?.let { runCatching { json.decodeFromString(ErrorEnvelopeDto.serializer(), it) }.getOrNull() }
+        val serverError = envelope?.error ?: bodyText?.take(MAX_ERROR_BODY_CHARS)
+        logger.error(TAG, "HTTP ${status.value} from AI function (code=${envelope?.errorCode}): ${serverError ?: "<no body>"}")
+        throw AiAnalyzeError.Http(status.value, serverError, envelope?.errorCode)
     }
 }
 
 /** Minimal envelope to extract the server `error` field from any non-2xx JSON body (both flows). */
 @Serializable
-private data class ErrorEnvelopeDto(val error: String? = null)
+private data class ErrorEnvelopeDto(
+    val error: String? = null,
+    // Machine twin of `error` (input_too_large / nothing_found / invalid_input /
+    // unsupported_input_type). Absent on older servers → null → classified by status + message.
+    @SerialName("error_code") val errorCode: String? = null,
+)
 
 // ============================================================================
 // DTOs for API communication
@@ -393,6 +430,7 @@ private data class ItemDto(
 private data class FillChecklistResponseDto(
     val success: Boolean,
     val error: String? = null,
+    @SerialName("error_code") val errorCode: String? = null,
     @SerialName("filled_items") val filledItems: List<FilledItemDto>? = null,
     val summary: String? = null,
     val confidence: Float? = null,
@@ -427,6 +465,7 @@ private data class GenerateChecklistRequest(
 private data class GenerateChecklistResponseDto(
     val success: Boolean,
     val error: String? = null,
+    @SerialName("error_code") val errorCode: String? = null,
     @SerialName("checklist_name") val checklistName: String? = null,
     val items: List<GenItemDto>? = null,
     val summary: String? = null,
@@ -438,6 +477,24 @@ private data class GenerateChecklistResponseDto(
     @SerialName("model_variant") val modelVariant: String? = null,
     @SerialName("model_id") val modelId: String? = null,
     @SerialName("ai_flow") val aiFlow: String? = null,
+)
+
+@Serializable
+private data class CreditsInfoRequest(
+    @SerialName("user_id") val userId: String,
+)
+
+@Serializable
+private data class CreditsInfoResponseDto(
+    val success: Boolean = false,
+    val error: String? = null,
+    val config: CreditsConfigDto? = null,
+    @SerialName("user_credits") val userCredits: Int? = null,
+)
+
+@Serializable
+private data class CreditsConfigDto(
+    @SerialName("action_cost") val actionCost: Int? = null,
 )
 
 @Serializable

@@ -41,6 +41,8 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(projects.core.filepicker.api)
             implementation(projects.core.remoteconfig.api)
+            // AnalysisJobStore persists background analysis jobs in one DataStore key.
+            implementation(projects.core.datastore.api)
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)
@@ -87,6 +89,15 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
+            // Background analysis: AnalysisWorker + WorkManagerAnalysisJobLauncher. WorkManager is
+            // built lazily through the Application's Configuration.Provider (the androidx.startup
+            // WorkManagerInitializer is removed in the androidApp manifest) — never call the no-arg
+            // WorkManager.getInstance().
+            implementation(libs.workmanager)
+            // AndroidImageDownscaler: EXIF orientation of the picked photo.
+            implementation(libs.androidx.exifinterface)
+            // ProcessLifecycleAppForegroundMonitor.
+            implementation(libs.androidx.lifecycle.process)
         }
 
         val iosMain by creating {

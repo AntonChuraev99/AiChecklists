@@ -17,6 +17,14 @@ data class AiServiceResponse<T>(
     val modelVariant: String? = null,
     val modelId: String? = null,
     val aiFlow: String? = null,
+    /** Machine-readable `error_code` of a failed response; null on success and on older servers. */
+    val errorCode: String? = null,
+)
+
+/** `get_credits_info`: what one Analyze run costs on the server right now. */
+data class CreditsInfo(
+    val actionCost: Int,
+    val userCredits: Int?,
 )
 
 data class UsageInfo(
@@ -78,12 +86,18 @@ data class GenerateChecklistResult(
 /**
  * Input types supported by the AI service.
  */
-enum class AiInputType {
-    TEXT,
-    URL,
-    IMAGE_BASE64,
-    AUDIO_BASE64,
-    NONE
+enum class AiInputType(
+    /** Value of `input_type` on the wire. Change only together with the Cloud Function. */
+    val wire: String,
+) {
+    TEXT("text"),
+    URL("url"),
+    IMAGE_BASE64("image_base64"),
+    AUDIO_BASE64("audio_base64"),
+
+    /** Base64 of the PDF file bytes; the server sends it to the model as `application/pdf`. */
+    PDF_BASE64("pdf_base64"),
+    NONE("none"),
 }
 
 /**
@@ -142,6 +156,39 @@ interface FirebaseAiService {
         inputType: AiInputType = AiInputType.NONE,
         inputData: String? = null
     ): Result<AiServiceResponse<GenerateChecklistResult>>
+
+    /**
+     * [analyzeAndFillChecklist] with a caller-owned idempotency key. A background job passes its id
+     * on every attempt so the server reserves credits once per job; null = a fresh key per call.
+     * The default ignores the key so test doubles keep compiling; the real service overrides it.
+     */
+    suspend fun analyzeAndFillChecklist(
+        userId: String,
+        isPremium: Boolean,
+        checklist: Checklist,
+        inputType: AiInputType,
+        inputData: String,
+        requestId: String?,
+    ): Result<AiServiceResponse<FillChecklistResult>> =
+        analyzeAndFillChecklist(userId, isPremium, checklist, inputType, inputData)
+
+    /** [generateChecklist] with a caller-owned idempotency key; see the fill overload. */
+    suspend fun generateChecklist(
+        userId: String,
+        isPremium: Boolean,
+        prompt: String,
+        inputType: AiInputType,
+        inputData: String?,
+        requestId: String?,
+    ): Result<AiServiceResponse<GenerateChecklistResult>> =
+        generateChecklist(userId, isPremium, prompt, inputType, inputData)
+
+    /**
+     * `get_credits_info`: the server's current `action_cost` (Remote Config on the server). Never
+     * hardcode the cost on the client. Default = unsupported, for test doubles.
+     */
+    suspend fun getCreditsInfo(userId: String): Result<CreditsInfo> =
+        Result.failure(UnsupportedOperationException("getCreditsInfo is not implemented by this service"))
 
     /**
      * Get user's AI usage statistics.

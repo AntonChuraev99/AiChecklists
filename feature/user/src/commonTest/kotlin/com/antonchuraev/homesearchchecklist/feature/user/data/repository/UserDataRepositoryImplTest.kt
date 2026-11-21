@@ -16,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RestoreCred
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.LinkGoogleAccountResult
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -760,6 +761,35 @@ class UserDataRepositoryImplTest {
             repo.getFirstLaunchAtMillis(),
             "An existing first_launch_at must survive every later start untouched",
         )
+    }
+
+    // ============================================
+    // CompleteOnboardingUseCase — must not touch credits / premium
+    // ============================================
+
+    /**
+     * Repro (2026-11-20): fresh install, `register_user` saves ai_credits=100, then the user
+     * finishes onboarding and the whole first session shows 0 credits until a cold restart
+     * re-syncs from the server. Completing onboarding must flip ONLY the onboarding flag.
+     */
+    @Test
+    fun completeOnboardingKeepsRegisteredCreditsAndPremium() = runTest {
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "fresh-user-1"),
+            booleans = mapOf("is_onboarding_passed" to false, "is_premium" to true),
+            ints = mapOf("ai_credits" to 100),
+        )
+        val repo = createRepository(datastore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        CompleteOnboardingUseCase(repo)()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val after = repo.getUserData()
+        assertTrue(after.isOnboardingPassed, "onboarding flag must be set")
+        assertEquals(100, after.aiCredits, "completing onboarding wiped the registered AI credits")
+        assertTrue(after.isPremium, "completing onboarding wiped premium")
+        assertEquals("fresh-user-1", after.userId)
     }
 
     // ============================================

@@ -9,15 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Delete
@@ -25,12 +22,14 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +40,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
+import kotlinx.coroutines.delay
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
@@ -71,7 +92,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalUuidApi::class)
 @Composable
 fun AnalyzeScreen(
     checklistId: Long? = null,
@@ -102,6 +123,16 @@ fun AnalyzeScreen(
 
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
+    // Visit lifecycle for the background analysis: the token survives rotation (same visit) and is
+    // new after this entry was popped and pushed again (new visit → fresh form, see AnalyzeViewModel).
+    // Leaving composition detaches the screen, so a finished job is delivered by the app snackbar
+    // instead of yanking the user back here.
+    val visitToken = rememberSaveable { Uuid.random().toString() }
+    DisposableEffect(viewModel, visitToken) {
+        viewModel.sendIntent(AnalyzeJobIntent.OnScreenEntered(visitToken))
+        onDispose { viewModel.sendIntent(AnalyzeJobIntent.OnScreenLeft) }
+    }
+
     // Opened ON a material → open that material's picker, don't ask for the material a second time.
     // The capture dock's "Photo" pill already said what the source is; the "Choose Photo" button
     // underneath is then a tap for a decision the user has already made.
@@ -124,11 +155,28 @@ fun AnalyzeScreen(
         },
     )
 
+    // Owner decision 3: ask for notifications once, when the first analysis starts. The system dialog
+    // goes up after the first Waiting frame (the screen is drawn under it, no artificial delay); the
+    // dock shows the rationale until the answer arrives. The analysis runs whatever the answer.
+    val requestNotificationPermission = rememberAnalyzeNotificationPermissionRequest { granted ->
+        viewModel.sendIntent(AnalyzeJobIntent.OnNotificationPermissionResult(granted))
+    }
+    val currentRequest by rememberUpdatedState(requestNotificationPermission)
+    LaunchedEffect(screenState.askNotificationPermission) {
+        if (screenState.askNotificationPermission) {
+            withFrameNanos { }
+            currentRequest()
+        }
+    }
+
     AnalyzeScreenContent(
         screenState = screenState,
         onIntent = viewModel::sendIntent,
     )
 }
+
+/** On-screen time after which the Waiting subtitle switches once to "Large files can take up to a minute". */
+internal const val SLOW_WAITING_HINT_AFTER_MS = 15_000L
 
 /**
  * Stateless Analyze screen: top bar, bottom CTA, body and error dialog, rendered from [screenState]
@@ -137,11 +185,13 @@ fun AnalyzeScreen(
  * [AnalyzeScreen] is the production caller and passes its ViewModel's `sendIntent`; this entry exists
  * so the screen can be drawn from fixed state (store-listing screenshots) without Koin.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class, ExperimentalTime::class)
 @Composable
 fun AnalyzeScreenContent(
     screenState: AnalyzeScreenState,
     onIntent: (AnalyzeScreenIntent) -> Unit,
+    /** Previews pass 0 to draw the "slow" Waiting subtitle without waiting 15 s. */
+    slowWaitingHintAfterMs: Long = SLOW_WAITING_HINT_AFTER_MS,
 ) {
     val title = if (screenState.isFillMode) {
         stringResource(Res.string.analyze_fill_title)
@@ -150,124 +200,133 @@ fun AnalyzeScreenContent(
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val phase = screenState.jobPhase
+
+    // The Waiting subtitle switches ONCE to "Large files can take up to a minute" after 15 s on screen.
+    // The phase-entry time is saveable, so a rotation does not restart the count.
+    val jobRunning = screenState.isAnalyzing
+    val jobEnteredAtMs = rememberSaveable(jobRunning) { Clock.System.now().toEpochMilliseconds() }
+    var slowHint by remember(jobRunning) {
+        mutableStateOf(Clock.System.now().toEpochMilliseconds() - jobEnteredAtMs >= slowWaitingHintAfterMs)
+    }
+    LaunchedEffect(jobRunning, slowHint) {
+        if (jobRunning && !slowHint) {
+            val elapsed = Clock.System.now().toEpochMilliseconds() - jobEnteredAtMs
+            delay((slowWaitingHintAfterMs - elapsed).coerceAtLeast(0L))
+            slowHint = true
+        }
+    }
 
     AppScaffold(
         title = title,
         onBackButtonClick = { onIntent(AnalyzeScreenIntent.OnBackClick) },
         scrollBehavior = scrollBehavior,
         bottomBar = {
-            if (screenState.selectedInputType != null && !screenState.isAnalyzing) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(AppDimens.ScreenPaddingHorizontal)
-                        .padding(bottom = AppDimens.SpacingLg)
-                        .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-                ) {
-                    // Credits info
-                    CostInfoRow(
-                        aiCredits = screenState.aiCredits,
-                        aiActionCost = screenState.aiActionCost,
-                        isPremium = screenState.isPremium
-                    )
-
-                    // All users (including premium) need enough credits
-                    val hasEnoughCredits = screenState.aiCredits >= screenState.aiActionCost
-
-                    AppButton(
-                        text = stringResource(Res.string.analyze_button),
-                        onClick = { onIntent(AnalyzeScreenIntent.OnAnalyzeClick) },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = hasEnoughCredits
-                    )
-
-                    if (!hasEnoughCredits) {
-                        Text(
-                            text = stringResource(Res.string.analyze_not_enough_credits),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
+            AnimatedContent(
+                targetState = phase,
+                contentKey = { it.dockKey(screenState.selectedInputType != null) },
+                transitionSpec = {
+                    fadeIn(AppMotion.effectsDefault) togetherWith fadeOut(AppMotion.effectsDefault)
+                },
+                label = "analyze-dock",
+            ) { dockPhase ->
+                when (dockPhase) {
+                    AnalyzeJobPhase.Editing -> if (screenState.selectedInputType != null) {
+                        AnalyzeDock { EditingDockContent(screenState, onIntent) }
+                    }
+                    is AnalyzeJobPhase.Waiting -> AnalyzeDock {
+                        WaitingDockContent(
+                            canCancel = dockPhase.canCancel,
+                            showNotificationRationale = screenState.askNotificationPermission,
+                            onContinueInBackground = { onIntent(AnalyzeJobIntent.OnContinueInBackgroundClick) },
+                            onCancel = { onIntent(AnalyzeJobIntent.OnCancelWaitingClick) },
+                        )
+                    }
+                    // Less than a second until the navigation lands: nothing to press.
+                    AnalyzeJobPhase.Delivering -> Unit
+                    is AnalyzeJobPhase.Failed -> AnalyzeDock {
+                        FailedDockContent(
+                            cta = dockPhase.cta,
+                            onRetry = { onIntent(AnalyzeJobIntent.OnRetryClick) },
+                            onBackToEditing = { onIntent(AnalyzeJobIntent.OnBackToEditingClick) },
                         )
                     }
                 }
             }
         }
     ) {
-        if (screenState.isAnalyzing) {
-            LoadingContent()
-        } else {
-            AnalyzeContent(
-                screenState = screenState,
-                onIntent = onIntent
-            )
+        updateTransition(phase, label = "analyze-body").Crossfade(
+            animationSpec = AppMotion.effectsDefault,
+            contentKey = { it.bodyKey() },
+        ) { bodyPhase ->
+            if (bodyPhase == AnalyzeJobPhase.Editing) {
+                AnalyzeContent(
+                    screenState = screenState,
+                    onIntent = onIntent
+                )
+            } else {
+                JobStatusBody(phase = bodyPhase, slowHint = slowHint)
+            }
         }
 
-        // Error dialog
-        screenState.error?.let { error ->
+        // Error dialog. A Failed phase is drawn by the body + dock above; its `error` mirror is for the
+        // dialog-only callers and must not stack a second rendering of the same failure.
+        screenState.error?.takeIf { phase !is AnalyzeJobPhase.Failed }?.let { error ->
             AnalyzeMessageDialog(
                 message = error,
                 onDismiss = { onIntent(AnalyzeScreenIntent.OnDismissError) },
-                title = stringResource(Res.string.error),
+                // A hint (4th parallel start) is not a failure: no "Error" title.
+                title = if (screenState.errorIsHint) null else stringResource(Res.string.error),
             )
         }
     }
 }
 
+/** Body crossfades only between these three; Waiting ⇄ network ⇄ Delivering swap in place. */
+private fun AnalyzeJobPhase.bodyKey(): Int = when (this) {
+    AnalyzeJobPhase.Editing -> 0
+    is AnalyzeJobPhase.Waiting, AnalyzeJobPhase.Delivering -> 1
+    is AnalyzeJobPhase.Failed -> 2
+}
+
+/** Dock fades between these; a Waiting(network → online) change keeps the same dock. */
+private fun AnalyzeJobPhase.dockKey(hasSource: Boolean): Int = when (this) {
+    AnalyzeJobPhase.Editing -> if (hasSource) 0 else -1
+    is AnalyzeJobPhase.Waiting -> 1
+    AnalyzeJobPhase.Delivering -> -1
+    is AnalyzeJobPhase.Failed -> 2
+}
+
+/** Editing dock: cost row, "Analyze", and the "Not enough credits" barrier. */
 @Composable
-private fun LoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingLg)
-        ) {
-            // Circular background with icon
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier.size(44.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+private fun ColumnScope.EditingDockContent(
+    screenState: AnalyzeScreenState,
+    onIntent: (AnalyzeScreenIntent) -> Unit,
+) {
+    // All users (including premium) need enough credits; unknown cost is not gated.
+    val hasEnoughCredits = screenState.hasEnoughCredits
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-            ) {
-                Text(
-                    text = stringResource(Res.string.analyze_loading),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = stringResource(Res.string.analyze_loading_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
+    CostInfoRow(
+        balance = (screenState.aiCredits - screenState.creditsReservedByRunningJobs).coerceAtLeast(0),
+        aiActionCost = screenState.aiActionCost,
+        balanceIsEnough = hasEnoughCredits,
+    )
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+    AppButton(
+        text = stringResource(Res.string.analyze_button),
+        onClick = { onIntent(AnalyzeScreenIntent.OnAnalyzeClick) },
+        modifier = Modifier.fillMaxWidth().testTag("analyze_analyze_button"),
+        enabled = hasEnoughCredits
+    )
 
-            CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 3.dp
-            )
-        }
+    if (!hasEnoughCredits) {
+        Text(
+            text = stringResource(Res.string.analyze_not_enough_credits),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -289,8 +348,13 @@ internal fun AnalyzeContent(
             .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
+        // The "N analyses in progress" strip lives in the same item as the top spacer: as an item of
+        // its own it would add a spacedBy gap even while hidden.
         item(key = "top-spacer") {
-            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+            Column {
+                Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+                JobsInProgressRow(count = screenState.otherJobsInProgress)
+            }
         }
 
         // Only while nothing is chosen. Once a material is picked, the pill showing it says what it
@@ -325,6 +389,7 @@ internal fun AnalyzeContent(
                     type = type,
                     inputText = screenState.inputText,
                     inputUrl = screenState.inputUrl,
+                    inputError = screenState.inputError,
                     selectedFilePath = screenState.selectedFilePath,
                     selectedFileName = screenState.selectedFileName,
                     isRecording = screenState.isRecording,
@@ -337,7 +402,8 @@ internal fun AnalyzeContent(
                     onStopRecording = { onIntent(AnalyzeScreenIntent.OnStopRecording) },
                     onRecordingComplete = { path, duration -> onIntent(AnalyzeScreenIntent.OnRecordingComplete(path, duration)) },
                     onRecordingError = { error -> onIntent(AnalyzeScreenIntent.OnRecordingError(error)) },
-                    onDeleteRecording = { onIntent(AnalyzeScreenIntent.OnDeleteRecording) }
+                    onDeleteRecording = { onIntent(AnalyzeScreenIntent.OnDeleteRecording) },
+                    onSubmit = { onIntent(AnalyzeScreenIntent.OnAnalyzeClick) },
                 )
             }
         }
@@ -353,6 +419,7 @@ private fun InputSection(
     type: InputDataType,
     inputText: String,
     inputUrl: String,
+    inputError: String?,
     selectedFilePath: String?,
     selectedFileName: String?,
     isRecording: Boolean,
@@ -365,7 +432,8 @@ private fun InputSection(
     onStopRecording: () -> Unit,
     onRecordingComplete: (filePath: String, durationMs: Long) -> Unit,
     onRecordingError: (String) -> Unit,
-    onDeleteRecording: () -> Unit
+    onDeleteRecording: () -> Unit,
+    onSubmit: () -> Unit,
 ) {
     when (type) {
         InputDataType.PHOTO, InputDataType.PDF, InputDataType.TEXT_FILE -> {
@@ -391,7 +459,17 @@ private fun InputSection(
                 onValueChange = onUrlChanged,
                 placeholder = stringResource(Res.string.analyze_url_placeholder),
                 label = stringResource(Res.string.analyze_url_label),
-                showClearButton = true
+                showClearButton = true,
+                // The ViewModel clears the error on the next edit; the Analyze button stays enabled.
+                isError = inputError != null,
+                errorMessage = inputError,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    autoCorrectEnabled = false,
+                    imeAction = ImeAction.Go,
+                ),
+                keyboardActions = KeyboardActions(onGo = { onSubmit() }),
+                modifier = Modifier.testTag("analyze_url_field"),
             )
         }
 
@@ -786,11 +864,16 @@ private fun formatDuration(durationMs: Long): String {
     return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
 
+/**
+ * "This action costs N credits • M credits". [balance] is already net of the credits running jobs
+ * hold. Unknown cost ([aiActionCost] null): only "M credits" — never a made-up number. The balance
+ * colour follows the same rule as the button barrier ([balanceIsEnough]).
+ */
 @Composable
 private fun CostInfoRow(
-    aiCredits: Int,
-    aiActionCost: Int,
-    isPremium: Boolean,
+    balance: Int,
+    aiActionCost: Int?,
+    balanceIsEnough: Boolean,
     modifier: Modifier = Modifier
 ) {
     // All users (including premium) now use credits
@@ -802,28 +885,28 @@ private fun CostInfoRow(
         Icon(
             imageVector = Icons.Outlined.AutoAwesome,
             contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppDimens.IconSizeSm),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.size(4.dp))
+        Spacer(modifier = Modifier.size(AppDimens.SpacingXs))
+        // ONE text, so a narrow screen at a large font wraps it as a sentence. Three Texts in a Row
+        // squeezed the balance into a one-letter-wide column at 320dp × 1.5 (RU).
+        val costPart = aiActionCost?.let { stringResource(Res.string.analyze_cost_info, it) }
+        val balancePart = stringResource(Res.string.credits_display, balance)
+        val balanceColor = if (balanceIsEnough) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.error
+        }
         Text(
-            text = stringResource(Res.string.analyze_cost_info, aiActionCost),
+            text = buildAnnotatedString {
+                if (costPart != null) append("$costPart • ")
+                withStyle(SpanStyle(color = balanceColor)) { append(balancePart) }
+            },
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = " • ",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = stringResource(Res.string.credits_display, aiCredits),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (aiCredits >= aiActionCost) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.error
-            }
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }

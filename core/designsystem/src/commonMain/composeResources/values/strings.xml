@@ -2129,4 +2129,49 @@
     <string name="telegram_open_failed">Couldn't open Telegram on this device.</string>
     <string name="telegram_link_expired">This link has expired. Send /start to the bot to get a new one.</string>
     <string name="telegram_link_failed">Couldn't connect Telegram. Open the link from the bot again.</string>
+    <!-- Background AI analysis: Android system notifications (AndroidAnalysisReadyNotifier, AnalysisWorker). -->
+    <string name="analysis_notification_channel_results">AI results</string>
+    <string name="analysis_notification_channel_results_desc">When a checklist made by AI is ready</string>
+    <string name="analysis_notification_channel_progress">Analysis in progress</string>
+    <string name="analysis_notification_progress_title">Analyzing your content</string>
+    <string name="analysis_notification_checklist_ready_title">Your checklist is ready</string>
+    <string name="analysis_notification_tap_to_open">Tap to open</string>
+    <string name="analysis_notification_fill_ready_title">Answers are ready to review</string>
+    <string name="analysis_notification_failed_title">Couldn't create a checklist</string>
+    <string name="analysis_notification_failed_body">Tap to see what happened</string>
+    <!-- Background AI analysis: Analyze screen (waiting / failed) and the in-app ready snackbar. -->
+    <string name="analyze_failed_title">Couldn't create a checklist</string>
+    <string name="analyze_error_nothing_found">We found nothing to turn into a checklist. Try a clearer photo or different text.</string>
+    <string name="analyze_error_input_too_large">This file is too large to analyze. Try a smaller file or a photo of the page.</string>
+    <string name="analyze_error_input_unreadable">We couldn't read this file. Pick it again.</string>
+    <string name="analyze_error_interrupted">The page reloaded before the analysis finished. Pick the file again.</string>
+    <string name="analyze_error_server">Something went wrong on our side. Try again in a moment.</string>
+    <string name="analyze_change_input">Change input</string>
+    <string name="analyze_try_again">Try again</string>
+    <string name="analyze_too_many_jobs">You already have %1$d analyses running. Wait for one to finish.</string>
+    <string name="analyze_loading_slow">Large files can take up to a minute</string>
+    <string name="analyze_waiting_leave_hint">You can leave — we'll let you know when it's ready</string>
+    <string name="analyze_continue_in_background">Continue in background</string>
+    <string name="analyze_waiting_network_title">Waiting for a connection</string>
+    <string name="analyze_waiting_network_description">The analysis starts automatically when you're back online</string>
+    <string name="analyze_waiting_notify_rationale">Allow notifications and we'll tell you when it's ready</string>
+    <plurals name="analyze_jobs_in_progress">
+        <item quantity="one">%1$d analysis in progress</item>
+        <item quantity="other">%1$d analyses in progress</item>
+    </plurals>
+    <string name="analyze_ready_snackbar">“%1$s” is ready</string>
+    <string name="analyze_ready_open">Open</string>
+    <string name="analyze_ready_fill_snackbar">Answers for “%1$s” are ready</string>
+    <string name="analyze_ready_review">Review</string>
+    <plurals name="analyze_ready_many_snackbar">
+        <item quantity="one">%1$d checklist is ready</item>
+        <item quantity="other">%1$d checklists are ready</item>
+    </plurals>
+    <string name="analyze_ready_view">View</string>
+    <string name="analyze_failed_snackbar">Couldn't create a checklist</string>
+    <string name="analyze_details">Details</string>
+    <string name="analyze_interrupted_snackbar">Analysis interrupted by a page reload</string>
+    <string name="analyze_error_checklist_gone">This checklist no longer exists.</string>
+    <string name="analyze_error_invalid_input">We couldn't use this input. Try different text, a link or another file.</string>
+    <string name="onboarding_try_ai_nothing_found">Gisti found nothing to turn into a list. Try describing it differently.</string>
 </resources>

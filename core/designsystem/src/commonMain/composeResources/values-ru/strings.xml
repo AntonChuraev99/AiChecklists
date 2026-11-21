@@ -571,6 +571,8 @@
     <string name="fill_error_name_required">Введите название</string>
     <string name="analyze_error_select_checklist">Выберите чек-лист</string>
     <string name="analyze_error_analysis_failed">Не удалось проанализировать</string>
+    <string name="analyze_error_network">Проблема с подключением. Проверьте интернет и попробуйте снова</string>
+    <string name="analyze_error_user_not_ready">Выполняем вход… попробуйте ещё раз через минуту</string>
     <!-- Имена по умолчанию (используются во ViewModel) -->
     <string name="default_checklist_name">Новый чек-лист</string>
     <string name="default_fill_name">AI-заполнение</string>
@@ -1893,4 +1895,51 @@
     <string name="telegram_open_failed">Не удалось открыть Telegram на этом устройстве.</string>
     <string name="telegram_link_expired">Ссылка устарела. Отправьте боту /start, чтобы получить новую.</string>
     <string name="telegram_link_failed">Не удалось подключить Telegram. Откройте ссылку из бота ещё раз.</string>
+    <string name="analysis_notification_channel_results">Результаты AI</string>
+    <string name="analysis_notification_channel_results_desc">Когда чек-лист, созданный AI, готов</string>
+    <string name="analysis_notification_channel_progress">Идёт анализ</string>
+    <string name="analysis_notification_progress_title">Анализируем ваш материал</string>
+    <string name="analysis_notification_checklist_ready_title">Чек-лист готов</string>
+    <string name="analysis_notification_tap_to_open">Нажмите, чтобы открыть</string>
+    <string name="analysis_notification_fill_ready_title">Ответы готовы к проверке</string>
+    <string name="analysis_notification_failed_title">Не удалось создать чек-лист</string>
+    <string name="analysis_notification_failed_body">Нажмите, чтобы узнать подробности</string>
+    <string name="analyze_failed_title">Не удалось создать чек-лист</string>
+    <string name="analyze_error_nothing_found">Не нашли, из чего сделать чек-лист. Попробуйте более чёткое фото или другой текст.</string>
+    <string name="analyze_error_input_too_large">Файл слишком большой для анализа. Попробуйте файл поменьше или фото страницы.</string>
+    <string name="analyze_error_input_unreadable">Не удалось прочитать этот файл. Выберите его ещё раз.</string>
+    <string name="analyze_error_interrupted">Страница перезагрузилась до конца анализа. Выберите файл ещё раз.</string>
+    <string name="analyze_error_server">У нас что-то пошло не так. Попробуйте ещё раз чуть позже.</string>
+    <string name="analyze_change_input">Изменить материал</string>
+    <string name="analyze_try_again">Попробовать снова</string>
+    <string name="analyze_too_many_jobs">У вас уже идут анализы: %1$d. Дождитесь, пока один закончится.</string>
+    <string name="analyze_loading_slow">Большие файлы могут обрабатываться до минуты</string>
+    <string name="analyze_waiting_leave_hint">Можно уйти с экрана — мы сообщим, когда будет готово</string>
+    <string name="analyze_continue_in_background">Продолжить в фоне</string>
+    <string name="analyze_waiting_network_title">Ждём подключения</string>
+    <string name="analyze_waiting_network_description">Анализ начнётся сам, когда появится интернет</string>
+    <string name="analyze_waiting_notify_rationale">Разрешите уведомления — сообщим, когда будет готово</string>
+    <plurals name="analyze_jobs_in_progress">
+        <item quantity="one">%1$d анализ в процессе</item>
+        <item quantity="few">%1$d анализа в процессе</item>
+        <item quantity="many">%1$d анализов в процессе</item>
+        <item quantity="other">%1$d анализа в процессе</item>
+    </plurals>
+    <string name="analyze_ready_snackbar">«%1$s» готов</string>
+    <string name="analyze_ready_open">Открыть</string>
+    <string name="analyze_ready_fill_snackbar">Ответы для «%1$s» готовы</string>
+    <string name="analyze_ready_review">Проверить</string>
+    <plurals name="analyze_ready_many_snackbar">
+        <item quantity="one">Готов %1$d чек-лист</item>
+        <item quantity="few">Готово %1$d чек-листа</item>
+        <item quantity="many">Готово %1$d чек-листов</item>
+        <item quantity="other">Готово %1$d чек-листа</item>
+    </plurals>
+    <string name="analyze_ready_view">Смотреть</string>
+    <string name="analyze_failed_snackbar">Не удалось создать чек-лист</string>
+    <string name="analyze_details">Подробнее</string>
+    <string name="analyze_interrupted_snackbar">Анализ прерван перезагрузкой страницы</string>
+    <string name="analyze_error_checklist_gone">Этого чек-листа больше нет.</string>
+    <string name="analyze_error_invalid_input">Не получилось использовать этот материал. Попробуйте другой текст, ссылку или файл.</string>
+    <string name="onboarding_try_ai_nothing_found">Gisti не нашёл, из чего сделать список. Попробуйте описать иначе.</string>
 </resources>

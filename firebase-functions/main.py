@@ -32,6 +32,7 @@ import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials, firestore, messaging, remote_config
 from flask import Request, jsonify, make_response
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 # Firestore query filters MUST be built with FieldFilter, never positionally:
 # `query.where("f", "==", v)` is deprecated and makes the SDK emit a UserWarning
@@ -46,7 +47,7 @@ import requests as http_requests  # avoid conflict with flask Request
 from flask import request as flask_request  # global request context for CORS origin echo-back
 
 import cors  # local module: CORS origin whitelist (unit-testable without firebase_admin)
-from generated_items import MAX_FOLDER_DEPTH, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
+from generated_items import MAX_FOLDER_DEPTH, has_leaf_item, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
 from credits_logic import reservation_decision  # local module: reserve-credits branch (unit-testable)
 from chat_agent_logic import scan_current_turn  # local module: chat_agent turn boundary (unit-testable)
 import voice_logic  # local module: voice-call minutes / session / rate-limit decisions (unit-testable)
@@ -387,12 +388,17 @@ def validate_request(request: Request) -> tuple[dict | None, str | None]:
     return data, None
 
 
-def create_error_response(message: str, status_code: int = 400):
+def create_error_response(message: str, status_code: int = 400, error_code: str | None = None):
     """Create standardized error response with CORS headers so the web client
-    can read the body even on non-2xx status."""
-    return add_cors_headers(make_response(
-        jsonify({"success": False, "error": message}), status_code
-    ))
+    can read the body even on non-2xx status.
+
+    [error_code] is the machine-readable twin of [message] (e.g. "input_too_large") for clients
+    that branch on the cause; it is added only when given, so every existing body stays the same.
+    """
+    body = {"success": False, "error": message}
+    if error_code:
+        body["error_code"] = error_code
+    return add_cors_headers(make_response(jsonify(body), status_code))
 
 
 def credit_error_response(action: str, message: str = "insufficient credits"):
@@ -893,35 +899,202 @@ def refund_credits(user_id: str, amount: int, reason: str, request_id: str | Non
 # Shared AI helpers
 # ============================================================================
 
-def call_gemini(prompt: str, input_type: str, input_data: str, audio_mime_type: str = "audio/mp4", model_id: str = None):
+# ----------------------------------------------------------------------------
+# Analyze inputs (analyze_and_fill_checklist / generate_checklist).
+# ----------------------------------------------------------------------------
+
+# Inputs Gemini receives as bytes (a Part), never as prompt text. Every other accepted type is text
+# the prompt quotes verbatim. A type outside the accepted set is refused with 400 BEFORE credits are
+# reserved: the old fall-through pasted input_data into the prompt, so an unknown binary type (the
+# client's new pdf_base64 was one) sent megabytes of base64 to the model as "text" and billed for it.
+BINARY_INPUT_TYPES = ("image_base64", "audio_base64", "pdf_base64")
+ANALYZE_INPUT_TYPES = ("text", "url") + BINARY_INPUT_TYPES
+# generate_checklist also takes "none" (prompt only); it is its default when input_type is absent.
+GENERATE_INPUT_TYPES = ANALYZE_INPUT_TYPES + ("none",)
+
+# Containers that are fixed per input type. Audio varies per request, see normalize_audio_mime.
+_FIXED_BINARY_MIME = {"image_base64": "image/jpeg", "pdf_base64": "application/pdf"}
+
+# Decoded-size cap for a binary input. The binding limit is the Cloud Functions gen2 request cap
+# of 32 MB: base64 adds a third, so 20 MB decoded is ~27 MB on the wire and still leaves room for
+# the JSON envelope. Gemini's own inline cap is higher. A body over 32 MB is rejected by the
+# platform before this code runs; this guard answers the rest with a reason the client can show.
+MAX_BINARY_INPUT_BYTES = 20 * 1024 * 1024
+
+# 422 `nothing_found`: the model found nothing to put in a checklist (a silent voice note, a blank
+# photo). The reserved credits are refunded — an empty checklist is not a result worth paying for.
+NOTHING_FOUND_MESSAGE = "Couldn't find anything to turn into a checklist. Try a clearer photo or more text."
+
+
+def check_analyze_input(input_type, input_data, accepted_types) -> tuple[int, str, str] | None:
+    """Return (status, error_code, message) when the input must be refused, else None.
+
+    Callers run this BEFORE reserving credits, so a refused input is never billed. Binary data
+    is decoded here exactly as call_gemini decodes it, which validates it and measures the
+    payload Gemini would receive.
+    """
+    if input_type not in accepted_types:
+        return 400, "unsupported_input_type", f"Unsupported input_type: {input_type}"
+    if input_type not in BINARY_INPUT_TYPES:
+        return None
+    try:
+        size = len(base64.b64decode(input_data))
+    except (ValueError, TypeError):  # binascii.Error is a ValueError
+        return 400, "invalid_input", "input_data is not valid base64"
+    if size == 0:
+        return 400, "invalid_input", "input_data is empty"
+    if size > MAX_BINARY_INPUT_BYTES:
+        limit_mb = MAX_BINARY_INPUT_BYTES // (1024 * 1024)
+        return 413, "input_too_large", f"File is too large. The limit is {limit_mb} MB."
+    return None
+
+
+# ----------------------------------------------------------------------------
+# Gemini overload resilience for the Analyze flows.
+#
+# google-genai never retries unless retry_options is set. Prod 2026-11-19: a 503 UNAVAILABLE
+# ("high demand") became our 500 within two seconds, and the same request succeeded when the user
+# retried by hand 40 s later. The SDK now retries 408/429/500/502/503/504 and transport timeouts
+# with exponential backoff; an overload that outlives the retries gets ONE call on the rollback
+# model (call_gemini_with_fallback).
+#
+# Budget: both functions run with --timeout=60s, and a request the platform kills is never
+# refunded — the reserve already happened. One resilient call costs at most 3 attempts x 15 s plus
+# backoff waits of 1-2 s and 2-3 s = 50 s, which fits ANALYZE_DEADLINE_SECONDS; the fallback only
+# starts when time is left and its timeout is clamped to what remains. 15 s per attempt sits well
+# above the latency of a normal Analyze call, so a slow-but-healthy answer is not cut off.
+# test_retry_budget_fits_inside_the_function_timeout checks this arithmetic against deploy.sh.
+# ----------------------------------------------------------------------------
+
+ANALYZE_ATTEMPT_TIMEOUT_MS = 15_000
+ANALYZE_GEMINI_HTTP_OPTIONS = types.HttpOptions(
+    timeout=ANALYZE_ATTEMPT_TIMEOUT_MS,
+    retry_options=types.HttpRetryOptions(attempts=3, initial_delay=1.0, max_delay=8.0, exp_base=2, jitter=1),
+)
+# Documents and audio: Gemini reads every page / second before it answers. Prod 2026-11-20 (smoke
+# after deploy): a one-page PDF did not answer within three 15 s attempts (httpx ReadTimeout, 42.7 s)
+# — the short-attempt policy above suits text, links and photos only. One long attempt instead; an
+# overload still gets the fallback call when time is left.
+ANALYZE_DOCUMENT_ATTEMPT_TIMEOUT_MS = 45_000
+ANALYZE_DOCUMENT_HTTP_OPTIONS = types.HttpOptions(
+    timeout=ANALYZE_DOCUMENT_ATTEMPT_TIMEOUT_MS,
+    retry_options=types.HttpRetryOptions(attempts=1),
+)
+_DOCUMENT_INPUT_TYPES = ("pdf_base64", "audio_base64")
+
+
+def analyze_attempt_timeout_ms(input_type: str) -> int:
+    """Per-attempt Gemini timeout of the Analyze flows for this input type."""
+    if input_type in _DOCUMENT_INPUT_TYPES:
+        return ANALYZE_DOCUMENT_ATTEMPT_TIMEOUT_MS
+    return ANALYZE_ATTEMPT_TIMEOUT_MS
+
+
+# Seconds from handler entry after which no fallback call may start; the remaining seconds up to
+# the 60 s function timeout are kept for the refund and the response.
+ANALYZE_DEADLINE_SECONDS = 55
+# A fallback with less time than this would most likely time out — and still cost a model call.
+_FALLBACK_MIN_SECONDS = 5
+# The model the Analyze flows fall back to on overload: the allow-listed rollback target.
+ANALYZE_FALLBACK_MODEL = "gemini-3.1-flash-lite"
+
+
+def call_gemini(
+    prompt: str,
+    input_type: str,
+    input_data: str,
+    audio_mime_type: str = "audio/mp4",
+    model_id: str = None,
+    http_options: types.HttpOptions | None = ANALYZE_GEMINI_HTTP_OPTIONS,
+):
     """Call Gemini API with appropriate content type.
 
-    [audio_mime_type] is honored only when input_type == "audio_base64".
+    Binary inputs (BINARY_INPUT_TYPES) are sent as a bytes Part next to the prompt; anything else
+    sends the prompt alone. [audio_mime_type] is honored only when input_type == "audio_base64".
     Allowed by Gemini: audio/mp4, audio/mpeg, audio/wav, audio/webm, audio/flac, audio/ogg.
     Callers must normalize browser variants (e.g. "audio/m4a", "audio/webm;codecs=opus")
     before invoking this function.
 
     [model_id] defaults to gemini-3.5-flash-lite. Callers may pass a test-override value
     already resolved via [resolve_model]; never pass an unvalidated client value here.
+
+    [http_options] defaults to the Analyze retry policy (ANALYZE_GEMINI_HTTP_OPTIONS). Callers
+    whose budget differs pass their own, or None for the client's plain single attempt:
+    classify_chat_intent's client gives up after 30 s, inside the Analyze worst case.
     """
     model_id = model_id or "gemini-3.5-flash-lite"
-    if input_type == "image_base64" and input_data:
-        return gemini_client.models.generate_content(
-            model=model_id,
-            contents=[
-                prompt,
-                types.Part.from_bytes(data=base64.b64decode(input_data), mime_type="image/jpeg"),
-            ],
+    contents = prompt
+    if input_type in BINARY_INPUT_TYPES and input_data:
+        mime_type = audio_mime_type if input_type == "audio_base64" else _FIXED_BINARY_MIME[input_type]
+        contents = [
+            prompt,
+            types.Part.from_bytes(data=base64.b64decode(input_data), mime_type=mime_type),
+        ]
+    if http_options is ANALYZE_GEMINI_HTTP_OPTIONS and input_type in _DOCUMENT_INPUT_TYPES:
+        http_options = ANALYZE_DOCUMENT_HTTP_OPTIONS
+    config_kwargs = {}
+    if http_options is not None:
+        config_kwargs["config"] = types.GenerateContentConfig(http_options=http_options)
+    return gemini_client.models.generate_content(model=model_id, contents=contents, **config_kwargs)
+
+
+def is_gemini_overload(exc: BaseException) -> bool:
+    """True when another model can absorb the failure: 503 UNAVAILABLE or 429 RESOURCE_EXHAUSTED.
+
+    NOT 402 — "prepayment credits are depleted" is the shared prepay wallet, so every model
+    refuses alike (it arrives as 402 RESOURCE_EXHAUSTED; the text check also covers it should it
+    ever come as 429). NOT other 4xx: a rejected input fails the same way on any model.
+    """
+    if not isinstance(exc, genai_errors.APIError) or exc.code not in (429, 503):
+        return False
+    return "prepayment" not in str(exc.message or "").lower()
+
+
+def call_gemini_with_fallback(prompt, input_type, input_data, *, user_id, flow, deadline, **gemini_kwargs):
+    """call_gemini, plus ONE call on ANALYZE_FALLBACK_MODEL when the model stays overloaded.
+
+    [gemini_kwargs] go to call_gemini unchanged for the first call. The SDK has already retried
+    by the time an overload reaches this function; the fallback is a single attempt whose
+    timeout is clamped to the time left before [deadline] (a time.monotonic() value). It is
+    skipped when the model already IS the fallback model or too little time remains, and the
+    error then propagates. This function never touches credits: the handler refunds once per
+    outcome, whichever call failed.
+
+    Returns (response, model_id that answered).
+    """
+    model_id = gemini_kwargs.get("model_id")
+    try:
+        return call_gemini(prompt, input_type, input_data, **gemini_kwargs), model_id
+    except Exception as exc:
+        if not is_gemini_overload(exc) or model_id == ANALYZE_FALLBACK_MODEL:
+            raise
+        remaining = deadline - time.monotonic()
+        if remaining < _FALLBACK_MIN_SECONDS:
+            logger.warning(
+                "%s: model=%s overloaded after retries (status=%s), %.1fs left — no fallback, user=%s",
+                flow, model_id, exc.code, remaining, user_id[:8],
+            )
+            raise
+        logger.warning(
+            "%s: model=%s overloaded after retries (status=%s) — falling back to %s, user=%s",
+            flow, model_id, exc.code, ANALYZE_FALLBACK_MODEL, user_id[:8],
         )
-    if input_type == "audio_base64" and input_data:
-        return gemini_client.models.generate_content(
-            model=model_id,
-            contents=[
-                prompt,
-                types.Part.from_bytes(data=base64.b64decode(input_data), mime_type=audio_mime_type),
-            ],
+    fallback_kwargs = {
+        **gemini_kwargs,
+        "model_id": ANALYZE_FALLBACK_MODEL,
+        "http_options": types.HttpOptions(
+            timeout=min(analyze_attempt_timeout_ms(input_type), int(remaining * 1000)),
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    }
+    try:
+        return call_gemini(prompt, input_type, input_data, **fallback_kwargs), ANALYZE_FALLBACK_MODEL
+    except Exception as exc:
+        logger.warning(
+            "%s: fallback model=%s failed too (%s: %s), user=%s",
+            flow, ANALYZE_FALLBACK_MODEL, type(exc).__name__, getattr(exc, "code", "-"), user_id[:8],
         )
-    return gemini_client.models.generate_content(model=model_id, contents=prompt)
+        raise
 
 
 # ----------------------------------------------------------------------------
@@ -1418,8 +1591,8 @@ def analyze_and_fill_checklist(request: Request):
             "name": "string",
             "items": [{"text": "string", "checked": boolean}]
         },
-        "input_type": "text" | "url" | "image_base64" | "audio_base64",
-        "input_data": "string (text content, URL, base64 image, or base64 audio)"
+        "input_type": "text" | "url" | "image_base64" | "audio_base64" | "pdf_base64",
+        "input_data": "string (text content, URL, or base64 image / audio / PDF)"
     }
 
     Response:
@@ -1430,10 +1603,17 @@ def analyze_and_fill_checklist(request: Request):
         "confidence": 0.0-1.0,
         "usage": {"count": number, "limit": number}
     }
+
+    Refusals carry a machine-readable `error_code` next to `error`, none of them billed:
+        400 unsupported_input_type / invalid_input, 413 input_too_large (refused before reserve);
+        422 nothing_found (the model filled nothing — credits refunded).
     """
     # CORS preflight — browsers send OPTIONS before cross-origin POST
     if request.method == "OPTIONS":
         return cors_preflight_ok()
+
+    # Monotonic time after which no Gemini fallback may start (see ANALYZE_DEADLINE_SECONDS).
+    deadline = time.monotonic() + ANALYZE_DEADLINE_SECONDS
 
     # Validate request
     data, error = validate_request(request)
@@ -1454,6 +1634,11 @@ def analyze_and_fill_checklist(request: Request):
         return create_error_response("checklist with items is required")
     if not input_type or not input_data:
         return create_error_response("input_type and input_data are required")
+    # Unknown type, undecodable or oversized binary -> refused here, before any credit is reserved.
+    refusal = check_analyze_input(input_type, input_data, ANALYZE_INPUT_TYPES)
+    if refusal:
+        status, error_code, message = refusal
+        return create_error_response(message, status, error_code)
 
     # Check feature flag
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
@@ -1466,7 +1651,7 @@ def analyze_and_fill_checklist(request: Request):
 
     # Check input length (skip for binary data types) — BEFORE reserving credits,
     # so a rejected (too-long) input never deducts credits.
-    if input_type not in ("image_base64", "audio_base64"):
+    if input_type not in BINARY_INPUT_TYPES:
         max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
         if len(input_data) > max_length:
             return create_error_response(f"Input data exceeds maximum length of {max_length} characters")
@@ -1491,6 +1676,8 @@ def analyze_and_fill_checklist(request: Request):
         user_data_for_prompt = "[Image data provided]"
     elif input_type == "audio_base64":
         user_data_for_prompt = "[Audio data provided - transcribe and analyze the voice recording]"
+    elif input_type == "pdf_base64":
+        user_data_for_prompt = "[PDF document provided - read the document and analyze its content]"
     else:
         user_data_for_prompt = input_data
 
@@ -1504,7 +1691,10 @@ def analyze_and_fill_checklist(request: Request):
     exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "analyze"}
 
     try:
-        response = call_gemini(prompt, input_type, input_data, model_id=model_id)
+        response, answered_by = call_gemini_with_fallback(
+            prompt, input_type, input_data,
+            user_id=user_id, flow="analyze_and_fill_checklist", deadline=deadline, model_id=model_id,
+        )
         result = parse_gemini_json(response.text)
     except json.JSONDecodeError as e:
         logger.exception("analyze_and_fill_checklist: parse failed for user=%s", user_id[:8])
@@ -1514,13 +1704,24 @@ def analyze_and_fill_checklist(request: Request):
         logger.exception("analyze_and_fill_checklist: gemini call failed for user=%s", user_id[:8])
         refund_credits(user_id, cost, "gemini_error", request_id)
         return create_error_response("AI processing failed. Please try again.", 500)
+    exp_meta["model_id"] = answered_by
+
+    # Nothing filled = nothing the user can use: refund instead of billing an empty answer.
+    filled_items = result.get("filled_items") if isinstance(result, dict) else None
+    if not isinstance(filled_items, list) or not filled_items:
+        logger.warning(
+            "analyze_and_fill_checklist: empty result (input_type=%s, model=%s) — refunding, user=%s",
+            input_type, answered_by, user_id[:8],
+        )
+        refund_credits(user_id, cost, "nothing_found", request_id)
+        return create_error_response(NOTHING_FOUND_MESSAGE, 422, "nothing_found")
 
     # Increment usage stats
     increment_usage(user_id, "analyze_and_fill_checklist", input_type)
 
     return create_success_response({
         **exp_meta,
-        "filled_items": result.get("filled_items", []),
+        "filled_items": filled_items,
         "summary": result.get("summary", ""),
         "confidence": result.get("confidence", 0.8),
         "ai_credits": remaining
@@ -1544,8 +1745,8 @@ def generate_checklist(request: Request):
         "user_id": "string",
         "is_premium": boolean (optional),
         "prompt": "string (user's description of what checklist they need)",
-        "input_type": "text" | "url" | "image_base64" | "audio_base64" | "none" (optional),
-        "input_data": "string (additional context data, base64 image, or base64 audio)" (optional),
+        "input_type": "text" | "url" | "image_base64" | "audio_base64" | "pdf_base64" | "none" (optional),
+        "input_data": "string (additional context data, or base64 image / audio / PDF)" (optional),
         "mime_type": "audio/ogg | audio/mpeg | ..." (optional; audio_base64 only — normalized by
                      normalize_audio_mime, absent = audio/mp4. The Telegram bot sends OGG/Opus
                      voice notes; the app does not send it.)
@@ -1560,10 +1761,17 @@ def generate_checklist(request: Request):
         "confidence": 0.0-1.0,
         "usage": {"count": number, "limit": number}
     }
+
+    Refusals carry a machine-readable `error_code` next to `error`, none of them billed:
+        400 unsupported_input_type / invalid_input, 413 input_too_large (refused before reserve);
+        422 nothing_found (the model produced no checkable item — credits refunded).
     """
     # CORS preflight — browsers send OPTIONS before cross-origin POST
     if request.method == "OPTIONS":
         return cors_preflight_ok()
+
+    # Monotonic time after which no Gemini fallback may start (see ANALYZE_DEADLINE_SECONDS).
+    deadline = time.monotonic() + ANALYZE_DEADLINE_SECONDS
 
     # Validate request
     data, error = validate_request(request)
@@ -1573,7 +1781,8 @@ def generate_checklist(request: Request):
     user_id = data["user_id"]
     is_premium = get_user_premium_status(user_id)
     user_prompt = data.get("prompt")
-    input_type = data.get("input_type", "none")
+    # An explicit null reads as "none", as the absent key always has.
+    input_type = data.get("input_type") or "none"
     input_data = data.get("input_data", "")
     locale = (data.get("locale") or "en").strip().lower()
     output_language = "Russian" if locale == "ru" else "English"
@@ -1584,6 +1793,11 @@ def generate_checklist(request: Request):
     # Validate required fields
     if not user_prompt:
         return create_error_response("prompt is required")
+    # Unknown type, undecodable or oversized binary -> refused here, before any credit is reserved.
+    refusal = check_analyze_input(input_type, input_data, GENERATE_INPUT_TYPES)
+    if refusal:
+        status, error_code, message = refusal
+        return create_error_response(message, status, error_code)
 
     # Check feature flag
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
@@ -1597,7 +1811,7 @@ def generate_checklist(request: Request):
     # Check input length (skip binary data in length calculation) — BEFORE reserving
     # credits, so a rejected (too-long) input never deducts credits.
     max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
-    if input_type in ("image_base64", "audio_base64"):
+    if input_type in BINARY_INPUT_TYPES:
         total_input = user_prompt  # Only check prompt length for binary inputs
     else:
         total_input = user_prompt + (input_data or "")
@@ -1618,7 +1832,10 @@ def generate_checklist(request: Request):
         user_data_text = "[Image data provided - analyze the image for context]"
     elif input_type == "audio_base64":
         user_data_text = "[Audio data provided - transcribe and analyze the voice recording for context]"
-    elif input_data and input_type not in ("image_base64", "audio_base64"):
+    elif input_type == "pdf_base64":
+        user_data_text = "[PDF document provided - read the document for context]"
+    elif input_data:
+        # Only text types reach here: check_analyze_input refused every other type above.
         user_data_text = input_data
     else:
         user_data_text = "No additional data provided"
@@ -1648,9 +1865,13 @@ def generate_checklist(request: Request):
     # input — retry the SAME call ONCE before failing the request (prod: three 500s in eleven
     # seconds for one user, all "Expecting value: line 1 column 1 (char 0)"). The final parse
     # error is re-raised into the handler below, so the refund stays in one place per outcome.
+    # Each call may also fall back to the rollback model on overload (call_gemini_with_fallback).
     try:
         for attempt in (1, 2):
-            response = call_gemini(prompt, input_type, input_data, **gemini_kwargs)
+            response, answered_by = call_gemini_with_fallback(
+                prompt, input_type, input_data,
+                user_id=user_id, flow="generate_checklist", deadline=deadline, **gemini_kwargs,
+            )
             try:
                 result = parse_gemini_json(response.text)
                 break
@@ -1669,6 +1890,18 @@ def generate_checklist(request: Request):
         logger.exception("generate_checklist: gemini call failed for user=%s", user_id[:8])
         refund_credits(user_id, cost, "gemini_error", request_id)
         return create_error_response("AI processing failed. Please try again.", 500)
+    exp_meta["model_id"] = answered_by
+
+    # No checkable item (an empty list, only empty folders, or JSON that is not an object) would
+    # become an empty checklist the user paid for: refund and say so instead.
+    items = sanitize_generated_items(result.get("items", [])) if isinstance(result, dict) else []
+    if not has_leaf_item(items):
+        logger.warning(
+            "generate_checklist: empty result (input_type=%s, model=%s) — refunding, user=%s",
+            input_type, answered_by, user_id[:8],
+        )
+        refund_credits(user_id, cost, "nothing_found", request_id)
+        return create_error_response(NOTHING_FOUND_MESSAGE, 422, "nothing_found")
 
     # Increment usage stats
     increment_usage(user_id, "generate_checklist", input_type)
@@ -1676,7 +1909,7 @@ def generate_checklist(request: Request):
     return create_success_response({
         **exp_meta,
         "checklist_name": result.get("checklist_name", "New Checklist"),
-        "items": sanitize_generated_items(result.get("items", [])),
+        "items": items,
         "summary": result.get("summary", ""),
         "confidence": result.get("confidence", 0.8),
         "ai_credits": remaining
@@ -2714,7 +2947,9 @@ def classify_chat_intent(request: Request):
     )
 
     try:
-        response = call_gemini(prompt, "text", "", model_id=model_id)
+        # http_options=None: single attempt, as before — the classifier's 30 s client timeout is
+        # shorter than the Analyze retry budget call_gemini applies by default.
+        response = call_gemini(prompt, "text", "", model_id=model_id, http_options=None)
         result = parse_gemini_json(response.text)
 
         # Light validation — never trust LLM output blindly
@@ -2846,7 +3081,11 @@ def transcribe_audio(request: Request):
         return credit_error_response(reserve_action)
 
     try:
-        response = call_gemini(TRANSCRIBE_AUDIO_PROMPT, "audio_base64", audio_b64, audio_mime_type=gemini_mime)
+        # http_options=None: single attempt without a per-attempt timeout, as before — a long
+        # recording can legitimately outlast the Analyze 15 s attempt timeout.
+        response = call_gemini(
+            TRANSCRIBE_AUDIO_PROMPT, "audio_base64", audio_b64, audio_mime_type=gemini_mime, http_options=None,
+        )
         transcript = (response.text or "").strip()
 
         # Defensive: strip outer quotes if Gemini wrapped the transcript despite
