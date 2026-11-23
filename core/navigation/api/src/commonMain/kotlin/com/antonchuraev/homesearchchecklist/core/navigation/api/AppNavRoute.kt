@@ -139,9 +139,13 @@ sealed interface AppNavRoute : NavKey {
      * "Telegram" account-link screen (bot @gisti_app_bot). Same placement as [Mcp]: a pushed
      * read-and-return detail page from the drawer / v2 Overview, also opened by the `?tg_link`
      * sign-in link handler in App.kt.
+     *
+     * [source] = `AnalyticsEvents.Telegram.SCREEN_SOURCE_*`, reported with `telegram_screen_opened`
+     * so a link can be attributed to the entry point. Compare with `is Telegram`, never `==`: the
+     * top-of-stack dedupe must hold whatever door the user came through.
      */
     @Serializable
-    data object Telegram : AppNavRoute
+    data class Telegram(val source: String) : AppNavRoute
 
     @Serializable
     data object Onboardings : AppNavRoute

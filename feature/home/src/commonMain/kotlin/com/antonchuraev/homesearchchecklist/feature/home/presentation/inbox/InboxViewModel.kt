@@ -77,7 +77,20 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.notificati
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.NotificationsBannerSession
 import com.antonchuraev.homesearchchecklist.core.common.api.notificationPermissionRequested
 import com.antonchuraev.homesearchchecklist.core.common.api.notificationPermissionResult
+import com.antonchuraev.homesearchchecklist.core.common.api.TelegramLinkKnowledge
+import com.antonchuraev.homesearchchecklist.core.common.api.TelegramReminderLink
+import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.TelegramPromoCounters
+import com.antonchuraev.homesearchchecklist.core.datastore.api.TelegramPromoPrefsRepository
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.TG_PROMO_AUTO_REST_SEEN_DAYS
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.TelegramPromoDecision
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.TelegramPromoInput
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.decideTelegramPromo
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.promoAnalyticsState
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.notifications.telegramPromoBookkeeping
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -153,6 +166,11 @@ class InboxViewModel(
     private val notificationsBannerSession: NotificationsBannerSession =
         NotificationsBannerSession { Clock.System.now().toEpochMilliseconds() },
     private val activationCoordinator: ActivationCoordinator = ActivationCoordinator.NoOp,
+    // Telegram promo banner (spec telegram-channel-banner §4.3). Null in hand-built test VMs = the
+    // banner never shows; HomeFeatureModule passes the app singletons.
+    private val telegramLink: TelegramReminderLink? = null,
+    private val hintsRepository: HintsRepository? = null,
+    private val telegramPromoPrefs: TelegramPromoPrefsRepository? = null,
 ) : AppViewModel<InboxScreenState, InboxIntent, InboxSideEffect>() {
 
     /**
@@ -308,6 +326,189 @@ class InboxViewModel(
         val planNudgeDismissedAt: Long,
     )
 
+    // ── Telegram promo banner (spec telegram-channel-banner §4.3 / §5.3 / §6) ────────────────────
+
+    /** × hides at once, before the DataStore write lands (rule 5). Per VM = per app process here. */
+    private val telegramPromoDismissedThisSession = MutableStateFlow(false)
+
+    /**
+     * The Inbox page's banner slot is composed AND the screen is RESUMED — reported by the UI
+     * ([InboxIntent.OnTelegramPromoSlotOnScreen]). Seen days, `telegram_promo_shown` and the auto-rest
+     * count only while this is true: the minute clock keeps re-evaluating in a back-stacked or
+     * backgrounded VM, and those evaluations must not burn the cycle.
+     */
+    private val telegramPromoSlotOnScreen = MutableStateFlow(false)
+
+    /** One evaluation of the rule plus what its writes and events need. */
+    private data class TelegramPromoEval(
+        val decision: TelegramPromoDecision,
+        val link: TelegramLinkKnowledge,
+        val counters: TelegramPromoCounters,
+        val nowMs: Long,
+        val today: Long,
+        val slotOnScreen: Boolean,
+    ) {
+        val cycle: Int get() = counters.dismissCount + 1
+    }
+
+    /**
+     * Null = not wired (tests) or not evaluable yet. Declared after [displayState] and
+     * [notificationsBannerFlow], which it reads (properties initialise in declaration order).
+     *
+     * `isInboxPage` is the SELECTED page: the banner lives only in the Inbox page's list header, and
+     * "shown" / seen-day must not count while the user is on a project page. `inboxHasTasks` reads
+     * the Inbox page with the display options applied — the list the user sees, so a list whose only
+     * tasks are hidden completed ones (empty state on screen) also hides the banner (rule 7).
+     */
+    private val telegramPromoEval: StateFlow<TelegramPromoEval?> =
+        if (telegramLink == null || hintsRepository == null || telegramPromoPrefs == null) {
+            MutableStateFlow(null)
+        } else {
+            combine(
+                telegramLink.telegramLink,
+                hintsRepository.telegramPromoRetired,
+                telegramPromoPrefs.counters,
+                combine(_pages, _selectedPage, displayState) { pages, selected, display ->
+                    val inbox = pages?.firstOrNull()?.takeIf { it.isInbox }
+                    Triple(inbox?.applyDisplayOptions(display.options), selected, inbox != null)
+                },
+                combine(
+                    notificationsBannerFlow,
+                    telegramPromoDismissedThisSession,
+                    _now,
+                    telegramPromoSlotOnScreen,
+                ) { banner, dismissed, now, onScreen ->
+                    PromoUiInputs(banner != null, dismissed, now, onScreen)
+                },
+            ) { link, retired, counters, (inbox, selected, _), (notificationsVisible, dismissed, now, onScreen) ->
+                val today = epochDayAt(now)
+                val decision = if (inbox == null) {
+                    TelegramPromoDecision.Hide // Loading / no Inbox row: the banner has no slot
+                } else {
+                    decideTelegramPromo(
+                        TelegramPromoInput(
+                            link = link,
+                            retired = retired,
+                            dismissCount = counters.dismissCount,
+                            lastDismissedAtMs = counters.lastDismissedAtMs,
+                            nowMs = now,
+                            isInboxPage = selected == 0,
+                            inboxHasTasks = inbox.tasks.isNotEmpty(),
+                            notificationsBannerVisible = notificationsVisible,
+                            dismissedThisSession = dismissed,
+                            cycleSeenDays = counters.cycleSeenDays,
+                            seenToday = counters.lastSeenDay == today,
+                        )
+                    )
+                }
+                TelegramPromoEval(decision, link, counters, now, today, onScreen) as TelegramPromoEval?
+            }
+                .catch { e ->
+                    // An optional promo must never take the Inbox down; hidden + logged.
+                    logger.error(TAG, "telegram promo inputs failed: ${e.message}", e)
+                    emit(null)
+                }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        }
+
+    private data class PromoUiInputs(
+        val notificationsVisible: Boolean,
+        val dismissed: Boolean,
+        val nowMs: Long,
+        val slotOnScreen: Boolean,
+    )
+
+    private fun epochDayAt(nowMs: Long): Long =
+        Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(TimeZone.currentSystemDefault()).date
+            .toEpochDays().toLong()
+
+    /** Writes and events that follow an evaluation (shown once per session, seen days, auto-rest). */
+    private suspend fun onTelegramPromoEvaluated(eval: TelegramPromoEval) {
+        val prefs = telegramPromoPrefs ?: return
+        val state = eval.link.promoAnalyticsState() ?: return
+        val step = telegramPromoBookkeeping(eval.decision, eval.slotOnScreen, eval.counters.lastSeenDay, eval.today)
+        if (step.reportShown && notificationsBannerSession.claimShownEvent(TELEGRAM_PROMO_SESSION_KEY)) {
+            analytics.event(
+                AnalyticsEvents.Telegram.PROMO_SHOWN,
+                mapOf(
+                    AnalyticsEvents.Telegram.PARAM_CYCLE to eval.cycle,
+                    AnalyticsParams.SCREEN to NotificationsBannerController.SCREEN_INBOX,
+                    AnalyticsEvents.Telegram.PARAM_STATE to state,
+                ),
+            )
+        }
+        step.countSeenDay?.let { day -> prefs.update { it.afterSeenOn(day) } }
+        if (step.closeCycle) {
+            // Idempotent against a re-evaluation racing the write: close only the cycle evaluated.
+            val after = prefs.update { stored ->
+                if (stored.dismissCount == eval.counters.dismissCount &&
+                    stored.cycleSeenDays >= TG_PROMO_AUTO_REST_SEEN_DAYS
+                ) {
+                    stored.afterCycleClosed(eval.nowMs)
+                } else {
+                    stored
+                }
+            }
+            if (after.dismissCount != eval.counters.dismissCount) {
+                analytics.event(
+                    AnalyticsEvents.Telegram.PROMO_AUTO_RESTED,
+                    mapOf(
+                        AnalyticsEvents.Telegram.PARAM_CYCLE to eval.cycle,
+                        AnalyticsEvents.Telegram.PARAM_STATE to state,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** The UI reports whether the Inbox banner slot is on screen (composed + RESUMED). */
+    private fun onTelegramPromoSlotOnScreen(onScreen: Boolean) {
+        telegramPromoSlotOnScreen.value = onScreen
+    }
+
+    /** Card tap: no counter changes (spec §4.3) — linking retires the banner, coming back keeps it. */
+    private fun openTelegramFromPromo() {
+        val eval = telegramPromoEval.value
+        val state = eval?.link?.promoAnalyticsState()
+        if (eval != null && state != null) {
+            analytics.event(
+                AnalyticsEvents.Telegram.PROMO_TAPPED,
+                mapOf(
+                    AnalyticsEvents.Telegram.PARAM_CYCLE to eval.cycle,
+                    AnalyticsEvents.Telegram.PARAM_STATE to state,
+                ),
+            )
+        }
+        navigator.navigateToTelegram(AnalyticsEvents.Telegram.SCREEN_SOURCE_HOME_BANNER)
+    }
+
+    /** ×: hide now, then persist one closed cycle and report the stored count. */
+    private fun dismissTelegramPromo() {
+        val eval = telegramPromoEval.value
+        telegramPromoDismissedThisSession.value = true
+        val prefs = telegramPromoPrefs ?: return
+        viewModelScope.launch {
+            val after = try {
+                prefs.update { it.afterCycleClosed(currentTimeMillis()) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The banner is already hidden for this session; it may return next session.
+                logger.error(TAG, "telegram promo dismiss not persisted: ${e.message}", e)
+                return@launch
+            }
+            val state = eval?.link?.promoAnalyticsState() ?: return@launch
+            analytics.event(
+                AnalyticsEvents.Telegram.PROMO_DISMISSED,
+                mapOf(
+                    AnalyticsEvents.Telegram.PARAM_CYCLE to eval.cycle,
+                    AnalyticsEvents.Telegram.PARAM_STATE to state,
+                    AnalyticsParams.DISMISS_COUNT to after.dismissCount,
+                ),
+            )
+        }
+    }
+
     /** Everything the list itself is built from, folded into one source of the outer combine. */
     private data class ListState(
         val pages: List<InboxPage>?,
@@ -337,9 +538,11 @@ class InboxViewModel(
         // Paired so the whole state still fits typed `combine`'s five-source ceiling; the sheet and
         // the limits that gate two of its rows belong to one interaction, so pairing costs no clarity.
         combine(_itemSheet, _userLimits) { sheet, limits -> sheet to limits },
-        // Paired with the banner to stay within the five-source ceiling.
-        combine(_listMenu, notificationsBannerFlow) { menu, banner -> menu to banner },
-    ) { list, selected, (draft, due), (itemSheet, userLimits), (listMenu, notificationsBanner) ->
+        // Grouped with the two banners to stay within the five-source ceiling.
+        combine(_listMenu, notificationsBannerFlow, telegramPromoEval) { menu, banner, promo ->
+            Triple(menu, banner, promo?.decision)
+        },
+    ) { list, selected, (draft, due), (itemSheet, userLimits), (listMenu, notificationsBanner, telegramPromoDecision) ->
         val (pages, display, loadError, nowMillis) = list
         val displayOptions = display.options
         val displayOptionsOpen = display.sheetOpen
@@ -390,6 +593,9 @@ class InboxViewModel(
                 // ticks every minute it reopens within a minute of expiring rather than on the next
                 // cold start.
                 notificationsBanner = notificationsBanner,
+                telegramPromoVisible = telegramPromoDecision == TelegramPromoDecision.Show,
+                telegramPromoTracksSlot = telegramPromoDecision == TelegramPromoDecision.Show ||
+                    telegramPromoDecision == TelegramPromoDecision.AutoRest,
                 planNudgeDismissed = display.planNudgeDismissedAt > 0L &&
                     nowMillis - display.planNudgeDismissedAt < PLAN_NUDGE_SNOOZE_MILLIS,
             )
@@ -399,6 +605,18 @@ class InboxViewModel(
     init {
         bootstrap()
         viewModelScope.launch { notificationsBanner?.refresh() }
+        viewModelScope.launch {
+            telegramPromoEval.collect { eval ->
+                if (eval == null) return@collect
+                try {
+                    onTelegramPromoEvaluated(eval)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error(TAG, "telegram promo bookkeeping failed: ${e.message}", e)
+                }
+            }
+        }
         observeUserLimits()
         observeClock()
         // Below the properties it reads — [_draft] is initialised in declaration order, and a
@@ -530,6 +748,9 @@ class InboxViewModel(
     override fun onIntent(intent: InboxIntent) {
         when (intent) {
             is InboxIntent.OnPageSelected -> _selectedPage.value = intent.index
+            InboxIntent.OnTelegramPromoClick -> openTelegramFromPromo()
+            InboxIntent.OnTelegramPromoDismiss -> dismissTelegramPromo()
+            is InboxIntent.OnTelegramPromoSlotOnScreen -> onTelegramPromoSlotOnScreen(intent.onScreen)
             is InboxIntent.OnQuickAddTextChanged ->
                 _draft.value = _draft.value.copy(text = intent.text)
             is InboxIntent.OnCreateChipAction -> applyCreateChip(intent.action)
@@ -2080,6 +2301,9 @@ class InboxViewModel(
          * belongs in one shared gate for both call sites.
          */
         const val FREE_ACTIVE_REMINDERS = 1
+
+        /** [NotificationsBannerSession.claimShownEvent] key: `telegram_promo_shown` once per session. */
+        const val TELEGRAM_PROMO_SESSION_KEY = "telegram_promo_inbox"
 
         /** Paywall attribution for the locked banner inside the item reminder sheet. */
         const val PAYWALL_SOURCE_ITEM_REMINDER = "inbox_item_reminder_limit"

@@ -21,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.automirrored.outlined.Article
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Campaign
@@ -56,6 +55,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.desingsystem.components.TelegramLogo
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
@@ -297,7 +297,8 @@ fun AppNavigationDrawerContent(
         )
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.drawer_item_telegram)) },
-            icon = { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null) },
+            // Brand logo, untinted: the selected/unselected drawer tint must not recolour it.
+            icon = { TelegramLogo() },
             selected = selectedItemId == DrawerDestination.Telegram,
             onClick = {
                 onCloseDrawer()

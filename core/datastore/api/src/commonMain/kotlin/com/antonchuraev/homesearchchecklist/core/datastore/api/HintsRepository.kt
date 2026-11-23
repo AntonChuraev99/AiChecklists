@@ -30,4 +30,14 @@ interface HintsRepository {
 
     /** Increment the persistent sync-banner dismiss count by one. */
     suspend fun incrementSyncBannerDismissCount()
+
+    /**
+     * Emits `true` once a Telegram link was EVER observed on this device: the Telegram promo
+     * banner is then gone for good, even after an unlink. Written by the Telegram link cache
+     * writer, not by the Inbox. Defaults to `false`. Never throws.
+     */
+    val telegramPromoRetired: Flow<Boolean>
+
+    /** Permanently retire the Telegram promo banner. Idempotent. */
+    suspend fun markTelegramPromoRetired()
 }

@@ -105,68 +105,104 @@ fun ReminderSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
-        if (state.isLocked) {
-            LockedReminderContent(
-                onUpgradeClick = callbacks.onUpgradeClick
-            )
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-            ) {
-                // Tab row
-                PrimaryTabRow(
-                    selectedTabIndex = if (state.activeTab == ReminderTab.ONCE) 0 else 1,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Tab(
-                        selected = state.activeTab == ReminderTab.ONCE,
-                        onClick = { callbacks.onTabSelected(ReminderTab.ONCE) },
-                        text = { Text(stringResource(Res.string.reminder_tab_once)) }
-                    )
-                    Tab(
-                        selected = state.activeTab == ReminderTab.REPEAT,
-                        onClick = { callbacks.onTabSelected(ReminderTab.REPEAT) },
-                        text = { Text(stringResource(Res.string.reminder_tab_repeat)) }
-                    )
-                }
+        ReminderSheetContent(state = state, callbacks = callbacks)
+    }
+}
 
-                // Tab content
-                when (state.activeTab) {
-                    ReminderTab.ONCE -> OnceTabContent(
-                        currentReminder = state.currentReminder,
-                        onPresetSelected = callbacks.onPresetSelected,
-                        onCustomDateRequested = callbacks.onCustomDateRequested,
-                        onRemoveReminder = callbacks.onRemoveReminder,
-                        onAddToCalendar = callbacks.onAddToCalendar,
-                        showFullScreenOption = state.showFullScreenOption,
-                        fullScreenEnabled = state.fullScreenEnabled,
-                        onFullScreenToggled = callbacks.onFullScreenToggled
-                    )
-                    ReminderTab.REPEAT -> RepeatTabContent(
-                        config = state.pendingRepeatConfig ?: PendingRepeatConfig(),
-                        currentRepeatRule = state.currentRepeatRule,
-                        repeatRuleSummary = state.repeatRuleSummary,
-                        showEndConditionPicker = state.showEndConditionPicker,
-                        onTypeSelected = callbacks.onRepeatTypeSelected,
-                        onSmartPresetSelected = callbacks.onSmartPresetSelected,
-                        onIntervalChanged = callbacks.onRepeatIntervalChanged,
-                        onWeekDayToggled = callbacks.onWeekDayToggled,
-                        onResetChecksToggled = callbacks.onResetChecksToggled,
-                        onTimeChanged = callbacks.onRepeatTimeChanged,
-                        onEndConditionClick = callbacks.onEndConditionClick,
-                        onEndConditionSelected = callbacks.onEndConditionSelected,
-                        onDismissEndCondition = callbacks.onDismissEndCondition,
-                        onSave = callbacks.onSaveRepeat,
-                        onRemove = callbacks.onRemoveRepeat,
-                        onAddToCalendar = callbacks.onAddToCalendar,
-                        showFullScreenOption = state.showFullScreenOption,
-                        fullScreenEnabled = state.fullScreenEnabled,
-                        onFullScreenToggled = callbacks.onFullScreenToggled
-                    )
-                }
+/**
+ * The body of [ReminderSheet] without the `ModalBottomSheet` window — what the sheet shows. Public
+ * only so screenshot tests in other modules can render it inline (a sheet window captures
+ * unreliably under Robolectric); production code calls [ReminderSheet].
+ *
+ * @param initialDeliveryExpanded the "Where all reminders go" card's expanded state on the first
+ *   frame. Production always starts collapsed (spec §3.4: collapsed on every sheet open); screenshot
+ *   fixtures pass `true` to frame the radio group.
+ */
+@Composable
+fun ReminderSheetContent(
+    state: ReminderSheetState,
+    callbacks: ReminderSheetCallbacks,
+    initialDeliveryExpanded: Boolean = false,
+) {
+    // UI-local, hoisted to the sheet body so switching tabs keeps it; the sheet's content leaves the
+    // composition when it closes, so every open starts from [initialDeliveryExpanded] (collapsed).
+    var deliveryExpanded by rememberSaveable { mutableStateOf(initialDeliveryExpanded) }
+    val deliverySlot: @Composable () -> Unit = {
+        state.delivery?.let { row ->
+            ReminderDeliveryRow(
+                row = row,
+                expanded = deliveryExpanded,
+                onExpandedChange = { expanded ->
+                    deliveryExpanded = expanded
+                    callbacks.delivery.onExpandedChange(expanded)
+                },
+                callbacks = callbacks.delivery,
+            )
+        }
+    }
+    if (state.isLocked) {
+        LockedReminderContent(
+            onUpgradeClick = callbacks.onUpgradeClick
+        )
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+        ) {
+            // Tab row
+            PrimaryTabRow(
+                selectedTabIndex = if (state.activeTab == ReminderTab.ONCE) 0 else 1,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Tab(
+                    selected = state.activeTab == ReminderTab.ONCE,
+                    onClick = { callbacks.onTabSelected(ReminderTab.ONCE) },
+                    text = { Text(stringResource(Res.string.reminder_tab_once)) }
+                )
+                Tab(
+                    selected = state.activeTab == ReminderTab.REPEAT,
+                    onClick = { callbacks.onTabSelected(ReminderTab.REPEAT) },
+                    text = { Text(stringResource(Res.string.reminder_tab_repeat)) }
+                )
+            }
+
+            // Tab content
+            when (state.activeTab) {
+                ReminderTab.ONCE -> OnceTabContent(
+                    currentReminder = state.currentReminder,
+                    onPresetSelected = callbacks.onPresetSelected,
+                    onCustomDateRequested = callbacks.onCustomDateRequested,
+                    onRemoveReminder = callbacks.onRemoveReminder,
+                    onAddToCalendar = callbacks.onAddToCalendar,
+                    showFullScreenOption = state.showFullScreenOption,
+                    fullScreenEnabled = state.fullScreenEnabled,
+                    onFullScreenToggled = callbacks.onFullScreenToggled,
+                    deliverySlot = deliverySlot,
+                )
+                ReminderTab.REPEAT -> RepeatTabContent(
+                    config = state.pendingRepeatConfig ?: PendingRepeatConfig(),
+                    currentRepeatRule = state.currentRepeatRule,
+                    repeatRuleSummary = state.repeatRuleSummary,
+                    showEndConditionPicker = state.showEndConditionPicker,
+                    onTypeSelected = callbacks.onRepeatTypeSelected,
+                    onSmartPresetSelected = callbacks.onSmartPresetSelected,
+                    onIntervalChanged = callbacks.onRepeatIntervalChanged,
+                    onWeekDayToggled = callbacks.onWeekDayToggled,
+                    onResetChecksToggled = callbacks.onResetChecksToggled,
+                    onTimeChanged = callbacks.onRepeatTimeChanged,
+                    onEndConditionClick = callbacks.onEndConditionClick,
+                    onEndConditionSelected = callbacks.onEndConditionSelected,
+                    onDismissEndCondition = callbacks.onDismissEndCondition,
+                    onSave = callbacks.onSaveRepeat,
+                    onRemove = callbacks.onRemoveRepeat,
+                    onAddToCalendar = callbacks.onAddToCalendar,
+                    showFullScreenOption = state.showFullScreenOption,
+                    fullScreenEnabled = state.fullScreenEnabled,
+                    onFullScreenToggled = callbacks.onFullScreenToggled,
+                    deliverySlot = deliverySlot,
+                )
             }
         }
     }
@@ -224,7 +260,8 @@ private fun OnceTabContent(
     onAddToCalendar: () -> Unit,
     showFullScreenOption: Boolean,
     fullScreenEnabled: Boolean,
-    onFullScreenToggled: (Boolean) -> Unit
+    onFullScreenToggled: (Boolean) -> Unit,
+    deliverySlot: @Composable () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -272,7 +309,10 @@ private fun OnceTabContent(
 
         // Always available — exports the checklist to Google Calendar. With a reminder set, its
         // time/repeat is pre-filled; without one, the calendar opens for the user to pick a time.
+        // The "Where all reminders go" row sits directly above it (no divider between them), so the
+        // "where does this reminder go" cluster reads as one block.
         HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+        deliverySlot()
         CalendarActionRow(onClick = onAddToCalendar)
 
         if (currentReminder != null) {
@@ -304,7 +344,8 @@ private fun RepeatTabContent(
     onAddToCalendar: () -> Unit,
     showFullScreenOption: Boolean,
     fullScreenEnabled: Boolean,
-    onFullScreenToggled: (Boolean) -> Unit
+    onFullScreenToggled: (Boolean) -> Unit,
+    deliverySlot: @Composable () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -493,6 +534,7 @@ private fun RepeatTabContent(
         // Always available — exports the checklist to Google Calendar (pre-filled with the saved
         // repeat schedule, or opens the calendar to pick a time if none is set yet).
         HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+        deliverySlot()
         CalendarActionRow(onClick = onAddToCalendar)
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))

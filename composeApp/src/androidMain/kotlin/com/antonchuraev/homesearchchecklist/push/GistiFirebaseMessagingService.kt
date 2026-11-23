@@ -10,9 +10,10 @@ import com.antonchuraev.homesearchchecklist.MainActivity
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
-import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderDeliveryPrefsRepository
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
+import com.antonchuraev.homesearchchecklist.telegram.TelegramLinkCacheWriter
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -122,13 +123,17 @@ internal class GistiFirebaseMessagingService : FirebaseMessagingService() {
      * write. Bounded well below FCM's ~20 s handling window.
      */
     private fun persistReminderChannel(channel: ReminderChannel) {
-        val repository: ReminderDeliveryPrefsRepository? = GlobalContext.getOrNull()?.getOrNull()
-        if (repository == null) {
-            logger?.warning(TAG, "reminder_channel push: no ReminderDeliveryPrefsRepository — '${channel.wire}' not cached")
+        // The Telegram cache writer updates the receiver channel AND the link snapshot the
+        // reminder sheet reads (only a Linked snapshot of the signed-in account).
+        val koin = GlobalContext.getOrNull()
+        val writer: TelegramLinkCacheWriter? = koin?.getOrNull()
+        if (writer == null) {
+            logger?.warning(TAG, "reminder_channel push: no TelegramLinkCacheWriter — '${channel.wire}' not cached")
             return
         }
+        val accountId = koin.getOrNull<GoogleAuthRepository>()?.currentUser?.firebaseUid?.takeIf { it.isNotBlank() }
         val written = runCatching {
-            runBlocking { withTimeoutOrNull(CHANNEL_WRITE_TIMEOUT_MS) { repository.setReminderChannel(channel) } }
+            runBlocking { withTimeoutOrNull(CHANNEL_WRITE_TIMEOUT_MS) { writer.onChannelPushed(accountId, channel) } }
         }
         written.onFailure { e ->
             logger?.error(TAG, "reminder_channel push: failed to cache '${channel.wire}' — ${e.message}", e)

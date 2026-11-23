@@ -5,7 +5,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.webReminderTarget
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.analyticsValue
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountError
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramAccountResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.TelegramLinkStatus
@@ -95,7 +97,8 @@ class TelegramViewModel(
 
     override fun onIntent(intent: TelegramIntent) {
         when (intent) {
-            TelegramIntent.ScreenEntered -> onScreenEntered()
+            TelegramIntent.ScreenEntered -> onScreenEntered(source = null)
+            is TelegramIntent.ScreenEnteredFrom -> onScreenEntered(intent.source)
             TelegramIntent.ScreenResumed -> onResumed()
             TelegramIntent.ScreenPaused -> onPaused()
             is TelegramIntent.ConnectClicked -> onConnect(intent.linkOpenedByHost)
@@ -146,8 +149,11 @@ class TelegramViewModel(
 
     // ── Lifecycle ───────────────────────────────────────────────────────────
 
-    private fun onScreenEntered() {
-        analyticsTracker.event(AnalyticsEvents.Telegram.SCREEN_OPENED)
+    private fun onScreenEntered(source: String?) {
+        analyticsTracker.event(
+            AnalyticsEvents.Telegram.SCREEN_OPENED,
+            if (source == null) emptyMap() else mapOf(AnalyticsParams.SOURCE to source),
+        )
         entered = true
         pollJob?.cancel()
         if (phase == TelegramAuthPhase.SignedIn) {
@@ -492,6 +498,16 @@ class TelegramViewModel(
                         return
                     }
                     val attempted = now.channelSaving ?: sending
+                    analyticsTracker.event(
+                        AnalyticsEvents.Telegram.REMINDER_CHANNEL_SET_FAILED,
+                        mapOf(
+                            // The failed request's channel; `attempted` (the retry target) may be a
+                            // later tap that was still waiting behind it.
+                            AnalyticsEvents.Telegram.PARAM_CHANNEL to sending.wire,
+                            AnalyticsParams.SOURCE to AnalyticsEvents.Telegram.SOURCE_APP,
+                            AnalyticsParams.REASON to result.error.toFailureReason().analyticsValue(),
+                        ),
+                    )
                     _screenState.value = now.copy(reminderChannel = confirmed, channelSaving = null)
                     // During an unlink the whole group is going away — no retry offer for it.
                     if (!now.isDisconnecting) {

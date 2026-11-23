@@ -1,6 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.create
 
 import androidx.compose.runtime.Composable
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.rememberReminderDelivery
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.withDelivery
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
@@ -35,6 +38,7 @@ fun DraftDueSheetHost(
     onIntent: (DraftDueIntent) -> Unit,
 ) {
     due.sheet?.let { sheet ->
+        val delivery = rememberReminderDelivery(AnalyticsEvents.Telegram.SURFACE_DRAFT)
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = sheet.tab,
@@ -47,7 +51,7 @@ fun DraftDueSheetHost(
                 pendingRepeatConfig = sheet.repeatConfig,
                 showEndConditionPicker = sheet.endConditionPickerOpen,
                 isLocked = sheet.locked,
-            ),
+            ).withDelivery(delivery),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(DraftDueIntent.OnSheetTabSelected(it)) },
                 onPresetSelected = { onIntent(DraftDueIntent.OnSheetPresetSelected(it)) },
@@ -66,7 +70,7 @@ fun DraftDueSheetHost(
                 onRemoveRepeat = { onIntent(DraftDueIntent.OnRepeatRemove) },
                 onDismiss = { onIntent(DraftDueIntent.OnSheetDismiss) },
                 onUpgradeClick = { onIntent(DraftDueIntent.OnSheetUpgradeClick) },
-            ),
+            ).withDelivery(delivery),
         )
     }
 
