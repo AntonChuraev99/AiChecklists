@@ -63,6 +63,11 @@ data class ReminderSheetState(
     val showFullScreenOption: Boolean = false,
     /** Current value of the full-screen-reminder toggle (only meaningful when [showFullScreenOption]). */
     val fullScreenEnabled: Boolean = false,
+    /**
+     * "Where all reminders go" row above "Add to Google Calendar", in both tabs (not in the locked
+     * branch). Null = no row — the default, so every caller that does not wire it is unchanged.
+     */
+    val delivery: ReminderDeliveryRowUi? = null,
 )
 
 /**
@@ -101,4 +106,7 @@ data class ReminderSheetCallbacks(
     val onDismiss: () -> Unit,
     // Locked paywall banner
     val onUpgradeClick: () -> Unit = {},
+    // "Where all reminders go" row (ReminderSheetState.delivery). No-op defaults: unwired callers
+    // compile unchanged and show no row.
+    val delivery: ReminderDeliveryCallbacks = ReminderDeliveryCallbacks(),
 )

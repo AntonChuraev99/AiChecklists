@@ -163,6 +163,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.Remind
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.rememberReminderDelivery
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.withDelivery
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.AttachmentFullscreenViewer
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ItemDetailsSheet
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ItemDetailsSheetRow
@@ -172,6 +175,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.Not
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.AnimatedNotificationsOffBanner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.rememberNotificationPermissionController
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
@@ -951,6 +955,7 @@ private fun InboxItemSheetHost(
     // ViewModel keeps `reminderSheet` non-null across both so their state (notably the full-screen
     // toggle) survives and dismissing them lands back here instead of closing everything.
     content.reminderSheet?.takeIf { surface == InboxItemSheetSurface.REMINDER_SHEET }?.let { reminder ->
+        val delivery = rememberReminderDelivery(AnalyticsEvents.Telegram.SURFACE_INBOX_TASK)
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = reminder.tab,
@@ -962,7 +967,7 @@ private fun InboxItemSheetHost(
                 isLocked = reminder.locked,
                 showFullScreenOption = true,
                 fullScreenEnabled = reminder.fullScreen,
-            ),
+            ).withDelivery(delivery),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(InboxIntent.OnReminderTabSelected(it)) },
                 onPresetSelected = { onIntent(InboxIntent.OnReminderPresetSelected(it)) },
@@ -983,7 +988,7 @@ private fun InboxItemSheetHost(
                 onFullScreenToggled = { onIntent(InboxIntent.OnReminderFullScreenToggled(it)) },
                 onDismiss = { onIntent(InboxIntent.OnReminderSheetDismiss) },
                 onUpgradeClick = { onIntent(InboxIntent.OnReminderUpgradeClick) },
-            ),
+            ).withDelivery(delivery),
         )
     }
 
@@ -1411,6 +1416,33 @@ private fun InboxContent(
                         .padding(bottom = AppDimens.SpacingSm),
                 )
             }
+            // The Inbox page's header: the same ONE slot, at most one banner in it (spec §4.1). The
+            // notifications-off banner reports something broken and wins; the Telegram promo is a
+            // suggestion, Inbox page only (a project page gets `notificationsBanner` alone). The VM
+            // already yields the promo to the notifications banner — the guard below keeps the UI
+            // from ever drawing both even if the two flags disagree for a frame.
+            val inboxHeader: @Composable () -> Unit = {
+                // "On screen" signal for the promo's seen days / shown event / auto-rest: this header
+                // is a LazyColumn item, so it is composed only while (near) visible, and the effect
+                // reports pause and disposal (scrolled away, page gone, app backgrounded) as off.
+                if (content.telegramPromoTracksSlot) {
+                    LifecycleResumeEffect(Unit) {
+                        onIntent(InboxIntent.OnTelegramPromoSlotOnScreen(true))
+                        onPauseOrDispose { onIntent(InboxIntent.OnTelegramPromoSlotOnScreen(false)) }
+                    }
+                }
+                Column {
+                    notificationsBanner()
+                    AnimatedTelegramPromoBanner(
+                        visible = content.telegramPromoVisible && content.notificationsBanner == null,
+                        onOpenTelegram = { onIntent(InboxIntent.OnTelegramPromoClick) },
+                        onDismiss = { onIntent(InboxIntent.OnTelegramPromoDismiss) },
+                        modifier = Modifier
+                            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                            .padding(bottom = AppDimens.SpacingSm),
+                    )
+                }
+            }
 
             HorizontalPager(
                 state = pagerState,
@@ -1440,7 +1472,7 @@ private fun InboxContent(
                         planNudgeSuppressed = content.planNudgeDismissed,
                         onPlanDayClick = onPlanDayClick,
                         onIntent = onIntent,
-                        listHeader = notificationsBanner,
+                        listHeader = if (page.isInbox) inboxHeader else notificationsBanner,
                     )
                 }
             }
@@ -1468,8 +1500,9 @@ private fun InboxContent(
  * @param showAddTaskRow whether the trailing add-task row is composed. Decided by [InboxScreen] (see
  *   its `showAddTaskRow`), never here: the reasons are the window size and the host's dock flag, and
  *   neither is this composable's business.
- * @param listHeader the first item of the list (the notifications-off banner), composed on every
- *   page and always present — it animates its own visibility, so an empty banner is a 0-height item.
+ * @param listHeader the first item of the list (the notifications-off banner; on the Inbox page also
+ *   the Telegram promo), composed on every page and always present — it animates its own
+ *   visibility, so an empty banner is a 0-height item.
  */
 @Composable
 private fun InboxPageList(

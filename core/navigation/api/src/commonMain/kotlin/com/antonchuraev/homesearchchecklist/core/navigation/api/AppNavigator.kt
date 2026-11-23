@@ -162,6 +162,14 @@ interface AppNavigator {
     fun navigateToOnboardings()
 
     /**
+     * Push the Telegram screen ([AppNavRoute.Telegram]) unless one is already on top.
+     *
+     * The default body exists ONLY so the many hand-written test navigators keep compiling; the
+     * production navigator overrides it. [source] = `AnalyticsEvents.Telegram.SCREEN_SOURCE_*`.
+     */
+    fun navigateToTelegram(source: String) = Unit
+
+    /**
      * Show the checklist picker for an ACTION_PROCESS_TEXT flow.
      *
      * @param purpose [AddToChecklistPurpose.ADD_ITEM] (default) appends [text] as a single item and

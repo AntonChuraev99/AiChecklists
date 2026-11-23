@@ -9,6 +9,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayPrefs
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderDeliveryPrefsRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.TelegramLinkCacheRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.TelegramPromoPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ActivationPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiChatPreferencesRepositoryImpl
@@ -19,6 +21,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.impl.InboxDisplayPref
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.LanguageRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.NavExperimentPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ReminderDeliveryPrefsRepositoryImpl
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.TelegramLinkCacheRepositoryImpl
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.TelegramPromoPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ThemeRepositoryImpl
 import org.koin.dsl.module
 
@@ -26,7 +30,7 @@ val datastoreModule = module {
     single<ThemeRepository> { ThemeRepositoryImpl(dataStore = get()) }
     single<LanguageRepository> { LanguageRepositoryImpl(dataStore = get()) }
     single<AiChatPreferencesRepository> { AiChatPreferencesRepositoryImpl(dataStore = get()) }
-    single<HintsRepository> { HintsRepositoryImpl(dataStore = get()) }
+    single<HintsRepository> { HintsRepositoryImpl(dataStore = get(), logger = get()) }
     single<FirstChecklistRepository> { FirstChecklistRepositoryImpl(dataStore = get()) }
     single<ActivationPrefsRepository> { ActivationPrefsRepositoryImpl(dataStore = get()) }
     single<AiExperimentPrefsRepository> { AiExperimentPrefsRepositoryImpl(dataStore = get()) }
@@ -39,5 +43,11 @@ val datastoreModule = module {
     // logger: read failures degrade to Push (ReminderReceiver must still notify) and are reported.
     single<ReminderDeliveryPrefsRepository> {
         ReminderDeliveryPrefsRepositoryImpl(dataStore = get(), logger = get())
+    }
+    single<TelegramLinkCacheRepository> {
+        TelegramLinkCacheRepositoryImpl(dataStore = get(), logger = get())
+    }
+    single<TelegramPromoPrefsRepository> {
+        TelegramPromoPrefsRepositoryImpl(dataStore = get(), logger = get())
     }
 }

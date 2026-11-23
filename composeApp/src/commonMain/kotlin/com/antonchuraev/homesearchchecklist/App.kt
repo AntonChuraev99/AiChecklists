@@ -290,6 +290,9 @@ import com.antonchuraev.homesearchchecklist.telegram.telegramAuthPhaseFlow
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.LocalReminderDeliveryHost
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDeliveryChannelController
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDeliveryHost
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -579,11 +582,25 @@ fun App() {
             }
 
             // ── Telegram screen + bot sign-in link (app.gisti-ai.com/?tg_link=<token>) ──────
-            // Pushed as a detail screen like MCP, with the same top-of-stack dedupe.
-            val openTelegramScreen: () -> Unit = {
-                if (navigator.backStack.lastOrNull() != AppNavRoute.Telegram) {
-                    navigator.backStack.add(AppNavRoute.Telegram)
-                }
+            // Pushed as a detail screen like MCP, with the same top-of-stack dedupe (in the navigator).
+            // `source` goes out with telegram_screen_opened (spec §6).
+            val openTelegramScreen: (source: String) -> Unit = { source ->
+                navigator.navigateToTelegram(source)
+            }
+            // Reminder sheet "Where all reminders go" row (spec §5.2): one app-scoped controller for
+            // every sheet. Connect pushes the Telegram screen; the sheet's host entry leaves
+            // composition (NavDisplay draws only the top scene, and the Telegram entry has no pane
+            // metadata, so even two-pane Expanded collapses to it), which disposes the
+            // ModalBottomSheet window. The open sheet + pending Repeat config live in the host VM,
+            // so Back re-shows the same sheet with the new link state.
+            val reminderDeliveryController: ReminderDeliveryChannelController = koinInject()
+            val reminderDeliveryHost = remember(reminderDeliveryController) {
+                ReminderDeliveryHost(
+                    controller = reminderDeliveryController,
+                    openTelegram = {
+                        navigator.navigateToTelegram(AnalyticsEvents.Telegram.SCREEN_SOURCE_REMINDER_SHEET)
+                    },
+                )
             }
             // Platform entry points (wasmJs main.kt / Android MainActivity) push the token into
             // PendingTelegramLink; handleTelegramLinkClaim waits for Google sign-in, claims it and
@@ -610,7 +627,9 @@ fun App() {
                                 navigator.backStack.any { isV2TabRoute(it) }
                             }.first { it }
                         },
-                        openTelegramScreen = openTelegramScreen,
+                        openTelegramScreen = {
+                            openTelegramScreen(AnalyticsEvents.Telegram.SCREEN_SOURCE_DEEP_LINK)
+                        },
                         showSnackbar = { message ->
                             val withDuration = resolveTelegramSnackbar(message)
                             snackbarHostState.showSnackbar(
@@ -1675,7 +1694,15 @@ fun App() {
                             navigator.backStack.add(AppNavRoute.Mcp)
                         }
                     }
-                    DrawerDestination.Telegram -> openTelegramScreen()
+                    // The v2 Overview tab and the drawer share this destination; the Overview tab is
+                    // the top route only when the tap came from its row.
+                    DrawerDestination.Telegram -> openTelegramScreen(
+                        if (navigator.backStack.lastOrNull() is AppNavRoute.Overview) {
+                            AnalyticsEvents.Telegram.SCREEN_SOURCE_OVERVIEW
+                        } else {
+                            AnalyticsEvents.Telegram.SCREEN_SOURCE_DRAWER
+                        },
+                    )
                     DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
                     DrawerDestination.Settings -> navigator.navigateToSettings()
                 }
@@ -2081,6 +2108,7 @@ fun App() {
             }
 
             val renderNav: @Composable (DrawerState?) -> Unit = { drawerState ->
+            CompositionLocalProvider(LocalReminderDeliveryHost provides reminderDeliveryHost) {
             NavDisplay(
                 backStack = navigator.backStack,
                 onBack = { navigator.onBack() },
@@ -2404,8 +2432,9 @@ fun App() {
                         McpScreen(onBack = { navigator.onBack() })
                     }
 
-                    entry<AppNavRoute.Telegram> {
+                    entry<AppNavRoute.Telegram> { route ->
                         TelegramRoute(
+                            source = route.source,
                             onBack = { navigator.onBack() },
                             onSignInClick = handleSignIn,
                         )
@@ -2582,6 +2611,7 @@ fun App() {
                     }
                 }, // end entryProvider
             ) // end NavDisplay
+            } // end CompositionLocalProvider(LocalReminderDeliveryHost)
             } // end renderNav lambda
 
             // Shell hand-offs requested by a feature that cannot reach the shell (today: the

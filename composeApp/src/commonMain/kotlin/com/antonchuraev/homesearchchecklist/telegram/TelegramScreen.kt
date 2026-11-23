@@ -126,9 +126,11 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDes
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.core.common.api.isWebOn
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSectionHeader
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSkeletonLine
+import com.antonchuraev.homesearchchecklist.desingsystem.components.TelegramLogo
 import com.antonchuraev.homesearchchecklist.desingsystem.components.GroupPosition
 import com.antonchuraev.homesearchchecklist.desingsystem.components.groupPositionOf
 import com.antonchuraev.homesearchchecklist.desingsystem.components.groupSegment
@@ -137,11 +139,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveCont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDensity
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import com.antonchuraev.homesearchchecklist.integrations.IntegrationNoteRow
-import com.antonchuraev.homesearchchecklist.integrations.IntegrationRowTile
+import com.antonchuraev.homesearchchecklist.integrations.IntegrationRowTileSize
 import com.antonchuraev.homesearchchecklist.integrations.ValuePropRow
 import com.antonchuraev.homesearchchecklist.integrations.firstLineCentring
 import com.antonchuraev.homesearchchecklist.integrations.lineHeightDp
@@ -154,7 +155,6 @@ import org.jetbrains.compose.resources.stringResource
 
 // Component-local sizes (spec §3) — the same dimensions McpScreen uses.
 private val HeroTileSize = 56.dp
-private val HeroIconSize = 28.dp
 private val StepDotSize = 24.dp
 private val SpinnerSize = 20.dp
 private val SpinnerStroke = 2.dp
@@ -278,19 +278,8 @@ internal fun TelegramScreenLayout(
 
 @Composable
 private fun TelegramHero() {
-    Box(
-        modifier = Modifier
-            .size(HeroTileSize)
-            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.Send,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(HeroIconSize),
-        )
-    }
+    // The brand logo is its own disc: no primary tile behind it (blue on blue) and no theme tint.
+    TelegramLogo(size = HeroTileSize)
     Spacer(Modifier.height(AppDimens.SpacingMd))
     Text(
         text = stringResource(Res.string.telegram_hero_title),
@@ -549,11 +538,8 @@ private fun AccountCard(state: TelegramScreenState.Linked) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
     ) {
-        IntegrationRowTile(
-            icon = Icons.AutoMirrored.Outlined.Send,
-            tileColor = GistiColors.successContainer,
-            iconTint = GistiColors.onSuccessContainer,
-        )
+        // Brand logo in the tile's 40dp footprint; "linked" is told by the "Linked since" line.
+        TelegramLogo(size = IntegrationRowTileSize)
         Column(Modifier.weight(1f)) {
             Text(
                 text = label,

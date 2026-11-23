@@ -978,8 +978,62 @@ object AnalyticsEvents {
 
     // ─── Telegram bot account link (composeApp/commonMain/telegram) ──────────
     object Telegram {
-        /** The Telegram screen was entered (every push of the route). */
+        /**
+         * The Telegram screen was entered (every push of the route). Param [AnalyticsParams.SOURCE] =
+         * [SCREEN_SOURCE_HOME_BANNER] | [SCREEN_SOURCE_REMINDER_SHEET] | [SCREEN_SOURCE_DRAWER] |
+         * [SCREEN_SOURCE_OVERVIEW] | [SCREEN_SOURCE_DEEP_LINK] (absent only on builds before 2026-11-21).
+         */
         const val SCREEN_OPENED = "telegram_screen_opened"
+        const val SCREEN_SOURCE_HOME_BANNER = "home_banner"
+        const val SCREEN_SOURCE_REMINDER_SHEET = "reminder_sheet"
+        const val SCREEN_SOURCE_DRAWER = "drawer"
+        const val SCREEN_SOURCE_OVERVIEW = "overview"
+        const val SCREEN_SOURCE_DEEP_LINK = "deep_link"
+
+        /**
+         * Inbox Telegram promo banner composed visible — at most once per app session. Params:
+         * [PARAM_CYCLE] (1..3), [AnalyticsParams.SCREEN] = "inbox", [PARAM_STATE] = signed_out|not_linked.
+         */
+        const val PROMO_SHOWN = "telegram_promo_shown"
+
+        /** Promo card tapped (the link is part of the card). Params: [PARAM_CYCLE], [PARAM_STATE]. */
+        const val PROMO_TAPPED = "telegram_promo_tapped"
+
+        /**
+         * Promo × tapped. Params: [PARAM_CYCLE], [PARAM_STATE], [AnalyticsParams.DISMISS_COUNT] =
+         * persisted count AFTER this dismissal.
+         */
+        const val PROMO_DISMISSED = "telegram_promo_dismissed"
+
+        /** A promo cycle closed by itself after 7 seen days. Params: [PARAM_CYCLE], [PARAM_STATE]. */
+        const val PROMO_AUTO_RESTED = "telegram_promo_auto_rested"
+
+        /**
+         * Tap on the reminder sheet's "Where all reminders go" header or its Connect row. Params:
+         * [PARAM_STATE] = linked|not_linked|signed_out, [AnalyticsParams.ACTION] = expand|collapse|connect,
+         * [AnalyticsParams.SURFACE] = checklist|item|inbox_task|draft|create.
+         */
+        const val REMINDER_ROW_TAPPED = "telegram_reminder_row_tapped"
+
+        /**
+         * A reminder-channel save failed. Params: [PARAM_CHANNEL] (attempted), [AnalyticsParams.SOURCE]
+         * = [SOURCE_APP] (screen) | [SOURCE_REMINDER_SHEET], [AnalyticsParams.REASON] = network|server|account.
+         */
+        const val REMINDER_CHANNEL_SET_FAILED = "tg_reminder_channel_set_failed"
+
+        const val PARAM_CYCLE = "cycle"
+        const val PARAM_STATE = "state"
+        const val STATE_SIGNED_OUT = "signed_out"
+        const val STATE_NOT_LINKED = "not_linked"
+        const val STATE_LINKED = "linked"
+        const val ACTION_EXPAND = "expand"
+        const val ACTION_COLLAPSE = "collapse"
+        const val ACTION_CONNECT = "connect"
+        const val SURFACE_CHECKLIST = "checklist"
+        const val SURFACE_ITEM = "item"
+        const val SURFACE_INBOX_TASK = "inbox_task"
+        const val SURFACE_DRAFT = "draft"
+        const val SURFACE_CREATE = "create"
 
         /** Connect tapped on the screen (fires per tap, whether or not the link token was ready). */
         const val CONNECT_TAPPED = "telegram_connect_tapped"
@@ -996,7 +1050,8 @@ object AnalyticsEvents {
         /**
          * The reminder channel was saved (server confirmed). Same event name as the bot's
          * (`tg_reminder_channel_set`, telegram-bot worker) so one chart covers every surface.
-         * Params: [PARAM_CHANNEL] = push|telegram|both, [AnalyticsParams.SOURCE] = [SOURCE_APP].
+         * Params: [PARAM_CHANNEL] = push|telegram|both, [AnalyticsParams.SOURCE] = [SOURCE_APP]
+         * (Telegram screen) | [SOURCE_REMINDER_SHEET] (reminder sheet row).
          */
         const val REMINDER_CHANNEL_SET = "tg_reminder_channel_set"
         const val PARAM_CHANNEL = "channel"
@@ -1004,6 +1059,7 @@ object AnalyticsEvents {
         const val SOURCE_SCREEN = "screen"
         const val SOURCE_WEB_LINK = "web_link"
         const val SOURCE_APP = "app"
+        const val SOURCE_REMINDER_SHEET = "reminder_sheet"
     }
 }
 

@@ -239,6 +239,20 @@ sealed interface InboxScreenState : State {
          * the pager list — never as a list item, so reorder / scroll indices are untouched.
          */
         val notificationsBanner: com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationsBannerUi? = null,
+        /**
+         * Telegram promo banner (spec telegram-channel-banner §4). Already resolves every rule of
+         * `shouldShowTelegramPromo` — link state, cycles, the SELECTED page being the Inbox, a
+         * non-empty Inbox, the notifications banner winning the slot. The screen still renders it
+         * ONLY in the Inbox page's `listHeader` (`page.isInbox`), because that header is composed for
+         * every page of the pager.
+         */
+        val telegramPromoVisible: Boolean = false,
+        /**
+         * The VM needs [InboxIntent.OnTelegramPromoSlotOnScreen] reports: true while the promo is
+         * showing OR its cycle is due to auto-rest (both count only while the slot is on screen).
+         * False = the Inbox header sends nothing, so screens without a promo raise no extra intents.
+         */
+        val telegramPromoTracksSlot: Boolean = false,
     ) : InboxScreenState {
 
         /** Whether one more attachment fits on an item that already has [currentCount] of them. */
@@ -396,6 +410,20 @@ sealed interface InboxIntent : Intent {
         val result: com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationPermissionResult,
     ) : InboxIntent
     data object OnNotificationsBannerDismiss : InboxIntent
+
+    // ─── Telegram promo banner (spec telegram-channel-banner §5.3) ───────────
+    /** Card tap (the link is part of the card): opens the Telegram screen, source = home_banner. */
+    data object OnTelegramPromoClick : InboxIntent
+
+    /** ×: hidden at once; the cycle closes and the banner may return in 14 days (max 3 cycles). */
+    data object OnTelegramPromoDismiss : InboxIntent
+
+    /**
+     * The Inbox page's banner slot (its `listHeader`) entered the screen while RESUMED (`true`), or
+     * left it — scrolled away, page disposed, screen paused (`false`). Seen days, the once-per-session
+     * `telegram_promo_shown` and the 7-day auto-rest count only while it is `true`.
+     */
+    data class OnTelegramPromoSlotOnScreen(val onScreen: Boolean) : InboxIntent
 
     /** The system dialog was launched from the inbox permission sheet (analytics). */
     data object OnNotificationPermissionRequested : InboxIntent

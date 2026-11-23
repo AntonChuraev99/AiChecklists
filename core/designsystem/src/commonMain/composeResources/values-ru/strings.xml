@@ -1889,6 +1889,24 @@
     <string name="telegram_reminders_web_off">Не присылать в Telegram</string>
     <string name="telegram_reminders_save_failed">Не удалось изменить, куда приходят напоминания. Попробуйте ещё раз.</string>
     <string name="telegram_reminders_saving_cd">Сохраняем</string>
+    <!-- Telegram promo banner on Inbox + reminder sheet delivery row (docs/designs/telegram-channel-banner-2026-11-21/spec.md §9) -->
+    <string name="telegram_promo_title">Напоминания и ИИ-чат в Telegram</string>
+    <string name="telegram_promo_cta_short">Подключить</string>
+    <string name="telegram_promo_body">Получайте напоминания сообщениями и превращайте любое сообщение в чек-лист.</string>
+    <string name="telegram_promo_body_web">В веб-версии нет уведомлений — бот пришлёт их в Telegram.</string>
+    <string name="telegram_promo_dismiss_cd">Скрыть подсказку о Telegram</string>
+    <string name="reminder_channel_title">Куда приходят все напоминания</string>
+    <string name="reminder_channel_caption">Для всех напоминаний, не только для этого.</string>
+    <string name="reminder_channel_value_web_on">В Telegram</string>
+    <string name="reminder_channel_value_web_off">Не присылаются в Telegram</string>
+    <string name="reminder_channel_save_failed_short">Не сохранилось. Попробуйте ещё раз.</string>
+    <string name="reminder_channel_connect_title">Напоминания в Telegram</string>
+    <string name="reminder_channel_connect_body">Подключите бота Gisti — для всех напоминаний</string>
+    <string name="reminder_channel_connect_body_web">В веб-версии нет уведомлений — подключите бота Gisti</string>
+    <string name="reminder_channel_show_options">Показать варианты</string>
+    <string name="reminder_channel_hide_options">Скрыть варианты</string>
+    <string name="reminder_channel_expanded_sd">Развёрнуто</string>
+    <string name="reminder_channel_collapsed_sd">Свёрнуто</string>
     <string name="telegram_reminders_disconnect_note">Напоминания снова будут приходить уведомлениями на телефон.</string>
     <string name="telegram_reminders_disconnect_note_web">Напоминания в Telegram прекратятся.</string>
     <string name="telegram_reminders_benefit">Напоминания приходят сообщениями — отмечайте прямо в чате</string>
