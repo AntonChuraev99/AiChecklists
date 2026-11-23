@@ -24,13 +24,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsEighteenReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsNineteenReleaseGroups`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 45 posts across 18 main-versions (v1.6-v1.21, v1.23, v1.24; v1.22 had no feed entry)
-        assertEquals(18, releases.size)
+        // 47 posts across 19 main-versions (v1.6-v1.21, v1.23-v1.25; v1.22 had no feed entry)
+        assertEquals(19, releases.size)
     }
 
     @Test
@@ -39,8 +39,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.24 has the highest post timestamp)
-        assertEquals("1.24", releases.first().version)
+        // Newest release first (v1.25 has the highest post timestamp)
+        assertEquals("1.25", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -52,9 +52,32 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.24", "1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.25", "1.24", "1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
+    }
+
+    @Test
+    fun `getReleases_withDefaultJson_v1_25HasTwoPostsLedByTelegramBotWithStoreDescription`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v125 = releases.first { it.version == "1.25" }
+
+        assertEquals(2, v125.posts.size)
+        // Both posts share one timestamp; JSON order decides the lead post
+        assertEquals("telegram_bot_v1", v125.posts.first().id, "telegram_bot_v1 must lead the 1.25 group")
+        assertEquals("analyze_background_v1", v125.posts[1].id)
+        // No whitelisted deeplink opens the Telegram screen; Analyze is an in-place change — no CTA
+        v125.posts.forEach { post ->
+            assertTrue(post.actions.isEmpty(), "Post ${post.id} must carry no CTA")
+        }
+        // The AI-chat line is not covered by the posts, so the note stays
+        val desc125 = requireNotNull(v125.storeDescription) { "v1.25 storeDescription must not be null" }
+        assertTrue(desc125.contains("Steadier AI chat"))
+        // De-dup: the note must not repeat the post titles
+        assertTrue(!desc125.contains("Gisti in Telegram"))
+        assertTrue(!desc125.contains("Leave while your checklist is made"))
     }
 
     @Test
@@ -355,13 +378,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsFortyFive`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsFortySeven`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(45, totalPosts)
+        assertEquals(47, totalPosts)
     }
 
     @Test
