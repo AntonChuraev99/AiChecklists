@@ -251,6 +251,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiA
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiInboxPromptChips
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentChipStrip
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
@@ -1973,10 +1974,20 @@ fun App() {
                                 chatUiState.pendingChoice!!.isPostAction
                             ) {
                               Column {
-                                // Item-create only: pending-attachment preview strip ABOVE the input.
-                                // In chat mode (ic == null) the strip lambda is absent → nothing renders,
-                                // and the Column wraps a single fillMaxWidth child (layout-neutral).
-                                if (ic != null) ic.attachmentStrip()
+                                // Pending-attachment preview strip ABOVE the input, in both modes:
+                                // item-create shows its staged files; chat shows the files picked via
+                                // the "+" pill / attach sheet (same strip as the full-screen ChatScreen),
+                                // so a picked file is visible before Send. The strip collapses to zero
+                                // height when empty. ChatInputRow stays the same node right after this
+                                // if/else group, so the chat ⇄ item-create morph and focus are untouched.
+                                if (ic != null) {
+                                    ic.attachmentStrip()
+                                } else {
+                                    ChatAttachmentChipStrip(
+                                        attachments = chatUiState.pendingAttachments,
+                                        onRemove = { chatViewModel.sendIntent(ChatScreenIntent.OnRemoveAttachment(it)) },
+                                    )
+                                }
                                 ChatInputRow(
                                     text = ic?.text ?: chatUiState.inputText,
                                     onTextChange = ic?.onTextChange
@@ -2077,6 +2088,12 @@ fun App() {
                         // Hidden while a pending choice block is shown (chips are the only interaction),
                         // mirroring the full ChatScreen.
                         if (chatUiState.pendingChoice == null) {
+                          Column {
+                            // Pending attachments above the input, as in the full-screen ChatScreen.
+                            ChatAttachmentChipStrip(
+                                attachments = chatUiState.pendingAttachments,
+                                onRemove = { chatViewModel.sendIntent(ChatScreenIntent.OnRemoveAttachment(it)) },
+                            )
                             ChatInputRow(
                                 text = chatUiState.inputText,
                                 onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
@@ -2095,6 +2112,7 @@ fun App() {
                                 focusRequester = chatFullInputFocusRequester,
                                 onCallClick = startVoiceCallFromChat,
                             )
+                          }
                         }
                     },
                     recordingOverlay = {
