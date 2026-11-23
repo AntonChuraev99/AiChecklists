@@ -1,15 +1,18 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -144,15 +147,41 @@ fun ChatAttachmentChip(
                 .size(24.dp)
                 .minimumInteractiveComponentSize(),
         ) {
-            Icon(
-                imageVector = Icons.Filled.Cancel,
-                contentDescription = removeLabel,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            RemoveBadge(contentDescription = removeLabel)
         }
     }
 }
+
+/**
+ * The ✕ drawn ON the thumbnail, so it has to read against any photo the user picks.
+ *
+ * A bare grey glyph blended into mid-grey and dark photos (and a light one in dark theme). The badge
+ * now carries its own contrast: an inverse disc (dark in light theme, light in dark theme) with the
+ * inverse-on glyph — glyph ↔ disc is the snackbar pair, so it never depends on the backdrop — plus a
+ * ring in the chip's own fill that cuts the disc out of a photo of the same tone as the disc.
+ */
+@Composable
+private fun RemoveBadge(contentDescription: String) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(RemoveBadgeSize)
+            .background(AppChatColors.raised(), CircleShape)
+            .padding(RemoveBadgeRing)
+            .background(MaterialTheme.colorScheme.inverseSurface, CircleShape),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(RemoveGlyphSize),
+            tint = MaterialTheme.colorScheme.inverseOnSurface,
+        )
+    }
+}
+
+private val RemoveBadgeSize = 22.dp
+private val RemoveBadgeRing = 2.dp
+private val RemoveGlyphSize = 14.dp
 
 /**
  * Derive [AttachmentSource] from mimeType, falling back to Image for unknown types.
