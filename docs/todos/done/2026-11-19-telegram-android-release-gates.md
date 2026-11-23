@@ -1,5 +1,6 @@
 ---
-status: deferred
+status: resolved
+resolved: 2026-11-23
 blocking_reason: ждёт Android-релиза, в котором впервые есть экран Telegram (ветка telegram-bot-phase1 влита после 1.24.0)
 resume_trigger: готовится релиз (bump versionCode после 1.24.0 / `/create-release` / `/build-release-aab`) из транка, где есть `composeApp/.../telegram/TelegramScreen.kt`
 keywords: [telegram, data safety, play console, privacy policy, botfather, release gate]
@@ -16,13 +17,13 @@ keywords: [telegram, data safety, play console, privacy policy, botfather, relea
    (определение Google: «an account ID, account number, or account name»).
 2. ~~**Политика конфиденциальности**~~ — ✅ 2026-11-19: раздел «Telegram Bot (optional)» в
    `hosting/public/privacy-policy.html` задеплоен на Firebase Hosting (живая страница содержит его).
-3. **BotFather** `/setjoingroups` → Disable (действие владельца; код и так игнорирует не-private чаты).
+3. ~~**BotFather**~~ — ✅ 2026-11-23: владелец выставил `/setjoingroups` → Disable.
 4. ~~**Фаза 4 (напоминания)**~~ — ✅ 2026-11-23: часовой пояс и канал напоминаний не подпадают ни
    под один тип данных Google Play; отправка текста пунктов в Telegram идёт по действию самого
    пользователя (привязал бота, выбрал канал) — исключение из «sharing». Отдельных строк не нужно
    (трактовка политики, подтверждается только прохождением ревью).
 
-Осталось только п. 3 (BotFather, действие владельца).
+Все гейты закрыты перед релизом 1.25.0 (vc94).
 
 Источник требований — документ задачи `docs/archive/telegram-bot-phase1-2026-11-19.md`, раздел
 «Release gates (Android)».

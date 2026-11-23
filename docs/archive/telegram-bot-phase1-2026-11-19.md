@@ -125,7 +125,7 @@ webhook = `0F_V7JjyEQfts-FqUHjJd6ceTdTdOC2jWK22GPZeawQ` (источник: pytho
 - Play Data Safety: declare "User IDs" (Telegram id) — app functionality — BEFORE the release that
   ships the screen (precedent: 1.18.7 rejected for declaration drift).
 - Privacy policy (`hosting/public/privacy-policy.html`): Telegram data + messages sent to AI — section
-  written in this branch; tracked with the other gates in `docs/todos/2026-11-19-telegram-android-release-gates.md`.
+  written in this branch; tracked with the other gates in `docs/todos/done/2026-11-19-telegram-android-release-gates.md`.
 - BotFather `/setjoingroups` → Disable (owner action; code also ignores non-private chats).
 
 ### Phase 3 — Stars subscription + «Mobile app» menu (added 2026-11-19, same branch)
@@ -210,4 +210,4 @@ Android-устройство (Pixel 9): владелец прошёл привя
 
 - **Сделано:** Фаза 1 (привязка в обе стороны, чек-лист из текста, строк, фото и голоса, `/lists` с отметкой пунктов, общие кредиты, экран Telegram на Android и вебе) и Фаза 3 (подписка за Stars, общий премиум, меню «Подписка» и «Мобильное приложение»). Обе живые и проверены владельцем; решение о втором канале оплаты — `docs/decisions/2026-11-19-telegram-stars-second-billing-channel.md`.
 - **Выяснили:** сплэш `replaceStack` стирает маршрут, положенный до конца сплэша, — диплинки ждут оболочку приложения; поле `updateTime` из `gcloud functions describe` (источник: вывод gcloud) не доказывает деплой, доказывает только новое поведение (`premium_status` → 200); деньги после ответа вебхука 200 нельзя держать только в повторах очереди — нужен долговечный журнал.
-- **Осталось:** гейты Android-релиза — `docs/todos/2026-11-19-telegram-android-release-gates.md`; Фаза 2 (AI-чат в боте) и Фаза 4 (напоминания в Telegram) не начаты; поля выдачи премиума всё ещё продублированы между `telegram_link.py` и `main._handle_rc_event_payload`; тот же гонщик сплэша в `handleGalleryDeepLink` не тронут.
+- **Осталось:** гейты Android-релиза — `docs/todos/done/2026-11-19-telegram-android-release-gates.md`; Фаза 2 (AI-чат в боте) и Фаза 4 (напоминания в Telegram) не начаты; поля выдачи премиума всё ещё продублированы между `telegram_link.py` и `main._handle_rc_event_payload`; тот же гонщик сплэша в `handleGalleryDeepLink` не тронут.
