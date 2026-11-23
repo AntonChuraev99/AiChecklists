@@ -2,7 +2,8 @@
 title: "AI Chat — _pendingAgentDecision виснет при Clear chat / новом ходе с открытым agent-batch"
 date: 2026-07-16
 type: todo
-status: deferred
+status: resolved
+resolved: 2026-11-23
 severity: low-medium
 modules: [feature/aichat/impl]
 keywords: [ai-chat, runAgentTurn, _pendingAgentDecision, CompletableDeferred, OnClearChat, coroutine-leak]
@@ -12,6 +13,18 @@ resume_trigger: «почини pending-decision leak» / в общей live-veri
 ---
 
 # `_pendingAgentDecision` виснет на двух edge-путях
+
+## Решение 2026-11-23 (ветка `worktree-aichat-reject-error-double-send`)
+
+Закрыто вместе с багом двойной отправки: два одинаковых хода агента подряд, оба тарифицированы; найден в проде на 1.24.0. Готовый патч ниже оказался **недостаточным**: после `complete(false)` брошенный ход продолжался как отказ, отправлял declined-раунд на сервер и дописывал ответ в уже очищенный чат.
+
+- **Место 1.** Решение стало `AgentPlanDecision { Approved, Declined, Abandoned }`. `OnClearChat` снимает план через `abandonPendingPlan()`: та обнуляет поле, сразу убирает карточку и завершает решение как `Abandoned`. На этом значении `runAgentTurn` выходит без серверного раунда и без ответа, а состояние экрана не трогает: иначе он затёр бы `isProcessing` и `pendingChoice` нового хода. Поле ход обнуляет, только если там всё ещё его собственное решение (`=== decision`).
+- **Место 2.** На входах `handleSend`, `OnPrefillAndSend`, `OnRetryClick` и `handleAskAiFallback` стоит единая проверка `admitNewTurn()`:
+  - `isProcessing` (ход в работе, двойной тап) — отказ и `logger.warning`;
+  - висит план без ответа — по решению владельца 2026-11-23 новый запрос заменяет план: `abandonPendingPlan()`, затем обычный ход.
+  `escalateChoice` и `sendOptionAsTurn` при висящем плане из UI недостижимы.
+- **Тесты.** `ChatViewModelTest.kt`: `clearChat_whileAgentPlanAwaitsDecision_releasesTurnWithoutReplyAndNextSendWorks`, `prefillAndSend_twiceWhileFirstTurnInFlight_startsOnlyOneAgentTurn`, `*_whileAgentPlanAwaitsDecision_replacesPlan*` (prefill / Ask AI / Retry), `retry_whileTurnProcessing_isRejected`, `replacePlan_onQueueingDispatcher_abandonedTurnNeverOverwritesNewTurnState`.
+- **Не закрыто.** Если нажать Clear chat, пока ход ещё ждёт ответа сервера (решения ещё нет), этот ход допишет ответ в очищенный чат. Этот путь существовал и до правок и в этот todo не входил.
 
 Найдено `@bug-pattern-reviewer` 2026-07-16 при L2-ревью диффа этапа 3. **Не регрессия этого диффа** —
 edge существовал и раньше; персист транскрипта + углубление роли агента чуть повышают вероятность
