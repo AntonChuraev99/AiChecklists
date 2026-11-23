@@ -85,6 +85,101 @@ internal fun InlineNudgeCard(
     hideBodyAtLargeFont: Boolean = false,
     dismissTestTag: String? = null,
 ) {
+    InlineNudgeCardBody(
+        leading = {
+            Box(
+                modifier = Modifier
+                    .size(LeadingSlotSize)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        title = title,
+        body = body,
+        actionLabel = actionLabel,
+        onAction = onAction,
+        onDismiss = onDismiss,
+        dismissLabel = dismissLabel,
+        modifier = modifier,
+        actionIcon = actionIcon,
+        rowAlignment = rowAlignment,
+        onClick = onClick,
+        actionStyle = actionStyle,
+        hideBodyAtLargeFont = hideBodyAtLargeFont,
+        dismissTestTag = dismissTestTag,
+    )
+}
+
+/**
+ * [InlineNudgeCard] led by a brand [logo] (e.g. the Telegram logo) instead of the tinted tile: a
+ * full-colour mark must not sit on the primary-tinted tile nor be recoloured by its tint, so [logo]
+ * is drawn as-is, centred in the same 36dp slot, and hidden at large font like the tile.
+ */
+@Composable
+internal fun InlineNudgeCard(
+    logo: @Composable () -> Unit,
+    title: String,
+    body: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    onDismiss: () -> Unit,
+    dismissLabel: String,
+    modifier: Modifier = Modifier,
+    actionIcon: ImageVector? = null,
+    rowAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    onClick: (() -> Unit)? = null,
+    actionStyle: NudgeActionStyle = NudgeActionStyle.Button,
+    hideBodyAtLargeFont: Boolean = false,
+    dismissTestTag: String? = null,
+) {
+    InlineNudgeCardBody(
+        leading = {
+            Box(modifier = Modifier.size(LeadingSlotSize), contentAlignment = Alignment.Center) { logo() }
+        },
+        title = title,
+        body = body,
+        actionLabel = actionLabel,
+        onAction = onAction,
+        onDismiss = onDismiss,
+        dismissLabel = dismissLabel,
+        modifier = modifier,
+        actionIcon = actionIcon,
+        rowAlignment = rowAlignment,
+        onClick = onClick,
+        actionStyle = actionStyle,
+        hideBodyAtLargeFont = hideBodyAtLargeFont,
+        dismissTestTag = dismissTestTag,
+    )
+}
+
+/** Leading slot of [InlineNudgeCard]: the tinted tile, or the brand logo's box. */
+private val LeadingSlotSize = 36.dp
+
+@Composable
+private fun InlineNudgeCardBody(
+    leading: @Composable () -> Unit,
+    title: String,
+    body: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    onDismiss: () -> Unit,
+    dismissLabel: String,
+    modifier: Modifier,
+    actionIcon: ImageVector?,
+    rowAlignment: Alignment.Vertical,
+    onClick: (() -> Unit)?,
+    actionStyle: NudgeActionStyle,
+    hideBodyAtLargeFont: Boolean,
+    dismissTestTag: String?,
+) {
     val largeFont = LocalDensity.current.fontScale >= TILE_HIDE_FONT_SCALE
     val showTile = !largeFont
     val showBody = !(hideBodyAtLargeFont && largeFont)
@@ -103,22 +198,7 @@ internal fun InlineNudgeCard(
                 verticalAlignment = rowAlignment,
                 horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
             ) {
-                if (showTile) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
+                if (showTile) leading()
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,

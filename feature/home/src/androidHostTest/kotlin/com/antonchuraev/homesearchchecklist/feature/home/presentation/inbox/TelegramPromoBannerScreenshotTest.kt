@@ -30,6 +30,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.NotificationsBannerUi
 import com.github.takahirom.roborazzi.captureRoboImage
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -168,6 +171,9 @@ class TelegramPromoBannerScreenshotTest(
                 null
             },
             telegramPromoVisible = promo,
+            // Pinned "today": the Inbox header prints the date, so the real clock made every golden
+            // go stale at midnight.
+            nowMillis = FIXED_NOW_MILLIS,
         )
 
     /** The longest title first, so the fold check measures the worst first row. */
@@ -197,6 +203,15 @@ class TelegramPromoBannerScreenshotTest(
             AppNavBarItem("today", "Today", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
             AppNavBarItem("calendar", "Calendar", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
         )
+
+        /**
+         * Monday, Nov 23 2026, noon in the JVM's own zone — the header formats with
+         * `TimeZone.currentSystemDefault()`, so building the instant in that zone keeps the printed
+         * date the same on every machine.
+         */
+        private val FIXED_NOW_MILLIS: Long = LocalDateTime(2026, 11, 23, 12, 0)
+            .toInstant(TimeZone.currentSystemDefault())
+            .toEpochMilliseconds()
 
         private const val PHONE = "w320dp-h640dp-xhdpi"
         private const val PIXEL = "w411dp-h891dp-xhdpi"

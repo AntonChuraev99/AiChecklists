@@ -45,7 +45,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -74,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.ReminderChannel
 import com.antonchuraev.homesearchchecklist.core.common.api.isWebOn
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.TelegramLogo
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
@@ -136,12 +136,7 @@ private fun DeliveryConnectRow(web: Boolean, onClick: () -> Unit) {
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.Send,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = iconPad).size(LeadingSlot),
-            )
+            TelegramLogo(modifier = Modifier.padding(top = iconPad), size = LeadingSlot)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(Res.string.reminder_channel_connect_title),
@@ -248,12 +243,7 @@ private fun ChoiceHeader(
                     color = MaterialTheme.colorScheme.primary,
                 )
             } else {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.Send,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(LeadingSlot),
-                )
+                TelegramLogo(size = LeadingSlot)
             }
         }
         Column(modifier = Modifier.weight(1f)) {

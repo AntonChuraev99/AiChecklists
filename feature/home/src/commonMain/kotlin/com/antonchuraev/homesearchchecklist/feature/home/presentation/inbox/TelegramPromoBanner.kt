@@ -15,14 +15,14 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.TelegramLogo
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppMotion
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalReducedMotion
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.InlineNudgeCard
@@ -33,6 +33,9 @@ import org.jetbrains.compose.resources.stringResource
 
 /** `getPlatformName()` value of the wasmJs build. */
 private const val PLATFORM_WEB = "web"
+
+/** The logo inside the card's 36dp leading slot — a full-colour disc reads heavier than a glyph tile. */
+private val PromoLogoSize = 32.dp
 
 /**
  * The Inbox Telegram promo with its enter / exit motion — the `AnimatedNotificationsOffBanner`
@@ -84,7 +87,8 @@ internal fun TelegramPromoBanner(
 ) {
     val largeFont = LocalDensity.current.fontScale >= TILE_HIDE_FONT_SCALE
     InlineNudgeCard(
-        icon = Icons.AutoMirrored.Outlined.Send,
+        // Brand logo, untinted and without the tinted tile (spec: the real Telegram mark).
+        logo = { TelegramLogo(size = PromoLogoSize) },
         title = stringResource(Res.string.telegram_promo_title),
         body = stringResource(if (isWeb) Res.string.telegram_promo_body_web else Res.string.telegram_promo_body),
         actionLabel = stringResource(
