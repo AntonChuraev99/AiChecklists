@@ -199,11 +199,20 @@ class ChatViewModel(
      * When the agent returns mutating tool calls, [runAgentTurn] sets this to a new
      * [CompletableDeferred] and suspends on [await()]. The choice handlers
      * ([handleChoiceSelected] for the ExecuteAll chip / [handleChoiceDismissed] for the
-     * escape chip) complete it with true/false respectively. The loop resumes after the
-     * user decides. Cleared to null at the start of each new turn so stale completions are ignored.
+     * escape chip) complete it with [AgentPlanDecision.Approved] / [AgentPlanDecision.Declined].
+     * The loop resumes after the user decides. "Clear chat" completes it with
+     * [AgentPlanDecision.Abandoned] so the suspended turn ends without a reply. Cleared to null at
+     * the start of each new turn so stale completions are ignored.
      */
     @Volatile
-    private var _pendingAgentDecision: CompletableDeferred<Boolean>? = null
+    private var _pendingAgentDecision: CompletableDeferred<AgentPlanDecision>? = null
+
+    /**
+     * How a suspended agent plan card was resolved. Three outcomes, not a Boolean: a plan the user
+     * never answered because they wiped the chat is neither consent nor refusal — answering it
+     * "declined" would send one more server round and write its reply into the empty chat.
+     */
+    private enum class AgentPlanDecision { Approved, Declined, Abandoned }
 
     /**
      * Escalation context for the currently-shown write-intent choice block. Captured when the
@@ -324,6 +333,9 @@ class ChatViewModel(
             }
 
             is ChatScreenIntent.OnPrefillAndSend -> {
+                // Checked BEFORE the prefill: a rejected duplicate must not park the chip text in
+                // the composer, where it would wait to be sent a second time after the turn ends.
+                if (!admitNewTurn(source = "prefill_and_send")) return
                 // Set text then dispatch in the same step (state updates are synchronous,
                 // so handleSend() sees the freshly-set inputText).
                 // forceAgent=true (checklist reasoning chips) bypasses classify() — see handleSend.
@@ -386,6 +398,8 @@ class ChatViewModel(
                 // Re-send the failed message through the normal pipeline. State updates are
                 // synchronous, so handleSend() reads the freshly-seeded inputText (it also
                 // clears the field afterwards). A fresh user bubble is appended — honest.
+                // Gated before the prefill for the same reason as OnPrefillAndSend.
+                if (!admitNewTurn(source = "retry")) return
                 _screenState.value = _screenState.value.copy(inputText = intent.text)
                 handleSend()
             }
@@ -477,6 +491,10 @@ class ChatViewModel(
             }
 
             is ChatScreenIntent.OnClearChat -> {
+                // Release a turn suspended on its plan card before wiping its state, else
+                // runAgentTurn hangs on await() forever. Abandoned (not Declined): no declined
+                // round to the server, no reply into the chat that is being emptied.
+                abandonPendingPlan(reason = "chat cleared")
                 viewModelScope.launch {
                     chatHistoryRepository.clear()
                     // Clear the agent's tool memory too, else "Clear chat" would wipe the visible
@@ -851,6 +869,55 @@ class ChatViewModel(
     // ─── Send flow ────────────────────────────────────────────────────────────
 
     /**
+     * The single gate every entry that starts a NEW turn passes first (Send, prefill chips, Retry,
+     * Ask AI). Prefill chips, Retry and Ask AI reach the send path from outside the composer, whose
+     * disabled Send never covered them — a double tap started two parallel agent turns: two
+     * 3-credit charges, the same user message twice, the second turn orphaning the first one's
+     * plan-card decision (prod 2026-11-22). Two states, two answers:
+     *
+     *  - **A turn is running** ([ChatScreenState.isProcessing]): the request is refused. The user is
+     *    looking at that turn's typing indicator and the extra tap repeats the request already on
+     *    screen, so a snackbar per tap would only add noise — the drop is logged with its reason.
+     *  - **A plan card waits for an answer** (isProcessing is false there): the user ignored the
+     *    card and asked for something else — a new intent, not a duplicate. Owner decision
+     *    2026-11-23: the new request REPLACES the plan ([abandonPendingPlan]) and goes through.
+     *    The VM is an app singleton and the card survives a closed dock, so refusing here would
+     *    swallow a chip tapped on another screen with no feedback at all.
+     *
+     * @return true when the caller may start the turn; false when it must stop.
+     */
+    private fun admitNewTurn(source: String): Boolean {
+        if (_screenState.value.isProcessing) {
+            logger.warning(TAG, "send ignored ($source): a turn is already in flight")
+            return false
+        }
+        abandonPendingPlan(reason = "replaced by a new request ($source)")
+        return true
+    }
+
+    /**
+     * Ends a turn suspended on its plan card WITHOUT an answer: no declined round to the server (a
+     * Gemini call for a reply nobody will see), no reply, nothing further billed — round 1 already
+     * charged and is not refundable from the client. No-op when no plan is waiting.
+     *
+     * The card is removed HERE, synchronously, by the caller that abandons it — never by the
+     * suspended turn when it resumes. That resume is dispatched later; a new turn started right
+     * after this call may by then own [ChatScreenState.isProcessing] and its own card, which the
+     * old turn would wipe. So the abandoned turn writes no screen state at all (see the Abandoned
+     * branch in [runAgentTurn]), on any dispatcher.
+     */
+    private fun abandonPendingPlan(reason: String) {
+        val decision = _pendingAgentDecision?.takeIf { it.isActive } ?: return
+        logger.info(TAG, "agent plan card abandoned: $reason")
+        _pendingAgentDecision = null
+        val pending = _screenState.value.pendingChoice
+        if (pending != null && pending.choice.options.any { it.action is ChoiceAction.ExecuteAll }) {
+            _screenState.value = _screenState.value.copy(pendingChoice = null)
+        }
+        decision.complete(AgentPlanDecision.Abandoned)
+    }
+
+    /**
      * @param forceAgent When true, skip Layer 1/2 classification and route the message straight
      *                  to the reasoning agent ([runAgentTurn]). Used by the checklist-detail
      *                  reasoning chips (What's missing? / Summary / Add items) whose intent is
@@ -862,6 +929,7 @@ class ChatViewModel(
      *                  CreateChecklistFromAttachment path that never reaches the agent).
      */
     private fun handleSend(forceAgent: Boolean = false) {
+        if (!admitNewTurn(source = "send")) return
         val text = _screenState.value.inputText.trim()
         val attachments = _screenState.value.pendingAttachments
 
@@ -1840,7 +1908,7 @@ class ChatViewModel(
                     params = mapOf(AnalyticsParams.ACTION_TYPE to "agent_plan"),
                 )
                 // Resume the suspended agent loop (runAgentTurn clears pendingChoice itself).
-                _pendingAgentDecision?.complete(true)
+                _pendingAgentDecision?.complete(AgentPlanDecision.Approved)
             }
             is ChoiceAction.FreeForm -> {
                 analytics.event(
@@ -2083,7 +2151,7 @@ class ChatViewModel(
         if (isAgentBatch) {
             // The agent loop owns clearing pendingChoice after the deferred resolves (it sends
             // declined results then continues). Just resolve the decision with "declined".
-            _pendingAgentDecision?.complete(false)
+            _pendingAgentDecision?.complete(AgentPlanDecision.Declined)
             return
         }
 
@@ -2718,7 +2786,7 @@ class ChatViewModel(
                             modelId = stepResult.modelId,
                             aiFlow = stepResult.aiFlow,
                         )
-                        val decision = CompletableDeferred<Boolean>()
+                        val decision = CompletableDeferred<AgentPlanDecision>()
                         _pendingAgentDecision = decision
                         // Agent batch choice: one Primary "Do it all" (ExecuteAll) + Dismiss escape.
                         val batchChoice = ChatChoice(
@@ -2744,10 +2812,23 @@ class ChatViewModel(
                             pendingChoice = PendingChoice(choice = batchChoice, batchItems = planItems),
                         )
 
-                        val approved = decision.await()
+                        val outcome = decision.await()
+                        // Only release the slot if it is still ours: after an abandon a new turn
+                        // may already own it, and nulling its deferred would orphan that turn.
+                        if (_pendingAgentDecision === decision) _pendingAgentDecision = null
+
+                        if (outcome == AgentPlanDecision.Abandoned) {
+                            // Clear chat or a new request replaced this plan (abandonPendingPlan).
+                            // The turn ends HERE — no declined round, no persisted round, no reply —
+                            // and it writes NO screen state: the abandoner already removed the card,
+                            // and by the time this resume is dispatched a new turn may own
+                            // isProcessing and its own card. Touching either here would wipe that
+                            // turn's state on a dispatcher that runs the new turn first.
+                            return
+                        }
+                        val approved = outcome == AgentPlanDecision.Approved
 
                         // Clear choice block and resume processing.
-                        _pendingAgentDecision = null
                         _screenState.value = _screenState.value.copy(
                             pendingChoice = null,
                             isProcessing = true,
@@ -3925,6 +4006,9 @@ class ChatViewModel(
      * We set [isProcessing] to match the UX of any other Layer 3 call.
      */
     private fun handleAskAiFallback(text: String) {
+        // The "Ask AI" button lives on an Unknown bubble in the HISTORY, so it stays tappable
+        // while a later turn runs or waits on its plan card — same one-turn-at-a-time gate as Send.
+        if (!admitNewTurn(source = "ask_ai")) return
         _screenState.value = _screenState.value.copy(isProcessing = true)
         viewModelScope.launch {
             runCatching {

@@ -75,6 +75,9 @@ import kotlin.test.assertTrue
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
+/** The reply of the turn that replaces a waiting agent plan card (see assertNewRequestReplacedPlan). */
+private const val REPLACEMENT_ANSWER = "Answer to the new request."
+
 private class FakeAiChatRepository(
     private val classifyResult: IntentClassification = IntentClassification(
         intent = ChatIntent.Unknown("?"),
@@ -86,6 +89,15 @@ private class FakeAiChatRepository(
     private val transcribeResult: TranscriptionOutcome = TranscriptionOutcome.ServiceError,
     /** Scripted step results consumed in order; last result is repeated when exhausted. */
     private val agentStepResults: List<AgentStepResult> = emptyList(),
+    /**
+     * When set, every agentStep suspends on it AFTER being counted — models a server round still
+     * in flight, so a test can fire a second send while the first turn is genuinely mid-request.
+     */
+    private val agentStepGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null,
+    /** 1-based agentStep call from which [agentStepGate] applies; earlier calls pass straight through. */
+    private val gatedFromCall: Int = 1,
+    /** When set, classify() suspends on it — holds a classify-path turn before its agent round. */
+    private val classifyGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null,
 ) : AiChatRepository {
     var classifyCallCount = 0
     var lastSkipLayer1: Boolean = false
@@ -128,13 +140,15 @@ private class FakeAiChatRepository(
         agentStepRequestIds.add(requestId)
         agentStepResponseLanguages.add(responseLanguage)
         agentStepScreenSnapshots.add(screenSnapshot)
-        val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
+        if (agentStepCallCount >= gatedFromCall) agentStepGate?.await()
+        val index =(agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
 
     override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
         classifyCallCount++
         lastSkipLayer1 = skipLayer1
+        classifyGate?.await()
         return if (skipLayer1 && skipLayer1Result != null) skipLayer1Result else classifyResult
     }
 
@@ -1960,6 +1974,289 @@ class ChatViewModelTest {
         assertNull(vm.screenState.value.pendingChoice)
         val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
         assertEquals(1, assistantMsgs.size)
+    }
+
+    // ── 38b. Double send while a turn is in flight (prod 2026-11-22, user I) ─────
+    // Two OnPrefillAndSend(forceAgent=true) 1.7 s apart, before the first answer: Cloud Run saw two
+    // chat-agent calls (two 3-credit charges) and the chat showed the same message twice.
+
+    @Test
+    fun prefillAndSend_twiceWhileFirstTurnInFlight_startsOnlyOneAgentTurn() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val repo = FakeAiChatRepository(
+            agentStepResults = listOf(AgentStepResult.Final(content = "Here is what is missing.", creditsRemaining = 94)),
+            agentStepGate = gate,
+        )
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        val chipText = "What's missing from this list?"
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend(chipText, forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertTrue(vm.screenState.value.isProcessing, "first turn must be in flight while the server round is pending")
+
+        // Second tap on the same chip before the first answer lands.
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend(chipText, forceAgent = true))
+        testScheduler.advanceUntilIdle()
+
+        gate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "a second send during an in-flight turn must not start a second agent turn (second charge)")
+        assertEquals(
+            1,
+            vm.screenState.value.messages.count { it.role == ChatRole.User },
+            "the duplicate send must not append a second user message",
+        )
+        assertEquals("", vm.screenState.value.inputText, "a rejected duplicate must not leave the chip text parked in the composer")
+        assertFalse(vm.screenState.value.isProcessing)
+    }
+
+    @Test
+    fun prefillAndSend_whileAgentPlanAwaitsDecision_replacesPlanWithNewTurn() = runTest {
+        val repo = planThenAnswerRepo()
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my trip", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.pendingChoice, "the agent plan card must be shown")
+        assertFalse(vm.screenState.value.isProcessing, "isProcessing is false while the plan card waits")
+
+        // A chip on another screen (the VM is an app singleton; the card survives a closed dock)
+        // fires while the plan card still waits for the user.
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Summarize this list", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+
+        assertNewRequestReplacedPlan(vm, repo, newUserText = "Summarize this list")
+    }
+
+    /**
+     * Owner decision 2026-11-23 — a new request REPLACES a waiting plan card: the old turn ends with
+     * no server round (no declined continuation), the new turn runs, and the chat gains exactly one
+     * new user message and one reply. Scripted results: [plan ToolCalls, Final], so a declined
+     * round from the old turn would consume the Final and show up as a third agentStep call.
+     */
+    private fun assertNewRequestReplacedPlan(vm: ChatViewModel, repo: FakeAiChatRepository, newUserText: String) {
+        assertEquals(2, repo.agentStepCallCount, "exactly one new server round — the new turn's; none for the abandoned plan")
+        assertTrue(
+            repo.agentStepTranscripts[1].none { it is AgentTranscriptEntry.ToolResults },
+            "the replaced plan must not be answered with a declined round inside the new turn's request",
+        )
+        assertNull(vm.screenState.value.pendingChoice, "the replaced plan card must be gone")
+        assertFalse(vm.screenState.value.isProcessing)
+        val messages = vm.screenState.value.messages
+        assertEquals(newUserText, messages.last { it.role == ChatRole.User }.content)
+        assertEquals(
+            listOf(REPLACEMENT_ANSWER),
+            messages.filter { it.role == ChatRole.Assistant }.map { it.content },
+            "exactly one reply — the new turn's",
+        )
+    }
+
+    private fun planThenAnswerRepo(gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null, gatedFromCall: Int = 1) =
+        FakeAiChatRepository(
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(
+                        AgentToolCall(id = "call-plan", name = "create_checklist", args = buildJsonObject { put("name", "Trip") }),
+                    ),
+                    creditsRemaining = 97,
+                ),
+                AgentStepResult.Final(content = REPLACEMENT_ANSWER, creditsRemaining = 94),
+            ),
+            agentStepGate = gate,
+            gatedFromCall = gatedFromCall,
+        )
+
+    @Test
+    fun retry_whileAgentPlanAwaitsDecision_replacesPlanWithRetriedTurn() = runTest {
+        val repo = planThenAnswerRepo()
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my trip", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.pendingChoice, "the agent plan card must be shown")
+
+        // Retry on an older error bubble — the bubble is not disabled by the waiting plan card.
+        vm.sendIntent(ChatScreenIntent.OnRetryClick("what is on my list"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.classifyCallCount, "Retry re-sends through the normal pipeline")
+        // FakeAiChatRepository's default classify → Unknown, so the retried turn ends in the hint,
+        // not in an agent round: the plan must still be gone and no declined round sent.
+        assertEquals(1, repo.agentStepCallCount, "the replaced plan must not be answered with a declined server round")
+        assertNull(vm.screenState.value.pendingChoice, "the replaced plan card must be gone")
+        assertEquals("what is on my list", vm.screenState.value.messages.last { it.role == ChatRole.User }.content)
+        assertFalse(vm.screenState.value.isProcessing)
+    }
+
+    @Test
+    fun retry_whileTurnProcessing_isRejected() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val repo = FakeAiChatRepository(
+            agentStepResults = listOf(AgentStepResult.Final(content = "Done.", creditsRemaining = 94)),
+            agentStepGate = gate,
+        )
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("What's missing?", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertTrue(vm.screenState.value.isProcessing)
+
+        vm.sendIntent(ChatScreenIntent.OnRetryClick("What's missing?"))
+        testScheduler.advanceUntilIdle()
+        gate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, repo.classifyCallCount, "a Retry tapped while a turn runs must not start a second turn")
+        assertEquals(1, repo.agentStepCallCount)
+        assertEquals(1, vm.screenState.value.messages.count { it.role == ChatRole.User })
+        assertEquals("", vm.screenState.value.inputText, "a rejected Retry must not park its text in the composer")
+    }
+
+    /**
+     * The race the replace path opens: abandoning the plan RESUMES the old turn's coroutine, and
+     * the new turn starts in the same intent. On a queueing dispatcher the old resume runs AFTER
+     * the new turn already set isProcessing = true. If the abandoned turn wrote any screen state on
+     * resume (isProcessing = false / pendingChoice = null), it would wipe the new turn's. Standard
+     * (not Unconfined) dispatcher on purpose. The new request takes the CLASSIFY path and its
+     * classify() is held open by a gate: runAgentTurn re-asserts isProcessing at the top of every
+     * round, which would mask the overwrite on the forceAgent path, while during classify nothing
+     * re-asserts it — the window where a clobber is visible.
+     */
+    @Test
+    fun replacePlan_onQueueingDispatcher_abandonedTurnNeverOverwritesNewTurnState() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val classifyGate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(
+                        AgentToolCall(id = "call-plan", name = "create_checklist", args = buildJsonObject { put("name", "Trip") }),
+                    ),
+                    creditsRemaining = 97,
+                ),
+                AgentStepResult.Final(content = REPLACEMENT_ANSWER, creditsRemaining = 94),
+            ),
+            classifyGate = classifyGate,
+        )
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my trip", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.pendingChoice, "the agent plan card must be shown")
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("Summarize this list"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // The old turn has resumed and ended; the new turn is mid-classify (gated).
+        assertEquals(1, repo.classifyCallCount, "the new turn started")
+        assertEquals(1, repo.agentStepCallCount, "the abandoned plan sent no declined round")
+        assertTrue(vm.screenState.value.isProcessing, "the abandoned turn must not reset the new turn's isProcessing")
+        assertNull(vm.screenState.value.pendingChoice)
+
+        classifyGate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+
+        assertNewRequestReplacedPlan(vm, repo, newUserText = "Summarize this list")
+    }
+
+    @Test
+    fun askAiFallback_whileAgentPlanAwaitsDecision_replacesPlanWithNewTurn() = runTest {
+        val repo = planThenAnswerRepo()
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my trip", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.pendingChoice, "the agent plan card must be shown")
+
+        // "Ask AI" on an older Unknown bubble in the history, tapped while the plan card waits.
+        vm.sendIntent(ChatScreenIntent.OnAskAiFallback("asdfgh"))
+        testScheduler.advanceUntilIdle()
+
+        // Ask AI re-asks an existing user message (no new user bubble), so assert the round + reply.
+        assertEquals(2, repo.agentStepCallCount, "exactly one new server round — Ask AI's; none for the abandoned plan")
+        assertTrue(
+            repo.agentStepTranscripts[1].none { it is AgentTranscriptEntry.ToolResults },
+            "the replaced plan must not be answered with a declined round",
+        )
+        assertNull(vm.screenState.value.pendingChoice, "the replaced plan card must be gone")
+        assertFalse(vm.screenState.value.isProcessing)
+        assertEquals(
+            listOf(REPLACEMENT_ANSWER),
+            vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }.map { it.content },
+        )
+    }
+
+    @Test
+    fun clearChat_whileAgentPlanAwaitsDecision_releasesTurnWithoutReplyAndNextSendWorks() = runTest {
+        val createCall = AgentToolCall(
+            id = "call-plan",
+            name = "create_checklist",
+            args = buildJsonObject { put("name", "Trip") },
+        )
+        val repo = FakeAiChatRepository(
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(createCall), creditsRemaining = 97),
+                AgentStepResult.Final(content = "Answer to the new question.", creditsRemaining = 94),
+            ),
+        )
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my trip", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.pendingChoice, "the agent plan card must be shown")
+
+        // User wipes the chat instead of answering the plan card.
+        vm.sendIntent(ChatScreenIntent.OnClearChat)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "the abandoned turn must not send a declined round to the server after Clear chat")
+        assertTrue(vm.screenState.value.messages.isEmpty(), "the abandoned turn must not write a reply into the cleared chat")
+        assertNull(vm.screenState.value.pendingChoice, "the plan card of the wiped turn must not stay on screen")
+        assertFalse(vm.screenState.value.isProcessing)
+
+        // The chat is usable again.
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("What's missing?", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repo.agentStepCallCount, "a send after Clear chat must start a new agent turn")
+        val messages = vm.screenState.value.messages
+        assertEquals(listOf("What's missing?"), messages.filter { it.role == ChatRole.User }.map { it.content })
+        assertEquals(listOf("Answer to the new question."), messages.filter { it.role == ChatRole.Assistant }.map { it.content })
+        assertTrue(
+            repo.agentStepTranscripts[1].none { it is AgentTranscriptEntry.ToolResults },
+            "the new turn must not replay the wiped turn's rounds",
+        )
+    }
+
+    @Test
+    fun prefillAndSend_afterTurnCompleted_startsNewTurn() = runTest {
+        val repo = FakeAiChatRepository(
+            agentStepResults = listOf(AgentStepResult.Final(content = "Done.", creditsRemaining = 94)),
+        )
+        val vm = makeVm(repo = repo)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("What's missing?", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("What's missing?", forceAgent = true))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repo.agentStepCallCount, "a send after the previous turn finished is a real new turn")
+        assertEquals(2, vm.screenState.value.messages.count { it.role == ChatRole.User })
     }
 
     // ── 39. Round cap: agentStep always returns ToolCalls → fallback after 5 rounds ──
