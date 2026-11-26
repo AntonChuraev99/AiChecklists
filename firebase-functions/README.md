@@ -160,30 +160,25 @@ gcloud run services add-iam-policy-binding $CLOUD_RUN_SERVICE \
 gcloud run services get-iam-policy restore-credits-after-purchase --region=us-central1
 
 # Test endpoint (should NOT return 403)
-curl -X POST https://us-central1-aichecklists-40230.cloudfunctions.net/restore_credits_after_purchase \
-    -H "Content-Type: application/json" \
-    -d '{"user_id": "test"}'
+curl -X POST https://us-central1-aichecklists-40230.cloudfunctions.net/restore_credits_after_purchase -H "Content-Type: application/json" -d '{"user_id": "test"}'  # docs-leak-scan: reviewed — a function name, not a metric
 ```
 
 See [Gen2 IAM Policy Documentation](../docs/solutions/deployment-issues/gen2-cloud-functions-iam-policy.md) for detailed troubleshooting.
 
 ## Usage Tracking
 
-Usage is tracked in Firestore:
+Usage is tracked in Firestore as telemetry only (it gates nothing):
 - Collection: `usage`
 - Document ID: `{user_id}_{date}` (e.g., `user123_2024-01-15`)
 - Fields: `count`, `requests[]`, `last_request`
 
 ## Limits
 
-| User Type | Daily Limit |
-|-----------|-------------|
-| Free      | 10 requests |
-| Premium   | 100 requests |
-
-Limits are configurable via Remote Config:
-- `ai_daily_limit_free`
-- `ai_daily_limit_premium`
+There is no daily request limit (removed 2026-11-26). Credits are the only AI gate: an action
+reserves its cost from the user's wallet, and an empty wallet returns HTTP 402. Credit amounts
+(fields `ai_action_cost`, `initial_ai_credits`, `premium_daily_credits_cap`) live in Firestore
+`remote_config/current` (read by `get_credits_config()`) and are served to clients by
+`get_credits_info`.
 
 ## Local Testing
 

@@ -6,7 +6,6 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FillChec
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.GenerateChecklistResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.RegisterUserResult
-import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.UsageInfo
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
@@ -175,11 +174,6 @@ class AnalyzeRepositoryTest {
                 ),
             )
         }
-
-        override suspend fun getUsageStats(
-            userId: String,
-            isPremium: Boolean,
-        ): Result<AiServiceResponse<UsageInfo>> = error("not used")
     }
 
     private class FakeUserDataRepository : UserDataRepository {

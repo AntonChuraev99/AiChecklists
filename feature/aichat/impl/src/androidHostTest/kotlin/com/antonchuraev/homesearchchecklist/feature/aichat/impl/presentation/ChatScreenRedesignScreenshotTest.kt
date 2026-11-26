@@ -11,7 +11,12 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_message_copy
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
@@ -43,8 +48,8 @@ import java.util.Locale
  * The full-screen AI chat in redesign B "Soft & tactile" (DESIGN_SPEC_B §3.3, §8(d)).
  *
  * Frames the REAL stateless [ChatScreen] on fake states: the mock frame (360×660), the narrow phone,
- * dark, fontScale 1.5, RU / HI, transcribing, a pending choice, an out-of-credits reply with its CTA
- * inside the bubble, three consecutive assistant replies (avatar only on the last), and the pricing /
+ * dark, fontScale 1.5, RU / HI, transcribing, a pending choice, the out-of-credits banner above the
+ * input (every variant + edge cases), three consecutive assistant replies (avatar only on the last), and the pricing /
  * settings sheets (sheets live in their own window → `captureScreenRoboImage`).
  *
  *   ./gradlew :feature:aichat:impl:recordRoborazziAndroidHostTest --tests "*ChatScreenRedesignScreenshotTest*"
@@ -92,22 +97,93 @@ class ChatScreenRedesignScreenshotTest {
         mockState(english).copy(isProcessing = false, pendingChoice = pendingChoice),
     )
 
-    @Test fun chat_360x660_outOfCredits() = shoot(
+    // 2026-11-26: a refusal has no assistant bubble — the answer is the banner pinned above the input
+    // (DESIGN_SPEC credits banner §11: variant × light/dark × fontScale + edge cases).
+    @Test fun chat_360x660_outOfCredits() = shoot("w360dp-h660dp", outOfCreditsState())
+
+    @Test fun chat_360x660_outOfCredits_dark() = shoot("w360dp-h660dp", outOfCreditsState(), dark = true)
+
+    @Test fun chat_360x660_outOfCredits_fontScale13() =
+        shoot("w360dp-h660dp", outOfCreditsState(), fontScale = 1.3f)
+
+    @Test fun chat_320x640_outOfCredits_ru_fontScale15() = shoot(
+        "ru-rRU-w320dp-h640dp",
+        outOfCreditsState(user = "Составь список вещей в Рим"),
+        fontScale = 1.5f,
+        locale = Locale("ru", "RU"),
+    )
+
+    @Test fun chat_360x660_outOfCredits_low() = shoot(
         "w360dp-h660dp",
-        ChatScreenState(
-            messages = listOf(
-                ChatMessage(id = "u1", role = ChatRole.User, content = "Plan my week", timestamp = 0L),
-                ChatMessage(
-                    id = "a1",
-                    role = ChatRole.Assistant,
-                    content = "You're out of AI credits for today. Upgrade to Premium for many more every day.",
-                    timestamp = 0L,
-                    paywallCtaCredits = 300,
-                ),
-            ),
-            creditBalance = 0,
+        outOfCreditsState(banner = OutOfCreditsBannerState.Free(premiumDailyCredits = 300, lowBalance = true)),
+    )
+
+    @Test fun chat_360x660_outOfCredits_premium() =
+        shoot("w360dp-h660dp", outOfCreditsState(banner = OutOfCreditsBannerState.Premium()))
+
+    @Test fun chat_360x660_outOfCredits_premium_dark_fontScale13() = shoot(
+        "w360dp-h660dp",
+        outOfCreditsState(banner = OutOfCreditsBannerState.Premium()),
+        dark = true,
+        fontScale = 1.3f,
+    )
+
+    @Test fun chat_360x660_outOfCredits_guest() =
+        shoot("w360dp-h660dp", outOfCreditsState(banner = OutOfCreditsBannerState.Guest))
+
+    @Test fun chat_320x640_outOfCredits_guest_hi_dark_fontScale15() = shoot(
+        "hi-rIN-w320dp-h640dp",
+        outOfCreditsState(banner = OutOfCreditsBannerState.Guest),
+        dark = true,
+        fontScale = 1.5f,
+        locale = Locale("hi", "IN"),
+    )
+
+    /** Banner + the pending-attachment strip + a draft in the field: banner stays on top. */
+    @Test fun chat_360x660_outOfCredits_attachmentAndDraft() = shoot(
+        "w360dp-h660dp",
+        outOfCreditsState().copy(
+            inputText = "Add milk",
+            pendingAttachments = listOf(ChatAttachment("doc://recipe", "application/pdf", "Recipe.pdf", 20_480L)),
         ),
     )
+
+    /** A pending question hides the input; the banner stays in the plate above it. */
+    @Test fun chat_360x660_outOfCredits_pendingChoice() = shoot(
+        "w360dp-h660dp",
+        outOfCreditsState().copy(pendingChoice = pendingChoice),
+    )
+
+    @Test fun chat_840x900_outOfCredits() = shoot("w840dp-h900dp", outOfCreditsState())
+
+    /** Balance not loaded yet (`outOfCredits == null` while `creditBalance` is still 0): no banner. */
+    @Test fun chat_360x660_balanceNotLoaded_noBanner() =
+        shoot("w360dp-h660dp", outOfCreditsState().copy(outOfCredits = null))
+
+    /** Nudge peak: a refused send bumps the counter → the outline flashes 2dp primary. */
+    @Test
+    fun chat_360x660_outOfCredits_nudge() {
+        setUp("w360dp-h660dp", Locale.ENGLISH, 1f)
+        composeTestRule.mainClock.autoAdvance = false
+        var nudge by mutableIntStateOf(0)
+        composeTestRule.setContent {
+            AppTheme(darkTheme = false) {
+                ChatScreen(
+                    state = outOfCreditsState().copy(inputText = "Add milk"),
+                    onIntent = {},
+                    onNavigateToPaywall = {},
+                    outOfCreditsNudge = nudge,
+                )
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(PIN_MS)
+        // A write from the test thread reaches composition only once the snapshot is applied.
+        composeTestRule.runOnUiThread { nudge++ }
+        Snapshot.sendApplyNotifications()
+        // Past the 140 ms rise and the 180 ms shake, inside the 400 ms hold.
+        composeTestRule.mainClock.advanceTimeBy(NUDGE_PEAK_MS)
+        composeTestRule.onRoot().captureRoboImage()
+    }
 
     @Test fun chat_360x660_threeAssistantInARow() = shoot(
         "w360dp-h660dp",
@@ -341,6 +417,17 @@ class ChatScreenRedesignScreenshotTest {
         creditBalance = 80,
     )
 
+    private fun outOfCreditsState(
+        banner: OutOfCreditsBannerState = OutOfCreditsBannerState.Free(premiumDailyCredits = 300),
+        user: String = "Make a packing list for Rome",
+    ) = ChatScreenState(
+        messages = listOf(
+            ChatMessage(id = "u1", role = ChatRole.User, content = user, timestamp = 0L),
+        ),
+        creditBalance = 0,
+        outOfCredits = banner,
+    )
+
     private val pendingChoice = PendingChoice(
         choice = ChatChoice(
             prompt = "Add **sunscreen** to Weekend trip?",
@@ -485,5 +572,6 @@ class ChatScreenRedesignScreenshotTest {
     private companion object {
         const val PIN_MS = 700L
         const val SHEET_SETTLE_MS = 3_000L
+        const val NUDGE_PEAK_MS = 300L
     }
 }

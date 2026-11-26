@@ -20,7 +20,7 @@ Guidance for Claude Code in this repo. Keep this file **≤200 lines** (Anthropi
 **→ Start here for anything product-shaped: `docs/PRODUCT.md`** — positioning, competitors, business model, live A/B, decisions-not-to-reopen, current metrics, open forks. Feature-level detail (per-feature UX, parity matrix, version history): `docs/product-features.md`. Both gitignored.
 
 **Business model:** Free (5 checklists, 5 fills each, 10 recurring reminders, 1 weekly, 3 attachments/item) · Premium $1.99/mo (unlimited + Calendar + Weekly) · 3-day trial · entitlement `"AiChecklists Pro"`, premium = `revenueCat || firestore`.
-⚠️ **The binding Free limit is the credit wallet, not the daily cap:** 100 lifetime credits at 20/action = **5 AI generations ever**, no Free refill, 0 on web until Google sign-in (Firestore `remote_config/current`, not Firebase RC). `ai_daily_limit_free=10` is effectively unreachable.
+⚠️ **Credits are the ONLY AI gate — there is no daily request cap (owner decision 2026-11-26: «никакой логики лимитов, всё через кредиты»).** 100 lifetime credits at 20/action = **5 AI generations ever**, no Free refill, 0 on web until Google sign-in; Premium refills to `premium_daily_credits_cap` at 12:00 CET (Firestore `remote_config/current`, not Firebase RC). An empty wallet = HTTP 402 → the chat's out-of-credits banner / Analyze's "Become Pro" CTA; never reintroduce a 429 request counter (the old `ai_daily_limit_*` keys are gone).
 
 ## Repository Visibility & Security
 
@@ -152,7 +152,7 @@ All dependency versions live in `gradle/libs.versions.toml` — the single sourc
 
 | Limit (Remote Config) | Free | Premium | Defaults in code |
 |---|---|---|---|
-| AI requests/day | 10 | 300 | `RemoteConfigKeys.kt:75-76` | <!-- docs-leak-scan: reviewed — published Free/Premium limits, visible in-app -->
+| AI credits | 100 once | refill to 300/day | Firestore `remote_config/current` (not RC) | <!-- docs-leak-scan: reviewed — published Free/Premium limits, visible in-app -->
 | Max checklists | 5 | unlimited | `:82` |
 | Max fills/checklist | 5 | unlimited | `:83` |
 | Recurring reminders | 10 | unlimited | `:84` |
@@ -160,7 +160,7 @@ All dependency versions live in `gradle/libs.versions.toml` — the single sourc
 | Attachments per item | 3 | unlimited | `:86` |
 | Items per checklist | 100 | 100 | `:70` |
 
-⚠️ **Read limits from Remote Config, never from a local constant.** A comment saying "mirrors X" is not checked by the compiler — treat it as a smell, not as documentation. Known stale mirrors, tracked in `docs/todos/` + `docs/backlog/`: `ToolCallDispatcherImpl.kt` still hardcodes `FREE_ATTACH_LIMIT_PER_ITEM = 3` against `max_attachments_per_item_free`, `PaywallScreen.kt:572` carries the same stale comment, and `main.py:292` holds a third value for the premium daily cap.
+⚠️ **Read limits from Remote Config, never from a local constant.** A comment saying "mirrors X" is not checked by the compiler — treat it as a smell, not as documentation. Known stale mirrors, tracked in `docs/todos/` + `docs/backlog/`: `ToolCallDispatcherImpl.kt` still hardcodes `FREE_ATTACH_LIMIT_PER_ITEM = 3` against `max_attachments_per_item_free`, `PaywallScreen.kt:572` carries the same stale comment, and `main.py` `DEFAULT_PREMIUM_DAILY_CREDITS_CAP` is the server-side fallback for the premium credit cap — the client must read that number only via `get_credits_info` (`CreditsConfigProvider`), never a literal.
 
 The shape of that class of defect matters more than any one number: a gate copy-pasted into two handlers drifts, so fixing one site leaves the other wrong — collapse it into one helper. Regression tests must pin **two different** config values; a fake pinned to the served value passes against a hardcoded number just as happily. Reference fix: `ToolCallDispatcherImpl.freeChecklistCeilingReached()` (2026-08-10).
 

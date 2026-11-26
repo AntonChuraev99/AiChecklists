@@ -222,8 +222,6 @@ rc.defaultConfig = {
     min_app_version: "1.0.0",
     maintenance_mode: false,
     ai_functions_base_url: "https://us-central1-aichecklists-40230.cloudfunctions.net",
-    ai_daily_limit_free: 10,
-    ai_daily_limit_premium: 300,
     // 5, not 4 — matches the RC template and RemoteConfigDefaults (fixed 2026-07-26: web users
     // whose fetch failed were held to a stricter free limit than the product actually grants).
     max_checklists_free: 5,

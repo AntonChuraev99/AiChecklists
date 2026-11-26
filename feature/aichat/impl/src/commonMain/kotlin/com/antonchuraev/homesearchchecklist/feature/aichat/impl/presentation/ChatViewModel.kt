@@ -9,9 +9,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
@@ -57,6 +54,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.CreditsConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.StoreEntitlementSource
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlin.concurrent.Volatile
 import kotlin.uuid.ExperimentalUuidApi
@@ -164,11 +165,15 @@ class ChatViewModel(
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val analytics: AnalyticsTracker,
     private val aiModelExperimentTracker: AiModelExperimentTracker,
-    // Reads ai_daily_limit_premium for the out-of-credits paywall CTA label. The CTA promises a
-    // concrete allowance ("300 credits now and every day"), so the number must track the live RC
-    // value — a literal turns into a false promise the day the limit is retuned.
-    private val remoteConfigProvider: RemoteConfigProvider,
     private val logger: AppLogger,
+    // Server credit economics (get_credits_info): `premium_daily_credits_cap` is the number the
+    // out-of-credits banner promises. Null in tests that do not care → the copy without a number.
+    private val creditsConfigProvider: CreditsConfigProvider? = null,
+    // Store half of `premium = revenueCat || firestore`; the Firestore half is UserData.isPremium.
+    // Null (no binding / tests) = not entitled by the store.
+    private val storeEntitlementSource: StoreEntitlementSource? = null,
+    // "web" → a not-Google-linked user gets the Guest banner (sign in) instead of Free (upsell).
+    private val platformName: String = getPlatformName(),
 ) : AppViewModel<ChatScreenState, ChatScreenIntent, ChatScreenSideEffect>() {
 
     // Welcome message is rendered as a fixed UI affordance in ChatScreen
@@ -232,6 +237,26 @@ class ChatViewModel(
     @Volatile
     private var _turnStartMs: Long? = null
 
+    // ── Out-of-credits banner inputs (see resolveOutOfCreditsBanner) ─────────────
+    // Kept outside ChatScreenState on purpose: the state carries only the derived banner, so the
+    // UI cannot re-derive it differently. Every write goes through recomputeOutOfCredits().
+
+    /** Latest user doc; null until the first emission (→ not registered → no banner, no flicker). */
+    private var bannerUser: UserData? = null
+
+    /** RevenueCat half of Premium. */
+    private var storeEntitled: Boolean = false
+
+    /** Balance snapshot at the last 402; null = no refusal pending. */
+    private var refusedAtBalance: Int? = null
+
+    /**
+     * True once the chat was opened in this process. The ViewModel is an app-scoped singleton that
+     * reads the wallet at startup: without this gate a user who never opens the chat would still
+     * log `banner_shown`. Transition events count only after the first open.
+     */
+    private var chatOpenedOnce: Boolean = false
+
     init {
         // Seed the message list from persisted history so the user sees
         // their previous conversation immediately on re-entry.
@@ -283,10 +308,31 @@ class ChatViewModel(
         // feedback; the next Firestore sync will reconcile any drift.
         viewModelScope.launch {
             userDataRepository.getUserDataFlow().collect { userData ->
+                bannerUser = userData
                 _screenState.value = _screenState.value.copy(
                     creditBalance = userData.aiCredits,
                     isPremium = userData.isPremium,
                 )
+                recomputeOutOfCredits(BANNER_REASON_BALANCE)
+            }
+        }
+
+        // Store entitlement (RevenueCat) and the server credits config feed the banner too. Both
+        // are best-effort: a failing flow is logged and the banner falls back to Firestore-only
+        // Premium / the copy without a number — never a made-up value.
+        storeEntitlementSource?.let { source ->
+            viewModelScope.launch {
+                source.isEntitled
+                    .catch { e -> logger.error(TAG, "store entitlement flow failed — Firestore premium only", e) }
+                    .collect { entitled ->
+                        storeEntitled = entitled
+                        recomputeOutOfCredits(BANNER_REASON_BALANCE)
+                    }
+            }
+        }
+        creditsConfigProvider?.let { provider ->
+            viewModelScope.launch {
+                provider.config.collect { recomputeOutOfCredits(BANNER_REASON_BALANCE) }
             }
         }
 
@@ -382,13 +428,11 @@ class ChatViewModel(
                 // the final text back so it lands in chat history with correct locale.
                 // linkedChecklistId is preserved for the "Open checklist" button.
                 // askAiForText is preserved for the "Ask AI" fallback button on Unknown responses.
-                // paywallCtaCredits is preserved for the "Become Pro" CTA on out-of-credits replies.
                 // routedLayer is preserved so thumb feedback reports the tier, not "unknown".
                 addAssistantMessage(
                     intent.text,
                     linkedChecklistId = intent.linkedChecklistId,
                     askAiForText = intent.askAiForText,
-                    paywallCtaCredits = intent.paywallCtaCredits,
                     retryText = intent.retryText,
                     routedLayer = intent.routedLayer,
                 )
@@ -405,7 +449,7 @@ class ChatViewModel(
             }
 
             ChatScreenIntent.OnPaywallCtaClick -> {
-                // The user acted on the out-of-credits reply. Nothing to undo or clean up —
+                // The user acted on the out-of-credits banner. Nothing to undo or clean up —
                 // just hand them to the paywall (both hosts observe NavigateToPaywall).
                 //
                 // The source tag is the point, not decoration: "paywall_shown with source=chat —
@@ -413,6 +457,7 @@ class ChatViewModel(
                 // disconnect is judged on (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
                 // Merged with the credits chip, that number cannot answer the question it was
                 // written for.
+                trackOutOfCreditsCtaTapped(OutOfCreditsBannerState.Free(premiumDailyCredits = null))
                 viewModelScope.launch {
                     _sideEffect.emit(
                         ChatScreenSideEffect.NavigateToPaywall(
@@ -420,6 +465,13 @@ class ChatViewModel(
                         )
                     )
                 }
+            }
+
+            ChatScreenIntent.OnOutOfCreditsSignInClick -> {
+                // Web guest: the host owns Google sign-in (and its failure snackbar). The banner
+                // goes away by itself when the linked balance arrives through the user-data flow.
+                trackOutOfCreditsCtaTapped(OutOfCreditsBannerState.Guest)
+                viewModelScope.launch { _sideEffect.emit(ChatScreenSideEffect.RequestGoogleSignIn) }
             }
 
             ChatScreenIntent.OnHelpClick -> {
@@ -654,6 +706,13 @@ class ChatViewModel(
                     ),
                 )
                 logger.debug(TAG, "chat opened: source=${intent.source} surface=${_screenState.value.contextSurface}")
+                chatOpenedOnce = true
+                // The banner is already in state (derived from the cached wallet) — report that the
+                // user SAW it on this open. No event when there is no banner.
+                _screenState.value.outOfCredits?.let { trackOutOfCreditsBannerShown(it, BANNER_REASON_OPEN, intent.source) }
+                // Fresh credits config for the banner copy (premium_daily_credits_cap). A failure
+                // keeps the last good value and is logged inside the provider.
+                creditsConfigProvider?.let { provider -> viewModelScope.launch { provider.refresh() } }
             }
         }
     }
@@ -756,6 +815,11 @@ class ChatViewModel(
         modelId?.let { params[AnalyticsParams.AI_MODEL_ID] = it }
         aiFlow?.let { params[AnalyticsParams.AI_FLOW] = it }
         analytics.event(name = AnalyticsEvents.Chat.RESPONSE_RECEIVED, params = params)
+        // A turn the server answered (it charged → the wallet works) releases the refusal latch.
+        if (refusedAtBalance != null && outcome in ANSWERED_OUTCOMES) {
+            refusedAtBalance = null
+            recomputeOutOfCredits(BANNER_REASON_BALANCE)
+        }
     }
 
     /** The AI-model A/B arm carried by a step result, if any (only success-carrying variants have it). */
@@ -797,17 +861,64 @@ class ChatViewModel(
         -> null
     }
 
+    // ─── Out-of-credits banner ──────────────────────────────────────────────────
+
     /**
-     * The Premium daily AI credit allowance advertised by the out-of-credits CTA.
+     * Re-derives [ChatScreenState.outOfCredits] from the current inputs and logs
+     * `ai_chat_out_of_credits_banner_shown` on a transition (null → variant, or a variant change).
+     * Also releases the refusal latch when the live balance rose above its snapshot.
      *
-     * Read from Remote Config on every use (cheap local lookup) rather than cached: the CTA
-     * promises a concrete number to a user who is about to pay for it, so a stale/hardcoded
-     * value is a false promise. Falls back to the compiled default before the first fetch.
+     * Called after EVERY write to an input: the user doc, the store entitlement, the credits config,
+     * the optimistic balance from a server response, the latch itself. Synchronous on purpose — the
+     * banner is in state by the time the refusal effect reaches the host.
      */
-    private fun premiumDailyCredits(): Int =
-        remoteConfigProvider
-            .getLong(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM, RemoteConfigDefaults.AI_DAILY_LIMIT_PREMIUM)
-            .toInt()
+    private fun recomputeOutOfCredits(reason: String) {
+        val state = _screenState.value
+        refusedAtBalance = releaseRefusalLatchOnBalance(refusedAtBalance, state.creditBalance)
+        val user = bannerUser
+        val banner = resolveOutOfCreditsBanner(
+            registered = user?.userId?.isNotBlank() == true,
+            balance = state.creditBalance,
+            isPremium = state.isPremium || storeEntitled,
+            isWebGuest = platformName == PLATFORM_WEB && user?.isGoogleLinked != true,
+            refusedAtBalance = refusedAtBalance,
+            premiumDailyCreditsCap = creditsConfigProvider?.config?.value?.premiumDailyCreditsCap,
+        )
+        val previous = state.outOfCredits
+        if (banner == previous) return
+        _screenState.value = _screenState.value.copy(outOfCredits = banner)
+        if (banner != null && chatOpenedOnce && banner.analyticsVariant != previous?.analyticsVariant) {
+            trackOutOfCreditsBannerShown(banner, reason, source = null)
+        }
+    }
+
+    private fun trackOutOfCreditsBannerShown(banner: OutOfCreditsBannerState, reason: String, source: String?) {
+        val params = mutableMapOf<String, Any>(
+            AnalyticsParams.VARIANT to banner.analyticsVariant,
+            AnalyticsParams.REASON to reason,
+        )
+        source?.let { params[AnalyticsParams.SOURCE] = it }
+        analytics.event(name = AnalyticsEvents.Chat.OUT_OF_CREDITS_BANNER_SHOWN, params = params)
+    }
+
+    private fun trackOutOfCreditsCtaTapped(variant: OutOfCreditsBannerState) {
+        analytics.event(
+            name = AnalyticsEvents.Chat.OUT_OF_CREDITS_CTA_TAPPED,
+            params = mapOf(AnalyticsParams.VARIANT to variant.analyticsVariant),
+        )
+    }
+
+    /**
+     * Sets the refusal latch at the current balance, re-derives the banner and fires
+     * [ChatScreenSideEffect.OutOfCreditsRefused] — the visible response to the refused tap (nudge +
+     * "Not sent."), emitted even when the banner was already up. Shared by every 402: chat turns
+     * ([emitInsufficientCredits]) and voice transcription.
+     */
+    private suspend fun latchRefusal() {
+        refusedAtBalance = _screenState.value.creditBalance
+        recomputeOutOfCredits(BANNER_REASON_REFUSAL)
+        _sideEffect.emit(ChatScreenSideEffect.OutOfCreditsRefused)
+    }
 
     /**
      * The single answer to "the server refused this turn — the wallet is empty" (HTTP 402),
@@ -819,8 +930,11 @@ class ChatViewModel(
      * tagged outcome="error" and billed 3 credits for a turn that cost 0), and fixing them one at
      * a time is how the survivors stayed hidden. One helper = one behaviour:
      *
-     *   - The reply states the billing reason and carries the paywall CTA; no "Ask AI" button
-     *     (it asks an empty wallet for 3 more credits and 402s again).
+     *   - The answer is the out-of-credits banner ([ChatScreenState.outOfCredits]), not a chat
+     *     bubble (owner decision 2026-11-26, reference: the Claude app): the refusal latch is set,
+     *     NO assistant message is written, the user's bubble stays, and
+     *     [ChatScreenSideEffect.OutOfCreditsRefused] nudges the banner. No "Ask AI" anywhere (it
+     *     asks an empty wallet for 3 more credits and 402s again), no escalation to Layer 3.
      *   - Analytics report outcome="insufficient_credits" with credits_used=0 — a refused turn is
      *     neither an "answer" nor an "error" nor a charge.
      *   - The spinner stops.
@@ -834,16 +948,10 @@ class ChatViewModel(
      *   still tell a 1-credit refusal from a 3-credit one even though both charged nothing.
      */
     private suspend fun emitInsufficientCredits(layer: RoutingLayer?) {
-        logger.info(TAG, "${layer?.name ?: "Unknown layer"} refused the turn (402) — replying out-of-credits + paywall CTA")
-        _sideEffect.emit(
-            ChatScreenSideEffect.ShowAssistantMessage(
-                messageKey = "chat_insufficient_credits",
-                paywallCtaCredits = premiumDailyCredits(),
-                routedLayer = layer,
-            )
-        )
+        logger.info(TAG, "${layer?.name ?: "Unknown layer"} refused the turn (402) — out-of-credits banner, no bubble")
         trackResponseReceived(layer, outcome = OUTCOME_INSUFFICIENT_CREDITS, creditsUsed = 0)
         _screenState.value = _screenState.value.copy(isProcessing = false)
+        latchRefusal()
     }
 
     /** Maps a routing layer to its credit cost (Layer 1 = 0, Layer 2 = 1, Layer 3 = 3). */
@@ -2440,7 +2548,9 @@ class ChatViewModel(
                         params = mapOf(AnalyticsParams.OUTCOME to OUTCOME_INSUFFICIENT_CREDITS),
                     )
                     _screenState.value = _screenState.value.copy(isTranscribing = false)
-                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
+                    // Same answer as a refused chat turn: the banner (latch) + the nudge. The input
+                    // field is left as it was — transcription never became a turn.
+                    latchRefusal()
                 }
             }
         }
@@ -2730,6 +2840,7 @@ class ChatViewModel(
                     _screenState.value = _screenState.value.copy(
                         creditBalance = stepResult.creditsRemaining,
                     )
+                    recomputeOutOfCredits(BANNER_REASON_BALANCE)
 
                     // Partition into read-only (no confirmation needed) and mutating (plan-card).
                     val readOnlyNames = setOf("find_items", "read_checklist")
@@ -2905,6 +3016,7 @@ class ChatViewModel(
                         creditBalance = stepResult.creditsRemaining,
                         isProcessing = false,
                     )
+                    recomputeOutOfCredits(BANNER_REASON_BALANCE)
                     runCatching {
                         val currentUserData = userDataRepository.getUserData()
                         userDataRepository.update(currentUserData.copy(aiCredits = stepResult.creditsRemaining))
@@ -2933,6 +3045,7 @@ class ChatViewModel(
                         creditBalance = stepResult.creditsRemaining,
                         isProcessing = false,
                     )
+                    recomputeOutOfCredits(BANNER_REASON_BALANCE)
                     runCatching {
                         val currentUserData = userDataRepository.getUserData()
                         userDataRepository.update(currentUserData.copy(aiCredits = stepResult.creditsRemaining))
@@ -3937,7 +4050,6 @@ class ChatViewModel(
         content: String,
         linkedChecklistId: Long? = null,
         askAiForText: String? = null,
-        paywallCtaCredits: Int? = null,
         retryText: String? = null,
         routedLayer: RoutingLayer? = null,
     ) {
@@ -3955,9 +4067,7 @@ class ChatViewModel(
             // askAiForText is transient: NOT persisted to Room (toEntry() ignores it).
             // The "Ask AI" button disappears on app restart — intentional to avoid migration.
             askAiForText = askAiForText,
-            // Same deal for the paywall CTA: transient, so a stale offer can't outlive the turn.
-            paywallCtaCredits = paywallCtaCredits,
-            // And the Retry handle: transient, so a restart (which loses the failed turn) doesn't
+            // Same deal for the Retry handle: transient, so a restart (which loses the failed turn) doesn't
             // leave a button that would retry nothing.
             retryText = retryText,
         )
@@ -4075,6 +4185,17 @@ class ChatViewModel(
          * them countable from the client side.
          */
         const val OUTCOME_INPUT_REJECTED = "input_rejected"
+
+        /**
+         * `outcome` values of a turn the server ANSWERED (and so charged) — the ones that release
+         * the refusal latch. Errors, input rejections and refusals do not.
+         */
+        val ANSWERED_OUTCOMES = setOf("answer", "preview", "action", "options")
+
+        /** `reason` of `ai_chat_out_of_credits_banner_shown`. */
+        const val BANNER_REASON_OPEN = "open"
+        const val BANNER_REASON_REFUSAL = "refusal"
+        const val BANNER_REASON_BALANCE = "balance"
         // Stable chip ids for the AiChoiceResponse block.
         const val CHOICE_EXECUTE = "execute"
         const val CHOICE_EXECUTE_ALL = "execute_all"

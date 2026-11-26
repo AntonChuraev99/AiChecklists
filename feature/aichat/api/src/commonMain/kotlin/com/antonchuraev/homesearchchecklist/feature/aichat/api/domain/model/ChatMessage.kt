@@ -41,23 +41,11 @@ data class ChatMessage(
      */
     val askAiForText: String? = null,
     /**
-     * Premium daily credit allowance to render in the "Become Pro" CTA of this message.
-     * Non-null only on the out-of-credits reply ([ChatIntent.InsufficientCredits]); the bubble
-     * then shows the CTA, which navigates to the paywall.
-     *
-     * The number comes from Remote Config (`ai_daily_limit_premium`), NOT a literal — the label
-     * promises a specific allowance and a hardcoded one silently lies the day that key changes.
-     *
-     * TRANSIENT — NOT persisted to Room, same as [askAiForText]: the CTA disappears on app
-     * restart rather than lingering as a stale offer, and no migration is needed.
-     */
-    val paywallCtaCredits: Int? = null,
-    /**
      * The original user text to re-send when the user taps "Retry" on a recoverable error reply
      * (offline / service / timeout — F1). When non-null on an assistant message, [ChatMessageBubble]
      * renders a "Retry" chip that dispatches [OnRetryClick] → re-runs the send pipeline with [retryText].
      *
-     * TRANSIENT — NOT persisted to Room, same as [askAiForText] / [paywallCtaCredits]: after a restart
+     * TRANSIENT — NOT persisted to Room, same as [askAiForText]: after a restart
      * the failed turn is gone, so the button would retry nothing. Text only (attachments are not
      * re-carried); connectivity errors are overwhelmingly on the text/classify/agent path.
      */

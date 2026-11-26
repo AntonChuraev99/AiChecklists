@@ -39,10 +39,17 @@ enum class FailedCta {
     ChangeInput,
 
     /**
-     * Only "OK" ([AnalyzeJobIntent.OnBackToEditingClick]): 402 credits / 429 daily limit. Back on the
-     * form the existing "Not enough credits" barrier explains the rest; retrying would fail the same way.
+     * Only "OK" ([AnalyzeJobIntent.OnBackToEditingClick]): a Premium user refused for credits (402),
+     * a cancelled job or a deleted target. Retrying would fail the same way.
      */
     Dismiss,
+
+    /**
+     * Free user refused for credits (402): primary "Get Pro" ([AnalyzeJobIntent.OnUpgradeClick] →
+     * paywall, source `analyze_insufficient_credits`), secondary "OK"
+     * ([AnalyzeJobIntent.OnBackToEditingClick]).
+     */
+    Upgrade,
 }
 
 /**
@@ -73,6 +80,9 @@ sealed interface AnalyzeJobIntent : AnalyzeScreenIntent {
 
     /** "Change input" on [AnalyzeJobPhase.Failed] without `canRetrySameInput`, or error dismissal. */
     data object OnBackToEditingClick : AnalyzeJobIntent
+
+    /** "Get Pro" on [AnalyzeJobPhase.Failed] with [FailedCta.Upgrade] → paywall. */
+    data object OnUpgradeClick : AnalyzeJobIntent
 
     /** Result of the POST_NOTIFICATIONS request the screen ran because `askNotificationPermission` was true. */
     data class OnNotificationPermissionResult(val granted: Boolean) : AnalyzeJobIntent

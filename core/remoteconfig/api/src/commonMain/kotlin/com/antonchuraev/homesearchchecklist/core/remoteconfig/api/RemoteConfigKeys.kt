@@ -10,8 +10,10 @@ object RemoteConfigKeys {
     const val MIN_APP_VERSION = "min_app_version"
     const val MAINTENANCE_MODE = "maintenance_mode"
     const val AI_FUNCTIONS_BASE_URL = "ai_functions_base_url"
-    const val AI_DAILY_LIMIT_FREE = "ai_daily_limit_free"
-    const val AI_DAILY_LIMIT_PREMIUM = "ai_daily_limit_premium"
+    // NOTE: `ai_daily_limit_free` / `ai_daily_limit_premium` were removed on 2026-11-26: there is no
+    // daily request limit any more (credits are the only gate), and the Premium allowance the chat
+    // promises comes from the server credits config (`premium_daily_credits_cap`). The console
+    // parameters are the owner's to delete; no client reads them.
 
     // Free user limits
     const val MAX_CHECKLISTS_FREE = "max_checklists_free"
@@ -80,8 +82,6 @@ object RemoteConfigDefaults {
     const val MIN_APP_VERSION = "1.0.0"
     const val MAINTENANCE_MODE = false
     const val AI_FUNCTIONS_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
-    const val AI_DAILY_LIMIT_FREE = 10L
-    const val AI_DAILY_LIMIT_PREMIUM = 300L
 
     // Free user limits
     // 5 mirrors the live Remote Config value; this default only applies before the first

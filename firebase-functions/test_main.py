@@ -4,7 +4,7 @@ Tests for Firebase Cloud Functions (main.py).
 Covers:
 - P0 Security: RevenueCat verification, is_premium from Firestore
 - P1 Race condition: atomic reserve_credits
-- P1 Usage limits: check_usage_limit enforcement
+- P1 No daily request limit: credits are the only gate on analyze/generate
 - P2 Helpers: parse_gemini_json
 """
 
@@ -429,27 +429,26 @@ class TestIsPremiumFromFirestore:
 
         # User is free in Firestore
         with patch.object(main, "get_user_premium_status", return_value=False) as mock_premium:
-            with patch.object(main, "check_usage_limit", return_value=(True, "")):
-                # reserve_credits returns None (not enough credits)
-                with patch.object(main, "reserve_credits_with_action", return_value=("insufficient", None)):
-                    with patch.object(main, "get_credits_config", return_value={
-                        "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
-                    }):
-                        with app.test_request_context():
-                            req = make_request({
-                                "user_id": "user-123",
-                                "is_premium": True,  # should be ignored
-                                "checklist": {"items": [{"text": "item1"}]},
-                                "input_type": "text",
-                                "input_data": "test"
-                            })
-                            response, status = main.analyze_and_fill_checklist(req)
-                            assert status == 402
-                            data = response.get_json()
-                            # Error says "Get premium" (free user), NOT "Refill" (premium)
-                            assert "Get premium" in data["error"]
-                            # Verify get_user_premium_status was called
-                            mock_premium.assert_called_once_with("user-123")
+            # reserve_credits returns None (not enough credits)
+            with patch.object(main, "reserve_credits_with_action", return_value=("insufficient", None)):
+                with patch.object(main, "get_credits_config", return_value={
+                    "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
+                }):
+                    with app.test_request_context():
+                        req = make_request({
+                            "user_id": "user-123",
+                            "is_premium": True,  # should be ignored
+                            "checklist": {"items": [{"text": "item1"}]},
+                            "input_type": "text",
+                            "input_data": "test"
+                        })
+                        response, status = main.analyze_and_fill_checklist(req)
+                        assert status == 402
+                        data = response.get_json()
+                        # Error says "Get premium" (free user), NOT "Refill" (premium)
+                        assert "Get premium" in data["error"]
+                        # Verify get_user_premium_status was called
+                        mock_premium.assert_called_once_with("user-123")
 
 
 # ===========================================================================
@@ -537,81 +536,13 @@ class TestReserveCredits:
             return default
 
         with patch.object(main, "get_user_premium_status", return_value=True):
-            with patch.object(main, "check_usage_limit", return_value=(True, "")):
-                with patch.object(main, "get_credits_config", return_value={
-                    "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
-                }):
-                    with patch.object(main, "reserve_credits_with_action", return_value=("reserve", 20)):
-                        with patch.object(main, "refund_credits", return_value=True) as mock_refund:
-                            with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
-                                with patch.object(main, "call_gemini", side_effect=Exception("Gemini error")):
-                                    with app.test_request_context():
-                                        req = make_request({
-                                            "user_id": "user-123",
-                                            "checklist": {"items": [{"text": "item1"}]},
-                                            "input_type": "text",
-                                            "input_data": "test"
-                                        })
-                                        response = main.analyze_and_fill_checklist(req)
-                                        # create_error_response returns a single CORS-wrapped
-                                        # Response (status baked in), not a (body, code) tuple.
-                                        status = response[1] if isinstance(response, tuple) else response.status_code
-                                        assert status == 500
-                                        # Reserved credits are refunded on Gemini failure.
-                                        mock_refund.assert_called_once_with(
-                                            "user-123", 30, "gemini_error"
-                                        )
-
-
-# ===========================================================================
-# P1: Usage limits
-# ===========================================================================
-
-class TestUsageLimits:
-    """Tests for check_usage_limit enforcement."""
-
-    def test_usage_limit_enforced_for_free_user(self, _import_main):
-        """Free user at daily limit gets 429, credits NOT deducted."""
-        main = _import_main
-
-        with patch.object(main, "get_user_premium_status", return_value=False):
-            with patch.object(main, "check_usage_limit", return_value=(False, "Daily limit of 10 requests exceeded.")):
-                with patch.object(main, "reserve_credits_with_action") as mock_reserve:
-                    with patch.object(main, "get_remote_config_value", return_value=True):
-                        with app.test_request_context():
-                            req = make_request({
-                                "user_id": "user-123",
-                                "checklist": {"items": [{"text": "item1"}]},
-                                "input_type": "text",
-                                "input_data": "test"
-                            })
-                            response, status = main.analyze_and_fill_checklist(req)
-                            assert status == 429
-                            # the reservation was NOT attempted (credits not deducted)
-                            mock_reserve.assert_not_called()
-
-    def test_premium_user_higher_usage_limit(self, _import_main):
-        """Premium user with 11 daily requests passes (limit is 100)."""
-        main = _import_main
-
-        def rc_side_effect(key, default):
-            if key == "feature_ai_analysis_enabled":
-                return True
-            if key == "ai_analysis_max_input_length":
-                return 10000
-            return default
-
-        with patch.object(main, "get_user_premium_status", return_value=True):
-            with patch.object(main, "check_usage_limit", return_value=(True, "")):
-                with patch.object(main, "reserve_credits_with_action", return_value=("reserve", 270)):
-                    with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
-                        with patch.object(main, "call_gemini") as mock_gemini:
-                            mock_response = MagicMock()
-                            # A non-empty result: an empty one is now `nothing_found` (422, refunded),
-                            # which is not what this premium-daily-limit test is about.
-                            mock_response.text = '{"filled_items": [{"index": 1, "text": "item1", "checked": true}], "summary": "ok", "confidence": 0.9}'
-                            mock_gemini.return_value = mock_response
-                            with patch.object(main, "increment_usage"):
+            with patch.object(main, "get_credits_config", return_value={
+                "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
+            }):
+                with patch.object(main, "reserve_credits_with_action", return_value=("reserve", 20)):
+                    with patch.object(main, "refund_credits", return_value=True) as mock_refund:
+                        with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
+                            with patch.object(main, "call_gemini", side_effect=Exception("Gemini error")):
                                 with app.test_request_context():
                                     req = make_request({
                                         "user_id": "user-123",
@@ -620,12 +551,101 @@ class TestUsageLimits:
                                         "input_data": "test"
                                     })
                                     response = main.analyze_and_fill_checklist(req)
-                                    # Success response (no tuple)
-                                    if isinstance(response, tuple):
-                                        response_data = response[0].get_json()
-                                    else:
-                                        response_data = response.get_json()
+                                    # create_error_response returns a single CORS-wrapped
+                                    # Response (status baked in), not a (body, code) tuple.
+                                    status = response[1] if isinstance(response, tuple) else response.status_code
+                                    assert status == 500
+                                    # Reserved credits are refunded on Gemini failure.
+                                    mock_refund.assert_called_once_with(
+                                        "user-123", 30, "gemini_error"
+                                    )
+
+
+# ===========================================================================
+# P1: No daily request limit — credits are the only gate (owner decision 2026-11-26)
+# ===========================================================================
+
+# Far above the old 10/day (free) and 100/day (premium) caps: a revived daily gate reading the
+# `usage` log would refuse every request in these tests.
+HEAVY_USAGE_LOG = {"user_id": "user-123", "date": "2026-11-26", "count": 150, "requests": []}
+
+ANALYZE_BODY = {
+    "user_id": "user-123",
+    "checklist": {"items": [{"text": "item1"}]},
+    "input_type": "text",
+    "input_data": "test",
+}
+GENERATE_BODY = {"user_id": "user-123", "prompt": "packing list for a weekend trip"}
+
+
+def _ai_rc(key, default):
+    if key == "feature_ai_analysis_enabled":
+        return True
+    if key == "ai_analysis_max_input_length":
+        return 10000
+    return default
+
+
+def _status_and_json(response):
+    """Status + body whether the endpoint returned a Response or a (Response, code) tuple."""
+    if isinstance(response, tuple):
+        return response[1], response[0].get_json()
+    return response.status_code, response.get_json()
+
+
+class TestNoDailyRequestLimit:
+    """A heavy `usage` log never refuses a request; only the credit wallet does."""
+
+    @pytest.mark.parametrize("endpoint,body", [
+        ("analyze_and_fill_checklist", ANALYZE_BODY),
+        ("generate_checklist", GENERATE_BODY),
+    ])
+    def test_empty_wallet_gets_402_not_429(self, _import_main, endpoint, body):
+        """Free user with 150 requests logged today: no 429; the empty wallet answers 402."""
+        main = _import_main
+
+        with patch.object(main, "get_user_usage", return_value=dict(HEAVY_USAGE_LOG)):
+            with patch.object(main, "get_user_premium_status", return_value=False):
+                with patch.object(main, "get_remote_config_value", side_effect=_ai_rc):
+                    with patch.object(main, "get_credits_config", return_value={
+                        "action_cost": 20, "premium_daily_credits_cap": 300, "initial_credits": 100
+                    }):
+                        with patch.object(
+                            main, "reserve_credits_with_action", return_value=("insufficient", None)
+                        ) as mock_reserve:
+                            with patch.object(main, "call_gemini") as mock_gemini:
+                                with app.test_request_context():
+                                    response = getattr(main, endpoint)(make_request(dict(body)))
+                                    status, data = _status_and_json(response)
+                                    assert status == 402
+                                    assert data["reason"] == "insufficient_credits"
+                                    # The request reached the credit gate — nothing refused it earlier.
+                                    mock_reserve.assert_called_once()
+                                    mock_gemini.assert_not_called()
+
+    @pytest.mark.parametrize("is_premium", [False, True])
+    def test_no_daily_limit_for_anyone(self, _import_main, is_premium):
+        """Free and premium users with 150 requests logged today pass when credits allow."""
+        main = _import_main
+
+        with patch.object(main, "get_user_usage", return_value=dict(HEAVY_USAGE_LOG)):
+            with patch.object(main, "get_user_premium_status", return_value=is_premium):
+                with patch.object(main, "reserve_credits_with_action", return_value=("reserve", 270)) as mock_reserve:
+                    with patch.object(main, "get_remote_config_value", side_effect=_ai_rc):
+                        with patch.object(main, "call_gemini") as mock_gemini:
+                            mock_response = MagicMock()
+                            # A non-empty result: an empty one is `nothing_found` (422, refunded),
+                            # which is not what this test is about.
+                            mock_response.text = '{"filled_items": [{"index": 1, "text": "item1", "checked": true}], "summary": "ok", "confidence": 0.9}'
+                            mock_gemini.return_value = mock_response
+                            with patch.object(main, "increment_usage"):
+                                with app.test_request_context():
+                                    response = main.analyze_and_fill_checklist(make_request(dict(ANALYZE_BODY)))
+                                    status, response_data = _status_and_json(response)
+                                    assert status == 200
                                     assert response_data["success"] is True
+                                    assert response_data["ai_credits"] == 270
+                                    mock_reserve.assert_called_once()
 
 
 # ===========================================================================

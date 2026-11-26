@@ -6,7 +6,6 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FillChec
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.GenerateChecklistResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.RegisterUserResult
-import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.UsageInfo
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -207,10 +206,5 @@ class AnalyzeRepositoryFoldersTest {
             inputType: AiInputType,
             inputData: String?,
         ): Result<AiServiceResponse<GenerateChecklistResult>> = error("not used")
-
-        override suspend fun getUsageStats(
-            userId: String,
-            isPremium: Boolean,
-        ): Result<AiServiceResponse<UsageInfo>> = error("not used")
     }
 }

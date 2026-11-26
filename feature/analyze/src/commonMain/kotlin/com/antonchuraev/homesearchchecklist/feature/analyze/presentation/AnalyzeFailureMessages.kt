@@ -20,7 +20,7 @@ import org.jetbrains.compose.resources.getString
  * The ONE mapping of an analysis failure to the text the user reads (DESIGN_SPEC G3) — used by the
  * Analyze screen's Failed phase and by the Android "couldn't create a checklist" notification, so the
  * two never say different things. Transport markers (`http_*`, `network`) are never shown raw;
- * credits / daily limit keep the server's own actionable message.
+ * the credit gate keeps the server's own actionable message.
  *
  * [resolve] defaults to Compose Resources' `getString`; tests pass a resolver because resources do not
  * load on a plain JVM host.
@@ -38,7 +38,6 @@ suspend fun AnalysisJobFailure.userFacingMessage(
     AiFailureReason.TARGET_MISSING -> resolve(Res.string.analyze_error_checklist_gone)
     AiFailureReason.INVALID_INPUT -> resolve(Res.string.analyze_error_invalid_input)
     AiFailureReason.CREDIT_GATE,
-    AiFailureReason.DAILY_LIMIT,
     AiFailureReason.INPUT_TOO_LONG,
     AiFailureReason.CANCELLED,
     AiFailureReason.UNKNOWN,
@@ -46,11 +45,16 @@ suspend fun AnalysisJobFailure.userFacingMessage(
         ?: resolve(Res.string.analyze_error_analysis_failed)
 }
 
-/** Buttons of the Failed phase for this failure (DESIGN_SPEC G1). */
-val AnalysisJobFailure.failedCta: FailedCta
-    get() = when (reason) {
-        AiFailureReason.CREDIT_GATE,
-        AiFailureReason.DAILY_LIMIT,
+/**
+ * Buttons of the Failed phase for this failure (DESIGN_SPEC G1).
+ *
+ * @param isPremium `revenueCat || firestore`. A refused run (402) offers Free users the paywall
+ *   ([FailedCta.Upgrade]); a Premium user has nothing to buy — today's credits refill on schedule —
+ *   so they only get [FailedCta.Dismiss].
+ */
+fun AnalysisJobFailure.failedCta(isPremium: Boolean): FailedCta =
+    when (reason) {
+        AiFailureReason.CREDIT_GATE -> if (isPremium) FailedCta.Dismiss else FailedCta.Upgrade
         AiFailureReason.CANCELLED,
         AiFailureReason.TARGET_MISSING,
         -> FailedCta.Dismiss

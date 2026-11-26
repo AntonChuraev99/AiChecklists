@@ -249,6 +249,7 @@ fun AnalyzeScreenContent(
                             cta = dockPhase.cta,
                             onRetry = { onIntent(AnalyzeJobIntent.OnRetryClick) },
                             onBackToEditing = { onIntent(AnalyzeJobIntent.OnBackToEditingClick) },
+                            onUpgrade = { onIntent(AnalyzeJobIntent.OnUpgradeClick) },
                         )
                     }
                 }

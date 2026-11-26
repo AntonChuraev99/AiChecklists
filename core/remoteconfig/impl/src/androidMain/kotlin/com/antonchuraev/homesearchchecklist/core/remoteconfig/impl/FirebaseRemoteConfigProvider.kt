@@ -52,8 +52,6 @@ class FirebaseRemoteConfigProvider(
         RemoteConfigKeys.MIN_APP_VERSION to RemoteConfigDefaults.MIN_APP_VERSION,
         RemoteConfigKeys.MAINTENANCE_MODE to RemoteConfigDefaults.MAINTENANCE_MODE,
         RemoteConfigKeys.AI_FUNCTIONS_BASE_URL to RemoteConfigDefaults.AI_FUNCTIONS_BASE_URL,
-        RemoteConfigKeys.AI_DAILY_LIMIT_FREE to RemoteConfigDefaults.AI_DAILY_LIMIT_FREE,
-        RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to RemoteConfigDefaults.AI_DAILY_LIMIT_PREMIUM,
         RemoteConfigKeys.MAX_CHECKLISTS_FREE to RemoteConfigDefaults.MAX_CHECKLISTS_FREE,
         RemoteConfigKeys.MAX_FILLS_FREE to RemoteConfigDefaults.MAX_FILLS_FREE,
         RemoteConfigKeys.MAX_RECURRING_REMINDERS_FREE to RemoteConfigDefaults.MAX_RECURRING_REMINDERS_FREE,

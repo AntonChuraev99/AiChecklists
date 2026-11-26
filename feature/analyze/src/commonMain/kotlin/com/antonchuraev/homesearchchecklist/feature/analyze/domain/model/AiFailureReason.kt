@@ -1,5 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.domain.model
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
+
 /**
  * Coarse machine reason attached to the `ai_analyze_failed` analytics event so failures are
  * groupable in Amplitude WITHOUT regex over free text. [wireValue] is the string sent on the wire;
@@ -11,11 +15,12 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.domain.model
  * "Not enough credits").
  *
  * [retryableWithSameInput]: whether sending the SAME input again can succeed. False for failures
- * about the input itself (a retry would fail again, or charge-and-fail) and for credit / limit gates.
+ * about the input itself (a retry would fail again, or charge-and-fail) and for the credit gate.
  */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
 enum class AiFailureReason(val wireValue: String, val retryableWithSameInput: Boolean) {
     CREDIT_GATE("credit_gate", retryableWithSameInput = false),
-    DAILY_LIMIT("daily_limit", retryableWithSameInput = false),
     INPUT_TOO_LONG("input_too_long", retryableWithSameInput = false),
     NETWORK("network", retryableWithSameInput = true),
     TIMEOUT("timeout", retryableWithSameInput = true),
@@ -43,6 +48,14 @@ enum class AiFailureReason(val wireValue: String, val retryableWithSameInput: Bo
 
     /** Server refused the input itself (`error_code = invalid_input` / `unsupported_input_type`). */
     INVALID_INPUT("invalid_input", retryableWithSameInput = false),
+
+    /**
+     * Anything unclassified. Also the decode target of the removed `DAILY_LIMIT` (2026-11-26: there
+     * is no daily request limit any more, credits are the only gate): a job persisted in
+     * `analysis_jobs_v1` by an older build must still decode, or the whole queue — active jobs
+     * included — would be dropped on the first read.
+     */
+    @JsonNames("DAILY_LIMIT")
     UNKNOWN("unknown", retryableWithSameInput = true);
 
     /**
@@ -80,7 +93,6 @@ enum class AiFailureReason(val wireValue: String, val retryableWithSameInput: Bo
                 error.statusCode == 403 -> AUTH_403
                 error.statusCode in 500..599 -> SERVER_5XX
                 error.statusCode == 402 -> CREDIT_GATE
-                error.statusCode == 429 -> DAILY_LIMIT
                 // Other 4xx (e.g. 400 validation): fall back to the server message for the specific cause.
                 else -> classifyByMessage(error.message).takeIf { it != UNKNOWN } ?: UNKNOWN
             }
@@ -91,7 +103,6 @@ enum class AiFailureReason(val wireValue: String, val retryableWithSameInput: Bo
             return when {
                 AiAnalyzeError.MARKER in msg || "user_id is required" in msg || "user id is required" in msg -> USER_NOT_READY
                 "not enough credit" in msg || "insufficient credit" in msg -> CREDIT_GATE
-                "daily limit" in msg || "limit reached" in msg || "rate limit" in msg -> DAILY_LIMIT
                 "maximum length" in msg || "too long" in msg || "exceeds maximum" in msg -> INPUT_TOO_LONG
                 "unable to resolve host" in msg || "failed to connect" in msg ||
                     "connection" in msg || "unexpected end of stream" in msg ||

@@ -551,7 +551,7 @@
     <string name="credits_get_more">और क्रेडिट पाएं</string>
     <string name="credits_pro_badge">PRO</string>
     <string name="credits_your_credits">आपके AI क्रेडिट</string>
-    <string name="credits_refill_info">रोज़ 12:00 CET पर रिफिल होता है</string>
+    <string name="credits_refill_info">रोज़ 12:00 CET पर रिफिल होता है</string>
     <string name="credits_refill_to">%1$d तक</string>
     <string name="credits_premium_benefit">प्रीमियम: रोज़ %1$d क्रेडिट तक रिफिल</string>
 
@@ -1077,7 +1077,7 @@
          notification we don't actually send, which is a Google Play "Deceptive behavior"
          policy risk. If we add real pre-trial-end push notifications, restore Day 2.) -->
     <string name="paywall_v1_timeline_step1_title">आज</string>
-    <string name="paywall_v1_timeline_step1_body">Gisti Pro अनलॉक करें — हर दिन 300 AI रिक्वेस्ट, असीमित चेकलिस्ट और दोहराने वाले रिमाइंडर।</string>
+    <string name="paywall_v1_timeline_step1_body">Gisti Pro अनलॉक करें — हर दिन 300 AI क्रेडिट, असीमित चेकलिस्ट और दोहराने वाले रिमाइंडर।</string>
     <string name="paywall_v1_timeline_step3_title">दिन 3</string>
     <string name="paywall_v1_timeline_step3_body">आपका मुफ़्त ट्रायल खत्म होता है और आपकी Pro सब्सक्रिप्शन शुरू होती है।</string>
 
@@ -1099,7 +1099,7 @@
     <string name="paywall_v1_feature_link_title">कोई भी लिंक</string>
     <string name="paywall_v1_feature_link_body">लेख और पोस्ट, स्टेप्स में बदल जाते हैं।</string>
     <!-- Active feature rows -->
-    <string name="paywall_v1_feature_ai_runs_title">हर दिन 300 AI रिक्वेस्ट</string>
+    <string name="paywall_v1_feature_ai_runs_title">हर दिन 300 AI क्रेडिट</string>
     <string name="paywall_v1_feature_ai_runs_body">रोज़ भरते हैं। एक हफ़्ते की ट्रिप, रेसिपी और प्रोजेक्ट प्लान करें।</string>
     <string name="paywall_v1_feature_unlimited_lists_title">असीमित चेकलिस्ट</string>
     <string name="paywall_v1_feature_unlimited_lists_body">4-चेकलिस्ट की सीमा नहीं। जितनी चाहें उतनी बनाएं।</string>
@@ -1133,7 +1133,7 @@
     <string name="paywall_v1_compare_row_reminders">स्मार्ट रिमाइंडर</string>
     <string name="paywall_v1_compare_row_priority_ai">बेस्ट AI मॉडल (Gemini 2.5 Flash)</string>
     <!-- Active compare rows + values -->
-    <string name="paywall_v1_compare_row_ai_requests">AI रिक्वेस्ट</string>
+    <string name="paywall_v1_compare_row_ai_requests">AI क्रेडिट</string>
     <string name="paywall_v1_compare_row_checklists">चेकलिस्ट</string>
     <string name="paywall_v1_compare_row_fills">फ़िल / सूची</string>
     <string name="paywall_v1_compare_row_recurring_reminders">बार-बार आने वाले रिमाइंडर</string>
@@ -1343,9 +1343,16 @@
     <string name="month_december">दिसंबर</string>
     <string name="chat_unknown_intent_hint">मैं समझ नहीं पाया। «शॉपिंग में दूध जोड़ें» या «शुक्रवार शाम 6 बजे याद दिलाएं» आज़माएं।</string>
     <string name="chat_ask_ai_fallback">AI से पूछें</string>
-    <!-- CTA on the out-of-credits reply. %1$s = Premium daily AI credits (Remote Config
-         ai_daily_limit_premium) — never hardcode the number, the label promises it. -->
-    <string name="chat_paywall_cta_credits">Pro बनें और अभी व हर दिन %1$s क्रेडिट पाएं</string>
+    <!-- Out-of-credits banner above the AI chat input. -->
+    <string name="chat_out_of_credits_free_title">मुफ़्त AI क्रेडिट खत्म हो गए</string>
+    <string name="chat_out_of_credits_free_body">Pro में हर दिन %1$s तक</string>
+    <string name="chat_out_of_credits_free_body_no_amount">Pro में क्रेडिट हर दिन भरते हैं</string>
+    <string name="chat_out_of_credits_cta_pro">Pro लें</string>
+    <string name="chat_out_of_credits_low_title">पर्याप्त AI क्रेडिट नहीं</string>
+    <string name="chat_out_of_credits_premium_title">आज के AI क्रेडिट खत्म हो गए</string>
+    <string name="chat_out_of_credits_guest_title">Gisti से पूछने के लिए साइन इन करें</string>
+    <string name="chat_out_of_credits_guest_body">Google खाते से मुफ़्त</string>
+    <string name="chat_out_of_credits_not_sent">नहीं भेजा गया।</string>
 
     <!-- AI Chat Pricing Help Sheet -->
     <string name="chat_pricing_sheet_title">AI चैट क्रेडिट कैसे चार्ज करता है</string>
@@ -2005,6 +2012,7 @@
     <string name="analyze_error_server">हमारी तरफ़ कुछ गड़बड़ हुई। थोड़ी देर में फिर कोशिश करें।</string>
     <string name="analyze_change_input">सामग्री बदलें</string>
     <string name="analyze_try_again">फिर कोशिश करें</string>
+    <string name="analyze_failed_get_pro">Pro लें</string>
     <string name="analyze_too_many_jobs">आपके %1$d विश्लेषण पहले से चल रहे हैं। किसी एक के पूरा होने तक रुकें।</string>
     <string name="analyze_loading_slow">बड़ी फ़ाइलों में एक मिनट तक लग सकता है</string>
     <string name="analyze_waiting_leave_hint">आप यहाँ से जा सकते हैं — तैयार होने पर हम बताएँगे</string>

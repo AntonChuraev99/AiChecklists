@@ -99,6 +99,12 @@ data class ChatScreenState(
     val responseLanguage: String? = null,
     /** Whether the response-language picker bottom sheet is visible (opened from chat settings). */
     val showResponseLanguageSheet: Boolean = false,
+    /**
+     * The out-of-credits banner pinned above the input on both chat surfaces, or null when the
+     * wallet is not known to be empty. Derived by the ViewModel (balance + 402 latch + credits
+     * config) — see [OutOfCreditsBannerState] for the rule. Hidden by the dock in item-create mode.
+     */
+    val outOfCredits: OutOfCreditsBannerState? = null,
 ) : State {
     /** True when the Send button should be active (text entered OR attachments pending). */
     val canSend: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -279,8 +285,6 @@ sealed interface ChatScreenIntent : Intent {
      * can show an "Open checklist" button for successful write-intent outcomes.
      * [askAiForText] is preserved so the bubble can show an "Ask AI" button
      * for Unknown-intent responses that should offer Layer 3 escalation.
-     * [paywallCtaCredits] is preserved so the bubble can show the "Become Pro" CTA
-     * on an out-of-credits reply (the number is the Premium daily allowance).
      * [routedLayer] is preserved so the appended assistant message carries the tier that
      * produced it — thumb_up / thumb_down analytics read `ChatMessage.routedLayer`, and a null
      * here is exactly the "unknown" that masked 86% of chat feedback before this round-trip.
@@ -289,7 +293,6 @@ sealed interface ChatScreenIntent : Intent {
         val text: String,
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
-        val paywallCtaCredits: Int? = null,
         val retryText: String? = null,
         val routedLayer: RoutingLayer? = null,
     ) : ChatScreenIntent
@@ -347,11 +350,19 @@ sealed interface ChatScreenIntent : Intent {
     data class OnAskAiFallback(val text: String) : ChatScreenIntent
 
     /**
-     * User tapped the "Become Pro" CTA on an out-of-credits assistant bubble.
-     * Emits [ChatScreenSideEffect.NavigateToPaywall] — the conversion moment the Layer 1
-     * disconnect was accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+     * User tapped "Get Pro" on the out-of-credits banner ([OutOfCreditsBannerState.Free]).
+     * Emits [ChatScreenSideEffect.NavigateToPaywall] with [ChatScreenSideEffect.NavigateToPaywall.SOURCE_INSUFFICIENT_CREDITS]
+     * — the conversion moment the Layer 1 disconnect was accepted to buy
+     * (docs/decisions/2026-07-15-remove-ai-chat-layer1.md) — plus `ai_chat_out_of_credits_cta_tapped`.
      */
     data object OnPaywallCtaClick : ChatScreenIntent
+
+    /**
+     * User tapped "Sign in" on the out-of-credits banner ([OutOfCreditsBannerState.Guest], web only).
+     * Emits [ChatScreenSideEffect.RequestGoogleSignIn]; the host runs its existing sign-in flow (its
+     * failure snackbar included). The banner disappears by itself once the linked balance arrives.
+     */
+    data object OnOutOfCreditsSignInClick : ChatScreenIntent
 
     /**
      * User tapped "Retry" on a recoverable error reply (offline / service / timeout — F1).
@@ -515,19 +526,14 @@ sealed interface ChatScreenSideEffect : SideEffect {
      * checklist" deeplink button for successful write-intent dispatch outcomes.
      * [askAiForText] is forwarded when the assistant message is an Unknown-intent response;
      * the bubble shows an "Ask AI" TextButton that escalates to Layer 3 explicitly.
-     * [paywallCtaCredits] is forwarded when the turn was refused for lack of credits: non-null
-     * makes the bubble show the "Become Pro" CTA, and the value is the Premium daily credit
-     * allowance rendered in its label (read from Remote Config — never hardcoded, see
-     * [ChatViewModel.premiumDailyCredits]). Mutually exclusive with [askAiForText] by intent:
-     * offering "Ask AI" to an empty wallet is how the shipped bug hid the truth (it asks for 3
-     * more credits, 402s again).
+     * A turn refused for lack of credits never comes through here: its answer is
+     * [ChatScreenState.outOfCredits] + [OutOfCreditsRefused], not a bubble.
      */
     data class ShowAssistantMessage(
         val messageKey: String,
         val args: List<String> = emptyList(),
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
-        val paywallCtaCredits: Int? = null,
         /**
          * The user text to re-send when the user taps "Retry" on this reply (F1 recoverable errors:
          * offline / service / timeout). Non-null makes the bubble show a "Retry" chip that dispatches
@@ -545,6 +551,21 @@ sealed interface ChatScreenSideEffect : SideEffect {
 
     /** Navigate back (handled by the host NavController). */
     data object NavigateBack : ChatScreenSideEffect
+
+    /**
+     * The server refused a send for lack of credits (HTTP 402 on a chat turn or on voice
+     * transcription). [ChatScreenState.outOfCredits] already holds the banner; this one-shot is the
+     * visible response to THIS tap: the host nudges (pulses) the banner and announces
+     * `chat_out_of_credits_not_sent` ("Not sent.") through its live region. Fired on every refusal,
+     * including when the banner was already up — a repeated tap must not look ignored.
+     */
+    data object OutOfCreditsRefused : ChatScreenSideEffect
+
+    /**
+     * The web guest tapped "Sign in" on the out-of-credits banner. The host runs its existing Google
+     * sign-in (`handleSignIn` in App.kt, which shows its own failure snackbar).
+     */
+    data object RequestGoogleSignIn : ChatScreenSideEffect
 
     /** Navigate to [ChecklistDetail] for the given checklist (triggered by "Open checklist" button). */
     data class NavigateToChecklist(val checklistId: Long) : ChatScreenSideEffect
@@ -580,7 +601,7 @@ sealed interface ChatScreenSideEffect : SideEffect {
      */
     data class NavigateToPaywall(val source: String) : ChatScreenSideEffect {
         companion object {
-            /** The user ran out of AI credits and tapped "Become Pro" on the refusal reply. */
+            /** The user ran out of AI credits and tapped "Get Pro" on the out-of-credits banner. */
             const val SOURCE_INSUFFICIENT_CREDITS = "chat_insufficient_credits"
 
             /** The user tapped the credit-balance chip in the chat top bar, unprompted. */

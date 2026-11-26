@@ -54,7 +54,8 @@ sealed interface ChatIntent {
      * (docs/todos/2026-07-16-aichat-insufficient-credits-shows-unknown-hint.md).
      *
      * Invariants for every call-site:
-     *   - Say the wallet is empty ("chat_insufficient_credits"), never the "not understood" hint.
+     *   - Say the wallet is empty (the out-of-credits banner above the input), never the
+     *     "not understood" hint.
      *   - Do NOT escalate to Layer 3 — that bills 3 credits to a wallet that just refused 1.
      *   - Charge the turn 0 credits: 402 means the server billed nothing.
      *

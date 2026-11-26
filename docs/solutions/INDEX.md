@@ -1,11 +1,12 @@
 # Solutions Index — Checklists
 
-_Last updated: 2026-11-21_
+_Last updated: 2026-11-26_
 
 Быстрый поиск по 95 накопленным решениям. Для полного контента — открой файл по ссылке.
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-11-26 | decision | paywall, credits, out-of-credits-banner, OutOfCreditsBannerState, emitInsufficientCredits, daily-limit, http-402 | [Credits are the only AI gate; an empty wallet is a banner above the chat input](../decisions/2026-11-26-credits-only-ai-gate-and-out-of-credits-banner.md) |
 | 2026-11-21 | architecture | network, retry, notification, analyze, WorkManager, resolveDelivery, request_id, gemini-503 | [Analyze: анализ как задание уровня приложения, доставка одной стороной, повторы Gemini на сервере](analyze-background-job-and-reliability-2026-11-21.md) |
 | 2026-11-20 | bug-fix | itemsJson, encodeFillItem, alarmEnabled, reminderFullScreen, unknown keys, mcp, telegram bot | [Серверный писатель данных приложения обязан сохранять ключи, которых не знает](mcp-fill-encoder-drops-unknown-keys-2026-11-20.md) |
 | 2026-11-19 | decision | telegram, stars, XTR, premium, verify_premium, anti-steering, refund | [Премиум за Telegram Stars — второй канал оплаты, общий на все платформы](../decisions/2026-11-19-telegram-stars-second-billing-channel.md) |

@@ -3,7 +3,6 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
@@ -35,6 +34,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.CreditsConfig
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.CreditsConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.StoreEntitlementSource
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -557,20 +559,37 @@ class HarnessRig(
 )
 
 /**
- * Remote Config for the offline rigs: answers every key with the caller's own default unless
- * [longs] overrides it.
+ * Server credits config for the offline rigs. [initial] is what `get_credits_info` "already
+ * returned"; null = never fetched. [refresh] serves [onRefresh] (default: keep [initial]).
  *
- * The override matters for the out-of-credits paywall CTA: with a pure echo-the-default fake, a
- * ViewModel that HARDCODED 300 would look identical to one that reads `ai_daily_limit_premium`
- * (the compiled default is 300). Tests that assert the RC wiring pass a non-default number.
+ * Tests that assert the out-of-credits number pass a NON-production cap (777): with the real 300 a
+ * ViewModel that hardcoded 300 would look identical to one that reads the config.
  */
-internal class HarnessRemoteConfigProvider(
-    private val longs: Map<String, Long> = emptyMap(),
-) : RemoteConfigProvider {
-    override suspend fun fetchAndActivate(): Boolean = true
-    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-    override fun getString(key: String, defaultValue: String): String = defaultValue
-    override fun getLong(key: String, defaultValue: Long): Long = longs[key] ?: defaultValue
+internal class FakeCreditsConfigProvider(
+    initial: CreditsConfig? = null,
+    private val onRefresh: () -> Result<CreditsConfig> = {
+        initial?.let { Result.success(it) } ?: Result.failure(IllegalStateException("not configured"))
+    },
+) : CreditsConfigProvider {
+    private val _config = MutableStateFlow(initial)
+    override val config: StateFlow<CreditsConfig?> = _config
+    var refreshCount = 0
+        private set
+
+    fun set(value: CreditsConfig?) {
+        _config.value = value
+    }
+
+    override suspend fun refresh(): Result<CreditsConfig> {
+        refreshCount++
+        return onRefresh().onSuccess { _config.value = it }
+    }
+}
+
+/** RevenueCat half of Premium for tests; flip [entitled] to simulate a store purchase. */
+internal class FakeStoreEntitlementSource(initial: Boolean = false) : StoreEntitlementSource {
+    val entitled = MutableStateFlow(initial)
+    override val isEntitled: Flow<Boolean> = entitled
 }
 
 /**
@@ -616,8 +635,8 @@ fun buildHarnessRig(scenario: ChatScenario): HarnessRig {
         aiChatPreferencesRepository = prefs,
         analytics = HarnessAnalytics(),
         aiModelExperimentTracker = HarnessNoOpModelExperimentTracker,
-        remoteConfigProvider = HarnessRemoteConfigProvider(),
         logger = HarnessNoOpLogger,
+        platformName = "android",
     )
 
     return HarnessRig(viewModel, dispatcher, classifierApi, completionApi, agentApi)
