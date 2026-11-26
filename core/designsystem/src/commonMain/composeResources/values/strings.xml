@@ -567,7 +567,7 @@
     <string name="credits_get_more">Get More Credits</string>
     <string name="credits_pro_badge">PRO</string>
     <string name="credits_your_credits">Your AI Credits</string>
-    <string name="credits_refill_info">Refills daily at 12:00 CET</string>
+    <string name="credits_refill_info">Refills daily at 12:00 CET</string>
     <string name="credits_refill_to">up to %1$d</string>
     <string name="credits_premium_benefit">Premium: daily refill to %1$d credits</string>
 
@@ -1096,7 +1096,7 @@
          notification we don't actually send, which is a Google Play "Deceptive behavior"
          policy risk. If we add real pre-trial-end push notifications, restore Day 2.) -->
     <string name="paywall_v1_timeline_step1_title">Today</string>
-    <string name="paywall_v1_timeline_step1_body">Unlock Gisti Pro — 300 AI requests every day, unlimited checklists and recurring reminders.</string>
+    <string name="paywall_v1_timeline_step1_body">Unlock Gisti Pro — 300 AI credits every day, unlimited checklists and recurring reminders.</string>
     <string name="paywall_v1_timeline_step3_title">Day 3</string>
     <string name="paywall_v1_timeline_step3_body">Your free trial ends and your Pro subscription begins.</string>
 
@@ -1118,7 +1118,7 @@
     <string name="paywall_v1_feature_link_title">Any link</string>
     <string name="paywall_v1_feature_link_body">Articles and posts, distilled into steps.</string>
     <!-- Active feature rows -->
-    <string name="paywall_v1_feature_ai_runs_title">300 AI requests every day</string>
+    <string name="paywall_v1_feature_ai_runs_title">300 AI credits every day</string>
     <string name="paywall_v1_feature_ai_runs_body">Refilled daily. Plan a week of trips, recipes, and projects.</string>
     <string name="paywall_v1_feature_unlimited_lists_title">Unlimited checklists</string>
     <string name="paywall_v1_feature_unlimited_lists_body">No 4-checklist cap. Build as many as you need.</string>
@@ -1152,7 +1152,7 @@
     <string name="paywall_v1_compare_row_reminders">Smart reminders</string>
     <string name="paywall_v1_compare_row_priority_ai">Best AI model (Gemini 2.5 Flash)</string>
     <!-- Active compare rows + values -->
-    <string name="paywall_v1_compare_row_ai_requests">AI requests</string>
+    <string name="paywall_v1_compare_row_ai_requests">AI credits</string>
     <string name="paywall_v1_compare_row_checklists">Checklists</string>
     <string name="paywall_v1_compare_row_fills">Fills / list</string>
     <string name="paywall_v1_compare_row_recurring_reminders">Recurring reminders</string>
@@ -1372,9 +1372,20 @@
     <string name="month_december">December</string>
     <string name="chat_unknown_intent_hint">I didn't catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
     <string name="chat_ask_ai_fallback">Ask AI</string>
-    <!-- CTA on the out-of-credits reply. %1$s = Premium daily AI credits (Remote Config
-         ai_daily_limit_premium) — never hardcode the number, the label promises it. -->
-    <string name="chat_paywall_cta_credits">Become Pro and get %1$s credits now and every day</string>
+    <!-- Out-of-credits banner pinned above the AI chat input (replaces the refusal bubble).
+         Copy by @design-expert (DESIGN_SPEC 2026-11-26). %1$s = premium_daily_credits_cap from
+         the server credits config, never a literal; config not loaded -> the _no_amount body.
+         Premium body reuses credits_refill_info, guest CTA reuses drawer_sign_in. -->
+    <string name="chat_out_of_credits_free_title">Free AI credits used up</string>
+    <string name="chat_out_of_credits_free_body">Pro gives you up to %1$s a day</string>
+    <string name="chat_out_of_credits_free_body_no_amount">Pro refills your credits every day</string>
+    <string name="chat_out_of_credits_cta_pro">Get Pro</string>
+    <string name="chat_out_of_credits_low_title">Not enough AI credits</string>
+    <string name="chat_out_of_credits_premium_title">Today's AI credits used up</string>
+    <string name="chat_out_of_credits_guest_title">Sign in to ask Gisti</string>
+    <string name="chat_out_of_credits_guest_body">It's free with your Google account</string>
+    <!-- Accessibility only: announced when a send was refused for lack of credits. -->
+    <string name="chat_out_of_credits_not_sent">Not sent.</string>
 
     <!-- AI Chat Pricing Help Sheet -->
     <string name="chat_pricing_sheet_title">How AI Chat charges credits</string>
@@ -2166,6 +2177,8 @@
     <string name="analyze_error_server">Something went wrong on our side. Try again in a moment.</string>
     <string name="analyze_change_input">Change input</string>
     <string name="analyze_try_again">Try again</string>
+    <!-- Analyze Failed phase, Free user refused for credits (402) → paywall. -->
+    <string name="analyze_failed_get_pro">Get Pro</string>
     <string name="analyze_too_many_jobs">You already have %1$d analyses running. Wait for one to finish.</string>
     <string name="analyze_loading_slow">Large files can take up to a minute</string>
     <string name="analyze_waiting_leave_hint">You can leave — we'll let you know when it's ready</string>

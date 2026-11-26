@@ -4,7 +4,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolve
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiServiceImpl
+import com.antonchuraev.homesearchchecklist.feature.user.data.repository.CreditsConfigProviderImpl
 import com.antonchuraev.homesearchchecklist.feature.user.data.repository.UserDataRepositoryImpl
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.CreditsConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.user.domain.experiment.NavExperimentResolverImpl
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
@@ -28,6 +30,11 @@ val userFeatureModule = module {
             analyticsTracker = get()
         )
     } bind UserDataRepository::class
+
+    // Server credit economics (get_credits_info): one cache for Analyze and AI Chat.
+    single<CreditsConfigProvider> {
+        CreditsConfigProviderImpl(userApiService = get(), userDataRepository = get(), logger = get())
+    }
 
     factory { CompleteOnboardingUseCase(get()) }
     factory { GetOnboardingVariantUseCase(remoteConfigProvider = get(), logger = get()) }

@@ -150,7 +150,6 @@ class FirebaseAiServiceImpl(
                     confidence = responseBody.confidence ?: 0.8f,
                     aiCredits = responseBody.aiCredits ?: -1
                 ),
-                usage = responseBody.usage?.toUsageInfo(),
                 modelVariant = responseBody.modelVariant,
                 modelId = responseBody.modelId,
                 aiFlow = responseBody.aiFlow,
@@ -226,7 +225,6 @@ class FirebaseAiServiceImpl(
                     aiCredits = responseBody.aiCredits ?: -1,
                     hasFolders = hasFolders
                 ),
-                usage = responseBody.usage?.toUsageInfo(),
                 modelVariant = responseBody.modelVariant,
                 modelId = responseBody.modelId,
                 aiFlow = responseBody.aiFlow,
@@ -237,56 +235,6 @@ class FirebaseAiServiceImpl(
                 success = false,
                 error = responseBody.error ?: "Unknown error",
                 errorCode = responseBody.errorCode,
-            )
-        }
-    }
-
-    override suspend fun getCreditsInfo(userId: String): Result<CreditsInfo> = aiRunCatching {
-        val response: HttpResponse = httpClient.post("$baseUrl/get_credits_info") {
-            contentType(ContentType.Application.Json)
-            setBody(CreditsInfoRequest(userId = userId))
-        }
-        response.throwIfHttpError()
-        val body = response.body<CreditsInfoResponseDto>()
-        val cost = body.config?.actionCost
-        if (!body.success || cost == null || cost <= 0) {
-            throw IllegalStateException("get_credits_info returned no action_cost: ${body.error}")
-        }
-        logger.debug(TAG, "getCreditsInfo: action_cost=$cost")
-        CreditsInfo(actionCost = cost, userCredits = body.userCredits)
-    }
-
-    override suspend fun getUsageStats(
-        userId: String,
-        isPremium: Boolean
-    ): Result<AiServiceResponse<UsageInfo>> = runCatching {
-        logger.debug(TAG, "getUsageStats: userId=${userId.take(8)}..., isPremium=$isPremium")
-
-        val request = UsageStatsRequest(
-            userId = userId,
-            isPremium = isPremium
-        )
-
-        logger.debug(TAG, "getUsageStats: calling $baseUrl/get_usage_stats")
-        val response: HttpResponse = httpClient.post("$baseUrl/get_usage_stats") {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }
-        logger.debug(TAG, "getUsageStats: response status=${response.status}")
-
-        val responseBody = response.body<UsageStatsResponseDto>()
-
-        if (responseBody.success && responseBody.usage != null) {
-            logger.info(TAG, "getUsageStats: SUCCESS - count=${responseBody.usage.count}, limit=${responseBody.usage.limit}")
-            AiServiceResponse(
-                success = true,
-                data = responseBody.usage.toUsageInfo()
-            )
-        } else {
-            logger.error(TAG, "getUsageStats: FAILED - ${responseBody.error}")
-            AiServiceResponse(
-                success = false,
-                error = responseBody.error ?: "Failed to get usage stats"
             )
         }
     }
@@ -339,12 +287,6 @@ class FirebaseAiServiceImpl(
     private fun newRequestId(): String = Uuid.random().toString()
 
     private fun AiInputType.toApiString(): String = wire
-
-    private fun UsageDto.toUsageInfo() = UsageInfo(
-        count = today ?: count ?: 0,
-        limit = limit ?: 10,
-        remaining = remaining ?: (limit ?: 10) - (today ?: count ?: 0)
-    )
 
     // ── Transient-failure resilience helpers ────────────────────────────────────────────────────
 
@@ -435,7 +377,6 @@ private data class FillChecklistResponseDto(
     val summary: String? = null,
     val confidence: Float? = null,
     @SerialName("ai_credits") val aiCredits: Int? = null,
-    val usage: UsageDto? = null,
     // Server-driven AI-model A/B assignment. Nullable + ignoreUnknownKeys → older servers stay
     // compatible; null means "experiment off / unknown", never a real arm.
     @SerialName("model_variant") val modelVariant: String? = null,
@@ -471,59 +412,11 @@ private data class GenerateChecklistResponseDto(
     val summary: String? = null,
     val confidence: Float? = null,
     @SerialName("ai_credits") val aiCredits: Int? = null,
-    val usage: UsageDto? = null,
     // Server-driven AI-model A/B assignment. Nullable + ignoreUnknownKeys → older servers stay
     // compatible; null means "experiment off / unknown", never a real arm.
     @SerialName("model_variant") val modelVariant: String? = null,
     @SerialName("model_id") val modelId: String? = null,
     @SerialName("ai_flow") val aiFlow: String? = null,
-)
-
-@Serializable
-private data class CreditsInfoRequest(
-    @SerialName("user_id") val userId: String,
-)
-
-@Serializable
-private data class CreditsInfoResponseDto(
-    val success: Boolean = false,
-    val error: String? = null,
-    val config: CreditsConfigDto? = null,
-    @SerialName("user_credits") val userCredits: Int? = null,
-)
-
-@Serializable
-private data class CreditsConfigDto(
-    @SerialName("action_cost") val actionCost: Int? = null,
-)
-
-@Serializable
-private data class UsageStatsRequest(
-    @SerialName("user_id") val userId: String,
-    @SerialName("is_premium") val isPremium: Boolean
-)
-
-@Serializable
-private data class UsageStatsResponseDto(
-    val success: Boolean,
-    val error: String? = null,
-    val usage: UsageDto? = null
-)
-
-@Serializable
-private data class UsageDto(
-    val today: Int? = null,
-    val count: Int? = null,
-    val limit: Int? = null,
-    val remaining: Int? = null,
-    val requests: List<RequestLogDto>? = null
-)
-
-@Serializable
-private data class RequestLogDto(
-    val function: String? = null,
-    @SerialName("input_type") val inputType: String? = null,
-    val timestamp: String? = null
 )
 
 @Serializable

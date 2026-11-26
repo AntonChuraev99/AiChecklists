@@ -60,6 +60,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatPricingHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentChipStrip
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.OutOfCreditsBanner
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.OutOfCreditsBannerDefaults
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ctaIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
@@ -115,6 +118,7 @@ fun ChatScreen(
     onVoiceRecordingStarted: (() -> Unit)? = null,
     onVoiceRecordingStopped: (() -> Unit)? = null,
     onVoiceRecordingCancelled: (() -> Unit)? = null,
+    outOfCreditsNudge: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -197,6 +201,7 @@ fun ChatScreen(
             onVoiceRecordingStopped = onVoiceRecordingStopped,
             onVoiceRecordingCancelled = onVoiceRecordingCancelled,
             onNavigateToPaywall = onNavigateToPaywall,
+            outOfCreditsNudge = outOfCreditsNudge,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding),
@@ -329,6 +334,7 @@ fun ChatContent(
     onVoiceRecordingCancelled: (() -> Unit)?,
     onNavigateToPaywall: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    outOfCreditsNudge: Int = 0,
 ) {
     // The mic press-and-hold gesture measures cancel-vs-commit in WINDOW coordinates (see
     // ChatInputRow), so it stays correct even when this input Column slides down as the keyboard
@@ -367,8 +373,9 @@ fun ChatContent(
         // the pill / chips inside resolve to their bottom-chrome values (AppChatColors).
         // While a QUESTION is pending the input is hidden (see ChatInputPlateContent); with nothing
         // to hold, an empty plate would read as a stray sliver of chrome — only the nav-bar inset stays.
+        // The out-of-credits banner stays in the plate above a question's chips too.
         val plateHasContent = state.pendingChoice == null || state.pendingChoice.isPostAction ||
-            state.pendingAttachments.isNotEmpty()
+            state.pendingAttachments.isNotEmpty() || state.outOfCredits != null
         if (!plateHasContent) {
             Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         } else CompositionLocalProvider(LocalChatSurfaceTone provides ChatSurfaceTone.BottomChrome) {
@@ -386,6 +393,7 @@ fun ChatContent(
                         onVoiceRecordingStarted = onVoiceRecordingStarted,
                         onVoiceRecordingStopped = onVoiceRecordingStopped,
                         onVoiceRecordingCancelled = onVoiceRecordingCancelled,
+                        outOfCreditsNudge = outOfCreditsNudge,
                     )
                 }
             }
@@ -403,7 +411,18 @@ private fun ChatInputPlateContent(
     onVoiceRecordingStarted: (() -> Unit)?,
     onVoiceRecordingStopped: (() -> Unit)?,
     onVoiceRecordingCancelled: (() -> Unit)?,
+    outOfCreditsNudge: Int,
 ) {
+        // Out-of-credits notice (DESIGN_SPEC 2026-11-26 §6): first child of the input slot, above
+        // the attachment strip. The plate has no horizontal padding of its own → default gutter.
+        val inputVisible = state.pendingChoice == null || state.pendingChoice.isPostAction
+        OutOfCreditsBanner(
+            state = state.outOfCredits,
+            nudgeKey = outOfCreditsNudge,
+            onCtaClick = { state.outOfCredits?.ctaIntent()?.let(onIntent) },
+            contentPadding = OutOfCreditsBannerDefaults.contentPadding(inputBelow = inputVisible),
+        )
+
         // Pending attachment chips
         ChatAttachmentChipStrip(
             attachments = state.pendingAttachments,
@@ -416,7 +435,7 @@ private fun ChatInputPlateContent(
         // A post-action offer (Undo / move) is NOT a question — it has no escape chip, so hiding
         // the input there left no way out but Back (which collapses the dock). Keep typing enabled;
         // sending a new message clears the offer.
-        if (state.pendingChoice == null || state.pendingChoice.isPostAction) {
+        if (inputVisible) {
             ChatInputRow(
                 text = state.inputText,
                 onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
@@ -573,9 +592,6 @@ fun ChatMessageList(
                 },
                 onAskAiFallback = message.askAiForText?.let { text ->
                     { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
-                },
-                onPaywallCta = message.paywallCtaCredits?.let {
-                    { onIntent(ChatScreenIntent.OnPaywallCtaClick) }
                 },
                 onRetry = message.retryText?.let { text ->
                     { onIntent(ChatScreenIntent.OnRetryClick(text)) }

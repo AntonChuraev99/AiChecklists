@@ -9,6 +9,7 @@ import aichecklists.core.designsystem.generated.resources.analyze_loading
 import aichecklists.core.designsystem.generated.resources.analyze_loading_description
 import aichecklists.core.designsystem.generated.resources.analyze_loading_slow
 import aichecklists.core.designsystem.generated.resources.analyze_try_again
+import aichecklists.core.designsystem.generated.resources.analyze_failed_get_pro
 import aichecklists.core.designsystem.generated.resources.analyze_waiting_leave_hint
 import aichecklists.core.designsystem.generated.resources.analyze_waiting_network_description
 import aichecklists.core.designsystem.generated.resources.analyze_waiting_network_title
@@ -250,6 +251,7 @@ internal fun ColumnScope.FailedDockContent(
     cta: FailedCta,
     onRetry: () -> Unit,
     onBackToEditing: () -> Unit,
+    onUpgrade: () -> Unit,
 ) {
     when (cta) {
         FailedCta.Retry -> {
@@ -274,6 +276,20 @@ internal fun ColumnScope.FailedDockContent(
             onClick = onBackToEditing,
             modifier = Modifier.fillMaxWidth().testTag("analyze_failed_ok"),
         )
+        // Out of credits (Free): the way out is Pro; "OK" returns to the form, laid out like Retry's
+        // primary + text pair so the failed dock keeps one rhythm across reasons.
+        FailedCta.Upgrade -> {
+            AppButton(
+                text = stringResource(Res.string.analyze_failed_get_pro),
+                onClick = onUpgrade,
+                modifier = Modifier.fillMaxWidth().testTag("analyze_failed_upgrade"),
+            )
+            AppButtonText(
+                text = stringResource(Res.string.ok),
+                onClick = onBackToEditing,
+                modifier = Modifier.testTag("analyze_failed_ok"),
+            )
+        }
     }
 }
 

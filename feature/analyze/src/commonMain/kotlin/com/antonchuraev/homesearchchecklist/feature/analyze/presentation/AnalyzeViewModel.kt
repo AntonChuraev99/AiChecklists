@@ -393,6 +393,17 @@ class AnalyzeViewModel(
 
             AnalyzeJobIntent.OnBackToEditingClick -> backToEditing()
 
+            AnalyzeJobIntent.OnUpgradeClick -> {
+                // Only from the Upgrade CTA of a Failed phase: a second tap lands on Editing and is
+                // ignored, so a double tap cannot push two paywalls. The form is restored first so
+                // the user returns from the paywall to their input, not to a stale failure.
+                val phase = _screenState.value.jobPhase
+                if (phase is AnalyzeJobPhase.Failed && phase.cta == FailedCta.Upgrade) {
+                    backToEditing()
+                    appNavigator.navigateToPaywall(source = PAYWALL_SOURCE_INSUFFICIENT_CREDITS)
+                }
+            }
+
             is AnalyzeJobIntent.OnNotificationPermissionResult -> {
                 _screenState.update { it.copy(askNotificationPermission = false) }
             }
@@ -664,8 +675,11 @@ class AnalyzeViewModel(
      */
     private suspend fun deliverFailure(status: AnalysisJobStatus.Failed) {
         val message = status.failure.userFacingMessage(resolveString)
+        // premium = revenueCat || firestore: state.isPremium is the store status, the user doc is
+        // the Firestore half (a restore that failed client-side still leaves it true).
+        val isPremium = _screenState.value.isPremium || userDataRepository.getUserDataFlow().value.isPremium
         _screenState.update {
-            it.withPhase(AnalyzeJobPhase.Failed(message, status.failure.failedCta)).copy(error = message)
+            it.withPhase(AnalyzeJobPhase.Failed(message, status.failure.failedCta(isPremium))).copy(error = message)
         }
     }
 
@@ -830,6 +844,12 @@ class AnalyzeViewModel(
         super.onCleared()
     }
 }
+
+/**
+ * `paywall_shown.source` of the Analyze "Get Pro" CTA after a run was refused for credits (402).
+ * A source of its own so the funnel can tell it from the chat's `chat_insufficient_credits`.
+ */
+internal const val PAYWALL_SOURCE_INSUFFICIENT_CREDITS = "analyze_insufficient_credits"
 
 /** [AnalyzeScreenState.isAnalyzing] is derived from the phase — never latched on its own. */
 internal fun AnalyzeScreenState.withPhase(phase: AnalyzeJobPhase): AnalyzeScreenState = copy(

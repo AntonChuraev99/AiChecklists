@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.remote
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.CreditsConfig
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -115,6 +116,15 @@ interface UserApiService {
         userId: String,
         platform: String,
     ): Result<Unit> = Result.success(Unit)
+
+    /**
+     * CF `get_credits_info` → `config`: the server's credit economics right now (`action_cost`,
+     * `premium_daily_credits_cap`). Never hardcode either on the client.
+     *
+     * Default = unsupported failure, so commonTest fakes keep compiling.
+     */
+    suspend fun getCreditsInfo(userId: String): Result<CreditsConfig> =
+        Result.failure(UnsupportedOperationException("getCreditsInfo is not implemented by this service"))
 }
 
 data class LinkGoogleAccountApiResult(
@@ -284,6 +294,21 @@ class UserApiServiceImpl(
         )
     }
 
+    override suspend fun getCreditsInfo(userId: String): Result<CreditsConfig> = runCatching {
+        val response: HttpResponse = httpClient.post("$baseUrl/get_credits_info") {
+            contentType(ContentType.Application.Json)
+            setBody(CreditsInfoRequest(userId = userId))
+        }
+        val raw = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            logger.warning(TAG, "getCreditsInfo: HTTP ${response.status.value}, body=${raw.take(200)}")
+            throw Exception("get_credits_info failed: HTTP ${response.status.value}")
+        }
+        decodeCreditsConfig(raw).also {
+            logger.debug(TAG, "getCreditsInfo: action_cost=${it.actionCost}, premium_cap=${it.premiumDailyCreditsCap}")
+        }
+    }
+
     private suspend fun postRegisterPushToken(op: String, request: RegisterPushTokenRequest) {
         val response: HttpResponse = httpClient.post("$baseUrl/register_push_token") {
             contentType(ContentType.Application.Json)
@@ -338,6 +363,40 @@ internal fun buildRegisterPushTokenRequest(
     pushHoldout = token != null && pushHoldout,
     fcmOptIn = token != null && fcmOptIn,
     markActive = token == null || markActive,
+)
+
+/**
+ * Decodes a `get_credits_info` 2xx body. Both numbers must be present and positive — a body
+ * without them is a failure (the caller keeps its last good config), never a client default.
+ */
+internal fun decodeCreditsConfig(raw: String): CreditsConfig {
+    val body = userApiJson.decodeFromString(CreditsInfoResponseDto.serializer(), raw)
+    val cost = body.config?.actionCost
+    val cap = body.config?.premiumDailyCreditsCap
+    if (!body.success || cost == null || cost <= 0 || cap == null || cap <= 0) {
+        throw IllegalStateException(
+            "get_credits_info returned no config (action_cost=$cost, premium_daily_credits_cap=$cap): ${body.error}",
+        )
+    }
+    return CreditsConfig(actionCost = cost, premiumDailyCreditsCap = cap)
+}
+
+@Serializable
+private data class CreditsInfoRequest(
+    @SerialName("user_id") val userId: String,
+)
+
+@Serializable
+private data class CreditsInfoResponseDto(
+    val success: Boolean = false,
+    val error: String? = null,
+    val config: CreditsConfigDto? = null,
+)
+
+@Serializable
+private data class CreditsConfigDto(
+    @SerialName("action_cost") val actionCost: Int? = null,
+    @SerialName("premium_daily_credits_cap") val premiumDailyCreditsCap: Int? = null,
 )
 
 @Serializable

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -47,7 +48,6 @@ import aichecklists.core.designsystem.generated.resources.chat_feedback_blank_hi
 import aichecklists.core.designsystem.generated.resources.chat_feedback_submitted
 import aichecklists.core.designsystem.generated.resources.chat_generic_error
 import aichecklists.core.designsystem.generated.resources.chat_history_load_error
-import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
 import aichecklists.core.designsystem.generated.resources.chat_completion_error
 import aichecklists.core.designsystem.generated.resources.chat_error_offline
 import aichecklists.core.designsystem.generated.resources.chat_error_message_too_long
@@ -132,6 +132,11 @@ fun ChatRoute(
      * events, and the Layer 1 disconnect is measured on telling them apart.
      */
     onNavigateToPaywall: ((String) -> Unit)? = null,
+    /**
+     * Runs the host's Google sign-in (App.kt `handleSignIn`, with its own failure snackbar). Invoked
+     * for [ChatScreenSideEffect.RequestGoogleSignIn] — the web guest's banner CTA.
+     */
+    onRequestSignIn: (() -> Unit)? = null,
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsState()
@@ -157,6 +162,10 @@ fun ChatRoute(
 
     // Tracks the source type we're waiting to pick, used by trigger-flag LaunchedEffect
     var pendingPickerSource by remember { mutableStateOf<AttachmentSource?>(null) }
+
+    // Bumped on every ChatScreenSideEffect.OutOfCreditsRefused; the out-of-credits banner pulses on
+    // each change. UI-local on purpose (a one-shot reaction, not screen state).
+    var outOfCreditsNudge by remember { mutableIntStateOf(0) }
 
     // Pre-resolve all chat_* messages once per locale change.
     val unknownText = stringResource(Res.string.chat_unknown_intent_hint)
@@ -197,7 +206,6 @@ fun ChatRoute(
     val dispatchMovedItemFmt = stringResource(Res.string.chat_dispatch_moved_item)
     val dispatchMoveSameListFmt = stringResource(Res.string.chat_dispatch_move_same_list)
     val dispatchMoveBlockedFmt = stringResource(Res.string.chat_dispatch_move_blocked)
-    val insufficientCreditsText = stringResource(Res.string.chat_insufficient_credits)
     val completionErrorText = stringResource(Res.string.chat_completion_error)
     // F1 connectivity-aware error replies (offline / service / timeout). Keep both maps in step.
     val errorOfflineText = stringResource(Res.string.chat_error_offline)
@@ -296,7 +304,6 @@ fun ChatRoute(
             "chat_dispatch_moved_item" to dispatchMovedItemFmt,
             "chat_dispatch_move_same_list" to dispatchMoveSameListFmt,
             "chat_dispatch_move_blocked" to dispatchMoveBlockedFmt,
-            "chat_insufficient_credits" to insufficientCreditsText,
             "chat_completion_error" to completionErrorText,
             "chat_error_offline" to errorOfflineText,
             "chat_error_service" to errorServiceText,
@@ -480,13 +487,17 @@ fun ChatRoute(
                             text = resolved,
                             linkedChecklistId = effect.linkedChecklistId,
                             askAiForText = effect.askAiForText,
-                            paywallCtaCredits = effect.paywallCtaCredits,
                             retryText = effect.retryText,
                             routedLayer = effect.routedLayer,
                         )
                     )
                 }
                 ChatScreenSideEffect.NavigateBack -> onBack()
+                // Visible response to a refused send: bumps the nudge counter the banner pulses on
+                // (and re-announces "Not sent." through its live region); ChatScreen's banner slot
+                // reads [outOfCreditsNudge] as its nudgeKey.
+                ChatScreenSideEffect.OutOfCreditsRefused -> outOfCreditsNudge++
+                ChatScreenSideEffect.RequestGoogleSignIn -> onRequestSignIn?.invoke()
                 is ChatScreenSideEffect.NavigateToChecklist -> onNavigateToChecklist?.invoke(effect.checklistId)
                 is ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke(effect.source)
                 is ChatScreenSideEffect.OpenFilePicker -> {
@@ -503,6 +514,7 @@ fun ChatRoute(
         state = state,
         onIntent = viewModel::sendIntent,
         drawerState = drawerState,
+        outOfCreditsNudge = outOfCreditsNudge,
         // ChatScreen's own paywall entry point is the credits chip in the top bar — an unprompted
         // tap, NOT a user who ran out mid-turn (that one arrives as the NavigateToPaywall effect
         // above, carrying its own source). Tagging both the same is what merged the two.

@@ -123,17 +123,8 @@ class AiChatVariantsScreenshotTest {
         )
     }
 
-    @Test
-    fun variant_out_of_credits_become_pro() = capture {
-        // Out-of-credits reply (paywallCtaCredits set) → the "Become Pro" CTA row.
-        ChatMessageBubble(
-            message = outOfCreditsMessage,
-            onFeedbackClick = {},
-            onThumbUpClick = {},
-            onPaywallCta = {},
-            showAvatar = true,
-        )
-    }
+    // (variant_out_of_credits_become_pro removed 2026-11-26: the refusal no longer renders a bubble
+    // with a CTA — it is the out-of-credits banner above the input, covered by its own previews.)
 
     @Test
     fun variant_generic_error() = capture {
@@ -365,14 +356,6 @@ private val unknownMessage = ChatMessage(
     timestamp = 0L,
     content = "I'm not sure how to help with that yet.",
     askAiForText = "what should I pack for a weekend in the mountains",
-)
-
-private val outOfCreditsMessage = ChatMessage(
-    id = "out_of_credits",
-    role = ChatRole.Assistant,
-    timestamp = 0L,
-    content = "You're out of AI credits for today. Upgrade to Premium for many more every day.",
-    paywallCtaCredits = 300,
 )
 
 private val errorMessage = ChatMessage(

@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.domain.model
 
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.job.AnalysisJobFailure
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -39,11 +41,6 @@ class AiFailureReasonTest {
     @Test
     fun classify_http402_isCreditGate() {
         assertEquals(AiFailureReason.CREDIT_GATE, AiFailureReason.classify(AiAnalyzeError.Http(402, "Not enough credits")))
-    }
-
-    @Test
-    fun classify_http429_isDailyLimit() {
-        assertEquals(AiFailureReason.DAILY_LIMIT, AiFailureReason.classify(AiAnalyzeError.Http(429, "Daily limit reached")))
     }
 
     @Test
@@ -116,7 +113,7 @@ class AiFailureReasonTest {
     fun inputFailures_areNotRetryableWithTheSameInput_transportOnesAre() {
         listOf(
             AiFailureReason.INPUT_TOO_LARGE, AiFailureReason.NOTHING_FOUND, AiFailureReason.INPUT_UNREADABLE,
-            AiFailureReason.INTERRUPTED, AiFailureReason.CREDIT_GATE, AiFailureReason.DAILY_LIMIT,
+            AiFailureReason.INTERRUPTED, AiFailureReason.CREDIT_GATE,
         ).forEach { assertEquals(false, it.retryableWithSameInput, "$it") }
         listOf(AiFailureReason.NETWORK, AiFailureReason.TIMEOUT, AiFailureReason.SERVER_5XX, AiFailureReason.AUTH_403)
             .forEach { assertEquals(true, it.retryableWithSameInput, "$it") }
@@ -129,6 +126,38 @@ class AiFailureReasonTest {
             val reason = AiFailureReason.classify(AiAnalyzeError.Http(400, "Bad input", code))
             assertEquals(AiFailureReason.INVALID_INPUT, reason, code)
             assertEquals(false, reason.retryableWithSameInput, code)
+        }
+    }
+
+    /** No daily request limit since 2026-11-26: a stray 429 is not a "limit" reason any more. */
+    @Test
+    fun classify_http429_isNoLongerALimitReason() {
+        assertEquals(AiFailureReason.UNKNOWN, AiFailureReason.classify(AiAnalyzeError.Http(429, "Daily limit reached")))
+    }
+
+    /**
+     * A job persisted by an older build with `reason = DAILY_LIMIT` must still decode (as UNKNOWN):
+     * one undecodable row makes the store drop the WHOLE `analysis_jobs_v1` queue, active jobs too.
+     * Same Json config as `DataStoreAnalysisJobStore`.
+     */
+    @Test
+    fun persistedDailyLimitFailure_decodesAsUnknown() {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val old = """{"reason":"DAILY_LIMIT","serverMessage":"Daily limit reached","retryableWithSameInput":false}"""
+
+        val decoded = json.decodeFromString(AnalysisJobFailure.serializer(), old)
+
+        assertEquals(AiFailureReason.UNKNOWN, decoded.reason)
+        assertEquals("Daily limit reached", decoded.serverMessage)
+    }
+
+    @Test
+    fun persistedFailure_roundTripsByEntryName() {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        AiFailureReason.entries.forEach { reason ->
+            val failure = AnalysisJobFailure(reason, retryableWithSameInput = reason.retryableWithSameInput)
+            val encoded = json.encodeToString(AnalysisJobFailure.serializer(), failure)
+            assertEquals(failure, json.decodeFromString(AnalysisJobFailure.serializer(), encoded), encoded)
         }
     }
 

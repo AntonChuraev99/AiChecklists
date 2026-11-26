@@ -56,7 +56,6 @@ def call_gemini(monkeypatch, main_module):
     monkeypatch.setattr(main_module, "increment_usage", MagicMock(return_value={}))
     monkeypatch.setattr(main_module, "get_user_premium_status", lambda user_id: False)
     monkeypatch.setattr(main_module, "get_remote_config_value", lambda key, default: default)
-    monkeypatch.setattr(main_module, "check_usage_limit", lambda user_id, is_premium=False: (True, ""))
     monkeypatch.setattr(main_module, "get_credits_config", lambda: {"action_cost": 20})
     monkeypatch.setattr(
         main_module, "reserve_credits_with_action",

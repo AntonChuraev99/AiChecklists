@@ -482,6 +482,14 @@ object AnalyticsEvents {
         const val PREVIEW_CONFIRMED = "ai_chat_preview_confirmed"
         const val PREVIEW_REJECTED = "ai_chat_preview_rejected"
 
+        // ── Out-of-credits banner pinned above the chat input (2026-11-26) ──────────
+        // BANNER_SHOWN: `variant` (free / premium / guest) + `reason` (open / refusal / balance),
+        // plus `source` (dock / screen) when reason=open. Sent on a transition null → variant, on a
+        // variant change and on chat open while visible — never per recomposition.
+        // CTA_TAPPED: `variant` (free / guest).
+        const val OUT_OF_CREDITS_BANNER_SHOWN = "ai_chat_out_of_credits_banner_shown"
+        const val OUT_OF_CREDITS_CTA_TAPPED = "ai_chat_out_of_credits_cta_tapped"
+
         // ── Reversible actions (D1: apply now, offer Undo after) ──────────────────
         // Confident add/complete no longer emit PREVIEW_SHOWN — there is no preview to show, the
         // action already ran. That funnel therefore drops in VOLUME by design; these three events
@@ -1154,7 +1162,7 @@ object AnalyticsParams {
     const val QUERY_LEN = "query_len"
 
     // AI analyze failure taxonomy on ai_analyze_failed — coarse machine reason so failures group in
-    // Amplitude WITHOUT regex over the free-text [ERROR]. Values (wire): credit_gate | daily_limit |
+    // Amplitude WITHOUT regex over the free-text [ERROR]. Values (wire): credit_gate |
     // input_too_long | network | timeout | server_5xx | auth_403 | user_not_ready | unknown.
     // Kept alongside [ERROR] (raw string) for the long tail. See AiFailureReason.
     const val FAILURE_REASON = "failure_reason"

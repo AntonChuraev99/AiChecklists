@@ -6,7 +6,7 @@ Functions:
 1b. link_google_account - Link Google account to existing user (web: grants starter pack)
 2. analyze_and_fill_checklist - Auto-fill existing checklist based on user data
 3. generate_checklist - Create new checklist from prompt + user data
-4. get_usage_stats - Get user's AI usage statistics
+4. get_usage_stats - Get user's AI usage log for today (telemetry; no daily request limit exists)
 5. refill_premium_credits - Daily credits refill for premium users (called by Cloud Scheduler at 12:00 CET)
 6. restore_credits_after_purchase - Instantly restore credits after premium purchase
 7. get_credits_info - Get credits configuration and user's current credits
@@ -305,9 +305,8 @@ VERIFIED = "verified"
 NOT_VERIFIED = "not_verified"
 UNAVAILABLE = "unavailable"
 
-# Usage limits (can be overridden via Remote Config)
-DEFAULT_DAILY_LIMIT_FREE = 10
-DEFAULT_DAILY_LIMIT_PREMIUM = 100
+# Input size cap (can be overridden via Remote Config). There is deliberately NO daily request
+# limit: credits are the only gate on AI actions (owner decision 2026-11-26).
 DEFAULT_MAX_INPUT_LENGTH = 10000
 
 # AI Credits system (configurable via remote_config collection in Firestore)
@@ -318,7 +317,7 @@ DEFAULT_PREMIUM_DAILY_CREDITS_CAP = 300  # Max credits premium users get refille
 
 
 def get_user_usage(user_id: str) -> dict:
-    """Get user's daily usage stats."""
+    """Get user's daily usage log (telemetry only — it gates nothing)."""
     today = datetime.utcnow().strftime("%Y-%m-%d")
     doc_ref = db.collection("usage").document(f"{user_id}_{today}")
     doc = doc_ref.get()
@@ -344,16 +343,6 @@ def increment_usage(user_id: str, function_name: str, input_type: str) -> dict:
 
     doc_ref.set(usage)
     return usage
-
-
-def check_usage_limit(user_id: str, is_premium: bool = False) -> tuple[bool, str]:
-    """Check if user has exceeded daily usage limit."""
-    usage = get_user_usage(user_id)
-    limit = DEFAULT_DAILY_LIMIT_PREMIUM if is_premium else DEFAULT_DAILY_LIMIT_FREE
-
-    if usage["count"] >= limit:
-        return False, f"Daily limit of {limit} requests exceeded. Resets at midnight UTC."
-    return True, ""
 
 
 def get_remote_config_value(key: str, default: Any) -> Any:
@@ -1601,7 +1590,7 @@ def analyze_and_fill_checklist(request: Request):
         "filled_items": [...],
         "summary": "string",
         "confidence": 0.0-1.0,
-        "usage": {"count": number, "limit": number}
+        "ai_credits": number  // wallet balance after this action
     }
 
     Refusals carry a machine-readable `error_code` next to `error`, none of them billed:
@@ -1643,11 +1632,6 @@ def analyze_and_fill_checklist(request: Request):
     # Check feature flag
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
         return create_error_response("AI analysis is currently disabled", 503)
-
-    # Check daily usage limit (before spending credits)
-    usage_allowed, usage_error = check_usage_limit(user_id, is_premium)
-    if not usage_allowed:
-        return create_error_response(usage_error, 429)
 
     # Check input length (skip for binary data types) — BEFORE reserving credits,
     # so a rejected (too-long) input never deducts credits.
@@ -1759,7 +1743,7 @@ def generate_checklist(request: Request):
         "items": [{"text": "string", "checked": false}],
         "summary": "string",
         "confidence": 0.0-1.0,
-        "usage": {"count": number, "limit": number}
+        "ai_credits": number  // wallet balance after this action
     }
 
     Refusals carry a machine-readable `error_code` next to `error`, none of them billed:
@@ -1802,11 +1786,6 @@ def generate_checklist(request: Request):
     # Check feature flag
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
         return create_error_response("AI analysis is currently disabled", 503)
-
-    # Check daily usage limit (before spending credits)
-    usage_allowed, usage_error = check_usage_limit(user_id, is_premium)
-    if not usage_allowed:
-        return create_error_response(usage_error, 429)
 
     # Check input length (skip binary data in length calculation) — BEFORE reserving
     # credits, so a rejected (too-long) input never deducts credits.
@@ -1923,12 +1902,12 @@ def generate_checklist(request: Request):
 @functions_framework.http
 def get_usage_stats(request: Request):
     """
-    Get user's AI usage statistics.
+    Get user's AI usage log for today (telemetry, not a quota).
 
     Request body:
     {
         "user_id": "string",
-        "is_premium": boolean (optional)
+        "is_premium": boolean (optional, ignored — kept so old clients' bodies still validate)
     }
 
     Response:
@@ -1936,11 +1915,13 @@ def get_usage_stats(request: Request):
         "success": true,
         "usage": {
             "today": number,
-            "limit": number,
-            "remaining": number,
             "requests": [...]
         }
     }
+
+    There is no daily request limit (credits are the only gate), so the former `limit` /
+    `remaining` fields are gone rather than faked. Safe for old clients: their `UsageDto`
+    declares both as nullable with defaults, so an absent field deserializes fine.
     """
     # CORS preflight — browsers send OPTIONS before cross-origin POST
     if request.method == "OPTIONS":
@@ -1950,17 +1931,11 @@ def get_usage_stats(request: Request):
     if error:
         return create_error_response(error)
 
-    user_id = data["user_id"]
-    is_premium = data.get("is_premium", False)
-
-    usage = get_user_usage(user_id)
-    limit = DEFAULT_DAILY_LIMIT_PREMIUM if is_premium else DEFAULT_DAILY_LIMIT_FREE
+    usage = get_user_usage(data["user_id"])
 
     return create_success_response({
         "usage": {
             "today": usage["count"],
-            "limit": limit,
-            "remaining": max(0, limit - usage["count"]),
             "requests": usage.get("requests", [])[-10:]  # Last 10 requests
         }
     })

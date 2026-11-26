@@ -27,6 +27,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.ChatH
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.AgentTranscriptDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.StoreEntitlementSource
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -124,10 +125,12 @@ val aiChatFeatureModule = module {
             aiChatPreferencesRepository = get<AiChatPreferencesRepository>(),
             analytics = get(),
             aiModelExperimentTracker = get(),
-            // Bound in remoteConfigModule (registered in appModule) — read for the Premium
-            // credit allowance advertised by the out-of-credits paywall CTA.
-            remoteConfigProvider = get(),
             logger = get(),
+            // userFeatureModule: server credits config (premium_daily_credits_cap) for the banner.
+            creditsConfigProvider = get(),
+            // paywallFeatureModule: RevenueCat half of `premium = revenueCat || firestore`.
+            // getOrNull — a graph without the paywall module degrades to Firestore-only premium.
+            storeEntitlementSource = getOrNull<StoreEntitlementSource>(),
         )
     }
 }

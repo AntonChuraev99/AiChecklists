@@ -15,6 +15,9 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Resto
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.CancelReasonSessionGate
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusViewModel
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.StoreEntitlementSource
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.koin.core.Koin
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -41,6 +44,15 @@ val paywallFeatureModule = module {
     // singletons, so there is nothing to share and nothing to leak into a dead composition.
     factory<CreditsBadgeProvider> { CreditsBadgeProviderImpl(get(), get(), getOrNull()) }
     factory<PremiumEntryPoint> { PremiumEntryPointImpl(get()) }
+
+    // Store half of `premium = revenueCat || firestore`, exposed through feature/user so the AI
+    // chat can read it without depending on feature/paywall.
+    factory<StoreEntitlementSource> {
+        val repository = get<PaywallRepository>()
+        object : StoreEntitlementSource {
+            override val isEntitled: Flow<Boolean> = repository.subscriptionStatus.map { it.isActive }
+        }
+    }
 
     // Use cases
     factory { GetSubscriptionStatusUseCase(get()) }

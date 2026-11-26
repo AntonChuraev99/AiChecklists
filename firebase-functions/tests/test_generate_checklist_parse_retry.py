@@ -76,7 +76,6 @@ def _stub_collaborators(monkeypatch, main_module, gemini_texts):
     monkeypatch.setattr(main_module, "increment_usage", increment_usage)
     monkeypatch.setattr(main_module, "get_user_premium_status", lambda user_id: False)
     monkeypatch.setattr(main_module, "get_remote_config_value", lambda key, default: default)
-    monkeypatch.setattr(main_module, "check_usage_limit", lambda user_id, is_premium=False: (True, ""))
     monkeypatch.setattr(main_module, "get_credits_config", lambda: {"action_cost": COST})
     monkeypatch.setattr(
         main_module, "reserve_credits_with_action",

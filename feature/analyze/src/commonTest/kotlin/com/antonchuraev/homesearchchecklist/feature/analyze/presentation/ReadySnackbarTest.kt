@@ -44,7 +44,8 @@ class ReadySnackbarTest {
 
     @Test
     fun failedCta_perReason() {
-        fun cta(reason: AiFailureReason) = AnalysisJobFailure(reason, retryableWithSameInput = reason.retryableWithSameInput).failedCta
+        fun cta(reason: AiFailureReason, isPremium: Boolean = false) =
+            AnalysisJobFailure(reason, retryableWithSameInput = reason.retryableWithSameInput).failedCta(isPremium)
         assertEquals(FailedCta.Retry, cta(AiFailureReason.NETWORK))
         assertEquals(FailedCta.Retry, cta(AiFailureReason.SERVER_5XX))
         assertEquals(FailedCta.Retry, cta(AiFailureReason.AUTH_403))
@@ -52,8 +53,18 @@ class ReadySnackbarTest {
         assertEquals(FailedCta.ChangeInput, cta(AiFailureReason.INPUT_TOO_LARGE))
         assertEquals(FailedCta.ChangeInput, cta(AiFailureReason.INPUT_UNREADABLE))
         assertEquals(FailedCta.ChangeInput, cta(AiFailureReason.INTERRUPTED))
-        assertEquals(FailedCta.Dismiss, cta(AiFailureReason.CREDIT_GATE))
-        assertEquals(FailedCta.Dismiss, cta(AiFailureReason.DAILY_LIMIT))
+        // 402: a Premium user has nothing to buy (credits refill on schedule); Free gets the paywall.
+        assertEquals(FailedCta.Dismiss, cta(AiFailureReason.CREDIT_GATE, isPremium = true))
+        assertEquals(FailedCta.Upgrade, cta(AiFailureReason.CREDIT_GATE, isPremium = false))
+    }
+
+    @Test
+    fun failedCta_premiumOnlyChangesTheCreditGate() {
+        // Every other reason answers the same for Free and Premium — premium must not hide a Retry.
+        AiFailureReason.entries.filter { it != AiFailureReason.CREDIT_GATE }.forEach { reason ->
+            val failure = AnalysisJobFailure(reason, retryableWithSameInput = reason.retryableWithSameInput)
+            assertEquals(failure.failedCta(isPremium = false), failure.failedCta(isPremium = true), "$reason")
+        }
     }
 
     @Test

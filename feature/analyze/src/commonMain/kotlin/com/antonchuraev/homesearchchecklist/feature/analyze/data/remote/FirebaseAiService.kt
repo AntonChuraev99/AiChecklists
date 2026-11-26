@@ -10,7 +10,6 @@ data class AiServiceResponse<T>(
     val success: Boolean,
     val data: T? = null,
     val error: String? = null,
-    val usage: UsageInfo? = null,
     // Server-driven AI-model A/B assignment (dimensions only, never affect behaviour). Null =
     // experiment off / older server. Flow-agnostic, so it lives on the shared response wrapper
     // (both analyze_and_fill and generate_checklist carry it), mirroring the chat_agent response.
@@ -19,18 +18,6 @@ data class AiServiceResponse<T>(
     val aiFlow: String? = null,
     /** Machine-readable `error_code` of a failed response; null on success and on older servers. */
     val errorCode: String? = null,
-)
-
-/** `get_credits_info`: what one Analyze run costs on the server right now. */
-data class CreditsInfo(
-    val actionCost: Int,
-    val userCredits: Int?,
-)
-
-data class UsageInfo(
-    val count: Int,
-    val limit: Int,
-    val remaining: Int = limit - count
 )
 
 /**
@@ -182,23 +169,4 @@ interface FirebaseAiService {
         requestId: String?,
     ): Result<AiServiceResponse<GenerateChecklistResult>> =
         generateChecklist(userId, isPremium, prompt, inputType, inputData)
-
-    /**
-     * `get_credits_info`: the server's current `action_cost` (Remote Config on the server). Never
-     * hardcode the cost on the client. Default = unsupported, for test doubles.
-     */
-    suspend fun getCreditsInfo(userId: String): Result<CreditsInfo> =
-        Result.failure(UnsupportedOperationException("getCreditsInfo is not implemented by this service"))
-
-    /**
-     * Get user's AI usage statistics.
-     *
-     * @param userId User identifier
-     * @param isPremium Whether user has premium subscription
-     * @return Usage stats or error
-     */
-    suspend fun getUsageStats(
-        userId: String,
-        isPremium: Boolean
-    ): Result<AiServiceResponse<UsageInfo>>
 }

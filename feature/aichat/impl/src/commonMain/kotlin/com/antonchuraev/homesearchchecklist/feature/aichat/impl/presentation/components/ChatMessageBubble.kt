@@ -23,7 +23,6 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
-import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,7 +44,6 @@ import aichecklists.core.designsystem.generated.resources.chat_message_show_acti
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_down
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_up
 import aichecklists.core.designsystem.generated.resources.chat_open_checklist
-import aichecklists.core.designsystem.generated.resources.chat_paywall_cta_credits
 import aichecklists.core.designsystem.generated.resources.chat_retry
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.SparkleTile
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppChatColors
@@ -117,8 +115,8 @@ internal fun AssistantAvatarSlot(showAvatar: Boolean, modifier: Modifier = Modif
  *   column aligned) + 8dp + the bubble. Bubble = [AppChatColors.raised] + a 1dp
  *   [AppChatColors.contentOutline] hairline (plane-relative — the same bubble renders on the page and
  *   inside the bottom chrome), corners 20/20/20/8 (tail bottom-start). Max width 300dp.
- *   The action chips — Open checklist · Ask AI · Retry — and the Become Pro CTA render INSIDE the
- *   bubble under the text.
+ *   The action chips — Open checklist · Ask AI · Retry — render INSIDE the bubble under the text.
+ *   (An out-of-credits refusal has no bubble: it is the banner above the input.)
  *
  * Feedback row (Copy · 👍 · 👎, 44dp targets) under an assistant bubble is shown only for the
  * latest assistant reply ([isLatestAssistant]) or when the user revealed it on an older reply by
@@ -131,7 +129,6 @@ internal fun AssistantAvatarSlot(showAvatar: Boolean, modifier: Modifier = Modif
  * @param actionsRevealed   Assistant only: the user tapped this older reply to show its actions.
  * @param onToggleActions   Assistant only: tap on an older bubble toggles [actionsRevealed]. Null →
  *                          the bubble is not clickable.
- * @param onPaywallCta Invoked by the "Become Pro" CTA shown inside an out-of-credits reply.
  * @param onRetry Invoked by the "Retry" chip on a recoverable-error reply (re-sends `retryText`).
  * @param attachedActions Assistant only: the actions of a blank-prompt pending choice that belongs to
  *                  THIS reply (D1 Undo / Move, AI answer options), rendered inside the bubble under
@@ -146,7 +143,6 @@ fun ChatMessageBubble(
     onThumbUpClick: ((ChatMessage) -> Unit)? = null,
     onOpenChecklist: (() -> Unit)? = null,
     onAskAiFallback: (() -> Unit)? = null,
-    onPaywallCta: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     showAvatar: Boolean = false,
     isLatestAssistant: Boolean = true,
@@ -164,7 +160,6 @@ fun ChatMessageBubble(
             onThumbUpClick = onThumbUpClick,
             onOpenChecklist = onOpenChecklist,
             onAskAiFallback = onAskAiFallback,
-            onPaywallCta = onPaywallCta,
             onRetry = onRetry,
             showAvatar = showAvatar,
             showActions = isLatestAssistant || actionsRevealed,
@@ -235,7 +230,6 @@ private fun AssistantBubble(
     onThumbUpClick: ((ChatMessage) -> Unit)?,
     onOpenChecklist: (() -> Unit)?,
     onAskAiFallback: (() -> Unit)?,
-    onPaywallCta: (() -> Unit)?,
     onRetry: (() -> Unit)?,
     showAvatar: Boolean,
     showActions: Boolean,
@@ -244,9 +238,7 @@ private fun AssistantBubble(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val showRetry = message.retryText != null && onRetry != null
-    val ctaCredits = message.paywallCtaCredits
-    val showCta = ctaCredits != null && onPaywallCta != null
-    val hasChips = onOpenChecklist != null || onAskAiFallback != null || showRetry || showCta
+    val hasChips = onOpenChecklist != null || onAskAiFallback != null || showRetry
     val showActionsLabel = stringResource(Res.string.chat_message_show_actions)
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -335,19 +327,6 @@ private fun AssistantBubble(
                                     onClick = onRetry,
                                     leadingIcon = Icons.Outlined.Refresh,
                                     maxLines = 1,
-                                )
-                            }
-                            // "Become Pro" — out-of-credits reply (Premium daily allowance from RC).
-                            if (showCta) {
-                                AiChoiceChip(
-                                    label = stringResource(
-                                        Res.string.chat_paywall_cta_credits,
-                                        ctaCredits.toString(),
-                                    ),
-                                    role = ChoiceRole.Primary,
-                                    onClick = onPaywallCta,
-                                    leadingIcon = Icons.Outlined.WorkspacePremium,
-                                    maxLines = 2,
                                 )
                             }
                         }

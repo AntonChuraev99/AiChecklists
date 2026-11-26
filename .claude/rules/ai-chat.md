@@ -26,19 +26,31 @@ Decision 2026-07-15 (`docs/decisions/2026-07-15-remove-ai-chat-layer1.md`): the 
 Fixed 2026-07-16 (`docs/todos/2026-07-16-aichat-insufficient-credits-shows-unknown-hint.md`): a
 refusal for lack of credits **must never be flattened into a generic intent**. `ChatIntent.InsufficientCredits`
 carries the cause in the type; every call-site routes through the single `emitInsufficientCredits(layer)`
-helper in `ChatViewModel`. Its contract: say the wallet is empty, do **not** escalate to Layer 3
-(that bills 3 credits to a wallet that just refused 1), charge the turn **0** credits, and show the
-"Become Pro" CTA → `NavigateToPaywall(source = SOURCE_INSUFFICIENT_CREDITS)`.
+helper in `ChatViewModel`. Its contract: do **not** escalate to Layer 3 (that bills 3 credits to a
+wallet that just refused 1), charge the turn **0** credits (`outcome=insufficient_credits`,
+`credits_used=0`), stop the spinner, set the refusal latch, and emit `OutOfCreditsRefused`.
 
-- **Never give a call-site its own dialect of "out of credits".** That is exactly how this bug hid:
-  Layer 2 was fixed while the Layer-3 sibling kept shipping a snackbar with no CTA, `outcome="error"`,
-  and `credits_used=3` for a turn the server charged 0 for. **Fixing one emit-site means grepping
-  the siblings** (`InsufficientCredits`) before you call it done.
-- **The credit number is Remote Config** (`ai_daily_limit_premium`), never a literal — the CTA
-  promises a number that must not drift. A test fake serves `777` so a hardcoded 300 fails.
-- Known exception: the voice path (`ChatViewModel:2066`) keeps a plain snackbar — transcription
-  never became a chat turn, so there is no assistant bubble to attach a CTA to, and its analytics
-  are already honest. Whether it deserves a paywall route is an open product question.
+**The answer to a refusal is the out-of-credits banner, not a chat bubble** (owner decision
+2026-11-26, reference: the Claude app). `ChatScreenState.outOfCredits` (`OutOfCreditsBannerState`:
+`Free` / `Premium` / `Guest`) is pinned above the input on every chat surface; a 402 adds **no**
+assistant bubble, the user's bubble stays. The banner shows when a registered user's balance is
+`<= 0` OR the refusal latch is set (balance snapshot at the last 402 — released when the live
+balance rises above it or a later turn is answered). It **never blocks Send**: the server is the
+gate, a refusal costs 0, and a stale client "0" (#84) must not lock out a user who has credits.
+Free CTA → `NavigateToPaywall(source = SOURCE_INSUFFICIENT_CREDITS)`; Premium → refill time, no
+upsell; Guest (web, not Google-linked) → the host's sign-in.
+
+- **Never give a call-site its own dialect of "out of credits".** That is exactly how the 2026-07-16
+  bug hid: Layer 2 was fixed while the Layer-3 sibling kept shipping a snackbar with no CTA,
+  `outcome="error"`, and `credits_used=3` for a turn the server charged 0 for. **Fixing one
+  emit-site means grepping the siblings** (`InsufficientCredits`) before you call it done. The
+  voice-transcription 402 goes through the same latch + `OutOfCreditsRefused` (no snackbar).
+- **The credit number comes from the server credits config** (`get_credits_info` →
+  `premium_daily_credits_cap`, via `CreditsConfigProvider`), never a literal and never Firebase RC
+  — the old `ai_daily_limit_premium` key is gone. Config not loaded → the copy without a number,
+  never a made-up one. A test fake serves `777` so a hardcoded 300 fails.
+- **There is no daily request limit anywhere** (removed 2026-11-26): no 429 gate on the server, no
+  `DAILY_LIMIT` reason on the client. Do not add a request counter back; credits are the only gate.
 
 ## Hard rule — feature catalog coverage
 

@@ -61,7 +61,7 @@ val analyzeFeatureModule = module {
     // All app-scoped singles: the analysis outlives the screen. The Android worker resolves
     // AnalysisJobProcessor + AnalysisJobStore from here; MainActivity resolves AnalysisReadySignal.
     single<AiActionCostProvider> {
-        AiActionCostProviderImpl(firebaseAiService = get(), userDataRepository = get(), logger = get())
+        AiActionCostProviderImpl(creditsConfigProvider = get(), appScope = get<CoroutineScope>())
     }
     single<AnalysisJobStore> { DataStoreAnalysisJobStore(datastore = get<AppDatastore>(), logger = get()) }
     single { AnalysisScreenAttachments() }

@@ -150,7 +150,6 @@ import aichecklists.core.designsystem.generated.resources.chat_feedback_blank_hi
 import aichecklists.core.designsystem.generated.resources.chat_feedback_submitted
 import aichecklists.core.designsystem.generated.resources.chat_generic_error
 import aichecklists.core.designsystem.generated.resources.chat_history_load_error
-import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
 import aichecklists.core.designsystem.generated.resources.chat_completion_error
 import aichecklists.core.designsystem.generated.resources.chat_error_offline
 import aichecklists.core.designsystem.generated.resources.chat_error_message_too_long
@@ -252,6 +251,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiD
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiInboxPromptChips
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentChipStrip
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.OutOfCreditsBanner
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.OutOfCreditsBannerDefaults
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ctaIntent
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
@@ -990,7 +992,6 @@ fun App() {
             val sm_dispatchMovedItem = stringResource(Res.string.chat_dispatch_moved_item)
             val sm_dispatchMoveSameList = stringResource(Res.string.chat_dispatch_move_same_list)
             val sm_dispatchMoveBlocked = stringResource(Res.string.chat_dispatch_move_blocked)
-            val sm_insufficientCredits = stringResource(Res.string.chat_insufficient_credits)
             val sm_completionError = stringResource(Res.string.chat_completion_error)
             // F1 connectivity-aware error replies. Keep in step with ChatRoute.kt's map.
             val sm_errorOffline = stringResource(Res.string.chat_error_offline)
@@ -1083,7 +1084,6 @@ fun App() {
                     "chat_dispatch_moved_item" to sm_dispatchMovedItem,
                     "chat_dispatch_move_same_list" to sm_dispatchMoveSameList,
                     "chat_dispatch_move_blocked" to sm_dispatchMoveBlocked,
-                    "chat_insufficient_credits" to sm_insufficientCredits,
                     "chat_completion_error" to sm_completionError,
                     "chat_error_offline" to sm_errorOffline,
                     "chat_error_service" to sm_errorService,
@@ -1170,6 +1170,9 @@ fun App() {
             // while the strings were long since loaded. Same stale-closure trap as the wasmJs
             // FilePicker callbacks (project memory: filepicker-rememberupdatedstate-closure-trap).
             val currentSheetMessages by rememberUpdatedState(sheetMessages)
+            // Bumped on every ChatScreenSideEffect.OutOfCreditsRefused — the out-of-credits banner
+            // pulses on each change. UI-local: a one-shot reaction, not screen state.
+            var dockOutOfCreditsNudge by remember { mutableIntStateOf(0) }
             LaunchedEffect(chatViewModel) {
                 chatViewModel.sideEffect.collect { effect ->
                     when (effect) {
@@ -1185,7 +1188,6 @@ fun App() {
                                     text = resolved,
                                     linkedChecklistId = effect.linkedChecklistId,
                                     askAiForText = effect.askAiForText,
-                                    paywallCtaCredits = effect.paywallCtaCredits,
                                     retryText = effect.retryText,
                                     routedLayer = effect.routedLayer,
                                 )
@@ -1206,6 +1208,13 @@ fun App() {
                             navigator.navigateToPaywall(source = effect.source)
                         }
                         is ChatScreenSideEffect.OpenFilePicker -> Unit // handled via trigger-flag
+                        // Refused send (402): the banner is already in state; this bump is what
+                        // pulses it and re-announces "Not sent." (read by the dock / overlay
+                        // banner slots as their nudgeKey).
+                        ChatScreenSideEffect.OutOfCreditsRefused -> dockOutOfCreditsNudge++
+                        // Web guest tapped "Sign in" on the banner: the same flow as the drawer's
+                        // sign-in, including its failure snackbar.
+                        ChatScreenSideEffect.RequestGoogleSignIn -> handleSignIn()
                     }
                 }
             }
@@ -1768,8 +1777,12 @@ fun App() {
                         // the answer frame) and are PINNED (chipsPinned below) so they stay visible with the
                         // keyboard up AND the create⇄chat peek is the same height → Back swaps the chip
                         // content in place with no shrink/grow.
+                        // While the out-of-credits banner is up the prompt chips go: each would only
+                        // prefill a turn the wallet cannot pay for (DESIGN_SPEC 2026-11-26 §5).
                         chipsContent = if (itemCreateOverride != null) {
                             { itemCreateOverride.chips() }
+                        } else if (chatUiState.outOfCredits != null) {
+                            null
                         } else {
                             chips
                         },
@@ -1911,9 +1924,6 @@ fun App() {
                                             onAskAiFallback = lastAssistantMessage.askAiForText?.let { text ->
                                                 { chatViewModel.sendIntent(ChatScreenIntent.OnAskAiFallback(text)) }
                                             },
-                                            onPaywallCta = lastAssistantMessage.paywallCtaCredits?.let {
-                                                { chatViewModel.sendIntent(ChatScreenIntent.OnPaywallCtaClick) }
-                                            },
                                             onOpenChecklist = lastAssistantMessage.linkedChecklistId?.let { id ->
                                                 {
                                                     chatSheetOpen = false
@@ -1969,11 +1979,27 @@ fun App() {
                             // A post-action offer (Undo / move) is not a question and has no escape
                             // chip — hiding the input there trapped the dock: the offer stayed up and
                             // only Back got out, collapsing the chat. Keep typing enabled for it.
-                            if (ic != null ||
+                            val dockInputVisible = ic != null ||
                                 chatUiState.pendingChoice == null ||
                                 chatUiState.pendingChoice!!.isPostAction
-                            ) {
+                            // The out-of-credits banner stays above a question's chips too (the input
+                            // is hidden then), but never in item-create — that mode spends no credits.
+                            val dockBannerState = if (ic == null) chatUiState.outOfCredits else null
+                            if (dockInputVisible || dockBannerState != null) {
                               Column {
+                                // Out-of-credits notice (DESIGN_SPEC 2026-11-26 §6): first child of the
+                                // input slot, above the attachment strip. Inside inputContent so the
+                                // dock's own onSizeChanged measures it; the slot has no horizontal
+                                // padding of its own (the strip and the row pad themselves) → default gutter.
+                                OutOfCreditsBanner(
+                                    state = dockBannerState,
+                                    nudgeKey = dockOutOfCreditsNudge,
+                                    onCtaClick = {
+                                        chatUiState.outOfCredits?.ctaIntent()?.let { chatViewModel.sendIntent(it) }
+                                    },
+                                    contentPadding = OutOfCreditsBannerDefaults.contentPadding(inputBelow = dockInputVisible),
+                                )
+                                if (dockInputVisible) {
                                 // Pending-attachment preview strip ABOVE the input, in both modes:
                                 // item-create shows its staged files; chat shows the files picked via
                                 // the "+" pill / attach sheet (same strip as the full-screen ChatScreen),
@@ -2032,6 +2058,7 @@ fun App() {
                                     // Same call entry as the home pill; the row hides it in item-create.
                                     onCallClick = startVoiceCallFromChat,
                                 )
+                                }
                               }
                             }
                         },
@@ -2087,8 +2114,20 @@ fun App() {
                     inputContent = {
                         // Hidden while a pending choice block is shown (chips are the only interaction),
                         // mirroring the full ChatScreen.
-                        if (chatUiState.pendingChoice == null) {
+                        val fullInputVisible = chatUiState.pendingChoice == null
+                        if (fullInputVisible || chatUiState.outOfCredits != null) {
                           Column {
+                            // Out-of-credits notice above the attachments and the input (DESIGN_SPEC
+                            // 2026-11-26 §6); stays above a question's chips when the input is hidden.
+                            OutOfCreditsBanner(
+                                state = chatUiState.outOfCredits,
+                                nudgeKey = dockOutOfCreditsNudge,
+                                onCtaClick = {
+                                    chatUiState.outOfCredits?.ctaIntent()?.let { chatViewModel.sendIntent(it) }
+                                },
+                                contentPadding = OutOfCreditsBannerDefaults.contentPadding(inputBelow = fullInputVisible),
+                            )
+                            if (fullInputVisible) {
                             // Pending attachments above the input, as in the full-screen ChatScreen.
                             ChatAttachmentChipStrip(
                                 attachments = chatUiState.pendingAttachments,
@@ -2112,6 +2151,7 @@ fun App() {
                                 focusRequester = chatFullInputFocusRequester,
                                 onCallClick = startVoiceCallFromChat,
                             )
+                            }
                           }
                         }
                     },
@@ -2625,6 +2665,8 @@ fun App() {
                             onNavigateToPaywall = { source ->
                                 navigator.navigateToPaywall(source = source)
                             },
+                            // Web guest's out-of-credits banner CTA → the shared sign-in flow.
+                            onRequestSignIn = handleSignIn,
                         )
                     }
                 }, // end entryProvider

@@ -6,7 +6,6 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FillChec
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.GenerateChecklistResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.RegisterUserResult
-import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.UsageInfo
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
@@ -162,8 +161,6 @@ class AnalyzeRepositoryNameTest {
         override suspend fun generateChecklist(
             userId: String, isPremium: Boolean, prompt: String, inputType: AiInputType, inputData: String?,
         ): Result<AiServiceResponse<GenerateChecklistResult>> = error("service must not be called")
-
-        override suspend fun getUsageStats(userId: String, isPremium: Boolean) = error("service must not be called")
     }
 
     private class FakeFirebaseAiService(
@@ -203,11 +200,6 @@ class AnalyzeRepositoryNameTest {
                     aiFlow = aiFlow,
                 ),
             )
-
-        override suspend fun getUsageStats(
-            userId: String,
-            isPremium: Boolean,
-        ): Result<AiServiceResponse<UsageInfo>> = error("not used")
     }
 
     private class FakeUserDataRepository(userId: String = "test") : UserDataRepository {

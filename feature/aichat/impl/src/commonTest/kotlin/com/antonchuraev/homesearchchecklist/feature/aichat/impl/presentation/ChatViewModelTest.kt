@@ -2,7 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.CreditsConfig
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
@@ -368,8 +368,18 @@ private class FakeAiChatPreferencesRepository(
 
 private class FakeUserDataRepository(
     initialCredits: Int = 0,
+    userId: String = "",
+    isPremium: Boolean = false,
+    isGoogleLinked: Boolean = false,
 ) : UserDataRepository {
-    private val _flow = MutableStateFlow(UserData(aiCredits = initialCredits))
+    private val _flow = MutableStateFlow(
+        UserData(userId = userId, aiCredits = initialCredits, isPremium = isPremium, isGoogleLinked = isGoogleLinked),
+    )
+
+    /** Simulates the Firestore listener / DataStore pushing a new wallet value. */
+    fun setCredits(credits: Int) {
+        _flow.value = _flow.value.copy(aiCredits = credits)
+    }
 
     override fun getUserDataFlow(): StateFlow<UserData> = _flow
     override suspend fun getUserData(): UserData = _flow.value
@@ -440,7 +450,9 @@ private fun makeVm(
     aiChatPreferencesRepo: AiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
     analytics: com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker = FakeAnalyticsTracker(),
     experimentTracker: FakeAiModelExperimentTracker = FakeAiModelExperimentTracker(),
-    remoteConfig: HarnessRemoteConfigProvider = HarnessRemoteConfigProvider(),
+    creditsConfig: FakeCreditsConfigProvider? = null,
+    storeEntitlement: FakeStoreEntitlementSource? = null,
+    platformName: String = "android",
 ): ChatViewModel = ChatViewModel(
     aiChatRepository = repo,
     toolCallDispatcher = dispatcher,
@@ -455,8 +467,10 @@ private fun makeVm(
     aiChatPreferencesRepository = aiChatPreferencesRepo,
     analytics = analytics,
     aiModelExperimentTracker = experimentTracker,
-    remoteConfigProvider = remoteConfig,
     logger = NoOpLogger,
+    creditsConfigProvider = creditsConfig,
+    storeEntitlementSource = storeEntitlement,
+    platformName = platformName,
 )
 
 /**
@@ -479,7 +493,7 @@ private fun makeVm(
  */
 private fun makeVmOutOfCredits(
     analytics: FakeAnalyticsTracker = FakeAnalyticsTracker(),
-    remoteConfig: HarnessRemoteConfigProvider = HarnessRemoteConfigProvider(),
+    creditsConfig: FakeCreditsConfigProvider? = null,
 ): ChatViewModel {
     // Non-blank userId: a blank one short-circuits Layer 2 before the 402 can happen.
     val userRepo = HarnessUserDataRepository("u1")
@@ -496,7 +510,7 @@ private fun makeVmOutOfCredits(
         repo = realRepo,
         userDataRepo = userRepo,
         analytics = analytics,
-        remoteConfig = remoteConfig,
+        creditsConfig = creditsConfig,
     )
 }
 
@@ -3916,22 +3930,23 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
+        // Owner decision 2026-11-26: the answer to a refusal is the out-of-credits banner, not a
+        // bubble. Still "say the wallet is empty, never blame the phrasing, never offer Ask AI".
         val effect = effectDeferred.await()
-        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
-            effect,
-            "A refused turn must answer in the chat, not vanish or snackbar; got $effect",
-        )
         assertEquals(
-            "chat_insufficient_credits",
-            message.messageKey,
-            "Out of credits must say so. chat_unknown_intent_hint blames the user's phrasing for a " +
-                "billing state — and the string chat_insufficient_credits already exists (EN+RU, " +
-                "wired in App.kt:825 + ChatRoute.kt:247)",
+            ChatScreenSideEffect.OutOfCreditsRefused,
+            effect,
+            "A refused turn must answer visibly (banner nudge), not vanish, snackbar or blame the " +
+                "user's phrasing with chat_unknown_intent_hint; got $effect",
         )
-        assertNull(
-            message.askAiForText,
-            "The 'Ask AI' button must NOT be offered here: it asks an empty wallet for 3 more " +
-                "credits, 402s again, and is how the user currently has to discover the truth",
+        assertIs<OutOfCreditsBannerState.Free>(
+            vm.screenState.value.outOfCredits,
+            "Out of credits must say so: the banner is the answer",
+        )
+        assertTrue(
+            vm.screenState.value.messages.none { it.role == ChatRole.Assistant },
+            "No assistant bubble — and so no 'Ask AI' button, which asks an empty wallet for 3 " +
+                "more credits and 402s again",
         )
     }
 
@@ -4001,35 +4016,48 @@ class ChatViewModelTest {
     // RED tests above; these pin the CTA — the conversion moment the Layer 1 disconnect was
     // accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
 
-    // ── G1. The refusal carries a paywall CTA, and its number comes from Remote Config ──
+    // ── G1. The refusal shows the Free banner, and its number comes from the credits config ──
     //
-    // "300" is the Premium daily allowance (RC ai_daily_limit_premium), NOT a constant: the label
-    // promises a specific number to a user about to pay for it, so a hardcoded one turns into a
-    // false promise the day the limit is retuned. The fake therefore serves a NON-default value —
-    // with an echo-the-default fake (300) a hardcoded 300 would look identical and this test would
-    // prove nothing.
+    // "300" is the Premium daily allowance (server `premium_daily_credits_cap`), NOT a constant:
+    // the banner promises a specific number to a user about to pay for it, so a hardcoded one turns
+    // into a false promise the day the cap is retuned. The fake therefore serves a NON-production
+    // value — with 300 a hardcoded 300 would look identical and this test would prove nothing.
+    // (Source moved from Firebase RC `ai_daily_limit_premium` to the server config 2026-11-26.)
 
     @Test
-    fun sendClick_layer2InsufficientCredits_offersPaywallCtaWithRemoteConfigCreditAllowance() = runTest {
+    fun sendClick_layer2InsufficientCredits_bannerCarriesTheConfiguredPremiumAllowance() = runTest {
         val vm = makeVmOutOfCredits(
-            remoteConfig = HarnessRemoteConfigProvider(
-                longs = mapOf(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to 777L),
-            ),
+            creditsConfig = FakeCreditsConfigProvider(CreditsConfig(actionCost = 20, premiumDailyCreditsCap = 777)),
         )
-
-        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-            vm.sideEffect.first()
-        }
 
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
 
-        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effectDeferred.await())
+        val banner = assertIs<OutOfCreditsBannerState.Free>(vm.screenState.value.outOfCredits)
         assertEquals(
             777,
-            message.paywallCtaCredits,
-            "The CTA advertises the Premium daily allowance, which lives in Remote Config " +
-                "(ai_daily_limit_premium). A hardcoded number silently lies once that key moves",
+            banner.premiumDailyCredits,
+            "The banner advertises the Premium daily allowance from the server credits config " +
+                "(premium_daily_credits_cap). A hardcoded number silently lies once that value moves",
+        )
+    }
+
+    // ── G1-null. Config not loaded → the copy WITHOUT a number, never a made-up one ──
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_configNotLoaded_bannerHasNoNumber() = runTest {
+        val vm = makeVmOutOfCredits(creditsConfig = FakeCreditsConfigProvider(initial = null))
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val banner = assertIs<OutOfCreditsBannerState.Free>(vm.screenState.value.outOfCredits)
+        assertNull(
+            banner.premiumDailyCredits,
+            "Unknown allowance must render the no-number copy — a client fallback (300) is the " +
+                "exact hardcode the config exists to remove",
         )
     }
 
@@ -4041,9 +4069,7 @@ class ChatViewModelTest {
         val analytics = FakeAnalyticsTracker()
         val vm = makeVmOutOfCredits(
             analytics = analytics,
-            remoteConfig = HarnessRemoteConfigProvider(
-                longs = mapOf(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to 777L),
-            ),
+            creditsConfig = FakeCreditsConfigProvider(CreditsConfig(actionCost = 20, premiumDailyCreditsCap = 777)),
         )
 
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
@@ -4052,10 +4078,14 @@ class ChatViewModelTest {
 
         vm.sendIntent(ChatScreenIntent.OnPrefillAndSend("Plan my week"))
 
-        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effectDeferred.await())
-        assertEquals("chat_insufficient_credits", message.messageKey)
-        assertEquals(777, message.paywallCtaCredits, "the auto-sent turn offers the same Become-Pro CTA")
+        assertEquals(ChatScreenSideEffect.OutOfCreditsRefused, effectDeferred.await())
+        val banner = assertIs<OutOfCreditsBannerState.Free>(vm.screenState.value.outOfCredits)
+        assertEquals(777, banner.premiumDailyCredits, "the auto-sent turn shows the same Get-Pro banner")
         testScheduler.advanceUntilIdle()
+        assertTrue(
+            vm.screenState.value.messages.none { it.role == ChatRole.Assistant },
+            "the refusal writes no assistant bubble on the hand-off path either",
+        )
         val params = assertNotNull(analytics.paramsOf("ai_chat_response_received"))
         assertEquals("insufficient_credits", params["outcome"])
         assertEquals(0, params["credits_used"])
@@ -4063,32 +4093,8 @@ class ChatViewModelTest {
         assertEquals("Plan my week", userMsg.content, "the hand-off text is the user's sent message")
     }
 
-    // ── G2. The CTA survives the ChatRoute round-trip onto the bubble ─────────
-    //
-    // ShowAssistantMessage is resolved to text by the host (ChatRoute / App.kt dock) and sent back
-    // as AppendAssistantMessage. A field dropped in that round-trip renders a bubble with no
-    // button — the message would say "upgrade to Premium" and offer no way to do it.
-
-    @Test
-    fun appendAssistantMessage_withPaywallCta_bubbleCarriesItForRendering() = runTest {
-        val vm = makeVm()
-
-        vm.sendIntent(
-            ChatScreenIntent.AppendAssistantMessage(
-                text = "Not enough credits for AI assist.",
-                paywallCtaCredits = 300,
-            )
-        )
-        testScheduler.advanceUntilIdle()
-
-        val assistantMsg = vm.screenState.value.messages.last()
-        assertEquals(
-            300,
-            assistantMsg.paywallCtaCredits,
-            "ChatMessageBubble shows the CTA off this field; dropping it in the host round-trip " +
-                "leaves the user told to upgrade with nothing to tap",
-        )
-    }
+    // (G2 — the CTA surviving the ChatRoute round-trip onto the bubble — was removed 2026-11-26
+    // together with ChatMessage.paywallCtaCredits: the refusal has no bubble any more.)
 
     // ── G3. Tapping the CTA navigates to the paywall, attributed to the limit ──
     //
@@ -4167,12 +4173,19 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnChoiceSelected("escape"))
         testScheduler.advanceUntilIdle()
 
-        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+        assertEquals(
+            ChatScreenSideEffect.OutOfCreditsRefused,
             effectDeferred.await(),
-            "A 402 on the reject path must answer in the chat, not fail silently",
+            "A 402 on the reject path must answer visibly, not fail silently",
         )
-        assertEquals("chat_insufficient_credits", message.messageKey)
-        assertNotNull(message.paywallCtaCredits, "The reject path offers the same paywall CTA")
+        assertIs<OutOfCreditsBannerState.Free>(
+            vm.screenState.value.outOfCredits,
+            "The reject path shows the same Get-Pro banner",
+        )
+        assertTrue(
+            vm.screenState.value.messages.none { it.askAiForText != null },
+            "No 'Ask AI' offer to an empty wallet",
+        )
         assertEquals(
             0,
             repo.agentStepCallCount,
@@ -4209,19 +4222,23 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("what should I pack for a trip?"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+        assertEquals(
+            ChatScreenSideEffect.OutOfCreditsRefused,
             effectDeferred.await(),
-            "A refused Layer 3 turn must answer in the chat. A ShowSnackbar here is the shipped " +
-                "bug: it vanishes, carries no button, and the owner asked for the Become Pro CTA " +
-                "on the out-of-credits reply — on every path that can produce one",
+            "A refused Layer 3 turn must answer visibly. A ShowSnackbar here is the shipped bug: " +
+                "it vanishes and carries no button",
         )
-        assertEquals("chat_insufficient_credits", message.messageKey)
-        assertNotNull(
-            message.paywallCtaCredits,
-            "Out of credits on Layer 3 is the same conversion moment as on Layer 2 — a snackbar " +
-                "tells the user to upgrade and gives them nothing to tap",
+        assertIs<OutOfCreditsBannerState.Free>(
+            vm.screenState.value.outOfCredits,
+            "Out of credits on Layer 3 is the same conversion moment as on Layer 2 — the same " +
+                "Get-Pro banner",
         )
-        assertNull(message.askAiForText, "Never offer 'Ask AI' to an empty wallet")
+        testScheduler.advanceUntilIdle()
+        assertTrue(
+            vm.screenState.value.messages.none { it.role == ChatRole.Assistant },
+            "No assistant bubble (and so never 'Ask AI') for an empty wallet",
+        )
+        assertFalse(vm.screenState.value.isProcessing, "The turn is over — the spinner must stop")
     }
 
     // ── G6. Layer 3 refusal is reported honestly ─────────────────────────────
@@ -4259,6 +4276,272 @@ class ChatViewModelTest {
             params["routed_layer"],
             "The refusal happened on Layer 3 and the funnel should say so",
         )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Out-of-credits banner (FEATURE_SPEC 2026-11-26) — the ViewModel wiring of
+    // resolveOutOfCreditsBanner: inputs, the refusal latch, variants, analytics.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun freeFormClassification() = IntentClassification(
+        intent = ChatIntent.FreeForm,
+        confidence = 1.0f,
+        layer = RoutingLayer.FullChat,
+        preBuiltToolCall = null,
+    )
+
+    @Test
+    fun banner_registeredUserWithEmptyWallet_isShownOnEntryWithoutASend() = runTest {
+        val vm = makeVm(userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(OutOfCreditsBannerState.Free(premiumDailyCredits = null), vm.screenState.value.outOfCredits)
+    }
+
+    @Test
+    fun banner_userNotLoadedYet_defaultZeroBalanceDoesNotFlashTheBanner() = runTest {
+        // UserData() default: blank id + 0 credits = "not read yet", not "empty wallet".
+        val vm = makeVm(userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = ""))
+        testScheduler.advanceUntilIdle()
+
+        assertNull(vm.screenState.value.outOfCredits)
+    }
+
+    @Test
+    fun banner_refusalAtPositiveBalance_isLowBalance_andARisingBalanceReleasesIt() = runTest {
+        val user = FakeUserDataRepository(initialCredits = 2, userId = "u1")
+        val repo = FakeAiChatRepository(
+            classifyResult = freeFormClassification(),
+            agentStepResults = listOf(AgentStepResult.InsufficientCredits),
+        )
+        val vm = makeVm(repo = repo, userDataRepo = user)
+        testScheduler.advanceUntilIdle()
+        assertNull(vm.screenState.value.outOfCredits, "2 credits: nothing to say before a refusal")
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I pack?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            OutOfCreditsBannerState.Free(premiumDailyCredits = null, lowBalance = true),
+            vm.screenState.value.outOfCredits,
+            "Refused with 2 credits left (a 3-credit turn): 'Not enough', not 'used up'",
+        )
+
+        user.setCredits(2)
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.outOfCredits, "Same balance as at the refusal keeps the latch")
+
+        user.setCredits(300)
+        testScheduler.advanceUntilIdle()
+        assertNull(vm.screenState.value.outOfCredits, "A balance above the refusal snapshot releases it")
+    }
+
+    @Test
+    fun banner_aLaterAnsweredTurnReleasesTheLatch() = runTest {
+        val user = FakeUserDataRepository(initialCredits = 2, userId = "u1")
+        val repo = FakeAiChatRepository(
+            classifyResult = freeFormClassification(),
+            agentStepResults = listOf(
+                AgentStepResult.InsufficientCredits,
+                // Charged → balance 1, which is NOT above the snapshot (2): only the answer can
+                // release the latch here.
+                AgentStepResult.Final(content = "Pack light.", creditsRemaining = 1),
+            ),
+        )
+        val vm = makeVm(repo = repo, userDataRepo = user)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("first"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.outOfCredits)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("second"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(
+            vm.screenState.value.outOfCredits,
+            "The server answered (and charged) — the wallet works, the refusal latch must go",
+        )
+    }
+
+    @Test
+    fun banner_sendIsNeverBlocked_whileTheBannerIsUp() = runTest {
+        val repo = FakeAiChatRepository(classifyResult = freeFormClassification())
+        val vm = makeVm(repo = repo, userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1"))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.outOfCredits)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("hello"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            1,
+            repo.classifyCallCount,
+            "The server is the gate: a stale client '0' must not lock out a user who has credits",
+        )
+    }
+
+    @Test
+    fun banner_guestVariant_onlyOnWebAndOnlyWhenNotGoogleLinked() = runTest {
+        fun vmFor(platform: String, linked: Boolean) = makeVm(
+            userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1", isGoogleLinked = linked),
+            platformName = platform,
+        )
+
+        val webGuest = vmFor("web", linked = false)
+        val webLinked = vmFor("web", linked = true)
+        val android = vmFor("android", linked = false)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(OutOfCreditsBannerState.Guest, webGuest.screenState.value.outOfCredits)
+        assertIs<OutOfCreditsBannerState.Free>(webLinked.screenState.value.outOfCredits)
+        assertIs<OutOfCreditsBannerState.Free>(
+            android.screenState.value.outOfCredits,
+            "Android grants the starter pack at install — signing in buys nothing, so no Guest",
+        )
+    }
+
+    @Test
+    fun banner_premiumIsRevenueCatOrFirestore() = runTest {
+        val storeOnly = makeVm(
+            userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1"),
+            storeEntitlement = FakeStoreEntitlementSource(initial = true),
+        )
+        val firestoreOnly = makeVm(
+            userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1", isPremium = true),
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            OutOfCreditsBannerState.Premium(),
+            storeOnly.screenState.value.outOfCredits,
+            "Paid in the store but the restore failed: never upsell Pro to a Pro user",
+        )
+        assertEquals(OutOfCreditsBannerState.Premium(), firestoreOnly.screenState.value.outOfCredits)
+    }
+
+    @Test
+    fun banner_shownEvent_onlyAfterTheChatWasOpened_withOpenReasonAndSource() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(
+            userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1"),
+            analytics = analytics,
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(
+            0,
+            analytics.count("ai_chat_out_of_credits_banner_shown"),
+            "The ViewModel reads the wallet at app start; a user who never opened the chat saw nothing",
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnChatOpened(source = "dock"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, analytics.count("ai_chat_out_of_credits_banner_shown"))
+        assertEquals(
+            mapOf<String, Any>("variant" to "free", "reason" to "open", "source" to "dock"),
+            analytics.paramsOf("ai_chat_out_of_credits_banner_shown"),
+        )
+    }
+
+    @Test
+    fun banner_shownEvent_firesOncePerTransition_notPerRecompute() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val user = FakeUserDataRepository(initialCredits = 3, userId = "u1")
+        val vm = makeVm(userDataRepo = user, analytics = analytics)
+        vm.sendIntent(ChatScreenIntent.OnChatOpened(source = "screen"))
+        testScheduler.advanceUntilIdle()
+        assertEquals(0, analytics.count("ai_chat_out_of_credits_banner_shown"), "no banner at 3 credits")
+
+        user.setCredits(0)
+        testScheduler.advanceUntilIdle()
+        user.setCredits(-1)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, analytics.count("ai_chat_out_of_credits_banner_shown"))
+        assertEquals(
+            mapOf<String, Any>("variant" to "free", "reason" to "balance"),
+            analytics.paramsOf("ai_chat_out_of_credits_banner_shown"),
+        )
+    }
+
+    @Test
+    fun banner_signInCta_requestsHostSignIn_andIsTracked() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnOutOfCreditsSignInClick)
+
+        assertEquals(ChatScreenSideEffect.RequestGoogleSignIn, effectDeferred.await())
+        assertEquals(mapOf<String, Any>("variant" to "guest"), analytics.paramsOf("ai_chat_out_of_credits_cta_tapped"))
+    }
+
+    @Test
+    fun banner_proCta_isTrackedAsFree() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnPaywallCtaClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(mapOf<String, Any>("variant" to "free"), analytics.paramsOf("ai_chat_out_of_credits_cta_tapped"))
+    }
+
+    @Test
+    fun banner_voiceTranscription402_usesTheSameLatchAndNudge_notASnackbar() = runTest {
+        val repo = FakeAiChatRepository(transcribeResult = TranscriptionOutcome.InsufficientCredits)
+        val vm = makeVm(repo = repo, userDataRepo = FakeUserDataRepository(initialCredits = 5, userId = "u1"))
+        testScheduler.advanceUntilIdle()
+        val effects = mutableListOf<ChatScreenSideEffect>()
+        val collector = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.collect { effects.add(it) }
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped("/tmp/rec.m4a"))
+        testScheduler.advanceUntilIdle()
+        collector.cancel()
+
+        assertEquals(listOf<ChatScreenSideEffect>(ChatScreenSideEffect.OutOfCreditsRefused), effects)
+        assertEquals(
+            OutOfCreditsBannerState.Free(premiumDailyCredits = null, lowBalance = true),
+            vm.screenState.value.outOfCredits,
+        )
+        assertFalse(vm.screenState.value.isTranscribing)
+    }
+
+    @Test
+    fun banner_chatOpen_refreshesTheCreditsConfig() = runTest {
+        val config = FakeCreditsConfigProvider()
+        val vm = makeVm(creditsConfig = config)
+
+        vm.sendIntent(ChatScreenIntent.OnChatOpened(source = "screen"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, config.refreshCount)
+    }
+
+    @Test
+    fun banner_configArrivingLater_fillsTheNumberIn() = runTest {
+        val config = FakeCreditsConfigProvider()
+        val vm = makeVm(
+            userDataRepo = FakeUserDataRepository(initialCredits = 0, userId = "u1"),
+            creditsConfig = config,
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(OutOfCreditsBannerState.Free(premiumDailyCredits = null), vm.screenState.value.outOfCredits)
+
+        config.set(CreditsConfig(actionCost = 20, premiumDailyCreditsCap = 777))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(OutOfCreditsBannerState.Free(premiumDailyCredits = 777), vm.screenState.value.outOfCredits)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

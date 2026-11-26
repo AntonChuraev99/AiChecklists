@@ -128,6 +128,14 @@ class AnalyzeJobStatesScreenshotTest {
             FailedCta.Dismiss,
         )
     }
+    // Free user refused for credits (402): "Get Pro" primary + "OK" under it.
+    @Test fun d_failed_upgrade_360() = shoot(PHONE) { Failed(SERVER_CREDITS_TEXT, FailedCta.Upgrade) }
+    @Test fun d_failed_upgrade_320_fs15_ru() = shoot(SMALL, fontScale = 1.5f, locale = ru) {
+        Failed(SERVER_CREDITS_TEXT, FailedCta.Upgrade)
+    }
+    @Test fun d_failed_upgrade_360_dark_hi() = shoot(PHONE, dark = true, locale = hi) {
+        Failed(SERVER_CREDITS_TEXT, FailedCta.Upgrade)
+    }
     @Test fun d_failed_interrupted_360() = shoot(PHONE) {
         Failed(stringResource(Res.string.analyze_error_interrupted), FailedCta.ChangeInput)
     }
@@ -262,6 +270,9 @@ class AnalyzeJobStatesScreenshotTest {
         const val SMALL = "w320dp-h640dp"
         const val TABLET = "w840dp-h900dp"
         const val SNACK_TALL = "w320dp-h1000dp"
+
+        /** The credit gate keeps the server's own message (see userFacingMessage). */
+        const val SERVER_CREDITS_TEXT = "Not enough AI credits for this analysis."
 
         /** Lets the frozen spinners draw a visible arc (frame 0 is a dot); far below the 15 s timer. */
         const val SPINNER_ADVANCE_MS = 400L
