@@ -89,8 +89,13 @@ googleid = "1.2.1"
 # which the legacy fallback in AndroidGoogleAuthProvider still uses. Bump together with removing it.
 playServicesAuth = "21.6.0"
 haze = "1.7.3"
+# Jetpack AppFunctions (on-device MCP for Android 16+ agents, :androidApp only). 1.0.0 stable
+# (2026-11-18) needs compileSdk 37+ and AGP 9.1+; the compiler is a KSP processor.
+appfunctions = "1.0.0"
 
 [libraries]
+androidx-appfunctions = { module = "androidx.appfunctions:appfunctions", version.ref = "appfunctions" }
+androidx-appfunctions-compiler = { module = "androidx.appfunctions:appfunctions-compiler", version.ref = "appfunctions" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppFunctions app metadata (manifest property android.app.appfunctions.app_metadata).
+     instructions = the agent-facing "server instructions": cross-function order and constraints,
+     not a repeat of each function's KDoc. displayDescription = user-visible, localizable. -->
+<AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
+    appfn:instructions="Gisti manages the user's personal checklists: to-do lists, shopping lists, packing lists and routines. Each checklist has a name and ordered items that can be marked done; items can carry a one-time reminder.
+Operational patterns:
+- When the target checklist is unclear, call listChecklists first and pass the checklist's id as checklistId where the function accepts it; names match by substring, so a short name can match several checklists.
+- If a call reports that several checklists match, ask the user which one and repeat the call with its checklistId. renameChecklist and the destination of moveItem take a name only: use a longer, unique name, otherwise that change has to be made in the app.
+- Use addItems once with all items rather than one call per item.
+- Call readChecklist before completeItem or moveItem when the exact item text is unknown.
+- Use findItems to locate an item when the checklist is unknown.
+Constraints:
+- Times are in the device's local time zone; reminders must be in the future. Repeating reminders cannot be set or changed through these functions.
+- The free plan limits how many checklists the user can create; a limit error means the user can upgrade in the app.
+- The user's Inbox list is not listed by listChecklists. Deleting items or checklists is not available through these functions."
+    appfn:displayDescription="@string/appfunctions_display_description" />

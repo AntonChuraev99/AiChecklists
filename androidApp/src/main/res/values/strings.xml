@@ -7,4 +7,6 @@
       They are available at runtime via resource merging in the final APK.
     -->
     <string name="app_name">Gisti - AI Checklists</string>
+    <!-- Shown to the user by the system where assistants list the apps they can act in (AppFunctions). -->
+    <string name="appfunctions_display_description">Create checklists, add and complete items, set reminders and look up what is on your lists.</string>
 </resources>

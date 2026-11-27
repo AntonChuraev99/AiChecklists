@@ -6,6 +6,7 @@ _Last updated: 2026-11-26_
 
 | Дата | Категория | Keywords | Файл |
 |---|---|---|---|
+| 2026-11-27 | feature | appfunctions, android-mcp, AppFunctionService, ToolCallDispatcher, connected-apps, gemini | [AppFunctions (Android MCP): операции с чек-листами для Gemini через ToolCallDispatcher](appfunctions-android-mcp-2026-11-27.md) |
 | 2026-11-26 | decision | paywall, credits, out-of-credits-banner, OutOfCreditsBannerState, emitInsufficientCredits, daily-limit, http-402 | [Credits are the only AI gate; an empty wallet is a banner above the chat input](../decisions/2026-11-26-credits-only-ai-gate-and-out-of-credits-banner.md) |
 | 2026-11-21 | architecture | network, retry, notification, analyze, WorkManager, resolveDelivery, request_id, gemini-503 | [Analyze: анализ как задание уровня приложения, доставка одной стороной, повторы Gemini на сервере](analyze-background-job-and-reliability-2026-11-21.md) |
 | 2026-11-20 | bug-fix | itemsJson, encodeFillItem, alarmEnabled, reminderFullScreen, unknown keys, mcp, telegram bot | [Серверный писатель данных приложения обязан сохранять ключи, которых не знает](mcp-fill-encoder-drops-unknown-keys-2026-11-20.md) |
