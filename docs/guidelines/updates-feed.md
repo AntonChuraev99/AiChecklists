@@ -304,7 +304,7 @@ Now `shrinkVertically` measures the 12dp padding together with the body, so tota
 
 Mandatory tests (all in `commonTest`, no platform deps):
 
-- `UpdateFeedRepositoryImplTest` — JSON parsing, version grouping, de-duplication invariants, store-notes attachment, min-version invariants (47 posts, 19 groups as of v1.25; update counts when content changes).
+- `UpdateFeedRepositoryImplTest` — JSON parsing, version grouping, de-duplication invariants, store-notes attachment, min-version invariants (48 posts, 20 groups as of v1.26; update counts when content changes).
 - `UpdateFeedViewModelTest` — state transitions for Loading/Empty/Success, action-click → deeplink dispatch, premium banner click routing.
 - `UpdateFeedDeepLinkHandlerTest` — every deeplink host listed as supported must parse; unknown hosts must return `false` and log.
 

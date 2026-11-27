@@ -24,13 +24,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsNineteenReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsTwentyReleaseGroups`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 47 posts across 19 main-versions (v1.6-v1.21, v1.23-v1.25; v1.22 had no feed entry)
-        assertEquals(19, releases.size)
+        // 48 posts across 20 main-versions (v1.6-v1.21, v1.23-v1.26; v1.22 had no feed entry)
+        assertEquals(20, releases.size)
     }
 
     @Test
@@ -39,8 +39,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.25 has the highest post timestamp)
-        assertEquals("1.25", releases.first().version)
+        // Newest release first (v1.26 has the highest post timestamp)
+        assertEquals("1.26", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -52,7 +52,7 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.25", "1.24", "1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.26", "1.25", "1.24", "1.23", "1.21", "1.20", "1.19", "1.18", "1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
     }
@@ -378,13 +378,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsFortySeven`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsFortyEight`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(47, totalPosts)
+        assertEquals(48, totalPosts)
     }
 
     @Test
