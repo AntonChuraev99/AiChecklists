@@ -180,6 +180,30 @@
             </intent-filter>
         </service>
 
+        <!-- AppFunctions (Android 16+ / API 36): checklist operations system agents such as Gemini can
+             call. The class is KSP-generated from appfunctions/BaseChecklistAppFunctionService; the
+             v2 property names the schema asset KSP writes (appFunctionXmlFileName + ".xml"). Only the
+             system can bind it (BIND_APP_FUNCTION_SERVICE). -->
+        <service
+            android:name="com.antonchuraev.homesearchchecklist.appfunctions.ChecklistAppFunctionService"
+            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
+            android:exported="true"
+            tools:targetApi="36">
+            <property
+                android:name="android.app.appfunctions.schema"
+                android:value="app_functions_schema.xsd" />
+            <property
+                android:name="android.app.appfunctions.v2"
+                android:value="gisti_app_function_service.xml" />
+            <intent-filter>
+                <action android:name="android.app.appfunctions.AppFunctionService" />
+            </intent-filter>
+        </service>
+
+        <property
+            android:name="android.app.appfunctions.app_metadata"
+            android:resource="@xml/app_metadata" />
+
         <!-- Default channel for notification-payload pushes (data-only campaign uses
              "promotions" explicitly; this only covers any future notification-payload sends). -->
         <meta-data
